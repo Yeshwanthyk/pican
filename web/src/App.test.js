@@ -47,6 +47,15 @@ describe('App', () => {
     expect(document.querySelector('[data-setting="pi-web-theme"]')).toBeTruthy();
   });
 
+  it('routes /workflows to the Svelte workflows page', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+
+    mounted = mountApp({ props: { path: '/workflows' } });
+
+    expect(document.querySelector('.session-header-title')?.textContent).toBe('Workflows');
+    expect(document.querySelector('[data-workflows-page]')).toBeTruthy();
+  });
+
   it('renders the 404 page for unknown routes', () => {
     document.body.innerHTML = '<div id="app"></div>';
 

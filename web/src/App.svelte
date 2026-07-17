@@ -4,6 +4,7 @@
   import SessionPage from './routes/SessionPage.svelte';
   import SettingsPage from './routes/SettingsPage.svelte';
   import SchedulesPage from './routes/SchedulesPage.svelte';
+  import WorkflowsPage from './routes/WorkflowsPage.svelte';
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
 
@@ -23,6 +24,7 @@
   // ?id= only at mount. Within-session navigation never changes the URL, so this
   // stays stable while reading a session.
   const sessionId = $derived(new URLSearchParams(search).get('id') || '');
+  const workflowRunId = $derived(new URLSearchParams(search).get('runId') || '');
 
   // Make in-app history navigation swap views without a full reload. popstate
   // covers back/forward; pushState/replaceState don't emit a native event, so
@@ -74,6 +76,8 @@
   <SettingsPage />
 {:else if path === '/schedules'}
   <SchedulesPage />
+{:else if path === '/workflows'}
+  <WorkflowsPage runId={workflowRunId} />
 {:else}
   <NotFoundPage />
 {/if}

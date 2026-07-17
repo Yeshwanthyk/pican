@@ -32,6 +32,7 @@ export function createStatusEvents({
   onSnapshot = () => {},
   onDelta = () => {},
   onMessage = () => {},
+  onWorkflowUpdate = () => {},
 } = {}) {
   let stream = null;
   let pagehideHandler = null;
@@ -70,6 +71,10 @@ export function createStatusEvents({
     es.addEventListener('status-delta', (event) => {
       const delta = normalizeDelta(parseJSON(event.data));
       if (delta) onDelta(delta);
+    });
+    es.addEventListener('workflows-updated', (event) => {
+      const payload = parseJSON(event.data);
+      if (payload && typeof payload.runId === 'string') onWorkflowUpdate(payload);
     });
 
     if (windowImpl?.addEventListener) {

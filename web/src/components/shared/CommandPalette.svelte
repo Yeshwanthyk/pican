@@ -345,6 +345,24 @@
       >{t('palette.newSession')}</button
     >
     <button
+      class="palette-action"
+      type="button"
+      data-schedules-btn
+      onclick={() => {
+        close();
+        go('/schedules');
+      }}>{t('schedules.navTitle')}</button
+    >
+    <button
+      class="palette-action"
+      type="button"
+      data-workflows-btn
+      onclick={() => {
+        close();
+        go('/workflows');
+      }}>{t('workflows.navTitle')}</button
+    >
+    <button
       class="palette-action muted"
       type="button"
       data-import-session-btn

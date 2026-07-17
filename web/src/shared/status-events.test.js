@@ -32,12 +32,14 @@ describe('createStatusEvents', () => {
     const onSnapshot = vi.fn();
     const onDelta = vi.fn();
     const onMessage = vi.fn();
+    const onWorkflowUpdate = vi.fn();
 
     const sub = createStatusEvents({
       EventSourceImpl: FakeEventSource,
       onSnapshot,
       onDelta,
       onMessage,
+      onWorkflowUpdate,
     });
     sub.connect();
 
@@ -56,6 +58,7 @@ describe('createStatusEvents', () => {
       JSON.stringify({ id: 'a.jsonl', running: false, model: 'm', modelProvider: 'p' }),
     );
     es.emit('message', 'new-session');
+    es.emit('workflows-updated', JSON.stringify({ runId: 'wf_123456abcdef' }));
 
     expect(onSnapshot).toHaveBeenCalledWith({
       ids: ['a.jsonl'],
@@ -69,6 +72,7 @@ describe('createStatusEvents', () => {
       modelProvider: 'p',
     });
     expect(onMessage).toHaveBeenCalledWith('new-session');
+    expect(onWorkflowUpdate).toHaveBeenCalledWith({ runId: 'wf_123456abcdef' });
   });
 
   it('ignores malformed payloads and invalid delta shapes', () => {

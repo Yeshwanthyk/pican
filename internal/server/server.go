@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -179,6 +180,7 @@ func New(deps Deps) (*Server, error) {
 		s.push = pm
 	}
 	s.watchFiles()
+	s.startWorkflowsWatcher()
 	if err := s.startSessionStatusWatcher(); err != nil {
 		fmt.Fprintf(os.Stderr, "session-status watcher unavailable: %v\n", err)
 	}
@@ -323,6 +325,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/schedule", s.auth.Wrap(s.handleApiSchedule))
 	mux.HandleFunc("/api/schedule/run", s.auth.Wrap(s.handleApiScheduleRun))
 	mux.HandleFunc("/api/schedule/runs", s.auth.Wrap(s.handleApiScheduleRuns))
+	mux.HandleFunc("/api/workflows", s.auth.Wrap(s.handleApiWorkflows))
+	mux.HandleFunc("/api/workflows/run", s.auth.Wrap(s.handleApiWorkflowRun))
 	mux.HandleFunc("/metrics", s.auth.Wrap(s.handleMetricsPage))
 	mux.HandleFunc("/api/metrics", s.auth.Wrap(s.handleMetrics))
 	s.registerPprof(mux)
@@ -390,6 +394,9 @@ func eventKey(msg string) string {
 		return "reload"
 	case "new-session":
 		return "new-session"
+	}
+	if strings.HasPrefix(msg, "event: workflows-updated\n") {
+		return "workflows-updated"
 	}
 	return ""
 }

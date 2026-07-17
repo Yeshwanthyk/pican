@@ -70,6 +70,8 @@ pi-web/
 │   │   ├── push.go             # PushManager: VAPID, subscribe/unsubscribe, NotifyDone, NotifyScheduleDone
 │   │   ├── scheduler.go        # Cron tick loop + fireSchedule runner (creates a session, sends instructions)
 │   │   ├── schedules_api.go    # /api/schedules + /api/schedule(/run|/runs) handlers
+│   │   ├── workflows_api.go    # Read-only workflow list/detail handlers
+│   │   ├── workflows_watcher.go # fsnotify + polling workflow run updates
 │   │   ├── update.go           # /api/version, check-update, update, restart handlers
 │   │   ├── events.go           # SSE endpoint (/events)
 │   │   ├── sse_format.go       # SSE event framing helper
@@ -289,6 +291,8 @@ type piRPCWorker struct {
 | `/api/schedule` | GET/POST/PUT/DELETE | `handleApiSchedule` | Read/update/delete one schedule (`?id=`) |
 | `/api/schedule/run` | POST | `handleApiScheduleRun` | Fire a schedule now (`?id=`); returns created `sessionId` |
 | `/api/schedule/runs` | GET | `handleApiScheduleRuns` | Run log for a schedule (`?id=`) |
+| `/api/workflows` | GET | `handleApiWorkflows` | Read-only workflow run summaries from `<agentDir>/workflows` |
+| `/api/workflows/run` | GET | `handleApiWorkflowRun` | Validated workflow run detail (`?runId=wf_…`) |
 | `/api/version` | GET | `handleVersion` | Current/latest version (when updater set) |
 | `/api/check-update` | POST | `handleCheckUpdate` | Force a version check |
 | `/api/update` | POST | `handleUpdate` | Install the latest pi-web |
@@ -332,7 +336,7 @@ Request ──▶ auth.Wrap(handler)
 
 The server maintains a slice of `sseClient` structs. Each client subscribes to a `sessID`:
 
-- `__all__` — index page subscribes here; receives `new-session`, `status-snapshot`, `status-delta`
+- `__all__` — index and workflows pages subscribe here; receives `new-session`, `status-snapshot`, `status-delta`, and named `workflows-updated` events
 - Specific session ID — session page subscribes here; receives `reload` when the file changes, `chat-preview` during streaming, and `annotations` (a full annotation snapshot) whenever a note is created/deleted for that session
 
 Broadcasting is fire-and-forget with a buffered channel (16). If the client is slow, keyless events are dropped rather than blocking. Duplicate `reload` and `new-session` events are coalesced per-client while pending.

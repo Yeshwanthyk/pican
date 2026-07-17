@@ -32,6 +32,7 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   │  /session → SessionPage (Svelte       │  │  • new-session (index)  │  │
 │   │     components + reactive model)      │  │  • status-delta         │  │
 │   │  /settings → SettingsPage (Svelte)    │  │  • status-snapshot      │  │
+│   │  /workflows → WorkflowsPage (Svelte)  │  │  • workflows-updated    │  │
 │   │  /login → LoginPage                   │  │  • annotations, btw…    │  │
 │   │  shared: CommandPalette, Version UI   │  │                         │  │
 │   └──────────────────────────────────────┘  └─────────────────────────┘  │
@@ -66,6 +67,7 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   GET/POST/DELETE /api/annotations → review annotations (SQLite, SSE)    │
 │   GET/POST /api/settings → user settings (SQLite, write-through cache)   │
 │   GET/POST /api/projects → project visibility prefs (SQLite)             │
+│   GET  /api/workflows{,/run} → external workflow run snapshots            │
 │   GET  /api/sounds  /  GET /sounds/…   (notification sounds)             │
 │   POST /share         →  handleShare         (GitHub Gist)               │
 │   GET  /events        →  handleEvents        (SSE)                       │

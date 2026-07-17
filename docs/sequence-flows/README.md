@@ -14,3 +14,4 @@ This directory documents the key runtime sequences in pi-web.
 | [btw.md](./btw.md) | Throwaway "btw" floating scratch-chats attached to a session page |
 | [share.md](./share.md) | Exporting a session to a private GitHub Gist |
 | [schedules.md](./schedules.md) | Cron/preset schedules that auto-create pi sessions and push on completion |
+| [workflows.md](./workflows.md) | Read-only workflow run dashboard, filesystem watcher, and SSE refresh |

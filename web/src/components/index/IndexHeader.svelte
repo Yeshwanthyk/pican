@@ -1,5 +1,5 @@
 <script>
-  import { icon, MoreHorizontal, CalendarClock } from '../../shared/icons.js';
+  import { icon, MoreHorizontal, CalendarClock, ListTree } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
 
   let {
@@ -11,6 +11,7 @@
     onToggleMenu = () => {},
     onLayoutChange = () => {},
     onSchedules = () => {},
+    onWorkflows = () => {},
   } = $props();
 </script>
 
@@ -78,6 +79,16 @@
               size: 15,
             })}</span
           ><span>{t('schedules.navTitle')}</span></button
+        >
+        <button
+          type="button"
+          class="schedules-nav-btn"
+          data-workflows-btn
+          title={t('workflows.navTitle')}
+          onclick={onWorkflows}
+          ><span class="schedules-nav-icon" aria-hidden="true"
+            >{@html icon(ListTree, { size: 15 })}</span
+          ><span>{t('workflows.navTitle')}</span></button
         >
       </div>
     </div>

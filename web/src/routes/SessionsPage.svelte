@@ -297,6 +297,7 @@
   onToggleMenu={toggleMenu}
   onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
+  onWorkflows={() => navigate('/workflows')}
 />
 
 <HomeMenu

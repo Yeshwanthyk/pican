@@ -33,6 +33,7 @@ var catWebm []byte
 
 // indexCSS and settingsCSS are inlined into the SPA shell by
 // appStylesheets() (spa_page.go); they are not served as standalone routes.
+//
 //go:embed embedded/styles/index.css
 var indexCSS string
 
@@ -41,6 +42,9 @@ var settingsCSS string
 
 //go:embed embedded/styles/schedules.css
 var schedulesCSS string
+
+//go:embed embedded/styles/workflows.css
+var workflowsCSS string
 
 // registerPWAHandlers serves the manifest, service worker, and icons.
 // Routes are registered without auth: a manifest/icon leaks nothing
