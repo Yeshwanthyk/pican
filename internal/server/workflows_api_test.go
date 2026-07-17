@@ -124,3 +124,24 @@ func TestHandleApiWorkflowRunReturnsDetail(t *testing.T) {
 		t.Fatal("expected script contents")
 	}
 }
+
+func TestWorkflowTimeAcceptsEpochMillisAndRFC3339(t *testing.T) {
+	var snapshot workflowSnapshot
+	data := []byte(`{"runId":"wf_0123456789ab","status":"completed","startedAt":1784315767306,"finishedAt":"2026-07-17T21:42:54.322Z"}`)
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if snapshot.StartedAt.IsZero() || snapshot.StartedAt.UnixMilli() != 1784315767306 {
+		t.Fatalf("epoch millis not parsed: %v", snapshot.StartedAt)
+	}
+	if snapshot.FinishedAt.IsZero() {
+		t.Fatal("RFC3339 not parsed")
+	}
+	out, err := json.Marshal(snapshot.StartedAt)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(out) == `""` {
+		t.Fatal("expected RFC3339 output, got empty string")
+	}
+}

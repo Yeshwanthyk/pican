@@ -14,12 +14,12 @@ import (
 var workflowRunIDPattern = regexp.MustCompile(`^wf_[0-9a-f]{12}$`)
 
 type workflowSummary struct {
-	RunID          string `json:"runId"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	Status         string `json:"status"`
-	StartedAt      string `json:"startedAt"`
-	FinishedAt     string `json:"finishedAt"`
+	RunID          string       `json:"runId"`
+	Name           string       `json:"name"`
+	Description    string       `json:"description"`
+	Status         string       `json:"status"`
+	StartedAt      workflowTime `json:"startedAt"`
+	FinishedAt     workflowTime `json:"finishedAt"`
 	CurrentPhase   string `json:"currentPhase"`
 	CurrentPhaseNo int    `json:"currentPhaseNumber"`
 	PhaseCount     int    `json:"phaseCount"`
@@ -35,11 +35,46 @@ type workflowSnapshot struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
 	Status       string            `json:"status"`
-	StartedAt    string            `json:"startedAt"`
-	FinishedAt   string            `json:"finishedAt"`
+	StartedAt    workflowTime      `json:"startedAt"`
+	FinishedAt   workflowTime      `json:"finishedAt"`
 	CurrentPhase string            `json:"currentPhase"`
 	Phases       []json.RawMessage `json:"phases"`
 	Agents       []json.RawMessage `json:"agents"`
+}
+
+// workflowTime accepts the timestamp shapes the workflows extension has
+// actually written — epoch milliseconds (current) and RFC3339 strings — and
+// always marshals as an RFC3339 string for the frontend.
+type workflowTime struct {
+	time.Time
+}
+
+func (t *workflowTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var ms float64
+	if err := json.Unmarshal(data, &ms); err == nil {
+		if ms > 0 {
+			t.Time = time.UnixMilli(int64(ms))
+		}
+		return nil
+	}
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		t.Time = parsed
+	}
+	return nil
+}
+
+func (t workflowTime) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte(`""`), nil
+	}
+	return json.Marshal(t.UTC().Format(time.RFC3339Nano))
 }
 
 func (s *Server) workflowsDir() string {
@@ -109,7 +144,6 @@ func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 		if err != nil || snapshot.RunID != entry.Name() {
 			continue
 		}
-		startedTime, _ := time.Parse(time.RFC3339Nano, snapshot.StartedAt)
 		workflows = append(workflows, workflowSummary{
 			RunID:          snapshot.RunID,
 			Name:           snapshot.Name,
@@ -123,7 +157,7 @@ func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 			AgentCount:     len(snapshot.Agents),
 			HasResult:      regularFileExists(filepath.Join(runDir, "result.json")),
 			HasTranscripts: regularFileExists(filepath.Join(runDir, "transcripts.json")),
-			startedTime:    startedTime,
+			startedTime:    snapshot.StartedAt.Time,
 		})
 	}
 
