@@ -1,0 +1,37 @@
+{
+  "name": "@ygncode/pi-web",
+  "description": "Remote control your pi coding agent from any browser on your network",
+  "version": "0.0.1-beta.34",
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./.pi/extensions"
+    ],
+    "skills": [
+      "./.pi/skills"
+    ]
+  },
+  "scripts": {
+    "postinstall": "node scripts/run-lifecycle.mjs install",
+    "preuninstall": "node scripts/run-lifecycle.mjs uninstall",
+    "test:extensions": "vitest run --config tests/extensions/vitest.config.ts"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ygncode/pi-web"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typebox": "^1.1.38",
+    "vitest": "^4.1.7"
+  }
+}

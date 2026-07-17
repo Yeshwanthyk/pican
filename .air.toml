@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/main"
+  cmd = "go build -o ./tmp/main ./cmd/pi-web"
+  delay = 1000
+  exclude_dir = ["tmp", "vendor", "web/node_modules", "web/src", ".git"]
+  exclude_regex = ["_test.go"]
+  kill_delay = "0s"
+  args_bin = ["--insecure"]

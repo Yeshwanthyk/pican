@@ -1,0 +1,24 @@
+pi-sessions-viewer
+*.exe
+.DS_Store
+.superpowers/
+.worktrees/
+/pi-web
+web/node_modules/
+web/dist/
+web/dist-export/
+internal/ui/embedded/export/export.js
+.pi/extensions/node_modules/
+.pi/APPEND_SYSTEM.md
+
+node_modules/
+tmp/
+__pycache__/
+
+.requirements/
+
+# VitePress docs site: generated srcDir, build output, cache, and locale config.
+website/src/
+website/dist/
+website/.vitepress/cache/
+website/.vitepress/locales.generated.json

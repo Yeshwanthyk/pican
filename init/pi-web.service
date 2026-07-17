@@ -1,0 +1,17 @@
+[Unit]
+Description=pi-web — browser-based pi session viewer and chat
+Documentation=https://github.com/ygncode/pi-web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pi-web
+Restart=on-failure
+RestartSec=5
+
+# Pass PI_WEB_TOKEN from the environment if set
+EnvironmentFile=-%h/.config/pi-web/env
+
+[Install]
+WantedBy=default.target

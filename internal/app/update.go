@@ -1,0 +1,127 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+// installChannel matches the dist-tag pi-web is published under and the
+// updater queries (see internal/updater).
+const installPackage = "npm:@ygncode/pi-web@beta"
+
+// inPlaceUpdateEnv signals install.sh (the package postinstall) that pi-web is
+// updating itself in place. install.sh then skips the service stop/restart:
+// this script runs inside the process tree that restart would kill, aborting
+// the in-flight npm install. pi-web restarts itself afterward via runRestart.
+const inPlaceUpdateEnv = "PI_WEB_INPLACE_UPDATE"
+
+// installCmd builds the `pi install` invocation used by the in-app updater.
+func installCmd(ctx context.Context) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "pi", "install", installPackage)
+	cmd.Env = append(os.Environ(), inPlaceUpdateEnv+"=1")
+	return cmd
+}
+
+// cleanupStaleNPMTemps removes npm's hidden backup directories for pi-web.
+// Interrupted installs can leave these behind, and later npm installs may fail
+// before package scripts run with ENOTEMPTY while trying to rename the package
+// directory into one of these stale paths.
+func cleanupStaleNPMTemps() {
+	agentRoot := os.Getenv("PI_CODING_AGENT_DIR")
+	if agentRoot == "" {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			return
+		}
+		agentRoot = filepath.Join(home, ".pi", "agent")
+	}
+
+	pattern := filepath.Join(agentRoot, "npm", "node_modules", "@ygncode", ".pi-web-*")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return
+	}
+	for _, path := range matches {
+		_ = os.RemoveAll(path)
+	}
+}
+
+// runInstall installs the latest pi-web package via the `pi` CLI. Output is
+// captured so a failure surfaces a useful message in the UI.
+func runInstall(ctx context.Context) error {
+	cleanupStaleNPMTemps()
+	cmd := installCmd(ctx)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := string(out)
+		if len(msg) > 500 {
+			msg = msg[len(msg)-500:]
+		}
+		return fmt.Errorf("%v: %s", err, msg)
+	}
+	return nil
+}
+
+// runRestart restarts the pi-web service so the freshly installed binary takes
+// over. The restart command is detached into its own session so it survives
+// this process being torn down by the service manager. A fallback timer exits
+// the process if the service manager does not replace us promptly. On Windows
+// there is no service manager: the detached helper waits for this process to
+// exit (the fallback timer guarantees that) and then starts the new binary.
+func runRestart() error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("sh", "-lc", darwinRestartScript)
+	case "linux":
+		cmd = exec.Command("systemctl", "--user", "restart", "pi-web.service")
+	case "windows":
+		cmd = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", windowsRestartScript())
+	default:
+		return fmt.Errorf("restart is not supported on %s", runtime.GOOS)
+	}
+	detachSession(cmd)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start restart command: %w", err)
+	}
+	// If the service manager doesn't kill us (e.g. it already booted a fresh
+	// instance), exit so the old process doesn't linger holding the port.
+	time.AfterFunc(5*time.Second, func() { os.Exit(0) })
+	return nil
+}
+
+// windowsRestartScript builds the PowerShell body of the detached restart
+// helper: wait for this process to release the port, then relaunch through the
+// hidden startup launcher written by install.ps1, falling back to the bare
+// executable for manual installs.
+func windowsRestartScript() string {
+	psQuote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	exe, _ := os.Executable()
+	home, _ := os.UserHomeDir()
+	launcher := filepath.Join(home, ".config", "pi-web", "pi-web-start.vbs")
+	return fmt.Sprintf(
+		"Wait-Process -Id %d -Timeout 30 -ErrorAction SilentlyContinue; "+
+			"if (Test-Path %s) { Start-Process wscript.exe -ArgumentList %s } else { Start-Process %s }",
+		os.Getpid(), psQuote(launcher), psQuote(`"`+launcher+`"`), psQuote(exe))
+}
+
+// darwinRestartScript mirrors the extension's `/pi-web restart`: re-bootstrap
+// the launchd job, preserving the PI_WEB_TOKEN from the env file, then kick it.
+const darwinRestartScript = `plist="$HOME/Library/LaunchAgents/com.pi-web.plist"
+if [ ! -f "$plist" ]; then exit 127; fi
+env_file="$HOME/.config/pi-web/env"
+token="$(awk -F= '$1 == "PI_WEB_TOKEN" { sub(/^[^=]*=/, ""); print; exit }' "$env_file" 2>/dev/null || true)"
+if [ -n "$token" ]; then
+  launchctl setenv PI_WEB_TOKEN "$token" 2>/dev/null || true
+fi
+launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || launchctl unload "$plist" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null || launchctl load "$plist"
+launchctl kickstart -k "gui/$(id -u)/com.pi-web" 2>/dev/null || launchctl start com.pi-web`
