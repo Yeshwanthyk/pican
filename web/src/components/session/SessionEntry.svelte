@@ -5,7 +5,7 @@
   // keeps its `entry-<id>` anchor so annotation offsets + scroll/toggle survive.
   // Shared by the live app and the static export (model passed as a prop).
   import { marked } from 'marked';
-  import { icon, GitFork, Link2, Tag } from '../../shared/icons.js';
+  import { icon, CircleCheck, CircleX, GitFork, Link2, Tag } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
   import { formatTimestamp } from '../../session/render/entry-format.js';
@@ -137,11 +137,81 @@
     <div class="markdown-content">{@html md(entry.summary)}</div>
   </div>
 {:else if entry?.type === 'custom_message' && entry.display}
-  <div class="hook-message" id={`entry-${entry.id}`}>
-    {@render timestamp()}
-    <div class="hook-type">[{entry.customType}]</div>
-    <div class="markdown-content">
-      {@html md(typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content))}
+  {#if entry.customType === 'subagent-result'}
+    {@const subagentStatus = entry.details?.status === 'error' ? 'error' : 'done'}
+    <div class="hook-message subagent-result-card {subagentStatus}" id={`entry-${entry.id}`}>
+      {@render timestamp()}
+      <div class="subagent-result-header">
+        <span class="subagent-result-icon">
+          {@html icon(subagentStatus === 'error' ? CircleX : CircleCheck, { size: 15 })}
+        </span>
+        <span
+          >{t('session.subagentResult', {
+            id: entry.details?.id ?? '',
+            title: entry.details?.title ?? '',
+          })}</span
+        >
+      </div>
+      <details class="subagent-result-details">
+        <summary>{t('session.showOutput')}</summary>
+        <div class="markdown-content subagent-result-content">
+          {@html md(
+            typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content),
+          )}
+        </div>
+      </details>
     </div>
-  </div>
+  {:else}
+    <div class="hook-message" id={`entry-${entry.id}`}>
+      {@render timestamp()}
+      <div class="hook-type">[{entry.customType}]</div>
+      <div class="markdown-content">
+        {@html md(
+          typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content),
+        )}
+      </div>
+    </div>
+  {/if}
 {/if}
+
+<style>
+  .subagent-result-card {
+    display: grid;
+    gap: 8px;
+  }
+
+  .subagent-result-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text);
+    font-weight: bold;
+  }
+
+  .subagent-result-icon {
+    display: inline-flex;
+  }
+
+  .subagent-result-card.done .subagent-result-icon {
+    color: var(--success);
+  }
+
+  .subagent-result-card.error .subagent-result-icon {
+    color: var(--error);
+  }
+
+  .subagent-result-details summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .subagent-result-details summary:hover {
+    color: var(--text);
+  }
+
+  .subagent-result-content {
+    margin-top: 8px;
+  }
+</style>

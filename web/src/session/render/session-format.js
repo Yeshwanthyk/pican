@@ -43,6 +43,36 @@ export function formatToolCall(name, args = {}) {
       return `[find: ${args.pattern || ''} in ${shortenPath(String(args.path || '.'))}]`;
     case 'ls':
       return `[ls: ${shortenPath(String(args.path || '.'))}]`;
+    case 'TaskCreate':
+      return `[TaskCreate: ${String(args.subject || '')}]`;
+    case 'TaskList':
+      return '[TaskList]';
+    case 'TaskUpdate':
+    case 'TaskGet':
+    case 'TaskClaim':
+    case 'TaskOutput':
+    case 'TaskStop':
+      return `[${name}: ${String(args.taskId ?? args.task_id ?? '')}]`;
+    case 'TaskExecute': {
+      const ids = Array.isArray(args.task_ids) ? args.task_ids.join(', ') : args.task_ids || '';
+      return `[TaskExecute: ${String(ids)}]`;
+    }
+    case 'subagent_spawn':
+      return `[subagent_spawn: ${String(args.title || args.id || '')}]`;
+    case 'subagent_wait':
+    case 'subagent_cancel': {
+      const ids = Array.isArray(args.ids) ? args.ids.join(', ') : args.id || args.ids || '';
+      return `[${name}: ${String(ids)}]`;
+    }
+    case 'subagent_check':
+      return `[subagent_check: ${String(args.id || '')}]`;
+    case 'subagent_list':
+      return '[subagent_list]';
+    case 'workflow': {
+      const label = args.name || args.runId || args.run_id || '';
+      const status = args.status ? ` (${args.status})` : '';
+      return `[workflow: ${String(label)}${status}]`;
+    }
     default: {
       const json = JSON.stringify(args);
       const preview = json.slice(0, 40);

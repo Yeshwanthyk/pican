@@ -58,4 +58,38 @@ describe('SessionEntry', () => {
     });
     expect(c2.querySelector('#entry-m2')).toBeNull();
   });
+
+  it('renders a collapsed subagent result card', () => {
+    const entry = {
+      id: 'subagent-result',
+      type: 'custom_message',
+      customType: 'subagent-result',
+      content: '**Review complete**',
+      display: true,
+      details: { id: 'agent-1', title: 'Review UI', status: 'done' },
+    };
+    const { container } = render(SessionEntry, { props: { entry, model: model([entry]) } });
+
+    const card = container.querySelector('#entry-subagent-result');
+    expect(card).toHaveClass('subagent-result-card', 'done');
+    expect(card.querySelector('.subagent-result-header')?.textContent).toContain(
+      'Subagent agent-1 — Review UI',
+    );
+    expect(card.querySelector('details')?.open).toBe(false);
+    expect(card.querySelector('strong')?.textContent).toBe('Review complete');
+  });
+
+  it('keeps the generic custom message renderer for other custom types', () => {
+    const entry = {
+      id: 'custom',
+      type: 'custom_message',
+      customType: 'notice',
+      content: 'Heads up',
+      display: true,
+    };
+    const { container } = render(SessionEntry, { props: { entry, model: model([entry]) } });
+
+    expect(container.querySelector('.hook-type')?.textContent).toBe('[notice]');
+    expect(container.querySelector('.subagent-result-card')).toBeNull();
+  });
 });

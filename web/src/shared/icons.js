@@ -13,6 +13,7 @@ import {
   CalendarClock,
   ChartColumn,
   Check,
+  CircleCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +30,7 @@ import {
   GitFork,
   Layers,
   Link2,
+  ListChecks,
   ListTree,
   Loader,
   Maximize2,
@@ -54,6 +56,7 @@ import {
   TextQuote,
   Trash2,
   X,
+  CircleX,
 } from 'lucide';
 
 // Lucide's default SVG presentation attributes (24x24 grid, 2px round strokes).
@@ -148,6 +151,7 @@ export {
   CalendarClock,
   ChartColumn,
   Check,
+  CircleCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -164,6 +168,7 @@ export {
   GitFork,
   Layers,
   Link2,
+  ListChecks,
   ListTree,
   Loader,
   Maximize2,
@@ -189,4 +194,5 @@ export {
   TextQuote,
   Trash2,
   X,
+  CircleX,
 };

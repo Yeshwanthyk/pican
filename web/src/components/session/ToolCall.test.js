@@ -61,4 +61,110 @@ describe('ToolCall', () => {
     expect(container.querySelector('.ask-question-card')?.dataset.needsSubmit).toBe('true');
     expect(container.querySelector('.ask-question-block')?.dataset.multiSelect).toBe('true');
   });
+
+  it('renders task tools as parsed task rows with passthrough output', () => {
+    const call = {
+      id: 'task-call',
+      name: 'TaskCreate',
+      arguments: { subject: 'Build task cards' },
+    };
+    const result = {
+      id: 'task-result',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'task-call',
+        content: [{ type: 'text', text: 'Created:\n#12 [pending] Build task cards' }],
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelector('.task-tool-card')).not.toBeNull();
+    expect(container.querySelector('.extension-tool-focus')?.textContent).toBe('Build task cards');
+    expect(container.querySelector('.task-tool-row')?.textContent).toContain('#12');
+    expect(container.querySelector('.status-pending')?.textContent).toBe('pending');
+    expect(container.querySelector('.extension-tool-plain')?.textContent).toBe('Created:');
+  });
+
+  it('renders structured subagent rows and keeps wait output collapsed', () => {
+    const call = { id: 'sub-call', name: 'subagent_wait', arguments: {} };
+    const result = {
+      id: 'sub-result',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'sub-call',
+        content: [{ type: 'text', text: '## agent-1\nFinished the review.' }],
+        details: {
+          results: [{ id: 'agent-1', title: 'Review', status: 'done' }],
+          pending: ['agent-2'],
+        },
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelectorAll('.subagent-row')).toHaveLength(2);
+    expect(container.querySelector('.status-done')?.textContent.trim()).toBe('done');
+    expect(container.querySelector('.status-running')?.textContent.trim()).toBe('running');
+    expect(container.querySelector('details')?.open).toBe(false);
+    expect(container.querySelector('.extension-markdown')?.textContent).toContain(
+      'Finished the review.',
+    );
+  });
+
+  it('falls back to plain subagent output when details are missing', () => {
+    const call = { id: 'sub-call', name: 'subagent_check', arguments: { id: 'agent-1' } };
+    const result = {
+      id: 'sub-result',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'sub-call',
+        content: [{ type: 'text', text: 'No structured details' }],
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelector('.subagent-tool-card')?.textContent).toContain(
+      'No structured details',
+    );
+  });
+
+  it('renders workflow phases, agents, and a collapsed result', () => {
+    const call = { id: 'workflow-call', name: 'workflow', arguments: {} };
+    const result = {
+      id: 'workflow-result',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'workflow-call',
+        content: [],
+        details: {
+          runId: 'run-1',
+          name: 'Release',
+          status: 'running',
+          currentPhase: 1,
+          phases: [{ title: 'Build' }, { title: 'Test' }, { title: 'Ship' }],
+          agents: [{ label: 'Reviewer', phase: 'Test', status: 'running', model: 'codex' }],
+          result: '**Partial** result',
+        },
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelector('.workflow-name')?.textContent).toBe('Release');
+    expect(container.querySelectorAll('.workflow-phase')).toHaveLength(3);
+    expect(container.querySelector('.phase-done')?.textContent).toContain('Build');
+    expect(container.querySelector('.phase-current')?.textContent).toContain('Test');
+    expect(container.querySelector('.workflow-agent-row')?.textContent).toContain('Reviewer');
+    expect(container.querySelector('details')?.open).toBe(false);
+  });
 });

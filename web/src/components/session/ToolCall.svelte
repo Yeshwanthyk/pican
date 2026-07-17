@@ -8,6 +8,9 @@
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
   import AskQuestion from './AskQuestion.svelte';
+  import TaskToolCard from './TaskToolCard.svelte';
+  import SubagentToolCard from './SubagentToolCard.svelte';
+  import WorkflowToolCard from './WorkflowToolCard.svelte';
 
   let { call, model } = $props();
 
@@ -39,6 +42,23 @@
 
   // read/write/edit/ls share a file-path arg; compute it once.
   const filePath = $derived(str(args.file_path ?? args.path));
+  const taskTools = new Set([
+    'TaskCreate',
+    'TaskList',
+    'TaskGet',
+    'TaskUpdate',
+    'TaskClaim',
+    'TaskOutput',
+    'TaskStop',
+    'TaskExecute',
+  ]);
+  const subagentTools = new Set([
+    'subagent_spawn',
+    'subagent_wait',
+    'subagent_check',
+    'subagent_cancel',
+    'subagent_list',
+  ]);
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
@@ -143,6 +163,12 @@
     {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={20} />{/if}
   {:else if call.name === 'ask_user_question' || call.name === 'pi_web_ask_user_question'}
     <AskQuestion {args} {result} />
+  {:else if taskTools.has(call.name)}
+    <TaskToolCard name={call.name} {args} {resultText} />
+  {:else if subagentTools.has(call.name)}
+    <SubagentToolCard name={call.name} {result} {resultText} />
+  {:else if call.name === 'workflow'}
+    <WorkflowToolCard {result} {resultText} />
   {:else if rendered && (rendered.callHtml || rendered.resultHtmlCollapsed || rendered.resultHtmlExpanded)}
     {#if rendered.callHtml}<div class="tool-header ansi-rendered">
         {@html rendered.callHtml}

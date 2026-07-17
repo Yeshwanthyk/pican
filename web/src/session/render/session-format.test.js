@@ -25,6 +25,21 @@ describe('session format helpers', () => {
     expect(truncate('abcdef', 3)).toBe('abc...');
   });
 
+  it('formats extension tool calls as compact summaries', () => {
+    expect(formatToolCall('TaskCreate', { subject: 'Ship renderer' })).toBe(
+      '[TaskCreate: Ship renderer]',
+    );
+    expect(formatToolCall('TaskGet', { task_id: '42' })).toBe('[TaskGet: 42]');
+    expect(formatToolCall('TaskExecute', { task_ids: ['1', '2'] })).toBe('[TaskExecute: 1, 2]');
+    expect(formatToolCall('subagent_spawn', { title: 'Review UI' })).toBe(
+      '[subagent_spawn: Review UI]',
+    );
+    expect(formatToolCall('subagent_check', { id: 'agent-1' })).toBe('[subagent_check: agent-1]');
+    expect(formatToolCall('workflow', { name: 'Release', status: 'running' })).toBe(
+      '[workflow: Release (running)]',
+    );
+  });
+
   it('renders tree display html for messages and tool results', () => {
     const toolCallMap = new Map([['tc1', { name: 'ls', arguments: { path: '/tmp' } }]]);
     expect(
