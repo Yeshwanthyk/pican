@@ -33,6 +33,7 @@ describe('createStatusEvents', () => {
     const onDelta = vi.fn();
     const onMessage = vi.fn();
     const onWorkflowUpdate = vi.fn();
+    const onTasksUpdate = vi.fn();
 
     const sub = createStatusEvents({
       EventSourceImpl: FakeEventSource,
@@ -40,6 +41,7 @@ describe('createStatusEvents', () => {
       onDelta,
       onMessage,
       onWorkflowUpdate,
+      onTasksUpdate,
     });
     sub.connect();
 
@@ -59,6 +61,7 @@ describe('createStatusEvents', () => {
     );
     es.emit('message', 'new-session');
     es.emit('workflows-updated', JSON.stringify({ runId: 'wf_123456abcdef' }));
+    es.emit('tasks-updated', JSON.stringify({ project: '/repo' }));
 
     expect(onSnapshot).toHaveBeenCalledWith({
       ids: ['a.jsonl'],
@@ -73,6 +76,7 @@ describe('createStatusEvents', () => {
     });
     expect(onMessage).toHaveBeenCalledWith('new-session');
     expect(onWorkflowUpdate).toHaveBeenCalledWith({ runId: 'wf_123456abcdef' });
+    expect(onTasksUpdate).toHaveBeenCalledWith({ project: '/repo' });
   });
 
   it('ignores malformed payloads and invalid delta shapes', () => {

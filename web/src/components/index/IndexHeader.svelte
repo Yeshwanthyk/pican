@@ -1,5 +1,5 @@
 <script>
-  import { icon, MoreHorizontal, CalendarClock, ListTree } from '../../shared/icons.js';
+  import { icon, MoreHorizontal, CalendarClock, ListChecks, ListTree } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
 
   let {
@@ -12,6 +12,7 @@
     onLayoutChange = () => {},
     onSchedules = () => {},
     onWorkflows = () => {},
+    onTasks = () => {},
   } = $props();
 </script>
 
@@ -89,6 +90,16 @@
           ><span class="schedules-nav-icon" aria-hidden="true"
             >{@html icon(ListTree, { size: 15 })}</span
           ><span>{t('workflows.navTitle')}</span></button
+        >
+        <button
+          type="button"
+          class="schedules-nav-btn"
+          data-tasks-btn
+          title={t('tasks.navTitle')}
+          onclick={onTasks}
+          ><span class="schedules-nav-icon" aria-hidden="true"
+            >{@html icon(ListChecks, { size: 15 })}</span
+          ><span>{t('tasks.navTitle')}</span></button
         >
       </div>
     </div>

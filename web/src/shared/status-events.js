@@ -33,6 +33,7 @@ export function createStatusEvents({
   onDelta = () => {},
   onMessage = () => {},
   onWorkflowUpdate = () => {},
+  onTasksUpdate = () => {},
 } = {}) {
   let stream = null;
   let pagehideHandler = null;
@@ -75,6 +76,10 @@ export function createStatusEvents({
     es.addEventListener('workflows-updated', (event) => {
       const payload = parseJSON(event.data);
       if (payload && typeof payload.runId === 'string') onWorkflowUpdate(payload);
+    });
+    es.addEventListener('tasks-updated', (event) => {
+      const payload = parseJSON(event.data);
+      if (payload && typeof payload.project === 'string') onTasksUpdate(payload);
     });
 
     if (windowImpl?.addEventListener) {

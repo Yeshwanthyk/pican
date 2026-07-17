@@ -363,6 +363,15 @@
       }}>{t('workflows.navTitle')}</button
     >
     <button
+      class="palette-action"
+      type="button"
+      data-tasks-btn
+      onclick={() => {
+        close();
+        go('/tasks');
+      }}>{t('tasks.navTitle')}</button
+    >
+    <button
       class="palette-action muted"
       type="button"
       data-import-session-btn

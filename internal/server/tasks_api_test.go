@@ -1,0 +1,102 @@
+package server
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func writeTaskTestFile(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+func taskAPIRequest(path, project string) *http.Request {
+	return httptest.NewRequest(http.MethodGet, path+"?project="+url.QueryEscape(project), nil)
+}
+
+func TestHandleApiTasksRejectsInvalidProject(t *testing.T) {
+	s := newTestServer(t)
+	for _, project := range []string{"", "relative", filepath.Join(t.TempDir(), "..", "unclean")} {
+		w := httptest.NewRecorder()
+		s.handleApiTasks(w, taskAPIRequest("/api/tasks", project))
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("project %q status = %d, want 400", project, w.Code)
+		}
+	}
+}
+
+func TestHandleApiTasksListsProjectAndSessionStores(t *testing.T) {
+	s := newTestServer(t)
+	project := t.TempDir()
+	tasksDir := filepath.Join(project, ".pi", "tasks")
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks.json"), `{"nextId":2,"tasks":[{"id":"1","subject":"Project"}]}`)
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks-session-abc.json"), `{"tasks":[{"id":"2","subject":"Session"}]}`)
+	writeTaskTestFile(t, filepath.Join(tasksDir, "broken.json"), `{bad`)
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks.lock"), `ignored`)
+
+	w := httptest.NewRecorder()
+	s.handleApiTasks(w, taskAPIRequest("/api/tasks", project))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		Stores []taskStore `json:"stores"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Stores) != 2 {
+		t.Fatalf("stores = %d, want 2: %s", len(response.Stores), w.Body.String())
+	}
+	if response.Stores[0].Scope != "session" || response.Stores[0].SessionID != "session-abc" {
+		t.Fatalf("unexpected session store: %+v", response.Stores[0])
+	}
+	if response.Stores[1].Scope != "project" || len(response.Stores[1].Tasks) != 1 {
+		t.Fatalf("unexpected project store: %+v", response.Stores[1])
+	}
+}
+
+func TestHandleApiTaskOutput(t *testing.T) {
+	s := newTestServer(t)
+	project := t.TempDir()
+	writeTaskTestFile(t, filepath.Join(project, ".pi", "tasks", "tasks.json"), `{"tasks":[]}`)
+	writeTaskTestFile(t, filepath.Join(project, ".pi", "tasks", "output", "task-abc-1.txt"), "task output\n")
+
+	for _, test := range []struct {
+		name   string
+		taskID string
+		status int
+	}{
+		{name: "success", taskID: "abc-1", status: http.StatusOK},
+		{name: "missing", taskID: "missing", status: http.StatusNotFound},
+		{name: "invalid", taskID: "../secret", status: http.StatusBadRequest},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := taskAPIRequest("/api/tasks/output", project)
+			query := req.URL.Query()
+			query.Set("taskId", test.taskID)
+			req.URL.RawQuery = query.Encode()
+			w := httptest.NewRecorder()
+			s.handleApiTaskOutput(w, req)
+			if w.Code != test.status {
+				t.Fatalf("status = %d, want %d: %s", w.Code, test.status, w.Body.String())
+			}
+			if test.status == http.StatusOK {
+				if w.Body.String() != "task output\n" || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain") {
+					t.Fatalf("unexpected response: content-type=%q body=%q", w.Header().Get("Content-Type"), w.Body.String())
+				}
+			}
+		})
+	}
+}

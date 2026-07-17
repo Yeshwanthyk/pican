@@ -100,6 +100,7 @@ type Server struct {
 	// auto_title.go), grouped so each subsystem owns its own fields + lock.
 	metrics   metricsState
 	autoTitle autoTitleState
+	tasks     tasksWatcherState
 }
 
 // metricsState backs the metrics dashboard. startedAt drives process uptime;
@@ -181,6 +182,7 @@ func New(deps Deps) (*Server, error) {
 	}
 	s.watchFiles()
 	s.startWorkflowsWatcher()
+	s.startTasksWatcher()
 	if err := s.startSessionStatusWatcher(); err != nil {
 		fmt.Fprintf(os.Stderr, "session-status watcher unavailable: %v\n", err)
 	}
@@ -327,6 +329,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/schedule/runs", s.auth.Wrap(s.handleApiScheduleRuns))
 	mux.HandleFunc("/api/workflows", s.auth.Wrap(s.handleApiWorkflows))
 	mux.HandleFunc("/api/workflows/run", s.auth.Wrap(s.handleApiWorkflowRun))
+	mux.HandleFunc("/api/tasks", s.auth.Wrap(s.handleApiTasks))
+	mux.HandleFunc("/api/tasks/output", s.auth.Wrap(s.handleApiTaskOutput))
 	mux.HandleFunc("/metrics", s.auth.Wrap(s.handleMetricsPage))
 	mux.HandleFunc("/api/metrics", s.auth.Wrap(s.handleMetrics))
 	s.registerPprof(mux)
@@ -397,6 +401,9 @@ func eventKey(msg string) string {
 	}
 	if strings.HasPrefix(msg, "event: workflows-updated\n") {
 		return "workflows-updated"
+	}
+	if strings.HasPrefix(msg, "event: tasks-updated\n") {
+		return msg
 	}
 	return ""
 }
