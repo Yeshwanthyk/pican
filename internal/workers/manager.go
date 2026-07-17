@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -33,6 +34,14 @@ type SlashCommand struct {
 	Description string `json:"description"`
 	Source      string `json:"source"`
 }
+
+type ExtensionUIResponse struct {
+	Confirmed *bool
+	Value     *string
+	Cancelled *bool
+}
+
+var ErrExtensionUIRequestNotFound = errors.New("extension UI request not found")
 
 // WorkerSnapshot is a point-in-time view of a single live worker for the
 // metrics dashboard. PID/UptimeS/IdleForS are only populated for workers that
@@ -267,6 +276,38 @@ func (m *Manager) GetCommands(ctx context.Context, sessionID string) (cmds []Sla
 	}
 	cmds, err = worker.GetCommands(ctx)
 	return cmds, true, err
+}
+
+func (m *Manager) PendingExtensionUI(sessionID string) (requests []json.RawMessage, ready bool) {
+	m.mu.Lock()
+	worker := m.workers[sessionID]
+	m.mu.Unlock()
+	if worker == nil {
+		return nil, false
+	}
+	extensionWorker, ok := worker.(interface {
+		PendingExtensionUI() []json.RawMessage
+	})
+	if !ok {
+		return nil, true
+	}
+	return extensionWorker.PendingExtensionUI(), true
+}
+
+func (m *Manager) RespondExtensionUI(sessionID, id string, response ExtensionUIResponse) error {
+	m.mu.Lock()
+	worker := m.workers[sessionID]
+	m.mu.Unlock()
+	if worker == nil {
+		return ErrExtensionUIRequestNotFound
+	}
+	extensionWorker, ok := worker.(interface {
+		RespondExtensionUI(string, ExtensionUIResponse) error
+	})
+	if !ok {
+		return ErrExtensionUIRequestNotFound
+	}
+	return extensionWorker.RespondExtensionUI(id, response)
 }
 
 func (m *Manager) Abort(ctx context.Context, sessionID string) error {

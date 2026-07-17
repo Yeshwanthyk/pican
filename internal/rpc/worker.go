@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,6 +38,16 @@ type piRPCWorker struct {
 	lastStreamActivity   atomic.Int64 // unix nanos; stream/turn events keep worker visually running
 	streamSink           StreamEventSink
 	streamPreview        *streamPreviewAccumulator
+	extensionUISink      ExtensionUIEventSink
+	pendingExtensionUI   map[string]pendingExtensionUIRequest
+}
+
+type ExtensionUIEventSink func(event string, payload json.RawMessage)
+
+type pendingExtensionUIRequest struct {
+	payload   json.RawMessage
+	arrivedAt time.Time
+	timeout   time.Duration
 }
 
 func (w *piRPCWorker) touch() {
@@ -66,6 +77,10 @@ func (w *piRPCWorker) StartedAt() time.Time {
 }
 
 func NewPiWorkerWithStream(sessionPath string, streamSink StreamEventSink) (workers.ChatWorker, error) {
+	return NewPiWorkerWithEvents(sessionPath, streamSink, nil)
+}
+
+func NewPiWorkerWithEvents(sessionPath string, streamSink StreamEventSink, extensionUISink ExtensionUIEventSink) (workers.ChatWorker, error) {
 	if _, err := exec.LookPath("pi"); err != nil {
 		return nil, fmt.Errorf("pi executable not found: %w", err)
 	}
@@ -81,15 +96,17 @@ func NewPiWorkerWithStream(sessionPath string, streamSink StreamEventSink) (work
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrBuf
 	worker := &piRPCWorker{
-		sessionPath:   sessionPath,
-		startedAt:     time.Now(),
-		cmd:           cmd,
-		stdin:         stdin,
-		status:        workers.WorkerStatus{State: workers.WorkerStateIdle},
-		pending:       make(map[string]chan response),
-		stderrBuf:     &stderrBuf,
-		streamSink:    streamSink,
-		streamPreview: &streamPreviewAccumulator{},
+		sessionPath:        sessionPath,
+		startedAt:          time.Now(),
+		cmd:                cmd,
+		stdin:              stdin,
+		status:             workers.WorkerStatus{State: workers.WorkerStateIdle},
+		pending:            make(map[string]chan response),
+		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
+		stderrBuf:          &stderrBuf,
+		streamSink:         streamSink,
+		streamPreview:      &streamPreviewAccumulator{},
+		extensionUISink:    extensionUISink,
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -109,6 +126,68 @@ func NewPiWorkerWithStream(sessionPath string, streamSink StreamEventSink) (work
 	stateCancel()
 	worker.touch()
 	return worker, nil
+}
+
+func (w *piRPCWorker) PendingExtensionUI() []json.RawMessage {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.pruneExpiredExtensionUILocked(time.Now())
+	pending := make([]pendingExtensionUIRequest, 0, len(w.pendingExtensionUI))
+	for _, request := range w.pendingExtensionUI {
+		pending = append(pending, request)
+	}
+	sort.Slice(pending, func(i, j int) bool { return pending[i].arrivedAt.Before(pending[j].arrivedAt) })
+	requests := make([]json.RawMessage, 0, len(pending))
+	for _, request := range pending {
+		var payload map[string]any
+		if json.Unmarshal(request.payload, &payload) == nil {
+			payload["_receivedAt"] = request.arrivedAt.UnixMilli()
+			if enriched, err := json.Marshal(payload); err == nil {
+				requests = append(requests, enriched)
+				continue
+			}
+		}
+		requests = append(requests, append(json.RawMessage(nil), request.payload...))
+	}
+	return requests
+}
+
+func (w *piRPCWorker) RespondExtensionUI(id string, response workers.ExtensionUIResponse) error {
+	w.mu.Lock()
+	w.pruneExpiredExtensionUILocked(time.Now())
+	if _, ok := w.pendingExtensionUI[id]; !ok {
+		w.mu.Unlock()
+		return workers.ErrExtensionUIRequestNotFound
+	}
+
+	cmd := map[string]any{"type": "extension_ui_response", "id": id}
+	if response.Confirmed != nil {
+		cmd["confirmed"] = *response.Confirmed
+	}
+	if response.Value != nil {
+		cmd["value"] = *response.Value
+	}
+	if response.Cancelled != nil {
+		cmd["cancelled"] = *response.Cancelled
+	}
+	w.writeMu.Lock()
+	err := WriteCommand(w.stdin, cmd)
+	w.writeMu.Unlock()
+	if err != nil {
+		w.mu.Unlock()
+		return err
+	}
+	delete(w.pendingExtensionUI, id)
+	w.mu.Unlock()
+	return nil
+}
+
+func (w *piRPCWorker) pruneExpiredExtensionUILocked(now time.Time) {
+	for id, request := range w.pendingExtensionUI {
+		if request.timeout > 0 && !now.Before(request.arrivedAt.Add(request.timeout)) {
+			delete(w.pendingExtensionUI, id)
+		}
+	}
 }
 
 func (w *piRPCWorker) Prompt(ctx context.Context, chat chat.Request) error {
@@ -326,6 +405,9 @@ func (w *piRPCWorker) Status() workers.WorkerStatus {
 }
 
 func (w *piRPCWorker) Close() error {
+	w.mu.Lock()
+	clear(w.pendingExtensionUI)
+	w.mu.Unlock()
 	if w.stdin != nil {
 		_ = w.stdin.Close()
 	}
@@ -443,6 +525,43 @@ func (w *piRPCWorker) handleRPCLine(line string) {
 			w.currentThinkingLevel = meta.Level
 			w.mu.Unlock()
 		}
+	case "extension_ui_request":
+		w.handleExtensionUIRequest([]byte(line))
+	}
+}
+
+func (w *piRPCWorker) handleExtensionUIRequest(payload json.RawMessage) {
+	var request struct {
+		ID         string `json:"id"`
+		Method     string `json:"method"`
+		Message    string `json:"message"`
+		NotifyType string `json:"notifyType"`
+		Timeout    int64  `json:"timeout"`
+	}
+	if err := json.Unmarshal(payload, &request); err != nil || request.ID == "" {
+		return
+	}
+	switch request.Method {
+	case "confirm", "select", "input", "editor":
+		copyPayload := append(json.RawMessage(nil), payload...)
+		w.mu.Lock()
+		if w.pendingExtensionUI == nil {
+			w.pendingExtensionUI = make(map[string]pendingExtensionUIRequest)
+		}
+		w.pendingExtensionUI[request.ID] = pendingExtensionUIRequest{
+			payload: copyPayload, arrivedAt: time.Now(), timeout: time.Duration(request.Timeout) * time.Millisecond,
+		}
+		w.mu.Unlock()
+		if w.extensionUISink != nil {
+			w.extensionUISink("extension-ui-request", copyPayload)
+		}
+	case "notify":
+		if w.extensionUISink != nil {
+			notification, _ := json.Marshal(map[string]string{"message": request.Message, "type": request.NotifyType})
+			w.extensionUISink("extension-notify", notification)
+		}
+	case "setStatus", "setTitle", "setWidget", "set_editor_text":
+		return
 	}
 }
 
@@ -493,6 +612,7 @@ func (w *piRPCWorker) setError(err error) {
 		delete(w.pending, id)
 		ch <- response{ID: id, Type: "response", Success: false, Error: err.Error()}
 	}
+	clear(w.pendingExtensionUI)
 }
 
 func (w *piRPCWorker) withStderr(err error) error {

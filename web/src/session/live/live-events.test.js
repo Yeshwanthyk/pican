@@ -205,4 +205,36 @@ describe('live events', () => {
     eventSource.onmessage({ data: 'noop' });
     expect(dispatched.length).toBe(1);
   });
+
+  it('dispatches extension UI events with parsed payloads', () => {
+    const handlers = new Map();
+    const eventSource = {
+      addEventListener: vi.fn((name, handler) => handlers.set(name, handler)),
+    };
+    const dispatched = [];
+    class FakeCustomEvent {
+      constructor(type, options = {}) {
+        this.type = type;
+        this.detail = options.detail;
+      }
+    }
+    wireSessionEvents({
+      eventSource,
+      onReload: vi.fn(),
+      onChatPreview: vi.fn(),
+      windowImpl: { dispatchEvent: (event) => dispatched.push(event) },
+      CustomEventImpl: FakeCustomEvent,
+    });
+
+    handlers.get('extension-ui-request')({ data: '{"id":"ui-1","method":"confirm"}' });
+    handlers.get('extension-ui-resolved')({ data: '{"id":"ui-1"}' });
+    handlers.get('extension-notify')({ data: '{"message":"Done","type":"info"}' });
+
+    expect(dispatched.map((event) => event.type)).toEqual([
+      'pi-extension-ui-request',
+      'pi-extension-ui-resolved',
+      'pi-extension-notify',
+    ]);
+    expect(dispatched[0].detail.id).toBe('ui-1');
+  });
 });

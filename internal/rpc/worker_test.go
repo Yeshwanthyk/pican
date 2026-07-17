@@ -3,6 +3,8 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -229,5 +231,74 @@ func TestHandleRPCLineTracksThinkingAndTextStreamEvents(t *testing.T) {
 		if got := w.Status(); got.State != workers.WorkerStateRunning {
 			t.Fatalf("line %s => status = %q, want running", strings.TrimSpace(line), got.State)
 		}
+	}
+}
+
+func TestExtensionUIRequestLifecycle(t *testing.T) {
+	var stdin bytes.Buffer
+	var eventName string
+	var eventPayload json.RawMessage
+	w := &piRPCWorker{
+		stdin:              nopWriteCloser{&stdin},
+		pending:            make(map[string]chan response),
+		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
+		extensionUISink: func(event string, payload json.RawMessage) {
+			eventName = event
+			eventPayload = append(json.RawMessage(nil), payload...)
+		},
+	}
+
+	request := `{"type":"extension_ui_request","id":"ui-1","method":"confirm","title":"Deploy?","message":"Ship it"}`
+	w.handleRPCLine(request)
+	if eventName != "extension-ui-request" || string(eventPayload) != request {
+		t.Fatalf("event = %q %s", eventName, eventPayload)
+	}
+	if got := w.PendingExtensionUI(); len(got) != 1 || !bytes.Contains(got[0], []byte(`"id":"ui-1"`)) {
+		t.Fatalf("pending = %s", got)
+	}
+
+	confirmed := false
+	if err := w.RespondExtensionUI("ui-1", workers.ExtensionUIResponse{Confirmed: &confirmed}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdin.String(); got != `{"confirmed":false,"id":"ui-1","type":"extension_ui_response"}`+"\n" {
+		t.Fatalf("stdin = %q", got)
+	}
+	if got := w.PendingExtensionUI(); len(got) != 0 {
+		t.Fatalf("pending after response = %s", got)
+	}
+	if err := w.RespondExtensionUI("ui-1", workers.ExtensionUIResponse{}); !errors.Is(err, workers.ErrExtensionUIRequestNotFound) {
+		t.Fatalf("unknown response error = %v", err)
+	}
+}
+
+func TestExtensionUIPendingClearsOnWorkerError(t *testing.T) {
+	w := &piRPCWorker{
+		pending:            make(map[string]chan response),
+		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
+	}
+	w.handleRPCLine(`{"type":"extension_ui_request","id":"ui-1","method":"input","title":"Name"}`)
+	w.setError(io.ErrUnexpectedEOF)
+	if got := w.PendingExtensionUI(); len(got) != 0 {
+		t.Fatalf("pending after exit = %s", got)
+	}
+}
+
+func TestExtensionUINotifyEmitsWithoutStoring(t *testing.T) {
+	var eventName string
+	var eventPayload json.RawMessage
+	w := &piRPCWorker{
+		pending:            make(map[string]chan response),
+		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
+		extensionUISink: func(event string, payload json.RawMessage) {
+			eventName, eventPayload = event, payload
+		},
+	}
+	w.handleRPCLine(`{"type":"extension_ui_request","id":"ui-1","method":"notify","message":"Done","notifyType":"info"}`)
+	if eventName != "extension-notify" || string(eventPayload) != `{"message":"Done","type":"info"}` {
+		t.Fatalf("notification = %q %s", eventName, eventPayload)
+	}
+	if got := w.PendingExtensionUI(); len(got) != 0 {
+		t.Fatalf("notify stored as pending: %s", got)
 	}
 }

@@ -36,10 +36,10 @@ describe('parseSlashTrigger', () => {
 });
 
 describe('isPaletteCommand', () => {
-  it('keeps prompt and skill commands, drops extensions', () => {
+  it('keeps prompt, skill, and extension commands', () => {
     expect(isPaletteCommand({ source: 'prompt' })).toBe(true);
     expect(isPaletteCommand({ source: 'skill' })).toBe(true);
-    expect(isPaletteCommand({ source: 'extension' })).toBe(false);
+    expect(isPaletteCommand({ source: 'extension' })).toBe(true);
     expect(isPaletteCommand({ source: 'mystery' })).toBe(false);
     expect(isPaletteCommand(null)).toBe(false);
   });
@@ -57,12 +57,13 @@ describe('filterCommands', () => {
 });
 
 describe('groupCommands', () => {
-  it('orders groups prompts, skills', () => {
+  it('orders groups prompts, skills, then extensions', () => {
     const groups = groupCommands([
       { name: 'skill:memory', source: 'skill' },
       { name: 'workon', source: 'prompt' },
+      { name: 'btw', source: 'extension' },
     ]);
-    expect(groups.map((g) => g.label)).toEqual(['Prompts', 'Skills']);
+    expect(groups.map((g) => g.label)).toEqual(['Prompts', 'Skills', 'Extensions']);
   });
 
   it('drops empty groups and buckets unknown sources into Other', () => {
@@ -144,11 +145,9 @@ describe('setupSlashCommands controller', () => {
     expect(popup.style.display).toBe('block');
     await flush();
     expect(getCommands).toHaveBeenCalledWith('s', { load: true });
-    // btw is an extension command and must be filtered out: only the prompt
-    // and skill commands run an agent turn and reach the palette.
     const items = document.querySelectorAll('.slash-item');
-    expect(items).toHaveLength(2);
-    expect([...items].some((el) => el.dataset.insert === 'btw')).toBe(false);
+    expect(items).toHaveLength(3);
+    expect([...items].some((el) => el.dataset.insert === 'btw')).toBe(true);
     el.remove();
   });
 

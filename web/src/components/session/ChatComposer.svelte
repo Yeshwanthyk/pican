@@ -18,10 +18,13 @@
   import ChatToolbar from './chat/ChatToolbar.svelte';
   import ContextUsage from './chat/ContextUsage.svelte';
   import QueuePanel from './chat/QueuePanel.svelte';
+  import ExtensionUiCard from './chat/ExtensionUiCard.svelte';
   import TextAttachmentModal from './chat/TextAttachmentModal.svelte';
   import { ChatToolbarState } from './chat/chat-toolbar-state.svelte.js';
   import { QueueStore } from './chat/queue-store.svelte.js';
   import { createQueueApi } from './chat/queue-api.js';
+  import { reducePendingExtensionUI } from './chat/extension-ui-state.js';
+  import { showToast } from '../../shared/toast.js';
 
   let {
     sessionId = '',
@@ -39,13 +42,21 @@
   // items live on the server (chat_queue table); we hydrate on mount and
   // re-fetch on SSE 'queue' events so other tabs (and the autonomous
   // backend drainer) stay in sync.
-  const queueApi = sessionId
-    ? createQueueApi({
-        sessionId,
-        fetchImpl: typeof window !== 'undefined' ? window.fetch.bind(window) : undefined,
-      })
-    : null;
+  const queueApi = (() =>
+    sessionId
+      ? createQueueApi({
+          sessionId,
+          fetchImpl: typeof window !== 'undefined' ? window.fetch.bind(window) : undefined,
+        })
+      : null)();
   const queueStore = new QueueStore({ api: queueApi });
+  let pendingExtensionUI = $state([]);
+  const resolvedExtensionUI = [];
+
+  function resolveExtensionUI(id) {
+    if (id && !resolvedExtensionUI.includes(id)) resolvedExtensionUI.push(id);
+    pendingExtensionUI = reducePendingExtensionUI(pendingExtensionUI, { type: 'resolve', id });
+  }
 
   // The composer runtime lives in <script module> (runChatComposer). It reads the
   // shared model + navigateTo (owned by SessionPage runtime context) at mount —
@@ -86,8 +97,39 @@
     // their own listeners.
     void queueStore.refresh?.();
     const onQueueEvent = () => queueStore.refresh?.();
+    const onExtensionRequest = (event) => {
+      if (resolvedExtensionUI.includes(event.detail?.id)) return;
+      pendingExtensionUI = reducePendingExtensionUI(pendingExtensionUI, {
+        type: 'add',
+        request: event.detail,
+      });
+    };
+    const onExtensionResolved = (event) => resolveExtensionUI(event.detail?.id);
+    const onExtensionNotify = (event) => {
+      const notification = event.detail || {};
+      showToast(notification.message || t('extensionUi.notification'), {
+        id: 'extension-notify',
+        duration: 6000,
+        title: notification.type || '',
+      });
+    };
     target.addEventListener('pi-queue-event', onQueueEvent);
-    return () => target.removeEventListener('pi-queue-event', onQueueEvent);
+    target.addEventListener('pi-extension-ui-request', onExtensionRequest);
+    target.addEventListener('pi-extension-ui-resolved', onExtensionResolved);
+    target.addEventListener('pi-extension-notify', onExtensionNotify);
+    void target
+      .fetch('/api/extension-ui/pending?session=' + encodeURIComponent(sessionId))
+      .then((response) => (response.ok ? response.json() : { requests: [] }))
+      .then((data) => {
+        for (const request of data.requests || []) onExtensionRequest({ detail: request });
+      })
+      .catch(() => {});
+    return () => {
+      target.removeEventListener('pi-queue-event', onQueueEvent);
+      target.removeEventListener('pi-extension-ui-request', onExtensionRequest);
+      target.removeEventListener('pi-extension-ui-resolved', onExtensionResolved);
+      target.removeEventListener('pi-extension-notify', onExtensionNotify);
+    };
   });
 </script>
 
@@ -107,6 +149,13 @@
     hidden
     disabled={!chatAvailable}
   />
+  {#if pendingExtensionUI.length > 0}
+    <div class="extension-ui-stack">
+      {#each pendingExtensionUI as request (request.id)}
+        <ExtensionUiCard {request} {sessionId} onResolved={resolveExtensionUI} />
+      {/each}
+    </div>
+  {/if}
   <QueuePanel store={queueStore} />
   <div class="pi-chat-shell">
     <ChatExpandButton {chatAvailable} />

@@ -350,6 +350,14 @@ export default {
   'composer.contextDetails': 'Click for details',
   'composer.pathCopied': 'Path copied',
 
+  // ── Extension UI ──
+  'extensionUi.title': 'Extension request',
+  'extensionUi.confirm': 'Confirm',
+  'extensionUi.send': 'Send',
+  'extensionUi.timeout': '{seconds}s remaining',
+  'extensionUi.failed': 'Couldn’t send the response. Try again.',
+  'extensionUi.notification': 'Extension notification',
+
   // ── Share / export ──
   'share.copiedSuffix': '{label} copied',
   'share.defaultTitle': 'Share session',

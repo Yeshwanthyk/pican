@@ -267,6 +267,23 @@ are never mistaken for steers. Dismissed steers are browser-local and gone on
 reload; queued rows persist server-side until the drainer dispatches them or
 the user removes them.
 
+### 12. Extension UI requests
+
+Extensions running inside the RPC worker can pause for browser input by emitting
+an `extension_ui_request`. The worker stores dialog methods (`confirm`, `select`,
+`input`, and `editor`) in memory and broadcasts the full request as a named
+`extension-ui-request` SSE event on the session topic. Fire-and-forget `notify`
+requests become `extension-notify`; the other display-only methods are ignored.
+
+`ChatComposer.svelte` hydrates pending dialogs from
+`GET /api/extension-ui/pending?session=<id>` and keeps them synchronized from
+the session EventSource. `ExtensionUiCard.svelte` renders them above the composer.
+Submitting a card posts to `/api/extension-ui/respond`; the manager finds the
+already-running worker without spawning one, writes an `extension_ui_response`
+JSONL line to its stdin, and broadcasts `extension-ui-resolved` so every open tab
+dismisses the request. Pending dialogs are process-local and are cleared when the
+worker exits or is reaped.
+
 ---
 
 **E2E coverage:** `e2e/tests/chat.spec.ts` drives this flow end-to-end with a stub `pi` worker (`e2e/lib/stub-pi/pi`); `e2e/tests/steer-queue.spec.ts` covers the steer/queue flow. See [docs/dev/e2e-testing.md](../dev/e2e-testing.md).

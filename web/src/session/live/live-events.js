@@ -104,11 +104,14 @@ export function wireSessionEvents({
   windowImpl = typeof window !== 'undefined' ? window : null,
   CustomEventImpl = typeof CustomEvent !== 'undefined' ? CustomEvent : null,
 } = {}) {
-  const dispatchReloadedEvent = () => {
+  const dispatch = (type, detail) => {
     if (!windowImpl || !CustomEventImpl) return;
     try {
-      windowImpl.dispatchEvent(new CustomEventImpl('pi-session-reload'));
+      windowImpl.dispatchEvent(new CustomEventImpl(type, { detail }));
     } catch (_) {}
+  };
+  const dispatchReloadedEvent = () => {
+    dispatch('pi-session-reload');
   };
 
   eventSource.onmessage = (event) => {
@@ -160,12 +163,21 @@ export function wireSessionEvents({
   // changes — autonomous drainer, another tab, etc. ChatComposer listens for
   // pi-queue-event on the window and refetches /api/chat/queue.
   eventSource.addEventListener('queue', () => {
-    if (windowImpl && CustomEventImpl) {
-      try {
-        windowImpl.dispatchEvent(new CustomEventImpl('pi-queue-event'));
-      } catch (_) {}
-    }
+    dispatch('pi-queue-event');
   });
+  for (const [eventName, windowEvent] of [
+    ['extension-ui-request', 'pi-extension-ui-request'],
+    ['extension-ui-resolved', 'pi-extension-ui-resolved'],
+    ['extension-notify', 'pi-extension-notify'],
+  ]) {
+    eventSource.addEventListener(eventName, (event) => {
+      try {
+        dispatch(windowEvent, JSON.parse(event.data));
+      } catch (error) {
+        onError(error);
+      }
+    });
+  }
   eventSource.onerror = onError;
   return eventSource;
 }

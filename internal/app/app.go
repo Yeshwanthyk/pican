@@ -69,11 +69,19 @@ func Main(version string) {
 
 	var srv *server.Server
 	manager := workers.NewManager(func(sessionID, sessionPath string) (workers.ChatWorker, error) {
-		return rpc.NewPiWorkerWithStream(sessionPath, func(preview rpc.StreamPreview) {
-			if srv != nil {
-				srv.BroadcastChatPreview(sessionID, preview)
-			}
-		})
+		return rpc.NewPiWorkerWithEvents(
+			sessionPath,
+			func(preview rpc.StreamPreview) {
+				if srv != nil {
+					srv.BroadcastChatPreview(sessionID, preview)
+				}
+			},
+			func(event string, payload json.RawMessage) {
+				if srv != nil {
+					srv.BroadcastExtensionUI(sessionID, event, payload)
+				}
+			},
+		)
 	})
 	var srvErr error
 	srv, srvErr = server.New(server.Deps{

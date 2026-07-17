@@ -299,6 +299,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
 	mux.HandleFunc("/api/worker-status", s.auth.Wrap(s.handleWorkerStatus))
 	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
+	mux.HandleFunc("/api/extension-ui/pending", s.auth.Wrap(s.handlePendingExtensionUI))
+	mux.HandleFunc("/api/extension-ui/respond", s.auth.Wrap(s.handleRespondExtensionUI))
 	mux.HandleFunc("/share", s.auth.Wrap(s.handleShare))
 	mux.HandleFunc("/events", s.auth.Wrap(s.handleEvents))
 	mux.HandleFunc("/api/new-session", s.auth.Wrap(s.handleNewSession))
@@ -426,6 +428,17 @@ func (s *Server) BroadcastChatPreview(sessionID string, preview rpc.StreamPrevie
 		return
 	}
 	msg, err := formatSSEJSONEvent("chat-preview", preview)
+	if err != nil {
+		return
+	}
+	s.broadcast(sessionID, msg)
+}
+
+func (s *Server) BroadcastExtensionUI(sessionID, event string, payload json.RawMessage) {
+	if sessionID == "" || sessionID == globalSessID {
+		return
+	}
+	msg, err := formatSSEJSONEvent(event, payload)
 	if err != nil {
 		return
 	}

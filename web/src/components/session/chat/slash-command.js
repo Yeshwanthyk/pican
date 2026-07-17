@@ -7,17 +7,14 @@
 // trigger is deliberately anchored to position 0. A slash mid-message, such as
 // in a file path, never opens the palette.
 
-const SOURCE_ORDER = ['prompt', 'skill'];
+const SOURCE_ORDER = ['prompt', 'skill', 'extension'];
 const SOURCE_LABELS = {
   prompt: 'Prompts',
   skill: 'Skills',
+  extension: 'Extensions',
 };
 
-// Only prompt templates and skills expand into a normal agent turn over the
-// headless RPC worker. Extension commands drive pi's TUI via
-// extension_ui_request events and never emit agent_end, so sending one leaves
-// the session stuck "running" forever. They are excluded from the palette.
-const PALETTE_SOURCES = new Set(['prompt', 'skill']);
+const PALETTE_SOURCES = new Set(['prompt', 'skill', 'extension']);
 
 export function isPaletteCommand(cmd) {
   return !!cmd && PALETTE_SOURCES.has(cmd.source);
