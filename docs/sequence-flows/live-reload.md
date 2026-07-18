@@ -39,6 +39,7 @@ There are two independent live-update mechanisms:
      │             │                │                │               │
      │             │                │                │─── update fileMod map
      │             │                │                │─── broadcast(sessID, "reload")
+     │             │                │                │─── broadcast(__all__, "reload:"+sessID)
      │             │                │                │               │
      │             │                │                │─── recomputeAndBroadcastStatus
      │             │                │                │               │
@@ -167,6 +168,7 @@ This catches cases where a signal goes stale (e.g., terminal process crashes wit
 | Event | Topic | Payload | Trigger |
 |-------|-------|---------|---------|
 | `reload` | `sessID` | `"reload"` | Session file modified |
+| `reload` | `__all__` | `"reload:<sessID>"` | Session file modified (index-wide echo, carries the touched id so the index page can skip refetching unrelated/already-known sessions) |
 | `new-session` | `__all__` | `"new-session"` | New `.jsonl` file created |
 | `status-snapshot` | `__all__` | `{"running": ["id1", "id2"]}` | Client connects to `/events?id=__all__` |
 | `status-delta` | `__all__` | `{"id": "abc", "running": true}` | Running status changes |
@@ -178,8 +180,15 @@ This catches cases where a signal goes stale (e.g., terminal process crashes wit
 ```js
 es.addEventListener('status-snapshot', (e) => this.applySnapshot(e.data))
 es.addEventListener('status-delta', (e) => this.applyDelta(e.data))
-es.onmessage = (e) => { if (e.data === 'new-session') window.location.reload() }
+es.onmessage = (e) => {
+  if (e.data === 'new-session') return refetchSessions()
+  const reload = parseReload(e.data) // matches "reload:<id>" (or bare "reload")
+  if (reload && shouldRefetchOnReload({ id: reload.id, knownIds, lastRefreshAt, now: Date.now(), throttleMs: 5000 })) {
+    refetchSessions()
+  }
+}
 ```
+Known session ids are always throttled to at most one refetch per 5s; an unknown/empty id (new session, or a legacy bare `"reload"`) always refetches immediately.
 
 **Session page** (`/events?id=<sessID>`):
 ```js

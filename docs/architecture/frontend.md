@@ -105,20 +105,21 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 | Vite SPA bundle | `web/dist/assets/app-*.js` | `/static/assets/app-*.js` |
 | Vite lazy chunks | `web/dist/assets/*.js` | `/static/assets/*.js` |
 | Static export JS | `internal/ui/embedded/export/export.js` + vendors | inline in exported HTML |
-| Theme CSS | `internal/ui/embedded/styles/theme.css` | `/theme.css` (PWA route) |
-| Index CSS | `internal/ui/embedded/styles/index.css` | `/index.css` (PWA route) |
-| Session CSS | `internal/ui/embedded/styles/session.css` | inlined in SPA shell |
-| Menu CSS | `internal/ui/embedded/styles/menu.css` | `/menu.css` and inlined in SPA shell |
-| Palette CSS | `internal/ui/embedded/styles/palette.css` | `/palette.css` and inlined in SPA shell |
-| Workflows CSS | `internal/ui/embedded/styles/workflows.css` | inlined in SPA shell |
-| Tasks CSS | `internal/ui/embedded/styles/tasks.css` | inlined in SPA shell |
-| Subagents CSS | `internal/ui/embedded/styles/subagents.css` | inlined in SPA shell |
+| Theme CSS | `internal/ui/embedded/styles/theme.css` | `/theme.css` (PWA route); inlined in SPA shell (boot script + FOUC prevention need it before any other asset loads) |
+| Index CSS | `internal/ui/embedded/styles/index.css` | `/index.css` (PWA route); also bundled into `/styles/app.css` for the SPA shell |
+| Session CSS | `internal/ui/embedded/styles/session.css` | bundled into `/styles/app.css`, linked (not inlined) in SPA shell |
+| Menu CSS | `internal/ui/embedded/styles/menu.css` | `/menu.css` and bundled into `/styles/app.css` |
+| Palette CSS | `internal/ui/embedded/styles/palette.css` | `/palette.css` and bundled into `/styles/app.css` |
+| Workflows CSS | `internal/ui/embedded/styles/workflows.css` | bundled into `/styles/app.css` |
+| Tasks CSS | `internal/ui/embedded/styles/tasks.css` | bundled into `/styles/app.css` |
+| Subagents CSS | `internal/ui/embedded/styles/subagents.css` | bundled into `/styles/app.css` |
 | Custom themes | `~/.pi/agent/pi-web/custom-themes.css` (optional) | `/custom-themes.css` |
 | PWA manifest | `internal/ui/embedded/assets/manifest.webmanifest` | `/manifest.webmanifest` |
 | Service worker | `internal/ui/embedded/assets/sw.js` | `/sw.js` |
 | Icons | `internal/ui/embedded/assets/icon.svg` etc. | `/icon.svg`, `/icon-maskable.svg`, `/pi-logo.svg` |
 | Sound assets | `internal/ui/embedded/assets/cat.webm` | `/cat.webm` |
 | User sound assets | `~/.pi/agent/pi-web/assets/*.mp3` | `/sounds/*.mp3` |
+| SPA bundled stylesheets | `internal/ui/app_styles.go` (index/session/menu/palette/workflows/tasks/subagents CSS joined) | `/styles/app.css?v=<hash>`, content-hash cache-busted, `Cache-Control: public, max-age=31536000, immutable`, served gzip when accepted |
 
 ## Theme System
 
