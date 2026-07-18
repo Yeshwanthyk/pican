@@ -27,6 +27,11 @@ const toolResult = (id) => ({
   type: 'message',
   message: { role: 'toolResult', toolCallId: `call-${id}`, content: [] },
 });
+const toolResultFor = (id, { isError = false } = {}) => ({
+  id: `result-${id}`,
+  type: 'message',
+  message: { role: 'toolResult', toolCallId: id, content: [], isError },
+});
 const bashExecution = (id) => ({
   id,
   type: 'message',
@@ -71,16 +76,21 @@ describe('groupToolRuns', () => {
     const prose = assistantText('a2');
     const second = assistantTools('a3', ['edit', 'edit', 'read']);
 
-    expect(groupToolRuns([first, prose, second])).toEqual([
-      { kind: 'entry', entry: first },
+    expect(groupToolRuns([first, prose, second])).toMatchObject([
+      { kind: 'group', entries: [first], toolCount: 3 },
       { kind: 'entry', entry: prose },
-      { kind: 'entry', entry: second },
+      { kind: 'group', entries: [second], toolCount: 3 },
     ]);
   });
 
-  it('keeps runs of four tool calls inline', () => {
-    const entries = [assistantTools('a1', ['bash', 'read']), assistantTools('a2', ['edit', 'ls'])];
-    expect(groupToolRuns(entries)).toEqual(entries.map((entry) => ({ kind: 'entry', entry })));
+  it('collapses a run as soon as it contains two tool calls', () => {
+    const entries = [assistantTools('a1', ['bash']), assistantTools('a2', ['edit'])];
+    expect(groupToolRuns(entries)).toMatchObject([{ kind: 'group', entries, toolCount: 2 }]);
+  });
+
+  it('keeps a single tool call inline', () => {
+    const entry = assistantTools('a1', ['bash']);
+    expect(groupToolRuns([entry])).toEqual([{ kind: 'entry', entry }]);
   });
 
   it('always breaks runs at user messages', () => {
@@ -88,10 +98,10 @@ describe('groupToolRuns', () => {
     const prompt = user('u1');
     const second = assistantTools('a2', ['read', 'read', 'read']);
 
-    expect(groupToolRuns([first, prompt, second])).toEqual([
-      { kind: 'entry', entry: first },
+    expect(groupToolRuns([first, prompt, second])).toMatchObject([
+      { kind: 'group', entries: [first], toolCount: 3 },
       { kind: 'entry', entry: prompt },
-      { kind: 'entry', entry: second },
+      { kind: 'group', entries: [second], toolCount: 3 },
     ]);
   });
 
@@ -103,6 +113,32 @@ describe('groupToolRuns', () => {
     ];
 
     expect(groupToolRuns(entries)).toMatchObject([{ kind: 'group', entries, toolCount: 5 }]);
+  });
+
+  it('keeps a pending interactive tool visible, then groups it after completion', () => {
+    const prior = assistantTools('prior', ['bash', 'edit']);
+    const priorResults = [toolResultFor('prior-0'), toolResultFor('prior-1')];
+    const prompt = assistantTools('prompt', ['ask_user']);
+
+    expect(groupToolRuns([prior, ...priorResults, prompt])).toMatchObject([
+      { kind: 'group', toolCount: 2, status: 'success' },
+      { kind: 'entry', entry: prompt },
+    ]);
+
+    expect(
+      groupToolRuns([prior, ...priorResults, prompt, toolResultFor('prompt-0')]),
+    ).toMatchObject([{ kind: 'group', toolCount: 3, status: 'success' }]);
+  });
+
+  it('marks failed groups so the renderer can open them', () => {
+    const calls = assistantTools('a1', ['bash', 'edit']);
+    const [group] = groupToolRuns([
+      calls,
+      toolResultFor('a1-0'),
+      toolResultFor('a1-1', { isError: true }),
+    ]);
+
+    expect(group).toMatchObject({ kind: 'group', status: 'error' });
   });
 
   it('groups leading and trailing runs independently', () => {

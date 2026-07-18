@@ -30,6 +30,24 @@ describe('SessionEntry', () => {
     expect(node.textContent).toContain('hi');
   });
 
+  it('renders thinking through the safe Markdown pipeline', () => {
+    const entry = {
+      id: 'thinking',
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking: '**Checking the package**\n\n- inspect exports' }],
+      },
+    };
+    const { container } = render(SessionEntry, { props: { entry, model: model([entry]) } });
+
+    expect(container.querySelector('.thinking-text strong')?.textContent).toBe(
+      'Checking the package',
+    );
+    expect(container.querySelector('.thinking-text li')?.textContent).toBe('inspect exports');
+    expect(container.querySelector('.thinking-text')?.textContent).not.toContain('**');
+  });
+
   it('renders nothing for tool-result entries', () => {
     const entry = {
       id: 'r',

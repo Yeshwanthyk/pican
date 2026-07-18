@@ -76,7 +76,7 @@
         </div>{:else if block.type === 'thinking' && block.thinking.trim()}<div
           class="thinking-block"
         >
-          <div class="thinking-text">{block.thinking}</div>
+          <div class="thinking-text markdown-content">{@html md(block.thinking)}</div>
           <div class="thinking-collapsed">Thinking ...</div>
         </div>{/if}
     {/each}

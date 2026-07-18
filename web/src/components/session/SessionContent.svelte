@@ -31,8 +31,20 @@
         item.breakdown,
         t('session.moreToolNames', { count: item.breakdown.remaining }),
       )}
-      <details class="tool-run-group">
+      <details class="tool-run-group {item.status}" open={item.status === 'error' || undefined}>
         <summary class="tool-run-group-summary">
+          <span
+            class="tool-run-group-status {item.status}"
+            title={t(
+              `session.${item.status === 'error' ? 'failed' : item.status === 'pending' ? 'running' : 'completed'}`,
+            )}
+            aria-hidden="true"
+          ></span>
+          <span class="sr-only">
+            {t(
+              `session.${item.status === 'error' ? 'failed' : item.status === 'pending' ? 'running' : 'completed'}`,
+            )}
+          </span>
           <span class="tool-run-group-count">
             {t('session.toolCalls', { count: item.toolCount })}
           </span>

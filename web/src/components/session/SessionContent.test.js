@@ -101,6 +101,46 @@ describe('SessionContent', () => {
     expect(group.querySelector('#entry-tools')).toBeInTheDocument();
   });
 
+  it('opens a compact tool group when one of its calls fails', () => {
+    const failedEntries = [
+      entries[0],
+      {
+        id: 'tools',
+        parentId: 'root',
+        type: 'message',
+        message: {
+          role: 'assistant',
+          content: ['bash', 'edit'].map((name, index) => ({
+            type: 'toolCall',
+            id: `call-${index}`,
+            name,
+            arguments: {},
+          })),
+        },
+      },
+      {
+        id: 'result-0',
+        parentId: 'tools',
+        type: 'message',
+        message: { role: 'toolResult', toolCallId: 'call-0', content: [], isError: false },
+      },
+      {
+        id: 'result-1',
+        parentId: 'result-0',
+        type: 'message',
+        message: { role: 'toolResult', toolCallId: 'call-1', content: [], isError: true },
+      },
+    ];
+    const model = new SessionDataModel({
+      entries: failedEntries,
+      header: {},
+      leafId: 'result-1',
+    });
+    const { container } = render(SessionContent, { props: { model } });
+
+    expect(container.querySelector('.tool-run-group.error')?.open).toBe(true);
+  });
+
   it('runs afterRender(container) when the path changes', async () => {
     const afterRender = vi.fn();
     const model = new SessionDataModel({ entries, header: {}, leafId: 'leaf' });
