@@ -95,7 +95,7 @@
   <div class="session-project">{session.project}</div>
   {#if modelLabel}
     <div class="session-model-row">
-      <img class="session-card-mark" src="/icon.svg" alt="" aria-hidden="true" />
+      <img class="session-card-mark" src="/pi-icon.svg" alt="" aria-hidden="true" />
       <div class="session-model" data-session-model>{modelLabel}</div>
     </div>
   {/if}
