@@ -43,7 +43,33 @@ describe('session page model helpers', () => {
 
     expect(sessionModel.currentLeafId).toBe('leaf');
     expect(sessionModel.currentTargetId).toBe('leaf');
-    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: 'next' }]);
+    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: 'next' }], undefined);
+
+    resetSessionRuntimeContext();
+  });
+
+  it('passes reconcile options (e.g. isDelta) through to the model', () => {
+    const payloadBase64 = encodeJSON({
+      header: {},
+      entries: [{ id: 'root' }],
+      leafId: 'root',
+    });
+    const sessionModel = {
+      load: vi.fn(function load(data) {
+        Object.assign(this, data);
+      }),
+      reconcile: vi.fn(),
+    };
+
+    hydrateSessionModel({ sessionModel, payloadBase64, windowImpl: window });
+    const runtime = createLiveSessionRuntime({
+      sessionModel,
+      contentRuntime: { afterRender: null },
+      documentImpl: document,
+    });
+
+    runtime.reconcileEntries([{ id: 'next' }], { isDelta: true });
+    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: 'next' }], { isDelta: true });
 
     resetSessionRuntimeContext();
   });

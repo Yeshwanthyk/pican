@@ -34,7 +34,7 @@ export function createLiveSessionRuntime({
     model: sessionModel,
     navigator,
     navigateTo: navigator.navigateTo,
-    reconcileEntries: (entries) => sessionModel.reconcile(entries),
+    reconcileEntries: (entries, opts) => sessionModel.reconcile(entries, opts),
     contentRuntime,
   });
 }

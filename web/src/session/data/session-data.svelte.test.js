@@ -171,6 +171,70 @@ describe('SessionDataModel', () => {
     expect(m.activePath.map((e) => e.id)).toEqual(['mc', 'u1', 'a1']);
   });
 
+  it('reconcile(entries, { isDelta: true }) appends without touching existing entry identity', () => {
+    const m = model();
+    const originalRoot = m.byId.get('root');
+    const originalOld = m.byId.get('old');
+    const originalMid = m.byId.get('mid');
+    const originalLeaf = m.byId.get('leaf');
+    m.navigateTo('leaf');
+
+    const leaf2 = {
+      id: 'leaf2',
+      parentId: 'leaf',
+      timestamp: '2026-01-01T00:04:00Z',
+      type: 'message',
+      message: { role: 'assistant', content: 'more' },
+    };
+    m.reconcile([leaf2], { isDelta: true });
+
+    expect(m.entries).toHaveLength(5);
+    // Existing entries are the exact same object references as before — the
+    // delta path only ever pushes the new tail, it never rebuilds this.entries
+    // from scratch.
+    expect(m.byId.get('root')).toBe(originalRoot);
+    expect(m.byId.get('old')).toBe(originalOld);
+    expect(m.byId.get('mid')).toBe(originalMid);
+    expect(m.byId.get('leaf')).toBe(originalLeaf);
+    // leaf2 is a genuinely new entry — no prior identity to preserve, just
+    // check it landed with the right content (Svelte's $state deeply proxies
+    // pushed objects, so it is never Object.is-equal to the plain literal).
+    expect(m.byId.get('leaf2').message.content).toBe('more');
+    expect(m.currentLeafId).toBe('leaf2');
+    expect(m.nodeMap.get('leaf').children.map((n) => n.entry.id)).toEqual(['leaf2']);
+  });
+
+  it('reconcile(entries) (full resync) reuses existing object references for known ids even when the incoming objects are fresh duplicates', () => {
+    const m = model();
+    const originalRoot = m.byId.get('root');
+    const originalMid = m.byId.get('mid');
+    const originalLeaf = m.byId.get('leaf');
+
+    // Freshly-constructed objects with the same ids/content, as a real fetch
+    // response would produce (never the same reference as what's already in
+    // the model) — plus one genuinely new entry.
+    const freshDuplicates = entries.map((e) => ({ ...e }));
+    const leaf2 = {
+      id: 'leaf2',
+      parentId: 'leaf',
+      timestamp: '2026-01-01T00:04:00Z',
+      type: 'message',
+      message: { role: 'assistant', content: 'more' },
+    };
+    m.reconcile([...freshDuplicates, leaf2]);
+
+    expect(m.entries).toHaveLength(5);
+    expect(m.byId.get('root')).toBe(originalRoot);
+    expect(m.byId.get('mid')).toBe(originalMid);
+    expect(m.byId.get('leaf')).toBe(originalLeaf);
+    // None of the merged entries are the fresh duplicate objects.
+    expect(m.entries).not.toContain(freshDuplicates[0]);
+    expect(m.entries).not.toContain(freshDuplicates[2]);
+    // The genuinely new entry (no prior id) is used as-is (content-wise; see
+    // the isDelta test above for why this isn't a toBe on the plain literal).
+    expect(m.byId.get('leaf2').message.content).toBe('more');
+  });
+
   it('derives the ordered active path (root→leaf)', () => {
     const m = model();
     expect(m.activePath.map((e) => e.id)).toEqual(['root', 'mid', 'leaf']);

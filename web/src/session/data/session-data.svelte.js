@@ -164,21 +164,46 @@ export class SessionDataModel {
     return findNewestLeaf(nodeId, this.nodeMap);
   }
 
-  // Live-reload / load-earlier reconciliation: replace entries in place and
+  // Live-reload / load-earlier reconciliation: merge entries in place and
   // refill the stable lookup maps (all reactive, so the Svelte tree, content
   // pane, and artifact panel update automatically), then advance the active
   // leaf to the newest descendant of the current one (or the last real entry).
   // Unlike load(), this preserves view state and never resets the target unless
   // it was unset.
-  reconcile(entries) {
+  //
+  // `entries` is either:
+  //   • a delta tail (isDelta: true) — just the entries appended since the
+  //     caller's last known count (see /api/session?afterCount=). These are
+  //     pushed onto this.entries as-is; existing entries are never touched, so
+  //     their object identity is trivially preserved.
+  //   • a full list (isDelta: false, the default — also what LoadEarlier.svelte
+  //     passes when prepending older entries) — reconciled by id against the
+  //     current byId map, reusing the existing object for any id already known
+  //     rather than the freshly-fetched duplicate. Session JSONL files are
+  //     append-only once written (renames/labels append new lines rather than
+  //     mutating existing ones — see AGENTS.md), so an existing entry's content
+  //     never changes out from under its id, making reuse-by-id safe: it lets
+  //     components keyed on entry identity (not just id) skip re-rendering
+  //     content that hasn't actually changed.
+  reconcile(entries, { isDelta = false } = {}) {
     if (!Array.isArray(entries)) return;
-    this.entries.splice(0, this.entries.length, ...stitchOrphanRoots(entries));
+    if (isDelta) {
+      const combined = stitchOrphanRoots([...this.entries, ...entries]);
+      this.entries.push(...combined.slice(this.entries.length));
+    } else {
+      const stitched = stitchOrphanRoots(entries);
+      const merged = stitched.map((entry) => (entry?.id && this.byId.get(entry.id)) || entry);
+      this.entries.splice(0, this.entries.length, ...merged);
+    }
     const lk = buildSessionLookups(this.entries);
     refillMap(this.byId, lk.byId);
     refillMap(this.toolCallMap, lk.toolCallMap);
     refillMap(this.labelMap, lk.labelMap);
 
-    const nodeMap = buildTreeNodeMap(buildTree(this.entries, this.labelMap));
+    // Reuse the $derived tree instead of building a second one here — reading
+    // this.nodeMap after the mutations above re-evaluates it synchronously
+    // (Svelte 5 $derived recomputes on read even outside a component/effect).
+    const nodeMap = this.nodeMap;
     let nextLeafId =
       this.currentLeafId && nodeMap.has(this.currentLeafId)
         ? findNewestLeaf(this.currentLeafId, nodeMap)

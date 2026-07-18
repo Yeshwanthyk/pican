@@ -219,6 +219,71 @@ func BenchmarkResolveByIDCached(b *testing.B) {
 	}
 }
 
+// BenchmarkParseFileIncrementalAppend5k is the perf guardrail for the
+// incremental-parsing change: it simulates the steady-state streaming case
+// (a session file that already has 5k lines gets one more message appended,
+// over and over) and compares parseFileCached's tail-only fold against a
+// from-scratch ParseFile on the same growing file. The incremental path's
+// per-append cost should stay flat; the full-reparse path's cost grows with
+// the file, which is exactly the regression this change fixes.
+func BenchmarkParseFileIncrementalAppend5k(b *testing.B) {
+	const baseLines = 5000
+
+	b.Run("incremental_tail_append", func(b *testing.B) {
+		tmp := b.TempDir()
+		cwd := filepath.Join(tmp, "project")
+		os.MkdirAll(cwd, 0755)
+		path := filepath.Join(tmp, "session.jsonl")
+		os.WriteFile(path, []byte(generateLargeSessionContent(baseLines, cwd)), 0644)
+
+		_, state, err := parseFileCached(path, "--bench--project--", "session.jsonl", nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+		prior := &sessionCacheEntry{parse: state}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			appendOneBenchLine(b, path, baseLines+i)
+			sess, newState, err := parseFileCached(path, "--bench--project--", "session.jsonl", prior)
+			if err != nil {
+				b.Fatal(err)
+			}
+			prior = &sessionCacheEntry{session: sess, parse: newState}
+		}
+	})
+
+	b.Run("full_reparse", func(b *testing.B) {
+		tmp := b.TempDir()
+		cwd := filepath.Join(tmp, "project")
+		os.MkdirAll(cwd, 0755)
+		path := filepath.Join(tmp, "session.jsonl")
+		os.WriteFile(path, []byte(generateLargeSessionContent(baseLines, cwd)), 0644)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			appendOneBenchLine(b, path, baseLines+i)
+			if _, err := ParseFile(path, "--bench--project--", "session.jsonl"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func appendOneBenchLine(b *testing.B, path string, msgIndex int) {
+	b.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+	ts := fmt.Sprintf("2026-01-01T%02d:%02d:%02dZ", msgIndex/3600, (msgIndex/60)%60, msgIndex%60)
+	line := `{"type":"message","id":"` + fmt.Sprintf("msg%06d", msgIndex) + `","timestamp":"` + ts + `","message":{"role":"user","content":"appended message ` + fmt.Sprintf("%d", msgIndex) + `","usage":{"totalTokens":50,"cost":{"total":0.001}}}}` + "\n"
+	if _, err := f.WriteString(line); err != nil {
+		b.Fatal(err)
+	}
+}
+
 func BenchmarkSortSummaries100(b *testing.B) {
 	summaries := make([]SessionSummary, 100)
 	for i := range summaries {

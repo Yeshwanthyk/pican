@@ -162,3 +162,149 @@ func TestHandleApiSession_InvalidParamsReturnFull(t *testing.T) {
 		t.Errorf("invalid params: got %d entries, want %d", len(resp.Entries), totalEntries)
 	}
 }
+
+type deltaResponse struct {
+	Entries []map[string]any `json:"entries"`
+	Total   int              `json:"total"`
+	From    int              `json:"from"`
+	DeltaOk bool             `json:"deltaOk"`
+}
+
+func TestHandleApiSession_AfterCountReturnsDelta(t *testing.T) {
+	root := t.TempDir()
+	const messages = 20
+	const totalEntries = messages + 1
+	writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	// Client last saw 15 entries; 6 more (entries[15:21]) exist now.
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=15", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.DeltaOk {
+		t.Fatal("deltaOk = false, want true")
+	}
+	if resp.From != 15 {
+		t.Errorf("from = %d, want 15", resp.From)
+	}
+	if resp.Total != totalEntries {
+		t.Errorf("total = %d, want %d", resp.Total, totalEntries)
+	}
+	if got := len(resp.Entries); got != totalEntries-15 {
+		t.Errorf("got %d delta entries, want %d", got, totalEntries-15)
+	}
+	firstID, _ := resp.Entries[0]["id"].(string)
+	if firstID != "id000014" {
+		t.Errorf("first delta entry id = %q, want id000014", firstID)
+	}
+}
+
+func TestHandleApiSession_AfterCountEqualToTotalReturnsEmptyDelta(t *testing.T) {
+	root := t.TempDir()
+	const messages = 10
+	const totalEntries = messages + 1
+	writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/session?id=s.jsonl&afterCount=%d", totalEntries), nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.DeltaOk {
+		t.Fatal("deltaOk = false, want true (afterCount == total is a valid, just-empty, delta)")
+	}
+	if len(resp.Entries) != 0 {
+		t.Errorf("got %d entries, want 0", len(resp.Entries))
+	}
+}
+
+func TestHandleApiSession_AfterCountBeyondTotalFallsBackToFull(t *testing.T) {
+	root := t.TempDir()
+	const messages = 10
+	const totalEntries = messages + 1
+	writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	// afterCount is bigger than total — simulates a client whose count is out
+	// of sync (e.g. after the session file was replaced). Must self-heal via
+	// a full resync rather than silently returning zero entries.
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=999", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.DeltaOk {
+		t.Fatal("deltaOk = true, want false")
+	}
+	if resp.From != 0 {
+		t.Errorf("from = %d, want 0", resp.From)
+	}
+	if len(resp.Entries) != totalEntries {
+		t.Errorf("got %d entries, want the full %d on fallback", len(resp.Entries), totalEntries)
+	}
+}
+
+func TestHandleApiSession_AfterCountInvalidFallsBackToFull(t *testing.T) {
+	root := t.TempDir()
+	const messages = 10
+	const totalEntries = messages + 1
+	writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=notanumber", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.DeltaOk {
+		t.Fatal("deltaOk = true, want false")
+	}
+	if len(resp.Entries) != totalEntries {
+		t.Errorf("got %d entries, want the full %d on fallback", len(resp.Entries), totalEntries)
+	}
+}
+
+func TestHandleApiSession_NoDeltaOkKeyWhenAfterCountAbsent(t *testing.T) {
+	root := t.TempDir()
+	writeSessionWithNMessages(t, root, "proj", "s.jsonl", 5)
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := resp["deltaOk"]; ok {
+		t.Error("deltaOk key present on a non-delta request; existing callers should see the same shape as before")
+	}
+}

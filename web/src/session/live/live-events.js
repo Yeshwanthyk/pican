@@ -23,11 +23,25 @@ export async function handleSessionReload({
   showFollowButton = () => {},
   onReloaded = () => {},
   onNewEntries = null,
+  getEntryCount = null,
 } = {}) {
-  const response = await fetchImpl('/api/session?id=' + encodeURIComponent(sessionId));
+  // getEntryCount is a live getter into the canonical entry count (typically
+  // model.entries.length), not a value snapshotted once — reading it fresh
+  // here keeps this correct even if something else (e.g. LoadEarlier
+  // prepending older entries) changed the model between reloads. It should
+  // return null/undefined when a from-0 count isn't meaningful (e.g. a
+  // tail-windowed/paginated large session), which disables the delta request.
+  const afterCount = typeof getEntryCount === 'function' ? getEntryCount() : null;
+  const hasValidAfterCount = typeof afterCount === 'number' && afterCount >= 0;
+  let url = '/api/session?id=' + encodeURIComponent(sessionId);
+  if (hasValidAfterCount) {
+    url += '&afterCount=' + afterCount;
+  }
+  const response = await fetchImpl(url);
   const data = await response.json();
   const entries = data.entries || [];
-  onReloaded({ ...data, entries });
+  const isDelta = hasValidAfterCount && data.deltaOk === true;
+  onReloaded({ ...data, entries, isDelta });
   if (typeof data.name === 'string' && data.name.trim()) {
     updateTitle(data.name);
   }

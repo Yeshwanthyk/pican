@@ -49,7 +49,7 @@ describe('live events', () => {
 
     expect(fetchImpl).toHaveBeenCalledWith('/api/session?id=s');
     expect(result.newCount).toBe(2);
-    expect(onReloaded).toHaveBeenCalledWith({ name: 'New Title', entries });
+    expect(onReloaded).toHaveBeenCalledWith({ name: 'New Title', entries, isDelta: false });
     expect(refresh).toHaveBeenCalledWith(entries[1], entries);
     expect(updateStats).toHaveBeenCalledWith(entries);
     expect(updateTitle).toHaveBeenCalledWith('New Title');
@@ -80,12 +80,105 @@ describe('live events', () => {
       onNewEntries,
     });
 
-    expect(onReloaded).toHaveBeenCalledWith({ entries });
+    expect(onReloaded).toHaveBeenCalledWith({ entries, isDelta: false });
     expect(result.newCount).toBe(1);
     expect(entryState.seen.has('b')).toBe(true);
     expect(onNewEntries).toHaveBeenCalledWith(['b']);
     expect(clearChatPreview).toHaveBeenCalled();
     expect(scrollAfterLayout).toHaveBeenCalledWith(true);
+  });
+
+  it('requests a delta with afterCount and flags isDelta when the server confirms deltaOk', async () => {
+    const deltaEntries = [{ id: 'c' }, { id: 'd' }];
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ entries: deltaEntries, deltaOk: true, from: 2, total: 4 }), {
+          status: 200,
+        }),
+      ),
+    );
+    const entryState = { seen: new Set(['a', 'b']), liveRendered: new Set() };
+    const onReloaded = vi.fn();
+    const getEntryCount = vi.fn(() => 2);
+
+    const result = await handleSessionReload({
+      sessionId: 's',
+      fetchImpl,
+      entryState,
+      clearChatPreview: vi.fn(),
+      isFollowing: () => true,
+      scrollAfterLayout: vi.fn(),
+      onReloaded,
+      getEntryCount,
+    });
+
+    expect(getEntryCount).toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledWith('/api/session?id=s&afterCount=2');
+    expect(onReloaded).toHaveBeenCalledWith({
+      entries: deltaEntries,
+      deltaOk: true,
+      from: 2,
+      total: 4,
+      isDelta: true,
+    });
+    // The new-id detection loop still works correctly on a delta-only tail:
+    // both ids in the delta are genuinely new against entryState.seen.
+    expect(result.newCount).toBe(2);
+  });
+
+  it('falls back to a full resync (isDelta: false) when the server reports deltaOk: false', async () => {
+    const fullEntries = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ entries: fullEntries, deltaOk: false, from: 0, total: 3 }), {
+          status: 200,
+        }),
+      ),
+    );
+    const entryState = { seen: new Set(['a']), liveRendered: new Set() };
+    const onReloaded = vi.fn();
+    // Client thinks it has 99 entries (stale/out-of-sync count) — the server
+    // rejects the delta and self-heals with the full list instead.
+    const getEntryCount = vi.fn(() => 99);
+
+    await handleSessionReload({
+      sessionId: 's',
+      fetchImpl,
+      entryState,
+      clearChatPreview: vi.fn(),
+      isFollowing: () => true,
+      scrollAfterLayout: vi.fn(),
+      onReloaded,
+      getEntryCount,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith('/api/session?id=s&afterCount=99');
+    expect(onReloaded).toHaveBeenCalledWith({
+      entries: fullEntries,
+      deltaOk: false,
+      from: 0,
+      total: 3,
+      isDelta: false,
+    });
+  });
+
+  it('does not append afterCount when getEntryCount returns null (e.g. a truncated/paginated session)', async () => {
+    const entries = [{ id: 'a' }];
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({ entries }), { status: 200 })),
+    );
+    const entryState = { seen: new Set(), liveRendered: new Set() };
+
+    await handleSessionReload({
+      sessionId: 's',
+      fetchImpl,
+      entryState,
+      clearChatPreview: vi.fn(),
+      onReloaded: vi.fn(),
+      getEntryCount: () => null,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith('/api/session?id=s');
   });
 
   it('scrolls instead of showing the button when at the bottom but follow flag is stale', async () => {
