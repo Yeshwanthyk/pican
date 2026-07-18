@@ -20,12 +20,8 @@ describe('session page layout helpers', () => {
     expect(document.body.classList.contains('pi-session-page')).toBe(false);
   });
 
-  it('applies stored sidebar and right-sidebar state', () => {
-    const storage = new Map([
-      ['pi-share:v1:sidebar-collapsed', 'true'],
-      ['pi-share:v1:sidebar-width', '321'],
-      ['pi-web:v1:right-sidebar-width', '456'],
-    ]);
+  it('applies stored right-sidebar state', () => {
+    const storage = new Map([['pi-web:v1:right-sidebar-width', '456']]);
     const windowImpl = {
       matchMedia: vi.fn(() => ({ matches: true })),
     };
@@ -36,9 +32,7 @@ describe('session page layout helpers', () => {
       storage: { getItem: (key) => storage.get(key) ?? null },
     });
 
-    expect(document.body.classList.contains('sidebar-collapsed')).toBe(true);
     expect(document.body.classList.contains('right-sidebar-collapsed')).toBe(true);
-    expect(document.documentElement.style.getPropertyValue('--sidebar-width')).toBe('321px');
     expect(document.documentElement.style.getPropertyValue('--right-sidebar-width')).toBe('456px');
   });
 });

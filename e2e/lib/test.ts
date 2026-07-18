@@ -63,4 +63,29 @@ export async function collapseScratchpad(
   });
 }
 
+/**
+ * Wait until the session app has rendered its first message entry — a
+ * readiness gate that does not depend on the tree overlay being open (the
+ * conversation tree is an on-demand FullScreenSheet, not a persistent
+ * sidebar; its nodes are absent from the DOM until opened).
+ */
+export async function waitForSessionReady(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.locator('#messages [id^="entry-"]').first().waitFor({ state: "attached" });
+}
+
+/**
+ * Open the on-demand session tree overlay via the header toggle and wait for
+ * its sheet to be visible. Dispatched directly to the button (not `.click()`)
+ * because on narrow viewports the long session title shares the header row
+ * and wins coordinate hit-testing at the button's center.
+ */
+export async function openTree(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.locator("#tree-toggle").dispatchEvent("click");
+  await page.locator(".tree-sheet-panel").waitFor({ state: "visible" });
+}
+
 export { expect };

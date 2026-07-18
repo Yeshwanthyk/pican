@@ -20,6 +20,8 @@
     sessionModals,
     hasDiffUrlParam,
     syncDiffUrlParam,
+    hasTreeUrlParam,
+    syncTreeUrlParam,
   } from '../../session/session-modals.svelte.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
 
@@ -60,6 +62,19 @@
     if (!diffRestored) return;
     syncDiffUrlParam(sessionModals.diff.open);
   });
+
+  // Same restore/sync pattern for the tree overlay's `?tree=open`.
+  let treeRestored = false;
+  $effect(() => {
+    if (treeRestored) return;
+    treeRestored = true;
+    if (hasTreeUrlParam()) sessionModals.tree.open = true;
+  });
+
+  $effect(() => {
+    if (!treeRestored) return;
+    syncTreeUrlParam(sessionModals.tree.open);
+  });
 </script>
 
 <SessionHeader {title} {cwd} {sessionId} />
@@ -70,9 +85,7 @@
      "message sent" listener is attached before the user can send. -->
 <LiveReload />
 
-<div id="sidebar-overlay"></div>
 <div id="app">
-  <SessionTree />
   <div id="content-container" class="content-container">
     <main id="content">
       <div id="header-container"><SessionInfoHeader model={sessionModel} /></div>
@@ -101,6 +114,7 @@
   onSave={sessionModals.label.onSave}
 />
 <DiffModal bind:open={sessionModals.diff.open} sessionId={sessionModals.diff.sessionId} />
+<SessionTree bind:open={sessionModals.tree.open} />
 
 <ShareDialog {sessionId} />
 <BtwPopup {cwd} parentId={sessionId} />

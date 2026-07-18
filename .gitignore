@@ -22,3 +22,4 @@ website/src/
 website/dist/
 website/.vitepress/cache/
 website/.vitepress/locales.generated.json
+.claude/

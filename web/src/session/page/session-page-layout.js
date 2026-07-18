@@ -17,19 +17,6 @@ export function applyStoredSessionLayout({
   if (!documentImpl || !storage) return;
 
   try {
-    if (storage.getItem('pi-share:v1:sidebar-collapsed') === 'true') {
-      documentImpl.body.classList.add('sidebar-collapsed');
-    }
-  } catch {}
-
-  try {
-    const width = Number(storage.getItem('pi-share:v1:sidebar-width'));
-    if (Number.isFinite(width) && width > 0) {
-      documentImpl.documentElement.style.setProperty('--sidebar-width', `${Math.round(width)}px`);
-    }
-  } catch {}
-
-  try {
     const collapsed = storage.getItem('pi-web:v1:right-sidebar-collapsed');
     const mobile = isMobileLayout({ windowImpl });
     if (collapsed === 'true' || mobile) {

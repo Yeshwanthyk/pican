@@ -1,4 +1,4 @@
-import { test, expect } from "../lib/test";
+import { test, expect, openTree } from "../lib/test";
 
 async function openDemoSession(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -9,6 +9,7 @@ async function openDemoSession(page: import("@playwright/test").Page) {
 test.describe("session viewer", () => {
   test("renders the conversation tree", async ({ page }) => {
     await openDemoSession(page);
+    await openTree(page);
 
     const nodes = page.locator("#tree-container .tree-node");
     await expect(nodes.first()).toBeVisible();
@@ -27,6 +28,7 @@ test.describe("session viewer", () => {
 
   test("renders assistant + tool entries from fixture", async ({ page }) => {
     await openDemoSession(page);
+    await openTree(page);
 
     // Tree node display tags roles; assistant entries must be present.
     await expect(

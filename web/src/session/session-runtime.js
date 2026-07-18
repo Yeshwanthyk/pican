@@ -12,13 +12,11 @@
 export const sessionRuntime = {
   artifacts: null, // { setArtifacts, selectArtifact, getArtifact, getCount, ... }
   rightSidebar: null, // { toggle, open, collapse, activateTab }
-  layout: null, // { isMobileLayout, closeSidebar }
   toggleState: null, // toggle controller { applyToNode, toggleThinking, ... }
 };
 
 export function resetSessionRuntime() {
   sessionRuntime.artifacts = null;
   sessionRuntime.rightSidebar = null;
-  sessionRuntime.layout = null;
   sessionRuntime.toggleState = null;
 }

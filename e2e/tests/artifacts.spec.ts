@@ -1,4 +1,4 @@
-import { test, expect } from "../lib/test";
+import { test, expect, waitForSessionReady } from "../lib/test";
 import { buildSession, uniqueSessionName, writeSession } from "../lib/sessions";
 
 /**
@@ -138,14 +138,10 @@ async function seedArtifactSetting(
 }
 
 async function openArtifactsTab(page: import("@playwright/test").Page) {
-  // Wait until the session app has initialized (a populated tree) so the sidebar
-  // collapse state has settled — reading it too early made the tab click race
-  // the slide-in animation and miss ("element outside viewport"). `attached`
-  // because the tree sidebar is hidden on mobile.
-  await page
-    .locator("#tree-container .tree-node")
-    .first()
-    .waitFor({ state: "attached" });
+  // Wait until the session app has initialized (a populated message pane) so
+  // the sidebar collapse state has settled — reading it too early made the
+  // tab click race the slide-in animation and miss ("element outside viewport").
+  await waitForSessionReady(page);
   // The right sidebar is open by default on desktop but collapsed on mobile;
   // toggle it open only when collapsed so we don't accidentally close it.
   const collapsed = await page.evaluate(() =>

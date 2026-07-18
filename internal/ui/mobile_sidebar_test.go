@@ -6,10 +6,11 @@ import (
 	"testing"
 )
 
-// Mobile sidebar close-on-navigate is implemented in the shared sidebar module
-// plus the tree node-click handler. After the tree-renderer.js -> Svelte
-// <SessionTreeNodes> migration, that handler lives in SessionTree.svelte (live)
-// and export-entry.js (static export). Assert against the source.
+// Navigating from the tree must never leave it stuck over the chat. In the
+// live app the tree is a FullScreenSheet overlay that closes via closeTree()
+// on every viewport; the static export keeps the docked drawer, whose mobile
+// close-on-navigate lives in sidebar.js + export-entry.js. Assert against the
+// source.
 func TestMobileSidebarClosesWhenNavigatingTree(t *testing.T) {
 	sidebarSrc, err := os.ReadFile(repoPath("web/src/session/ui/sidebar.js"))
 	if err != nil {
@@ -32,8 +33,8 @@ func TestMobileSidebarClosesWhenNavigatingTree(t *testing.T) {
 			t.Fatalf("sidebar.js missing %q; mobile sidebar can remain stuck over chat", check)
 		}
 	}
-	if !strings.Contains(string(liveTreeSrc), "sessionRuntime.layout?.closeSidebar") {
-		t.Fatal("SessionTree.svelte missing mobile close-on-navigate; sidebar can remain stuck over chat")
+	if !strings.Contains(string(liveTreeSrc), "closeTree()") {
+		t.Fatal("SessionTree.svelte missing close-on-navigate; tree overlay can remain stuck over chat")
 	}
 	if !strings.Contains(string(exportSrc), "ui.closeSidebar()") {
 		t.Fatal("export-entry.js missing mobile close-on-navigate; sidebar can remain stuck over chat")

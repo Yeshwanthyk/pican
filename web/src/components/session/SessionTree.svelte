@@ -1,43 +1,41 @@
 <script>
-  import { icon, PanelLeftClose, X } from '../../shared/icons.js';
+  // On-demand conversation-branch tree, opened as a FullScreenSheet overlay
+  // (centered dialog on desktop, bottom sheet on mobile) — same pattern as
+  // DiffModal. Replaces the old persistent docked `<aside id="sidebar">`.
+  import FullScreenSheet from './FullScreenSheet.svelte';
   import { t } from '../../shared/i18n.js';
   import { getSessionModel } from '../../session/session-context.js';
-  import { sessionRuntime } from '../../session/session-runtime.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
+  import { closeTree } from '../../session/session-modals.svelte.js';
   import SessionTreeNodes from './SessionTreeNodes.svelte';
+
+  let { open = $bindable(false) } = $props();
 
   const model = getSessionModel();
 
   // Route a tree-node click through the shared navigator so message content
   // scrolls after the reactive render. Navigate to the newest leaf under the
-  // clicked node, with the clicked node as the scroll target; auto-close the
-  // drawer on mobile.
+  // clicked node, with the clicked node as the scroll target, and close the
+  // overlay — on every viewport, since the tree is now an on-demand sheet
+  // rather than a persistent panel.
   function onNavigate(id) {
     const leaf = model?.newestLeaf(id) || id;
     const navigateTo = getSessionRuntime().navigateTo;
     navigateTo?.(leaf, 'target', id);
-    if (sessionRuntime.layout?.isMobileLayout?.()) sessionRuntime.layout?.closeSidebar?.();
+    closeTree();
   }
 </script>
 
-<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
-
-<aside id="sidebar">
+<FullScreenSheet
+  bind:open
+  title={t('menu.tree')}
+  backdropClass="tree-sheet-backdrop"
+  panelClass="tree-sheet-panel"
+  bodyClass="tree-sheet-body"
+>
   <div class="sidebar-header">
     <div class="sidebar-controls">
-      <input
-        type="text"
-        class="sidebar-search"
-        id="tree-search"
-        placeholder={t('common.search')}
-      /><button id="hide-sidebar" class="hide-sidebar" title={t('session.hideSidebar')}
-        >{@html icon(PanelLeftClose, { size: 14 })}</button
-      ><button
-        id="sidebar-close"
-        class="sidebar-close"
-        title={t('common.close')}
-        aria-label={t('session.closeTree')}>{@html icon(X, { size: 14 })}</button
-      >
+      <input type="text" class="sidebar-search" id="tree-search" placeholder={t('common.search')} />
     </div>
     <div class="sidebar-filters">
       <button
@@ -60,10 +58,7 @@
       id="tree-container"
     ></div>
     <div class="tree-status" id="tree-status"></div>{/if}
-</aside>
-<div
-  id="sidebar-resizer"
-  role="separator"
-  aria-orientation="vertical"
-  aria-label={t('session.resizeTree')}
-></div>
+</FullScreenSheet>
+
+<!-- Styles live in internal/ui/embedded/styles/session.css (the app loads global
+     stylesheets, not Svelte-scoped <style> blocks — see ModelUsageModal). -->

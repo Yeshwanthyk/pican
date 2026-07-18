@@ -1,4 +1,4 @@
-import { expect, test, isMobileLayout } from "../lib/test";
+import { expect, test, openTree } from "../lib/test";
 import { buildSession, uniqueSessionName, writeSession } from "../lib/sessions";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,14 +19,12 @@ test.describe("session labels", () => {
     await page.locator('#label-modal-input').fill('Review checkpoint');
     await page.locator('.label-modal-save').click();
 
-    await expect(page.locator("#tree-container .tree-label", { hasText: "[Review checkpoint]" })).toBeVisible();
+    // The tree is an on-demand overlay; open it so its nodes/filter controls
+    // are in the DOM and clickable.
+    await page.locator("#tree-toggle").dispatchEvent("click");
+    await expect(page.locator(".tree-sheet-panel")).toBeVisible();
 
-    // On mobile the tree is an off-screen drawer; open it so its filter controls
-    // are in the viewport and clickable.
-    if (await isMobileLayout(page)) {
-      await page.locator("#tree-toggle").dispatchEvent("click");
-      await expect(page.locator("#sidebar")).toHaveClass(/open/);
-    }
+    await expect(page.locator("#tree-container .tree-label", { hasText: "[Review checkpoint]" })).toBeVisible();
 
     await page.locator('.filter-btn[data-filter="labeled-only"]').click();
     await expect(page.locator("#tree-container .tree-node")).toHaveCount(1);
@@ -54,11 +52,19 @@ test.describe("session labels", () => {
     const id = writeSession(sessionsDir, name, entries);
 
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
+    await openTree(page);
     await expect(page.locator("#tree-container .tree-label", { hasText: "[Old label]" })).toBeVisible();
+
+    // The tree overlay's backdrop covers the message pane; close it before
+    // interacting with the entry's label button.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".tree-sheet-panel")).toBeHidden();
+
     await page.locator(`#entry-${lastId} .label-btn`).click({ force: true });
     await expect(page.locator('.label-modal-remove')).toBeVisible();
     await page.locator('.label-modal-remove').click();
 
+    await openTree(page);
     await expect(page.locator("#tree-container .tree-label", { hasText: "[Old label]" })).toHaveCount(0);
     const file = readFileSync(join(sessionsDir, "--home-user-demo-project--", name), "utf8")
       .trim()

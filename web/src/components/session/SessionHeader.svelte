@@ -6,6 +6,7 @@
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
+  import { openTree } from '../../session/session-modals.svelte.js';
   let { title = 'Session', cwd = '', sessionId = '' } = $props();
 
   // The title prop seeds the shared store (and re-seeds it on session switch);
@@ -103,7 +104,8 @@
       class="session-header-actions session-header-tree-toggle"
       title={t('session.toggleTree')}
       aria-label={t('session.toggleTree')}
-      aria-pressed="true">{@html icon(PanelLeft, { size: 14 })}</button
+      aria-haspopup="dialog"
+      onclick={() => openTree()}>{@html icon(PanelLeft, { size: 14 })}</button
     >
   </div>
   <span class="session-header-title" id="session-header-title">{sessionTitle.name || title}</span>

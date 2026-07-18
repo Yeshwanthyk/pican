@@ -1,4 +1,4 @@
-import { test, expect } from "../lib/test";
+import { test, expect, waitForSessionReady } from "../lib/test";
 import {
   buildSession,
   realWorkingDir,
@@ -39,15 +39,8 @@ function gitRepoWithChanges(): string {
   return dir;
 }
 
-async function waitSessionReady(page: Page) {
-  await page
-    .locator("#tree-container .tree-node")
-    .first()
-    .waitFor({ state: "attached" });
-}
-
 async function openDiffModal(page: Page) {
-  await waitSessionReady(page);
+  await waitForSessionReady(page);
   await page.locator("#command-menu-btn").click();
   await page.locator('#command-menu-popover [data-action="diff"]').click();
   await expect(page.locator(".diff-toolbar")).toBeVisible();

@@ -27,7 +27,12 @@
   import { openVersionModal } from '../../shared/version.js';
   import { navigate } from '../../shared/navigation.js';
   import { openSessionPalette } from '../../shared/command-palette-runtime.js';
-  import { openModelUsage, openFork, openDiff } from '../../session/session-modals.svelte.js';
+  import {
+    openModelUsage,
+    openFork,
+    openDiff,
+    openTree,
+  } from '../../session/session-modals.svelte.js';
   import { showToast } from '../../shared/toast.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
   import {
@@ -185,8 +190,7 @@
           closeMenu();
           break;
         case 'tree':
-          if (isMobile()) sidebarApi.setSidebarOpen(true, { documentImpl: document });
-          else sidebarApi.setSidebarCollapsed(false, { documentImpl: document });
+          openTree();
           closeMenu();
           break;
         case 'model-usage':

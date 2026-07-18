@@ -26,12 +26,10 @@ describe('setupSessionGlobals — keyboard shortcuts', () => {
 
   beforeEach(() => {
     document.body.innerHTML = `
-      <aside id="sidebar"></aside>
       <button id="new-btn"></button>
       <button id="shortcuts-help-btn"></button>
       <button id="new-session-header-btn"></button>
     `;
-    document.body.classList.remove('sidebar-collapsed');
     window.matchMedia = vi.fn(() => ({
       matches: false,
       addEventListener: vi.fn(),
@@ -68,10 +66,12 @@ describe('setupSessionGlobals — keyboard shortcuts', () => {
     expect(click).toHaveBeenCalledOnce();
   });
 
-  it('Cmd+B toggles the sidebar-collapsed body class on desktop', () => {
-    expect(document.body.classList.contains('sidebar-collapsed')).toBe(false);
+  it('Cmd+B toggles the tree overlay', () => {
+    expect(sessionModals.tree.open).toBe(false);
     dispatchKey('b', { meta: true });
-    expect(document.body.classList.contains('sidebar-collapsed')).toBe(true);
+    expect(sessionModals.tree.open).toBe(true);
+    dispatchKey('b', { meta: true });
+    expect(sessionModals.tree.open).toBe(false);
   });
 
   it('Cmd+Shift+N toggles the right sidebar via the runtime registry', () => {

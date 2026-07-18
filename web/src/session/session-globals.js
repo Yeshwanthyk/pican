@@ -7,10 +7,9 @@
 // the mobile visual-viewport / scroll-lock handlers.
 
 import * as doneNotifier from './chat/done-notifier.js';
-import * as sidebarApi from './ui/sidebar.js';
 import { openSessionPalette } from '../shared/command-palette-runtime.js';
 import { setupKeyboardNav } from '../shared/keyboard-nav.js';
-import { openShortcuts } from './session-modals.svelte.js';
+import { openShortcuts, toggleTree } from './session-modals.svelte.js';
 import { sessionRuntime } from './session-runtime.js';
 import { toggleTheme, syncThemeIcons } from '../shared/theme.js';
 
@@ -48,20 +47,11 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
     }
   });
 
-  // Cmd+B — toggle sidebar/tree
+  // Cmd+B — toggle the session tree overlay
   on(target, 'keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
       e.preventDefault();
-      const sidebar = documentImpl.getElementById('sidebar');
-      if (sidebarApi.isMobileLayout({ windowImpl: target })) {
-        const isOpen = sidebar?.classList.contains('open');
-        sidebarApi.setSidebarOpen(!isOpen, { documentImpl });
-      } else {
-        const isCollapsed = documentImpl.body?.classList.contains('sidebar-collapsed');
-        const next = !isCollapsed;
-        sidebarApi.setSidebarCollapsed(next, { documentImpl });
-        sidebarApi.saveSidebarCollapsed(next);
-      }
+      toggleTree();
     }
   });
 

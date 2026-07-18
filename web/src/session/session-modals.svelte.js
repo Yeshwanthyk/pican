@@ -13,6 +13,7 @@ export const sessionModals = $state({
   fork: { open: false, entries: [], onSelect: null },
   label: { open: false, entryId: '', currentLabel: '', onSave: null },
   diff: { open: false, sessionId: '' },
+  tree: { open: false },
 });
 
 export function openShortcuts() {
@@ -45,6 +46,18 @@ export function openDiff({ sessionId = '' } = {}) {
   sessionModals.diff.open = true;
 }
 
+export function openTree() {
+  sessionModals.tree.open = true;
+}
+
+export function closeTree() {
+  sessionModals.tree.open = false;
+}
+
+export function toggleTree() {
+  sessionModals.tree.open = !sessionModals.tree.open;
+}
+
 // The diff modal's open state is mirrored to a `?diff=open` query param so a
 // page refresh restores the open sheet. SessionShell drives this — calling
 // syncDiffUrlParam whenever sessionModals.diff.open flips, and restoring from
@@ -74,6 +87,31 @@ export function hasDiffUrlParam({ windowImpl } = {}) {
   return new URL(win.location.href).searchParams.get(DIFF_URL_PARAM) === DIFF_URL_VALUE;
 }
 
+// The session tree overlay mirrors its open state to `?tree=open`, exactly
+// like the diff sheet above — SessionShell drives syncTreeUrlParam/restore the
+// same way.
+export const TREE_URL_PARAM = 'tree';
+export const TREE_URL_VALUE = 'open';
+
+export function syncTreeUrlParam(open, { windowImpl } = {}) {
+  const win = windowImpl ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!win) return;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-shot read+mutate, fed to replaceState; not reactive state
+  const url = new URL(win.location.href);
+  const has = url.searchParams.get(TREE_URL_PARAM) === TREE_URL_VALUE;
+  if (open === has) return;
+  if (open) url.searchParams.set(TREE_URL_PARAM, TREE_URL_VALUE);
+  else url.searchParams.delete(TREE_URL_PARAM);
+  win.history.replaceState(win.history.state, '', url);
+}
+
+export function hasTreeUrlParam({ windowImpl } = {}) {
+  const win = windowImpl ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!win) return false;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-shot read of location, not reactive state
+  return new URL(win.location.href).searchParams.get(TREE_URL_PARAM) === TREE_URL_VALUE;
+}
+
 export function resetSessionModals() {
   sessionModals.shortcuts = false;
   sessionModals.modelUsage = false;
@@ -86,4 +124,5 @@ export function resetSessionModals() {
   sessionModals.label.onSave = null;
   sessionModals.diff.open = false;
   sessionModals.diff.sessionId = '';
+  sessionModals.tree.open = false;
 }

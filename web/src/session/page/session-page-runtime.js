@@ -1,7 +1,6 @@
 import { marked } from 'marked';
 import { wireSessionContentRuntime } from '../session-content-runtime.js';
 import { setupSessionGlobals } from '../session-globals.js';
-import { sessionRuntime } from '../session-runtime.js';
 import { configureSessionMarkdown, safeMarkedParse } from '../render/markdown.js';
 import { setupSessionUi } from '../ui/session-ui-runner.js';
 import * as sidebarApi from '../ui/sidebar.js';
@@ -64,7 +63,6 @@ export function startSessionPageRuntime({
     navigateTo,
   });
 
-  sessionRuntime.layout = { isMobileLayout: ui.isMobileLayout, closeSidebar: ui.closeSidebar };
   ui.attachHeaderHandlers();
   // Catch up the toggle state to whatever the server returned, once it lands.
   // hydrated may be null when fetch isn't configured (export bundle / tests).

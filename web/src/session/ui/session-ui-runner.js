@@ -30,22 +30,25 @@ export function setupSessionUi({
     navigateTo,
   });
 
+  // The live app's tree is a FullScreenSheet overlay (see SessionTree.svelte);
+  // this hamburger/overlay/close wiring only matters for the static export's
+  // simplified docked sidebar, whose only mobile affordance is this drawer.
+  // The elements are absent in the live DOM, so this is a no-op there.
   const isMobileLayout = () => sidebarApi.isMobileLayout({ windowImpl });
-  sidebarApi.setupSidebarResize({ documentImpl, windowImpl, storage });
-  sidebarApi.setupSidebarCollapse({ documentImpl, windowImpl, storage });
   const closeSidebar = () => sidebarApi.setSidebarOpen(false, { documentImpl });
+  const openSidebar = () => sidebarApi.setSidebarOpen(true, { documentImpl });
   const overlayEl = documentImpl.getElementById('sidebar-overlay');
-  if (overlayEl) {
-    overlayEl.addEventListener('click', closeSidebar);
-    overlayEl.addEventListener(
-      'touchstart',
-      (e) => {
-        e.preventDefault();
-        closeSidebar();
-      },
-      { passive: false },
-    );
-  }
+  overlayEl?.addEventListener('click', closeSidebar);
+  overlayEl?.addEventListener(
+    'touchstart',
+    (e) => {
+      e.preventDefault();
+      closeSidebar();
+    },
+    { passive: false },
+  );
+  documentImpl.getElementById('hamburger')?.addEventListener('click', openSidebar);
+  documentImpl.getElementById('sidebar-close')?.addEventListener('click', closeSidebar);
 
   const toggleController = toggleStateApi.createToggleController({
     documentImpl,

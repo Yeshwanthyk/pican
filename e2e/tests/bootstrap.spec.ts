@@ -1,4 +1,4 @@
-import { test, expect } from "../lib/test";
+import { test, expect, openTree } from "../lib/test";
 import {
   buildSession,
   realWorkingDir,
@@ -24,6 +24,7 @@ test.describe("session bootstrap (embedded payload)", () => {
 
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
     await expect(page.locator("#messages")).toContainText("Initial");
+    await openTree(page);
     await expect(page.locator("#tree-container .tree-node").first()).toBeVisible();
 
     const hasBootstrap = await page.evaluate(
