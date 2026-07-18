@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTheme, toggleTheme } from './theme.js';
+import { applyTheme, THEME_IDS, toggleTheme } from './theme.js';
 
 function fakeStorage() {
   const values = new Map();
@@ -48,6 +48,23 @@ describe('theme helpers', () => {
     expect(documentImpl._meta.content).toBe('#1a1b26');
   });
 
+  it('uses the active community theme chrome variable in window-controls-overlay mode', () => {
+    const storage = fakeStorage();
+    const documentImpl = fakeDocument();
+    const windowImpl = {
+      localStorage: storage,
+      navigator: { windowControlsOverlay: { visible: true } },
+      getComputedStyle: () => ({
+        getPropertyValue: (property) => (property === '--chrome-bg' ? '  #181825  ' : ''),
+      }),
+    };
+
+    applyTheme(windowImpl, documentImpl, 'catppuccin-mocha');
+
+    expect(documentImpl.documentElement.style.backgroundColor).toBe('#181825');
+    expect(documentImpl._meta.content).toBe('#181825');
+  });
+
   it('falls back to the dark background when custom defines no --body-bg', () => {
     const storage = fakeStorage();
     const documentImpl = fakeDocument();
@@ -72,5 +89,17 @@ describe('theme helpers', () => {
 
     expect(documentImpl.documentElement.dataset.theme).toBe('custom');
     expect(storage.getItem('pi-web-theme')).toBe('custom');
+  });
+
+  it('cycles through the full theme registry and wraps to dark', () => {
+    const storage = fakeStorage();
+    const documentImpl = fakeDocument();
+    const windowImpl = { localStorage: storage, navigator: {} };
+    documentImpl.documentElement.dataset.theme = 'kanagawa-wave';
+
+    toggleTheme(windowImpl, documentImpl);
+
+    expect(THEME_IDS).toHaveLength(15);
+    expect(documentImpl.documentElement.dataset.theme).toBe('dark');
   });
 });

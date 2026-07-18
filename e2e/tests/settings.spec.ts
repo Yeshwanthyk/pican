@@ -76,6 +76,89 @@ test.describe("settings page", () => {
       .toBe("rgb(1, 2, 3)");
   });
 
+  test("community themes reach shell, message, tool, and content tokens", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "Desktop Chrome",
+      "the shared CSS cascade only needs one representative browser",
+    );
+
+    await page.goto("/settings");
+    await openSection(page, "appearance");
+    const select = page.locator('[data-setting="pi-web-theme"]');
+    const previous = await select.inputValue();
+
+    const themes = {
+      "catppuccin-mocha": ["#1e1e2e", "#181825", "#313244"],
+      "catppuccin-latte": ["#eff1f5", "#e6e9ef", "#dce0e8"],
+      "gruvbox-dark": ["#282828", "#32302f", "#3c3836"],
+      "tokyo-night": ["#1a1b26", "#16161e", "#1f2335"],
+      "rose-pine": ["#191724", "#1f1d2e", "#26233a"],
+      "github-dark": ["#0d1117", "#010409", "#161b22"],
+      "github-light": ["#ffffff", "#f6f8fa", "#eaeef2"],
+      "one-dark-pro": ["#282c34", "#21252b", "#2c313a"],
+      "everforest-dark": ["#2d353b", "#232a2e", "#374247"],
+      "kanagawa-wave": ["#1f1f28", "#16161d", "#2a2a37"],
+    };
+
+    for (const [theme, [body, surface, message]] of Object.entries(themes)) {
+      const savedTheme = page.waitForResponse(
+        (r) =>
+          r.url().includes("/api/settings") && r.request().method() === "POST",
+      );
+      await select.selectOption(theme);
+      await savedTheme;
+
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const root = getComputedStyle(document.documentElement);
+            return [
+              root.getPropertyValue("--body-bg").trim(),
+              root.getPropertyValue("--surface").trim(),
+              root.getPropertyValue("--userMessageBg").trim(),
+            ];
+          }),
+        )
+        .toEqual([body, surface, message]);
+    }
+
+    const savedRepresentative = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/settings") && r.request().method() === "POST",
+    );
+    await select.selectOption("catppuccin-mocha");
+    await savedRepresentative;
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const root = getComputedStyle(document.documentElement);
+          return {
+            body: getComputedStyle(document.body).backgroundColor,
+            toolError: root.getPropertyValue("--toolErrorBg").trim(),
+            markdownLink: root.getPropertyValue("--mdLink").trim(),
+            syntaxString: root.getPropertyValue("--syntaxString").trim(),
+          };
+        }),
+      )
+      .toEqual({
+        body: "rgb(30, 30, 46)",
+        toolError: "#585b70",
+        markdownLink: "#89b4fa",
+        syntaxString: "#a6e3a1",
+      });
+
+    if (previous !== "catppuccin-mocha") {
+      const restored = page.waitForResponse(
+        (r) =>
+          r.url().includes("/api/settings") && r.request().method() === "POST",
+      );
+      await select.selectOption(previous);
+      await restored;
+    }
+  });
+
   // Settings persist in one global server-side store; running this on all 7
   // projects in parallel would race on the same key. Persistence is
   // browser-independent, so verify it on a single project.
@@ -279,8 +362,7 @@ test.describe("settings page", () => {
       // off and assert the change is POSTed.
       const saved = page.waitForResponse(
         (r) =>
-          r.url().includes("/api/settings") &&
-          r.request().method() === "POST",
+          r.url().includes("/api/settings") && r.request().method() === "POST",
       );
       await page.locator(thinkingLabel).click();
       await saved;
@@ -442,9 +524,7 @@ test.describe("settings page", () => {
         .locator(".session-card", { hasText: "add deepseek-v4-pro" })
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
-      const toolOutputBtn = page.locator(
-        '[data-action="toggle-tool-output"]',
-      );
+      const toolOutputBtn = page.locator('[data-action="toggle-tool-output"]');
       await expect(toolOutputBtn).toBeEnabled();
       await page.locator('[data-action="toggle-tools"]').click();
       await expect(toolOutputBtn).toBeDisabled();
@@ -466,8 +546,7 @@ test.describe("settings page", () => {
       await expect(toolOutputsInput).toBeEnabled();
       const offSaved = page.waitForResponse(
         (r) =>
-          r.url().includes("/api/settings") &&
-          r.request().method() === "POST",
+          r.url().includes("/api/settings") && r.request().method() === "POST",
       );
       await page.locator(toolsLabel).click();
       await offSaved;
