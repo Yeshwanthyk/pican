@@ -321,7 +321,6 @@ export default {
   'git.createPrManually': 'បង្កើត PR ដោយដៃ',
   'git.viewPr': 'មើល PR',
   'git.mergePr': 'បញ្ចូល PR',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'មិនបានកំណត់ GitHub remote',
   'git.renameFailed': 'ប្ដូរឈ្មោះបរាជ័យ',
   'git.currentBranch': 'សាខាបច្ចុប្បន្ន',

@@ -322,7 +322,6 @@ export default {
   'git.createPrManually': 'ສ້າງ PR ດ້ວຍຕົນເອງ',
   'git.viewPr': 'ເບິ່ງ PR',
   'git.mergePr': 'ລວມ PR',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'ບໍ່ໄດ້ກຳນົດ GitHub remote',
   'git.renameFailed': 'ປ່ຽນຊື່ບໍ່ສຳເລັດ',
   'git.currentBranch': 'ສາຂາປັດຈຸບັນ',

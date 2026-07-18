@@ -322,7 +322,6 @@ export default {
   'git.createPrManually': 'Tạo PR thủ công',
   'git.viewPr': 'Xem PR',
   'git.mergePr': 'Hợp nhất PR',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'Chưa cấu hình remote GitHub',
   'git.renameFailed': 'Đổi tên thất bại',
   'git.currentBranch': 'Nhánh hiện tại',

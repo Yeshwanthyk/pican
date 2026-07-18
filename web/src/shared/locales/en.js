@@ -526,7 +526,6 @@ export default {
   'git.createPrManually': 'Create PR manually',
   'git.viewPr': 'View PR',
   'git.mergePr': 'Merge PR',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'No GitHub remote configured',
   'git.renameFailed': 'Rename failed',
   'git.currentBranch': 'Current branch',

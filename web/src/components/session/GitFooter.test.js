@@ -1,10 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import GitFooter, {
-  DRAFT_PR_PROMPT,
-  COMMIT_PUSH_PROMPT,
-  MERGE_PR_PROMPT,
-} from './GitFooter.svelte';
+import GitFooter, { DRAFT_PR_PROMPT, MERGE_PR_PROMPT } from './GitFooter.svelte';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const id = (x) => document.getElementById(x);
@@ -51,14 +47,14 @@ describe('GitFooter', () => {
     expect(id('pi-git-branch-edit').hidden).toBe(false);
     expect(id('pi-git-caret').hidden).toBe(false);
     expect(id('pi-git-pr-manual').hidden).toBe(false);
-    expect(id('pi-git-pr-commit').hidden).toBe(true);
     expect(id('pi-git-pr-view').hidden).toBe(true);
     expect(id('pi-git-pr-merge').hidden).toBe(true);
     id('pi-git-primary').click();
     expect(id('pi-chat-message').value).toBe(DRAFT_PR_PROMPT);
   });
 
-  it('feature branch, open PR + local changes -> primary Commit & push, secondary view + merge', async () => {
+  it('feature branch, open PR -> primary View PR, secondary merge only (regardless of changes)', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderFooter({
       getGitInfo: vi.fn().mockResolvedValue({
         isRepo: true,
@@ -69,59 +65,27 @@ describe('GitFooter', () => {
       }),
     });
     await flush();
-    expect(id('pi-git-primary-label').textContent).toBe('Commit & push');
-    expect(id('pi-git-pr-view').hidden).toBe(false);
+    expect(id('pi-git-primary-label').textContent.trim()).toBe('View PR');
+    expect(id('pi-git-primary-label').querySelector('svg')).not.toBeNull();
     expect(id('pi-git-pr-merge').hidden).toBe(false);
     expect(id('pi-git-pr-draft').hidden).toBe(true);
     expect(id('pi-git-pr-manual').hidden).toBe(true);
     id('pi-git-primary').click();
-    expect(id('pi-chat-message').value).toBe(COMMIT_PUSH_PROMPT);
-  });
-
-  it('feature branch, open PR + no changes -> primary View PR, secondary merge only (no commit)', async () => {
-    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    renderFooter({
-      getGitInfo: vi.fn().mockResolvedValue({
-        isRepo: true,
-        branch: 'feature/x',
-        isDefault: false,
-        hasChanges: false,
-        prUrl: 'https://github.com/o/r/pull/42',
-      }),
-    });
-    await flush();
-    expect(id('pi-git-primary-label').textContent.trim()).toBe('View PR');
-    expect(id('pi-git-primary-label').querySelector('svg')).not.toBeNull();
-    expect(id('pi-git-pr-merge').hidden).toBe(false);
-    expect(id('pi-git-pr-commit').hidden).toBe(true);
-    id('pi-git-primary').click();
     expect(open).toHaveBeenCalledWith('https://github.com/o/r/pull/42', '_blank', 'noopener');
   });
 
-  it('default branch + changes -> primary Commit & push, no caret, no edit pencil', async () => {
+  it('default branch -> action control hidden, only the branch shows', async () => {
     renderFooter({
       getGitInfo: vi
         .fn()
         .mockResolvedValue({ isRepo: true, branch: 'main', isDefault: true, hasChanges: true }),
     });
     await flush();
-    expect(id('pi-git-primary-label').textContent).toBe('Commit & push');
-    expect(id('pi-git-caret').hidden).toBe(true);
-    expect(id('pi-git-branch-edit').hidden).toBe(true);
-    id('pi-git-primary').click();
-    expect(id('pi-chat-message').value).toBe(COMMIT_PUSH_PROMPT);
-  });
-
-  it('default branch + no changes -> action control hidden, only the branch shows', async () => {
-    renderFooter({
-      getGitInfo: vi
-        .fn()
-        .mockResolvedValue({ isRepo: true, branch: 'main', isDefault: true, hasChanges: false }),
-    });
-    await flush();
     expect(id('pi-git-bar').hidden).toBe(false);
     expect(id('pi-git-pr').hidden).toBe(true);
     expect(id('pi-git-primary').hidden).toBe(true);
+    expect(id('pi-git-caret').hidden).toBe(true);
+    expect(id('pi-git-branch-edit').hidden).toBe(true);
   });
 
   it('menu items run their actions (Merge PR injects merge prompt)', async () => {

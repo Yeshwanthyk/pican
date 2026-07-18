@@ -325,7 +325,6 @@ export default {
   'git.createPrManually': 'Cipta PR secara manual',
   'git.viewPr': 'Lihat PR',
   'git.mergePr': 'Gabungkan PR',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'Tiada remote GitHub dikonfigurasi',
   'git.renameFailed': 'Gagal menamakan semula',
   'git.currentBranch': 'Cabang semasa',

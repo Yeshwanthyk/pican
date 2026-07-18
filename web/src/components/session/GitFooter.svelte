@@ -7,11 +7,6 @@
     '`git log`) and write a clear PR title, a description summarizing what ' +
     'changed and why, and a short test plan.';
 
-  export const COMMIT_PUSH_PROMPT =
-    'Review the current changes (run `git status` and `git diff`), then stage ' +
-    'and commit them with a clear message summarizing what changed and why, and ' +
-    'push to the remote.';
-
   export const MERGE_PR_PROMPT =
     'Merge the pull request for this branch once its checks are green: run ' +
     '`gh pr merge` (use a squash merge unless the project prefers otherwise) and ' +
@@ -55,7 +50,6 @@
       draft: documentImpl.getElementById('pi-git-pr-draft'),
       manual: documentImpl.getElementById('pi-git-pr-manual'),
       merge: documentImpl.getElementById('pi-git-pr-merge'),
-      commit: documentImpl.getElementById('pi-git-pr-commit'),
     };
 
     let currentBranch = '';
@@ -87,19 +81,17 @@
       manual: { label: t('git.createPrManually'), external: true, run: () => openUrl(prCreateUrl) },
       view: { label: t('git.viewPr'), external: true, run: () => openUrl(existingPrUrl) },
       merge: { label: t('git.mergePr'), run: () => insertPrompt(MERGE_PR_PROMPT) },
-      commit: { label: t('git.commitPush'), run: () => insertPrompt(COMMIT_PUSH_PROMPT) },
     };
 
     // Decide the primary action + secondary list from the current git state.
-    // "Commit & push" only appears when there is actually something to push.
-    function planActions({ isDefault, hasPr, hasChanges }) {
+    // On the default branch there is no PR flow, so no action control at all.
+    function planActions({ isDefault, hasPr }) {
       if (isDefault) {
-        return { primary: hasChanges ? 'commit' : null, secondary: [] };
+        return { primary: null, secondary: [] };
       }
       if (!hasPr) {
         return { primary: 'draft', secondary: ['manual'] };
       }
-      if (hasChanges) return { primary: 'commit', secondary: ['view', 'merge'] };
       return { primary: 'view', secondary: ['merge'] };
     }
 
@@ -121,11 +113,10 @@
 
       const isDefault = !!info.isDefault;
       const hasPr = !isDefault && !!existingPrUrl;
-      const hasChanges = !!info.hasChanges;
 
       show(editBtn, !isDefault);
 
-      const plan = planActions({ isDefault, hasPr, hasChanges });
+      const plan = planActions({ isDefault, hasPr });
       const primary = plan.primary ? ACTIONS[plan.primary] : null;
       if (primary) {
         if (primaryLabel) {
@@ -297,8 +288,6 @@
           >{t('git.createPrManually')} {@html icon(ExternalLink, { size: 12 })}</button
         ><button type="button" class="pi-git-pr-item" id="pi-git-pr-merge" role="menuitem" hidden
           >{t('git.mergePr')}</button
-        ><button type="button" class="pi-git-pr-item" id="pi-git-pr-commit" role="menuitem" hidden
-          >{t('git.commitPush')}</button
         >
       </div>
     </div>

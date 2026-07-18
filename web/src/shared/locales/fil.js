@@ -330,7 +330,6 @@ export default {
   'git.createPrManually': 'Gumawa ng PR nang manu-mano',
   'git.viewPr': 'Tingnan ang PR',
   'git.mergePr': 'I-merge ang PR',
-  'git.commitPush': 'Commit at push',
   'git.noRemote': 'Walang naka-configure na GitHub remote',
   'git.renameFailed': 'Nabigo ang pagpapalit ng pangalan',
   'git.currentBranch': 'Kasalukuyang branch',

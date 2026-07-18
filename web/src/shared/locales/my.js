@@ -328,7 +328,6 @@ export default {
   'git.createPrManually': 'PR ကို ကိုယ်တိုင် ဖန်တီး',
   'git.viewPr': 'PR ကြည့်',
   'git.mergePr': 'PR ပေါင်းစည်း',
-  'git.commitPush': 'Commit & push',
   'git.noRemote': 'GitHub remote ပြင်ဆင်မထားပါ',
   'git.renameFailed': 'အမည်ပြောင်း၍ မရပါ',
   'git.currentBranch': 'လက်ရှိ branch',

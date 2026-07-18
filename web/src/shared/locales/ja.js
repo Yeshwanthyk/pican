@@ -324,7 +324,6 @@ export default {
   'git.createPrManually': 'PR を手動で作成',
   'git.viewPr': 'PR を表示',
   'git.mergePr': 'PR をマージ',
-  'git.commitPush': 'コミットしてプッシュ',
   'git.noRemote': 'GitHub のリモートが設定されていません',
   'git.renameFailed': '名前の変更に失敗しました',
   'git.currentBranch': '現在のブランチ',

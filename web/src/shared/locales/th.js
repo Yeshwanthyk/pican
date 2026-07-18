@@ -321,7 +321,6 @@ export default {
   'git.createPrManually': 'สร้าง PR ด้วยตนเอง',
   'git.viewPr': 'ดู PR',
   'git.mergePr': 'รวม PR',
-  'git.commitPush': 'commit และ push',
   'git.noRemote': 'ยังไม่ได้ตั้งค่ารีโมต GitHub',
   'git.renameFailed': 'เปลี่ยนชื่อไม่สำเร็จ',
   'git.currentBranch': 'แบรนช์ปัจจุบัน',

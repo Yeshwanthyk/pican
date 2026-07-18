@@ -316,7 +316,6 @@ export default {
   'git.createPrManually': '手动创建 PR',
   'git.viewPr': '查看 PR',
   'git.mergePr': '合并 PR',
-  'git.commitPush': '提交并推送',
   'git.noRemote': '未配置 GitHub 远程仓库',
   'git.renameFailed': '重命名失败',
   'git.currentBranch': '当前分支',

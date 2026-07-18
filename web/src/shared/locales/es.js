@@ -328,7 +328,6 @@ export default {
   'git.createPrManually': 'Crear PR manualmente',
   'git.viewPr': 'Ver PR',
   'git.mergePr': 'Fusionar PR',
-  'git.commitPush': 'Commit y push',
   'git.noRemote': 'No hay remoto de GitHub configurado',
   'git.renameFailed': 'Error al renombrar',
   'git.currentBranch': 'Rama actual',
