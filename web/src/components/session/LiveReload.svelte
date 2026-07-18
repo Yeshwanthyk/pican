@@ -152,6 +152,15 @@
     }
 
     // ── Reload (fetch /api/session → reconcile the model) ──────────────────────
+    // A live getter (not a snapshotted count) into the model's canonical entry
+    // count: reading it fresh on every reload keeps the delta request correct
+    // even if something else (e.g. LoadEarlier prepending older entries)
+    // changed model.entries between reloads. Returns null when the model is
+    // tail-windowed/paginated (model.truncated) — model.entries.length isn't a
+    // from-0 prefix count in that case, so the delta request is disabled and a
+    // full reconcile is used instead.
+    const getEntryCount = () => (model.truncated ? null : model.entries.length);
+
     function triggerReload() {
       return handleSessionReload({
         sessionId: sessId,
@@ -166,8 +175,9 @@
         scrollAfterLayout,
         incrementPending,
         showFollowButton,
+        getEntryCount,
         onReloaded: (data) => {
-          reconcileEntries(data.entries);
+          reconcileEntries(data.entries, { isDelta: data.isDelta });
         },
         onNewEntries: highlightNewEntries,
       }).catch((err) => {

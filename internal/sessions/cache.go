@@ -12,11 +12,13 @@ type cacheEntry struct {
 	modTime time.Time
 	dirName string
 	summary SessionSummary
+	parse   parseState
 }
 
 type sessionCacheEntry struct {
 	modTime time.Time
 	session Session
+	parse   fileParseState
 }
 
 type Cache struct {
@@ -85,7 +87,8 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 
 	// Determine which files need parsing (new or modified).
 	type parseWork struct {
-		rec fileRecord
+		rec   fileRecord
+		prior *cacheEntry // previous parse state, if any — enables an incremental tail parse (see incremental.go)
 	}
 	var toparse []parseWork
 	seen := make(map[string]struct{}, len(records))
@@ -93,12 +96,18 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 
 	for _, rec := range records {
 		seen[rec.path] = struct{}{}
-		if ce, ok := c.entries[rec.path]; ok && ce.modTime.Equal(rec.modTime) && ce.dirName == rec.dirName {
+		ce, ok := c.entries[rec.path]
+		if ok && ce.modTime.Equal(rec.modTime) && ce.dirName == rec.dirName {
 			c.hits++
 			cached = append(cached, ce.summary)
-		} else {
-			toparse = append(toparse, parseWork{rec})
+			continue
 		}
+		var prior *cacheEntry
+		if ok {
+			priorCopy := ce
+			prior = &priorCopy
+		}
+		toparse = append(toparse, parseWork{rec: rec, prior: prior})
 	}
 
 	// Evict files no longer present.
@@ -120,6 +129,7 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 	type result struct {
 		rec     fileRecord
 		summary SessionSummary
+		state   parseState
 		err     error
 	}
 	results := make([]result, len(toparse))
@@ -139,8 +149,8 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			summary, err := ParseSummary(w.rec.path, w.rec.dirName, w.rec.name)
-			results[i] = result{rec: w.rec, summary: summary, err: err}
+			summary, state, err := parseSummaryCached(w.rec.path, w.rec.dirName, w.rec.name, w.prior)
+			results[i] = result{rec: w.rec, summary: summary, state: state, err: err}
 		}(i, w)
 	}
 	wg.Wait()
@@ -157,6 +167,7 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 			modTime: res.rec.modTime,
 			dirName: res.rec.dirName,
 			summary: res.summary,
+			parse:   res.state,
 		}
 		c.pathIndex[res.rec.name] = res.rec.path
 		summaries = append(summaries, res.summary)
@@ -219,13 +230,19 @@ func (c *Cache) Resolve(sessionsDir, id string) (ResolvedSession, error) {
 		return ResolvedSession{Session: ce.session, Path: path}, nil
 	}
 
-	sess, err := ParseFile(path, filepath.Base(filepath.Dir(path)), id)
+	var prior *sessionCacheEntry
+	if hasCached {
+		priorCopy := ce
+		prior = &priorCopy
+	}
+
+	sess, state, err := parseFileCached(path, filepath.Base(filepath.Dir(path)), id, prior)
 	if err != nil {
 		return ResolvedSession{}, err
 	}
 
 	c.mu.Lock()
-	c.sessionCache[path] = sessionCacheEntry{modTime: modTime, session: sess}
+	c.sessionCache[path] = sessionCacheEntry{modTime: modTime, session: sess, parse: state}
 	c.mu.Unlock()
 
 	return ResolvedSession{Session: sess, Path: path}, nil

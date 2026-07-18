@@ -202,6 +202,82 @@ func applySummaryContext(s *SessionSummary, path, fileName, sessionInfoName, hea
 	}
 }
 
+// summaryFoldState accumulates the fields ParseSummary derives, one line at a
+// time. It is shared between a from-scratch parse (fold every line starting
+// at byte 0) and an incremental parse (see incremental.go: fold only the
+// newly appended lines onto a copy of the fold state saved from a previous
+// parse) so the two code paths can never drift on how a line updates the
+// running summary.
+type summaryFoldState struct {
+	s               SessionSummary
+	headerName      string
+	sessionInfoName string
+	firstUserText   string
+	headerCwd       string
+}
+
+func newSummaryFoldState(dirName, fileName string) summaryFoldState {
+	return summaryFoldState{s: newSessionSummary(dirName, fileName)}
+}
+
+func (fs *summaryFoldState) foldLine(raw summaryLine) {
+	switch raw.Type {
+	case "session":
+		if raw.Name != "" {
+			fs.headerName = raw.Name
+		}
+		if raw.CWD != "" {
+			fs.headerCwd = raw.CWD
+		}
+		if raw.ID != "" {
+			fs.s.SessionUUID = raw.ID
+		}
+	case "session_info":
+		if raw.Name != "" {
+			fs.sessionInfoName = raw.Name
+		}
+	case "message":
+		if raw.Timestamp != "" {
+			fs.s.LastActivity = raw.Timestamp
+		}
+		if raw.Message == nil {
+			return
+		}
+		msg := raw.Message
+		fs.s.MessageCount++
+		fs.s.TokenTotal += int(msg.Usage.TotalTokens)
+		fs.s.CostTotal += msg.Usage.Cost.Total
+		if msg.Model != "" {
+			fs.s.Model = msg.Model
+			fs.s.ModelProvider = msg.Provider
+		}
+		if fs.firstUserText == "" && msg.Role == "user" {
+			fs.firstUserText = extractRawText(msg.Content)
+		}
+	case "model_change":
+		if raw.Timestamp != "" {
+			fs.s.LastActivity = raw.Timestamp
+		}
+		if raw.ModelID != "" {
+			fs.s.Model = raw.ModelID
+			fs.s.ModelProvider = raw.Provider
+		}
+	default:
+		if raw.Timestamp != "" {
+			fs.s.LastActivity = raw.Timestamp
+		}
+	}
+}
+
+// finalize applies the same name/project/chat-availability resolution
+// ParseSummary and ParseFile share (applySummaryContext), producing the
+// public SessionSummary from the running fold state.
+func (fs *summaryFoldState) finalize(path, fileName string) SessionSummary {
+	s := fs.s
+	applySummaryContext(&s, path, fileName, fs.sessionInfoName, fs.headerName, fs.firstUserText, fs.headerCwd)
+	return s
+}
+
 // ParseSummary streams path line-by-line, accumulating only the fields the
 // index page needs. Lines are discarded after parsing — unlike ParseFile,
 // the full conversation is not retained in memory.
@@ -212,9 +288,7 @@ func ParseSummary(path, dirName, fileName string) (SessionSummary, error) {
 	}
 	defer f.Close()
 
-	s := newSessionSummary(dirName, fileName)
-
-	var headerName, sessionInfoName, firstUserText, headerCwd string
+	fs := newSummaryFoldState(dirName, fileName)
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, scanInitialBufferBytes), maxScanLineBytes)
 	for scanner.Scan() {
@@ -226,60 +300,13 @@ func ParseSummary(path, dirName, fileName string) (SessionSummary, error) {
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
-		switch raw.Type {
-		case "session":
-			if raw.Name != "" {
-				headerName = raw.Name
-			}
-			if raw.CWD != "" {
-				headerCwd = raw.CWD
-			}
-			if raw.ID != "" {
-				s.SessionUUID = raw.ID
-			}
-		case "session_info":
-			if raw.Name != "" {
-				sessionInfoName = raw.Name
-			}
-		case "message":
-			if raw.Timestamp != "" {
-				s.LastActivity = raw.Timestamp
-			}
-			if raw.Message == nil {
-				continue
-			}
-			msg := raw.Message
-			s.MessageCount++
-			s.TokenTotal += int(msg.Usage.TotalTokens)
-			s.CostTotal += msg.Usage.Cost.Total
-			if msg.Model != "" {
-				s.Model = msg.Model
-				s.ModelProvider = msg.Provider
-			}
-			if firstUserText == "" && msg.Role == "user" {
-				firstUserText = extractRawText(msg.Content)
-			}
-		case "model_change":
-			if raw.Timestamp != "" {
-				s.LastActivity = raw.Timestamp
-			}
-			if raw.ModelID != "" {
-				s.Model = raw.ModelID
-				s.ModelProvider = raw.Provider
-			}
-		default:
-			if raw.Timestamp != "" {
-				s.LastActivity = raw.Timestamp
-			}
-		}
+		fs.foldLine(raw)
 	}
 	if err := scanner.Err(); err != nil {
 		return SessionSummary{}, err
 	}
 
-	applySummaryContext(&s, path, fileName, sessionInfoName, headerName, firstUserText, headerCwd)
-
-	return s, nil
+	return fs.finalize(path, fileName), nil
 }
 
 // extractRawText pulls plain text from a json.RawMessage content value
@@ -474,6 +501,124 @@ func appendSessionName(path, name string, auto bool, now func() time.Time) error
 	return err
 }
 
+// fileFoldState is ParseFile's map-based counterpart to summaryFoldState: it
+// accumulates the running SessionSummary fields plus the full Entries slice,
+// Header, and the session-header dedupe set, so a from-scratch parse and an
+// incremental tail parse (incremental.go) fold each line identically.
+type fileFoldState struct {
+	s                  SessionSummary
+	headerName         string
+	sessionInfoName    string
+	firstUserText      string
+	headerCwd          string
+	header             map[string]any
+	entries            []map[string]any
+	seenSessionHeaders map[string]bool
+}
+
+func newFileFoldState(dirName, fileName string) fileFoldState {
+	return fileFoldState{
+		s:                  newSessionSummary(dirName, fileName),
+		seenSessionHeaders: make(map[string]bool),
+	}
+}
+
+// clone deep-copies the reference-typed fields (entries slice, header map,
+// seenSessionHeaders set) so the result can be mutated independently of fs.
+// Required before extending a cached fold state incrementally: fs may be
+// shared (read-only) with a concurrent parse of the same cache entry, and a
+// plain struct copy would still alias its slice/map backing storage.
+func (fs fileFoldState) clone() fileFoldState {
+	cloned := fs
+	if fs.entries != nil {
+		cloned.entries = make([]map[string]any, len(fs.entries))
+		copy(cloned.entries, fs.entries)
+	}
+	if fs.seenSessionHeaders != nil {
+		cloned.seenSessionHeaders = make(map[string]bool, len(fs.seenSessionHeaders))
+		for k, v := range fs.seenSessionHeaders {
+			cloned.seenSessionHeaders[k] = v
+		}
+	}
+	return cloned
+}
+
+func (fs *fileFoldState) foldLine(raw map[string]any) {
+	if raw["type"] == "session" {
+		key := sessionHeaderKey(raw)
+		if key != "" && fs.seenSessionHeaders[key] {
+			return
+		}
+		if key != "" {
+			fs.seenSessionHeaders[key] = true
+		}
+	}
+	fs.entries = append(fs.entries, raw)
+	switch raw["type"] {
+	case "session":
+		fs.header = raw
+		if n, _ := raw["name"].(string); n != "" {
+			fs.headerName = n
+		}
+		if cwd, _ := raw["cwd"].(string); cwd != "" {
+			fs.headerCwd = cwd
+		}
+		if sid, _ := raw["id"].(string); sid != "" {
+			fs.s.SessionUUID = sid
+		}
+	case "session_info":
+		if n, _ := raw["name"].(string); n != "" {
+			fs.sessionInfoName = n
+		}
+	case "message":
+		if ts, ok := raw["timestamp"].(string); ok {
+			fs.s.LastActivity = ts
+		}
+		msg, ok := raw["message"].(map[string]any)
+		if !ok {
+			return
+		}
+		fs.s.MessageCount++
+		if model, _ := msg["model"].(string); model != "" {
+			fs.s.Model = model
+			fs.s.ModelProvider, _ = msg["provider"].(string)
+		}
+		if usage, ok := msg["usage"].(map[string]any); ok {
+			if t, ok := usage["totalTokens"].(float64); ok {
+				fs.s.TokenTotal += int(t)
+			}
+			if cost, ok := usage["cost"].(map[string]any); ok {
+				if total, ok := cost["total"].(float64); ok {
+					fs.s.CostTotal += total
+				}
+			}
+		}
+		if fs.firstUserText == "" {
+			if role, _ := msg["role"].(string); role == "user" {
+				fs.firstUserText = extractMessageText(msg["content"])
+			}
+		}
+	case "model_change":
+		if ts, ok := raw["timestamp"].(string); ok {
+			fs.s.LastActivity = ts
+		}
+		if model, _ := raw["modelId"].(string); model != "" {
+			fs.s.Model = model
+			fs.s.ModelProvider, _ = raw["provider"].(string)
+		}
+	default:
+		if ts, ok := raw["timestamp"].(string); ok {
+			fs.s.LastActivity = ts
+		}
+	}
+}
+
+func (fs *fileFoldState) finalize(path, fileName string) Session {
+	s := fs.s
+	applySummaryContext(&s, path, fileName, fs.sessionInfoName, fs.headerName, fs.firstUserText, fs.headerCwd)
+	return Session{SessionSummary: s, Header: fs.header, Entries: fs.entries}
+}
+
 // ParseFile parses path in a single pass, collecting both the SessionSummary
 // fields and the full Entries slice. This avoids the double-read that would
 // result from calling ParseSummary followed by os.ReadFile.
@@ -484,13 +629,7 @@ func ParseFile(path, dirName, fileName string) (Session, error) {
 	}
 	defer f.Close()
 
-	s := newSessionSummary(dirName, fileName)
-
-	var entries []map[string]any
-	var header map[string]any
-	var headerName, sessionInfoName, firstUserText, headerCwd string
-	seenSessionHeaders := make(map[string]bool)
-
+	fs := newFileFoldState(dirName, fileName)
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, scanInitialBufferBytes), maxScanLineBytes)
 	for scanner.Scan() {
@@ -502,81 +641,13 @@ func ParseFile(path, dirName, fileName string) (Session, error) {
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
-		if raw["type"] == "session" {
-			key := sessionHeaderKey(raw)
-			if key != "" && seenSessionHeaders[key] {
-				continue
-			}
-			if key != "" {
-				seenSessionHeaders[key] = true
-			}
-		}
-		entries = append(entries, raw)
-		switch raw["type"] {
-		case "session":
-			header = raw
-			if n, _ := raw["name"].(string); n != "" {
-				headerName = n
-			}
-			if cwd, _ := raw["cwd"].(string); cwd != "" {
-				headerCwd = cwd
-			}
-			if sid, _ := raw["id"].(string); sid != "" {
-				s.SessionUUID = sid
-			}
-		case "session_info":
-			if n, _ := raw["name"].(string); n != "" {
-				sessionInfoName = n
-			}
-		case "message":
-			if ts, ok := raw["timestamp"].(string); ok {
-				s.LastActivity = ts
-			}
-			msg, ok := raw["message"].(map[string]any)
-			if !ok {
-				continue
-			}
-			s.MessageCount++
-			if model, _ := msg["model"].(string); model != "" {
-				s.Model = model
-				s.ModelProvider, _ = msg["provider"].(string)
-			}
-			if usage, ok := msg["usage"].(map[string]any); ok {
-				if t, ok := usage["totalTokens"].(float64); ok {
-					s.TokenTotal += int(t)
-				}
-				if cost, ok := usage["cost"].(map[string]any); ok {
-					if total, ok := cost["total"].(float64); ok {
-						s.CostTotal += total
-					}
-				}
-			}
-			if firstUserText == "" {
-				if role, _ := msg["role"].(string); role == "user" {
-					firstUserText = extractMessageText(msg["content"])
-				}
-			}
-		case "model_change":
-			if ts, ok := raw["timestamp"].(string); ok {
-				s.LastActivity = ts
-			}
-			if model, _ := raw["modelId"].(string); model != "" {
-				s.Model = model
-				s.ModelProvider, _ = raw["provider"].(string)
-			}
-		default:
-			if ts, ok := raw["timestamp"].(string); ok {
-				s.LastActivity = ts
-			}
-		}
+		fs.foldLine(raw)
 	}
 	if err := scanner.Err(); err != nil {
 		return Session{}, err
 	}
 
-	applySummaryContext(&s, path, fileName, sessionInfoName, headerName, firstUserText, headerCwd)
-
-	return Session{SessionSummary: s, Header: header, Entries: entries}, nil
+	return fs.finalize(path, fileName), nil
 }
 
 func sessionHeaderKey(raw map[string]any) string {
