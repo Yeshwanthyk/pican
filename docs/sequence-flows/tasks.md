@@ -36,5 +36,5 @@ removals are debounced for 100ms and emit a named `tasks-updated` SSE event with
 debounces matching refreshes. Global deep links use `/tasks?project=<absolute
 path>`. Session-scoped links include both `session=<id>` and `project=<absolute
 path>`, hide the project selector, and link back to the session. The session
-command menu shows Tasks only when the filtered stores contain at least one
-task.
+command menu always shows Tasks; a session without tasks opens the board's
+instructional empty state.

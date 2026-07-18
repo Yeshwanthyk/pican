@@ -41,15 +41,8 @@
     loadForkEntries,
     renameSession,
   } from '../../session/session-menu-actions.js';
-  import { defaultFetchWorkflows } from '../../workflows/workflows.js';
-  import { defaultFetchTasks } from '../../tasks/tasks.js';
-  import { defaultFetchSubagents } from '../../subagents/subagents.js';
 
   let { sessionId = '', cwd = '' } = $props();
-
-  let hasWorkflows = $state(false);
-  let hasTasks = $state(false);
-  let hasSubagents = $state(false);
 
   // Close animations must outlast the matching CSS transitions before the panel
   // is display:none'd (see command-menu styles).
@@ -68,20 +61,10 @@
     { action: 'tree', icon: ListTree, label: 'menu.tree', kbd: '⌘B' },
     { action: 'diff', icon: FileDiff, label: 'menu.diff' },
     { action: 'model-usage', icon: ChartColumn, label: 'menu.modelUsage' },
-    { action: 'workflows', icon: Workflow, label: 'workflows.navTitle', scope: 'workflows' },
-    { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle', scope: 'tasks' },
-    { action: 'subagents', icon: Layers, label: 'subagents.navTitle', scope: 'subagents' },
+    { action: 'workflows', icon: Workflow, label: 'workflows.navTitle' },
+    { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle' },
+    { action: 'subagents', icon: Layers, label: 'subagents.navTitle' },
   ];
-
-  const visiblePrimaryItems = $derived(
-    primaryItems.filter(
-      (item) =>
-        !item.scope ||
-        (item.scope === 'workflows' && hasWorkflows) ||
-        (item.scope === 'tasks' && hasTasks) ||
-        (item.scope === 'subagents' && hasSubagents),
-    ),
-  );
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
   const footerItems = [
@@ -93,28 +76,6 @@
 
   const clickHidden = (id) => document.getElementById(id)?.click();
   const isMobile = () => sidebarApi.isMobileLayout();
-
-  onMount(() => {
-    if (!sessionId) return;
-    let active = true;
-    Promise.allSettled([
-      defaultFetchWorkflows(sessionId),
-      cwd ? defaultFetchTasks(cwd, sessionId) : Promise.resolve({ stores: [] }),
-      defaultFetchSubagents(sessionId),
-    ]).then(([workflowResult, taskResult, subagentResult]) => {
-      if (!active) return;
-      hasWorkflows =
-        workflowResult.status === 'fulfilled' && workflowResult.value.workflows?.length > 0;
-      hasTasks =
-        taskResult.status === 'fulfilled' &&
-        taskResult.value.stores?.some((store) => store.tasks?.length > 0);
-      hasSubagents =
-        subagentResult.status === 'fulfilled' && subagentResult.value.subagents?.length > 0;
-    });
-    return () => {
-      active = false;
-    };
-  });
 
   onMount(() => {
     const menuBtn = document.getElementById('command-menu-btn');
@@ -318,7 +279,7 @@
 
 {#snippet menuBody(itemClass, sectionClass, desktop)}
   <div class={sectionClass}>
-    {#each visiblePrimaryItems as item (item.action)}
+    {#each primaryItems as item (item.action)}
       <button class={itemClass} type="button" data-action={item.action}
         >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
       >

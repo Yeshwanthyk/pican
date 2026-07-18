@@ -20,7 +20,11 @@ With `?session=<filename-or-uuid>` the parent scan is restricted to that session
 
 ## Entry points
 
-Like workflows and tasks, subagents are session-scoped: the session `⋯` menu shows a Subagents item (only when the session has spawn records), which opens `/subagents?session=<id>`. There is no global nav entry; `/subagents` without a param still renders the unscoped list for direct URLs.
+Like workflows and tasks, subagents are session-scoped: the session `⋯` menu
+always shows a Subagents item, which opens `/subagents?session=<id>`. A session
+without spawn records opens the panel's instructional empty state. There is no
+global nav entry; `/subagents` without a param still renders the unscoped list
+for direct URLs.
 
 ## Live updates
 

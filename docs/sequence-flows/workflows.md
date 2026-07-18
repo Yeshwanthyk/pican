@@ -31,5 +31,6 @@ a named `workflows-updated` SSE event with `{ "runId": "wf_…" }` on the
 `WorkflowsPage.svelte` listens through the shared status-event connection and
 debounces its own refetch. It refreshes the list and, when open, the selected
 run. Global deep links use `/workflows?runId=wf_…`; session-scoped links retain
-`session=<id>` while opening a run. The session command menu probes the filtered
-endpoint and shows Workflows only when that session has at least one run.
+`session=<id>` while opening a run. The session command menu always shows
+Workflows; a session without runs opens the dashboard's instructional empty
+state.
