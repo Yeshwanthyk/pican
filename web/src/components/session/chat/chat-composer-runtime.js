@@ -68,6 +68,7 @@ export function runChatComposer({
   let onWorkerModelUpdate = null;
   let currentModelForThinking = null;
   let positionPopover = () => {};
+  const disposables = [];
   const contextUsage = createContextUsageController({
     documentImpl: document,
     entries,
@@ -237,6 +238,7 @@ export function runChatComposer({
       CustomEventImpl: CustomEvent,
     });
     submission.setRefreshWorkerStatus(workerStatus.refresh);
+    disposables.push(workerStatus.dispose);
 
     // Keep phones compact until the user taps the input; desktop retains its
     // existing ready-to-type autofocus behavior.
@@ -277,4 +279,10 @@ export function runChatComposer({
   }
 
   navigateInitialChatLeaf({ entries, leafId, urlTargetId, byId, navigateTo });
+
+  return {
+    dispose: () => {
+      disposables.splice(0).forEach((dispose) => dispose?.());
+    },
+  };
 }

@@ -124,4 +124,21 @@ describe('setupWorkerStatusPolling', () => {
     await tick();
     expect(getWorkerStatus).toHaveBeenCalledTimes(2);
   });
+
+  it('clears the polling interval on dispose', () => {
+    const setIntervalImpl = vi.fn(() => 42);
+    const clearIntervalImpl = vi.fn();
+
+    const controller = setupWorkerStatusPolling({
+      windowImpl: new EventTarget(),
+      chatApi: { getWorkerStatus: vi.fn(() => Promise.resolve(response({ state: 'idle' }))) },
+      setIntervalImpl,
+      clearIntervalImpl,
+      CustomEventImpl: Event,
+    });
+
+    expect(setIntervalImpl).toHaveBeenCalledTimes(1);
+    controller.dispose();
+    expect(clearIntervalImpl).toHaveBeenCalledWith(42);
+  });
 });

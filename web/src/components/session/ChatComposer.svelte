@@ -67,7 +67,7 @@
     const runtime = getSessionRuntime();
     const model = runtime.model;
     globalThis.__PI_TEST_CHAT_COMPOSER_HOOK__?.();
-    runChatComposer({
+    const composerRuntime = runChatComposer({
       documentImpl: document,
       windowImpl: target,
       locationImpl: target.location,
@@ -125,6 +125,7 @@
       })
       .catch(() => {});
     return () => {
+      composerRuntime?.dispose?.();
       target.removeEventListener('pi-queue-event', onQueueEvent);
       target.removeEventListener('pi-extension-ui-request', onExtensionRequest);
       target.removeEventListener('pi-extension-ui-resolved', onExtensionResolved);

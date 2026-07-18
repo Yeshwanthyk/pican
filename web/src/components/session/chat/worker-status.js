@@ -12,6 +12,7 @@ export function setupWorkerStatusPolling({
   setKnownThinkingLevel = () => {},
   getWorkerModelUpdate = () => null,
   setIntervalImpl = windowImpl.setInterval?.bind(windowImpl),
+  clearIntervalImpl = windowImpl.clearInterval?.bind(windowImpl),
   CustomEventImpl = windowImpl.CustomEvent,
   intervalMs = 1500,
 } = {}) {
@@ -66,7 +67,7 @@ export function setupWorkerStatusPolling({
     }
   }
 
-  if (setIntervalImpl) setIntervalImpl(refresh, intervalMs);
+  const timer = setIntervalImpl ? setIntervalImpl(refresh, intervalMs) : null;
   void refresh();
   updateContextUsage();
 
@@ -79,6 +80,10 @@ export function setupWorkerStatusPolling({
   return {
     refresh,
     dispose: () => {
+      // Leaving the interval running after unmount lets stale pollers from
+      // previously-visited sessions keep writing #pi-chat-context-usage (a
+      // global-id lookup), making the context gauge flicker between sessions.
+      if (timer !== null) clearIntervalImpl?.(timer);
       windowImpl.removeEventListener?.('pi-session-reload', onSessionReload);
     },
   };
