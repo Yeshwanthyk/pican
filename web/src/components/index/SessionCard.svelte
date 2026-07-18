@@ -93,7 +93,12 @@
     </div>
   </div>
   <div class="session-project">{session.project}</div>
-  <div class="session-model" data-session-model>{modelLabel}</div>
+  {#if modelLabel}
+    <div class="session-model-row">
+      <img class="session-card-mark" src="/icon.svg" alt="" aria-hidden="true" />
+      <div class="session-model" data-session-model>{modelLabel}</div>
+    </div>
+  {/if}
   <div class="session-meta">
     <span class="session-active-status" data-running-status
       ><span aria-hidden="true">●</span> {t('index.active')}</span

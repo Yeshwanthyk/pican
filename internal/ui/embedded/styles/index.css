@@ -96,14 +96,14 @@ a { color: inherit; }
     font-weight: 650;
     letter-spacing: -0.015em;
 }
+/* The header wordmark uses the same rounded-square app icon as the favicon /
+   PWA icon, so the brand mark is identical everywhere. */
 .header h1 .pi-logo-mark {
     width: 23px;
     height: 23px;
     display: inline-block;
     flex-shrink: 0;
-    background: var(--text);
-    -webkit-mask: url("/pi-logo.svg") center / contain no-repeat;
-    mask: url("/pi-logo.svg") center / contain no-repeat;
+    border-radius: 4px;
 }
 .header-actions {
     display: flex;
@@ -478,11 +478,23 @@ a { color: inherit; }
 }
 .session-pin-btn--pinned:hover { color: var(--accent); }
 .session-project { display: none; }
+.session-model-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-bottom: 16px;
+}
+.session-card-mark {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border-radius: 3px;
+}
 .session-model {
     color: var(--text-soft);
     font-size: 12px;
     line-height: 1.4;
-    margin-bottom: 16px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1154,8 +1166,10 @@ body.modal-sheet-open { overflow: hidden; }
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .session-model {
+    .session-model-row {
         margin-bottom: 9px;
+    }
+    .session-model {
         font-size: 12px;
     }
     .session-meta {

@@ -19,7 +19,11 @@
 <div class="header">
   <div class="header-inner">
     <div class="header-top">
-      <h1><span class="pi-logo-mark" aria-hidden="true"></span><span>{t('index.title')}</span></h1>
+      <h1>
+        <img class="pi-logo-mark" src="/icon.svg" alt="" aria-hidden="true" /><span
+          >{t('index.title')}</span
+        >
+      </h1>
       <div class="header-actions">
         <button
           class="nav-search-btn"
