@@ -19,15 +19,12 @@ export const test = base.extend<Fixtures>({
   sessionsDir: async ({}, use) => {
     await use(readState().sessionsDir);
   },
-  // Belt-and-suspenders for the cat gatekeeper: global-setup disables it
-  // server-side, but settings hydrate asynchronously, so also set localStorage
-  // before any page script runs to cover the synchronous pre-hydration read.
+  // Mirror the server-seeded "show all" artifact filter before page scripts run
+  // so the synchronous pre-hydration read is deterministic.
   page: async ({ page }, use) => {
     await page.addInitScript(() => {
       try {
-        localStorage.setItem("pi-web:v1:cat:enabled", "false");
-        // Mirror the server-seeded "show all" artifact filter for the synchronous
-        // pre-hydration read. Filter tests override this with their own init script.
+        // Filter tests override this with their own init script.
         localStorage.setItem("pi-web:v1:artifacts:include", "");
       } catch {
         /* ignore */

@@ -76,7 +76,7 @@ Do not import live-only modules (SSE, chat, worker status, service-worker live g
 
 ## Current Migration State
 
-The SPA owns all live browser routes. The **session viewer is fully Svelte-orchestrated**: `SessionPage.svelte` creates the reactive `SessionDataModel` (`session/data/session-data.svelte.js`), provides it via context, and renders the session UI as Svelte components (`SessionTree`, `SessionContent`, `SessionInfoHeader`, `RightSidebar` + `ArtifactPanel`/`AnnotationLayer`, `ChatComposer`, `LiveReload`, `CommandMenu`, the modals, `BtwPopup`, `CatGatekeeper`, …). There is **no `session.js` orchestrator anymore** — its glue was distributed into:
+The SPA owns all live browser routes. The **session viewer is fully Svelte-orchestrated**: `SessionPage.svelte` creates the reactive `SessionDataModel` (`session/data/session-data.svelte.js`), provides it via context, and renders the session UI as Svelte components (`SessionTree`, `SessionContent`, `SessionInfoHeader`, `RightSidebar` + `ArtifactPanel`/`AnnotationLayer`, `ChatComposer`, `LiveReload`, `CommandMenu`, the modals, `BtwPopup`, …). There is **no `session.js` orchestrator anymore** — its glue was distributed into:
 
 - `SessionPage.svelte`'s `onMount` (`startSessionPageRuntime()`): per-page bootstrap, `setupSessionUi`, content-runtime wiring, header handlers, initial `navigateTo`, annotation-layer init
 - `session/session-globals.js`: page-global glue (keyboard shortcuts, done-notifier, visual-viewport/scroll) — returns a disposer

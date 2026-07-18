@@ -10,8 +10,6 @@
   import ShortcutsModal from './ShortcutsModal.svelte';
   import ModelUsageModal from './ModelUsageModal.svelte';
   import ForkModal from './ForkModal.svelte';
-  import CatGatekeeperSettings from './CatGatekeeperSettings.svelte';
-  import CatGatekeeper from './CatGatekeeper.svelte';
   import BtwPopup from './BtwPopup.svelte';
   import LabelModal from './LabelModal.svelte';
   import DiffModal from './DiffModal.svelte';
@@ -146,11 +144,6 @@
   entries={sessionModals.fork.entries}
   onSelect={sessionModals.fork.onSelect}
 />
-<CatGatekeeperSettings
-  bind:open={sessionModals.catSettings.open}
-  controller={sessionModals.catSettings.controller}
-  onChange={sessionModals.catSettings.onChange}
-/>
 <LabelModal
   bind:open={sessionModals.label.open}
   entryId={sessionModals.label.entryId}
@@ -160,7 +153,6 @@
 <DiffModal bind:open={sessionModals.diff.open} sessionId={sessionModals.diff.sessionId} />
 
 <ShareDialog {sessionId} />
-<CatGatekeeper />
 <BtwPopup {cwd} parentId={sessionId} />
 <svelte:element this={"script"} id="session-data" type="application/json" bind:this={dataEl}
 ></svelte:element>

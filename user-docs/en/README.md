@@ -63,7 +63,6 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | 💬 **Annotations** | Highlight and comment on any part of a session — great for code review, feedback, or bookmarking key moments. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pi-web feel like *yours*. |
 | 🌐 **Multi-language** | 14 built-in languages (English, Español, Français, Deutsch, 中文, 日本語, Bahasa Indonesia, Bahasa Melayu, Tiếng Việt, ไทย, Filipino, မြန်မာ, ភាសាខ្មែរ, ລາວ). Add your own custom language from Settings. |
-| 🐱 **Wellness & pomodoro** | Too much vibe coding isn't healthy. Built-in pomodoro timer with a cat companion and sleep reminders to keep you balanced. |
 | 📤 **Share & export** | Download JSONL, export static snapshots rendered with pi's native `pi.dev` look, or share as private GitHub Gists — all rendered client-side. |
 | 🔔 **Notification sounds** | Customizable notification chimes for session events — stay in the loop even when pi-web is in another tab. |
 | ⌨️ **Keyboard shortcuts** | Vim-style navigation, quick actions — [full reference →](keyboard-shortcuts.md) |

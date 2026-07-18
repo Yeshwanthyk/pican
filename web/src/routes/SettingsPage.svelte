@@ -3,7 +3,6 @@
   import AboutSettings from '../components/settings/AboutSettings.svelte';
   import AppearanceSettings from '../components/settings/AppearanceSettings.svelte';
   import ArtifactSettings from '../components/settings/ArtifactSettings.svelte';
-  import CatGatekeeperSettings from '../components/settings/CatGatekeeperSettings.svelte';
   import LanguageSettings from '../components/settings/LanguageSettings.svelte';
   import NotificationSettings from '../components/settings/NotificationSettings.svelte';
   import SessionDisplayDefaultsSettings from '../components/settings/SessionDisplayDefaultsSettings.svelte';
@@ -25,7 +24,6 @@
     { id: 'sessionDisplay', labelKey: 'settings.sessionDisplay' },
     { id: 'artifacts', labelKey: 'settings.artifacts' },
     { id: 'notifications', labelKey: 'settings.notifications' },
-    { id: 'catGatekeeper', labelKey: 'settings.catGatekeeper' },
     { id: 'about', labelKey: 'settings.about' },
   ];
   const sectionIds = new Set(sections.map((s) => s.id));
@@ -187,8 +185,6 @@
       <ArtifactSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'notifications'}
       <NotificationSettings {settings} onSave={saveSetting} onSaved={flashSaved} />
-    {:else if activeSection === 'catGatekeeper'}
-      <CatGatekeeperSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'about'}
       <AboutSettings />
     {/if}
