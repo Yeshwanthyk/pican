@@ -17,8 +17,6 @@
     ListTree,
     FileDiff,
     ChartColumn,
-    BookOpen,
-    Send,
     Settings,
     Tag,
   } from '../../shared/icons.js';
@@ -29,7 +27,6 @@
   import { openModelUsage, openFork, openDiff } from '../../session/session-modals.svelte.js';
   import { showToast } from '../../shared/toast.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
-  import { USER_DOCS_URL, TELEGRAM_INVITE_URL } from '../../shared/links.js';
   import {
     cloneSession,
     forkSession,
@@ -60,14 +57,6 @@
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
   const footerItems = [
-    { kind: 'action', action: 'user-docs', icon: BookOpen, label: 'common.userDocs' },
-    {
-      kind: 'link',
-      href: TELEGRAM_INVITE_URL,
-      external: true,
-      icon: Send,
-      label: 'common.telegram',
-    },
     { kind: 'link', href: '/settings', icon: Settings, label: 'common.settings', kbd: '⌘,' },
     { kind: 'version', action: 'version', icon: Tag, label: 'common.version', desktopOnly: true },
   ];
@@ -204,10 +193,6 @@
         case 'version':
           closeMenu();
           openVersionModal();
-          break;
-        case 'user-docs':
-          closeMenu();
-          window.open(USER_DOCS_URL, '_blank', 'noreferrer');
           break;
         case 'diff':
           closeMenu();

@@ -2,4 +2,3 @@
 // the session command menu, the home menu, and the settings panes.
 export const REPO_URL = 'https://github.com/ygncode/pi-web';
 export const USER_DOCS_URL = `${REPO_URL}/tree/main/user-docs`;
-export const TELEGRAM_INVITE_URL = 'https://t.me/+NJvFOTTa0wNjNTc9';

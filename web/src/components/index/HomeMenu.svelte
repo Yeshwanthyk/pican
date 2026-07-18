@@ -1,16 +1,7 @@
 <script>
   import { t } from '../../shared/i18n.js';
-  import {
-    icon,
-    SquarePen,
-    FolderGit2,
-    BookOpen,
-    Send,
-    Settings,
-    Tag,
-  } from '../../shared/icons.js';
+  import { icon, SquarePen, FolderGit2, Settings, Tag } from '../../shared/icons.js';
   import { openVersionModal } from '../../shared/version.js';
-  import { USER_DOCS_URL, TELEGRAM_INVITE_URL } from '../../shared/links.js';
   import { handleNavClick } from '../../shared/navigation.js';
 
   let {
@@ -82,27 +73,6 @@
     >
   </div>
   <div class="web-menu-section">
-    <a
-      class="web-menu-item"
-      href={USER_DOCS_URL}
-      target="_blank"
-      rel="noreferrer"
-      role="menuitem"
-      onclick={onClose}
-      ><span class="menu-item-label"
-        >{@html icon(BookOpen, { size: 15 })}{t('common.userDocs')}</span
-      ></a
-    >
-    <a
-      class="web-menu-item"
-      href={TELEGRAM_INVITE_URL}
-      target="_blank"
-      rel="noreferrer"
-      role="menuitem"
-      onclick={onClose}
-      ><span class="menu-item-label">{@html icon(Send, { size: 15 })}{t('common.telegram')}</span
-      ></a
-    >
     <a
       class="web-menu-item"
       href="/settings"
