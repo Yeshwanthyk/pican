@@ -13,7 +13,7 @@ or missing snapshots so one incomplete run cannot break the dashboard.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/workflows` | List valid run summaries, newest first |
+| GET | `/api/workflows?session=<id-or-filename>` | List valid run summaries, newest first; optionally filter by the run snapshot's session UUID |
 | GET | `/api/workflows/run?runId=wf_…` | Read one workflow, transcripts, result, and script |
 
 The detail endpoint validates `runId` against the complete run-id pattern
@@ -30,4 +30,6 @@ a named `workflows-updated` SSE event with `{ "runId": "wf_…" }` on the
 
 `WorkflowsPage.svelte` listens through the shared status-event connection and
 debounces its own refetch. It refreshes the list and, when open, the selected
-run. Deep links use `/workflows?runId=wf_…`.
+run. Global deep links use `/workflows?runId=wf_…`; session-scoped links retain
+`session=<id>` while opening a run. The session command menu probes the filtered
+endpoint and shows Workflows only when that session has at least one run.

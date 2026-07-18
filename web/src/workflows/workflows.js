@@ -51,8 +51,8 @@ export function formatWorkflowDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
-export function defaultFetchWorkflows() {
-  return getJSON('/api/workflows');
+export function defaultFetchWorkflows(session = '') {
+  return getJSON('/api/workflows' + (session ? '?session=' + encodeURIComponent(session) : ''));
 }
 
 export function defaultFetchWorkflowRun(runId) {

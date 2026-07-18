@@ -72,4 +72,30 @@ describe('CommandMenu', () => {
     expect(sessionModals.modelUsage).toBe(true);
     expect(openPalette).toHaveBeenCalled();
   });
+
+  it('shows only scoped workflow and task links that have content', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) => {
+        const payload = String(url).startsWith('/api/workflows')
+          ? { workflows: [{ runId: 'wf_123456abcdef' }] }
+          : { stores: [{ scope: 'session', tasks: [] }] };
+        return Promise.resolve(new Response(JSON.stringify(payload), { status: 200 }));
+      }),
+    );
+    render(CommandMenu, { props: { sessionId: 'session.jsonl', cwd: '/repo' } });
+
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-action="workflows"]')).toHaveLength(2),
+    );
+    expect(document.querySelector('[data-action="tasks"]')).toBeNull();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/workflows?session=session.jsonl',
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/tasks?project=%2Frepo&session=session.jsonl',
+      expect.objectContaining({ headers: { Accept: 'application/json' } }),
+    );
+  });
 });

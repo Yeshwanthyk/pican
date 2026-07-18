@@ -14,7 +14,7 @@
     workflowPhaseProgress,
   } from '../workflows/workflows.js';
 
-  let { runId = '' } = $props();
+  let { runId = '', session = '' } = $props();
 
   let workflows = $state([]);
   let loading = $state(true);
@@ -26,12 +26,12 @@
   let detailGeneration = 0;
   let updateTimer = null;
 
-  async function refreshList({ soft = false } = {}) {
+  async function refreshList({ soft = false, sessionFilter = session } = {}) {
     const generation = ++listGeneration;
     if (!soft) loading = true;
     loadError = '';
     try {
-      const response = await defaultFetchWorkflows();
+      const response = await defaultFetchWorkflows(sessionFilter);
       if (generation !== listGeneration) return;
       workflows = (response.workflows || []).map(normalizeWorkflowSummary);
     } catch (error) {
@@ -70,11 +70,19 @@
   }
 
   function selectRun(selectedRunId) {
-    navigate('/workflows?runId=' + encodeURIComponent(selectedRunId));
+    navigate(workflowsHref(selectedRunId));
+  }
+
+  function workflowsHref(selectedRunId = '') {
+    const params = [];
+    if (session) params.push('session=' + encodeURIComponent(session));
+    if (selectedRunId) params.push('runId=' + encodeURIComponent(selectedRunId));
+    return '/workflows' + (params.length ? '?' + params.join('&') : '');
   }
 
   function leavePage() {
-    navigate(runId ? '/workflows' : '/');
+    if (runId) navigate(workflowsHref());
+    else navigate(session ? '/session?id=' + encodeURIComponent(session) : '/');
   }
 
   $effect(() => {
@@ -88,10 +96,13 @@
     }
   });
 
+  $effect(() => {
+    refreshList({ sessionFilter: session });
+  });
+
   onMount(() => {
     const previousTitle = document.title;
     document.title = t('workflows.title');
-    refreshList();
     const statusEvents = createStatusEvents({ onWorkflowUpdate: scheduleRefresh });
     try {
       statusEvents.connect();
@@ -118,6 +129,12 @@
 </div>
 
 <main class="workflows-page" data-workflows-page>
+  {#if session}
+    <a class="workflow-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+      >{t('workflows.sessionScope')}</a
+    >
+  {/if}
+
   {#if loadError}
     <p class="workflow-page-error" role="alert">{loadError}</p>
   {/if}
@@ -128,7 +145,7 @@
     {:else if detailError}
       <div class="workflow-empty">
         <p class="workflow-page-error" role="alert">{detailError}</p>
-        <button type="button" class="workflow-button" onclick={() => navigate('/workflows')}
+        <button type="button" class="workflow-button" onclick={() => navigate(workflowsHref())}
           >{t('workflows.backToList')}</button
         >
       </div>

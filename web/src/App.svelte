@@ -27,7 +27,9 @@
   // stays stable while reading a session.
   const sessionId = $derived(new URLSearchParams(search).get('id') || '');
   const workflowRunId = $derived(new URLSearchParams(search).get('runId') || '');
+  const workflowSession = $derived(new URLSearchParams(search).get('session') || '');
   const tasksProject = $derived(new URLSearchParams(search).get('project') || '');
+  const tasksSession = $derived(new URLSearchParams(search).get('session') || '');
 
   // Make in-app history navigation swap views without a full reload. popstate
   // covers back/forward; pushState/replaceState don't emit a native event, so
@@ -80,9 +82,9 @@
 {:else if path === '/schedules'}
   <SchedulesPage />
 {:else if path === '/workflows'}
-  <WorkflowsPage runId={workflowRunId} />
+  <WorkflowsPage runId={workflowRunId} session={workflowSession} />
 {:else if path === '/tasks'}
-  <TasksPage project={tasksProject} />
+  <TasksPage project={tasksProject} session={tasksSession} />
 {:else if path === '/subagents'}
   <SubagentsPage />
 {:else}

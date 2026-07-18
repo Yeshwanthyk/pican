@@ -14,6 +14,7 @@ so an interrupted or unrelated write cannot break the board.
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/tasks?project=<absolute path>` | List project, session, and global task stores |
+| GET | `/api/tasks?project=<absolute path>&session=<id>` | List only `tasks.json` and the matching `tasks-<sessionId>.json` |
 | GET | `/api/tasks/output?project=<absolute path>&taskId=<id>` | Read a project's task output as plain text |
 
 Both endpoints require an absolute, cleaned project path. The path must match a
@@ -32,4 +33,8 @@ removals are debounced for 100ms and emit a named `tasks-updated` SSE event with
 `{ "project": "<absolute path or global>" }` on the `__all__` topic.
 
 `TasksPage.svelte` listens through the shared status-event connection and
-debounces matching refreshes. Deep links use `/tasks?project=<absolute path>`.
+debounces matching refreshes. Global deep links use `/tasks?project=<absolute
+path>`. Session-scoped links include both `session=<id>` and `project=<absolute
+path>`, hide the project selector, and link back to the session. The session
+command menu shows Tasks only when the filtered stores contain at least one
+task.

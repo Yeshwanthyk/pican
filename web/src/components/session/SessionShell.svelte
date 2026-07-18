@@ -114,7 +114,7 @@
 
 <SessionHeader {title} {cwd} {sessionId} />
 
-<CommandMenu {sessionId} />
+<CommandMenu {sessionId} {cwd} />
 
 <!-- Live reload (SSE) mounts before <ChatComposer> so its optimistic
      "message sent" listener is attached before the user can send. -->

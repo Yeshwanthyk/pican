@@ -297,8 +297,6 @@
   onToggleMenu={toggleMenu}
   onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
-  onWorkflows={() => navigate('/workflows')}
-  onTasks={() => navigate('/tasks')}
   onSubagents={() => navigate('/subagents')}
 />
 

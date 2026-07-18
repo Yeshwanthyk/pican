@@ -19,6 +19,7 @@
     ChartColumn,
     Settings,
     Tag,
+    ListChecks,
   } from '../../shared/icons.js';
   import * as sidebarApi from '../../session/ui/sidebar.js';
   import { openVersionModal } from '../../shared/version.js';
@@ -33,8 +34,13 @@
     loadForkEntries,
     renameSession,
   } from '../../session/session-menu-actions.js';
+  import { defaultFetchWorkflows } from '../../workflows/workflows.js';
+  import { defaultFetchTasks } from '../../tasks/tasks.js';
 
-  let { sessionId = '' } = $props();
+  let { sessionId = '', cwd = '' } = $props();
+
+  let hasWorkflows = $state(false);
+  let hasTasks = $state(false);
 
   // Close animations must outlast the matching CSS transitions before the panel
   // is display:none'd (see command-menu styles).
@@ -53,7 +59,18 @@
     { action: 'tree', icon: ListTree, label: 'menu.tree', kbd: '⌘B' },
     { action: 'diff', icon: FileDiff, label: 'menu.diff' },
     { action: 'model-usage', icon: ChartColumn, label: 'menu.modelUsage' },
+    { action: 'workflows', icon: ListTree, label: 'workflows.navTitle', scope: 'workflows' },
+    { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle', scope: 'tasks' },
   ];
+
+  const visiblePrimaryItems = $derived(
+    primaryItems.filter(
+      (item) =>
+        !item.scope ||
+        (item.scope === 'workflows' && hasWorkflows) ||
+        (item.scope === 'tasks' && hasTasks),
+    ),
+  );
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
   const footerItems = [
@@ -65,6 +82,25 @@
 
   const clickHidden = (id) => document.getElementById(id)?.click();
   const isMobile = () => sidebarApi.isMobileLayout();
+
+  onMount(() => {
+    if (!sessionId) return;
+    let active = true;
+    Promise.allSettled([
+      defaultFetchWorkflows(sessionId),
+      cwd ? defaultFetchTasks(cwd, sessionId) : Promise.resolve({ stores: [] }),
+    ]).then(([workflowResult, taskResult]) => {
+      if (!active) return;
+      hasWorkflows =
+        workflowResult.status === 'fulfilled' && workflowResult.value.workflows?.length > 0;
+      hasTasks =
+        taskResult.status === 'fulfilled' &&
+        taskResult.value.stores?.some((store) => store.tasks?.length > 0);
+    });
+    return () => {
+      active = false;
+    };
+  });
 
   onMount(() => {
     const menuBtn = document.getElementById('command-menu-btn');
@@ -198,6 +234,19 @@
           closeMenu();
           openDiff({ sessionId });
           break;
+        case 'workflows':
+          closeMenu();
+          navigate('/workflows?session=' + encodeURIComponent(sessionId));
+          break;
+        case 'tasks':
+          closeMenu();
+          navigate(
+            '/tasks?session=' +
+              encodeURIComponent(sessionId) +
+              '&project=' +
+              encodeURIComponent(cwd),
+          );
+          break;
         default:
           break;
       }
@@ -252,7 +301,7 @@
 
 {#snippet menuBody(itemClass, sectionClass, desktop)}
   <div class={sectionClass}>
-    {#each primaryItems as item (item.action)}
+    {#each visiblePrimaryItems as item (item.action)}
       <button class={itemClass} type="button" data-action={item.action}
         >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
       >

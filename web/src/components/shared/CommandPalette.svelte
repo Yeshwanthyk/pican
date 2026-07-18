@@ -356,24 +356,6 @@
     <button
       class="palette-action"
       type="button"
-      data-workflows-btn
-      onclick={() => {
-        close();
-        go('/workflows');
-      }}>{t('workflows.navTitle')}</button
-    >
-    <button
-      class="palette-action"
-      type="button"
-      data-tasks-btn
-      onclick={() => {
-        close();
-        go('/tasks');
-      }}>{t('tasks.navTitle')}</button
-    >
-    <button
-      class="palette-action"
-      type="button"
       data-subagents-btn
       onclick={() => {
         close();

@@ -142,6 +142,7 @@ export default {
   // ── Workflows ──
   'workflows.navTitle': 'Workflows',
   'workflows.title': 'Workflows',
+  'workflows.sessionScope': 'Workflows for this session',
   'workflows.loading': 'Loading workflows…',
   'workflows.loadingRun': 'Loading workflow…',
   'workflows.emptyTitle': 'No workflow runs yet',
@@ -174,6 +175,7 @@ export default {
   // ── Tasks ──
   'tasks.navTitle': 'Tasks',
   'tasks.title': 'Tasks',
+  'tasks.sessionScope': 'Tasks for this session',
   'tasks.project': 'Task store',
   'tasks.global': 'Global',
   'tasks.loading': 'Loading tasks…',

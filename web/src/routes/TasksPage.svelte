@@ -16,7 +16,7 @@
     tasksSelectionStorageKey,
   } from '../tasks/tasks.js';
 
-  let { project = '' } = $props();
+  let { project = '', session = '' } = $props();
   let projects = $state([]);
   let selected = $state('');
   let stores = $state([]);
@@ -46,7 +46,7 @@
       return;
     }
     try {
-      const response = await defaultFetchTasks(currentProject);
+      const response = await defaultFetchTasks(currentProject, session);
       if (loadGeneration === generation && currentSelection === selected) {
         stores = response.stores || [];
       }
@@ -66,6 +66,11 @@
   }
 
   async function chooseInitialSelection() {
+    if (session && project) {
+      projects = [{ path: project }];
+      selected = project;
+      return;
+    }
     const response = await defaultFetchProjects();
     projects = (response.projects || []).filter((entry) => entry?.path);
     const saved = localStorage.getItem(tasksSelectionStorageKey) || '';
@@ -126,7 +131,11 @@
 
 <div class="session-header-bar">
   <div class="session-header-left">
-    <button type="button" class="session-header-back tasks-back" onclick={() => navigate('/')}>
+    <button
+      type="button"
+      class="session-header-back tasks-back"
+      onclick={() => navigate(session ? '/session?id=' + encodeURIComponent(session) : '/')}
+    >
       <span aria-hidden="true">{@html icon(ChevronLeft, { size: 16 })}</span>
       {t('session.back')}
     </button>
@@ -136,19 +145,25 @@
 </div>
 
 <main class="tasks-page" data-tasks-page>
-  <header class="tasks-toolbar">
-    <label for="tasks-project">{t('tasks.project')}</label>
-    <select
-      id="tasks-project"
-      value={selected}
-      onchange={(event) => selectProject(event.currentTarget.value)}
+  {#if session}
+    <a class="tasks-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+      >{t('tasks.sessionScope')}</a
     >
-      <option value="global">{t('tasks.global')}</option>
-      {#each projects as entry (entry.path)}
-        <option value={entry.path}>{entry.path}</option>
-      {/each}
-    </select>
-  </header>
+  {:else}
+    <header class="tasks-toolbar">
+      <label for="tasks-project">{t('tasks.project')}</label>
+      <select
+        id="tasks-project"
+        value={selected}
+        onchange={(event) => selectProject(event.currentTarget.value)}
+      >
+        <option value="global">{t('tasks.global')}</option>
+        {#each projects as entry (entry.path)}
+          <option value={entry.path}>{entry.path}</option>
+        {/each}
+      </select>
+    </header>
+  {/if}
 
   {#if loadError}<p class="tasks-page-error" role="alert">{loadError}</p>{/if}
 

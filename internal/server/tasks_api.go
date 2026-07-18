@@ -112,6 +112,18 @@ func (s *Server) handleApiTasks(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	sessionID := sessionUUIDFromReference(r.URL.Query().Get("session"))
+	if sessionID != "" {
+		filteredStores := make([]taskStore, 0, 2)
+		for _, store := range projectStores {
+			if (store.Scope == "project" && filepath.Base(store.Path) == "tasks.json") ||
+				(store.Scope == "session" && store.SessionID == sessionID) {
+				filteredStores = append(filteredStores, store)
+			}
+		}
+		writeJSON(w, 0, map[string]any{"stores": filteredStores})
+		return
+	}
 	globalStores, err := readTaskStores(s.globalTasksDir(), "global")
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())

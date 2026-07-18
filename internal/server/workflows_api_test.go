@@ -65,6 +65,35 @@ func TestHandleApiWorkflowsListsValidRuns(t *testing.T) {
 	}
 }
 
+func TestHandleApiWorkflowsFiltersBySessionFilename(t *testing.T) {
+	s := newTestServer(t)
+	workflowsDir := filepath.Join(s.agentDir, "workflows")
+	writeWorkflowTestFile(t, filepath.Join(workflowsDir, "wf_aaaaaaaaaaaa", "workflow.json"), `{
+		"runId":"wf_aaaaaaaaaaaa","sessionId":"019f6af1-290d-7c63-a029-65da984aa074",
+		"name":"Matching","status":"completed"
+	}`)
+	writeWorkflowTestFile(t, filepath.Join(workflowsDir, "wf_bbbbbbbbbbbb", "workflow.json"), `{
+		"runId":"wf_bbbbbbbbbbbb","sessionId":"other-session",
+		"name":"Unrelated","status":"completed"
+	}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/workflows?session=2026-07-17T12-00-00.000Z_019f6af1-290d-7c63-a029-65da984aa074.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleApiWorkflows(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		Workflows []workflowSummary `json:"workflows"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Workflows) != 1 || response.Workflows[0].RunID != "wf_aaaaaaaaaaaa" {
+		t.Fatalf("unexpected filtered workflows: %+v", response.Workflows)
+	}
+}
+
 func TestHandleApiWorkflowRunRejectsInvalidRunID(t *testing.T) {
 	s := newTestServer(t)
 	for _, runID := range []string{"", "../secret", "wf_ABCDEF123456", "wf_short"} {

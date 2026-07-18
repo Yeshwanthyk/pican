@@ -67,6 +67,41 @@ func TestHandleApiTasksListsProjectAndSessionStores(t *testing.T) {
 	}
 }
 
+func TestHandleApiTasksFiltersStoresBySession(t *testing.T) {
+	s := newTestServer(t)
+	project := t.TempDir()
+	tasksDir := filepath.Join(project, ".pi", "tasks")
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks.json"), `{"tasks":[{"id":"1","subject":"Project"}]}`)
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks-session-abc.json"), `{"tasks":[{"id":"2","subject":"Matching"}]}`)
+	writeTaskTestFile(t, filepath.Join(tasksDir, "tasks-other-session.json"), `{"tasks":[{"id":"3","subject":"Unrelated"}]}`)
+	writeTaskTestFile(t, filepath.Join(s.globalTasksDir(), "named.json"), `{"tasks":[{"id":"4","subject":"Global"}]}`)
+
+	req := taskAPIRequest("/api/tasks", project)
+	query := req.URL.Query()
+	query.Set("session", "2026-07-17T12-00-00.000Z_session-abc.jsonl")
+	req.URL.RawQuery = query.Encode()
+	w := httptest.NewRecorder()
+	s.handleApiTasks(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		Stores []taskStore `json:"stores"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Stores) != 2 {
+		t.Fatalf("stores = %d, want project and matching session: %s", len(response.Stores), w.Body.String())
+	}
+	if response.Stores[0].Scope != "session" || response.Stores[0].SessionID != "session-abc" {
+		t.Fatalf("unexpected session store: %+v", response.Stores[0])
+	}
+	if response.Stores[1].Scope != "project" {
+		t.Fatalf("unexpected project store: %+v", response.Stores[1])
+	}
+}
+
 func TestHandleApiTaskOutput(t *testing.T) {
 	s := newTestServer(t)
 	project := t.TempDir()

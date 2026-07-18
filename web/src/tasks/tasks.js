@@ -49,8 +49,12 @@ export function shortSessionId(sessionId = '') {
   return sessionId.length > 12 ? sessionId.slice(0, 8) + '…' : sessionId;
 }
 
-export function defaultFetchTasks(project) {
-  return getJSON('/api/tasks?project=' + encodeURIComponent(project));
+export function defaultFetchTasks(project, session = '') {
+  return getJSON(
+    '/api/tasks?project=' +
+      encodeURIComponent(project) +
+      (session ? '&session=' + encodeURIComponent(session) : ''),
+  );
 }
 
 export function defaultFetchTaskOutput(project, taskId) {

@@ -20,6 +20,14 @@
   align-items: center;
 }
 
+.tasks-session-scope {
+  display: inline-flex;
+  margin-bottom: 20px;
+  color: var(--accent);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
 .tasks-toolbar {
   display: flex;
   align-items: center;

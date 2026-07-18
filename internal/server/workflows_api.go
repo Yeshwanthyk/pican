@@ -20,18 +20,19 @@ type workflowSummary struct {
 	Status         string       `json:"status"`
 	StartedAt      workflowTime `json:"startedAt"`
 	FinishedAt     workflowTime `json:"finishedAt"`
-	CurrentPhase   string `json:"currentPhase"`
-	CurrentPhaseNo int    `json:"currentPhaseNumber"`
-	PhaseCount     int    `json:"phaseCount"`
-	AgentCount     int    `json:"agentCount"`
-	HasResult      bool   `json:"hasResult"`
-	HasTranscripts bool   `json:"hasTranscripts"`
+	CurrentPhase   string       `json:"currentPhase"`
+	CurrentPhaseNo int          `json:"currentPhaseNumber"`
+	PhaseCount     int          `json:"phaseCount"`
+	AgentCount     int          `json:"agentCount"`
+	HasResult      bool         `json:"hasResult"`
+	HasTranscripts bool         `json:"hasTranscripts"`
 
 	startedTime time.Time
 }
 
 type workflowSnapshot struct {
 	RunID        string            `json:"runId"`
+	SessionID    string            `json:"sessionId"`
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
 	Status       string            `json:"status"`
@@ -134,6 +135,7 @@ func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sessionID := sessionUUIDFromReference(r.URL.Query().Get("session"))
 	workflows := make([]workflowSummary, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() || !workflowRunIDPattern.MatchString(entry.Name()) {
@@ -142,6 +144,9 @@ func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 		runDir := filepath.Join(s.workflowsDir(), entry.Name())
 		_, snapshot, err := readWorkflowJSON(filepath.Join(runDir, "workflow.json"))
 		if err != nil || snapshot.RunID != entry.Name() {
+			continue
+		}
+		if sessionID != "" && snapshot.SessionID != sessionID {
 			continue
 		}
 		workflows = append(workflows, workflowSummary{

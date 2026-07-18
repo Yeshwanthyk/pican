@@ -56,6 +56,29 @@ describe('App', () => {
     expect(document.querySelector('[data-workflows-page]')).toBeTruthy();
   });
 
+  it('passes the session query to the workflows page', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+
+    mounted = mountApp({ props: { path: '/workflows', search: '?session=session.jsonl' } });
+
+    expect(document.querySelector('.workflow-session-scope')?.getAttribute('href')).toBe(
+      '/session?id=session.jsonl',
+    );
+  });
+
+  it('passes project and session queries to the tasks page', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+
+    mounted = mountApp({
+      props: { path: '/tasks', search: '?session=session.jsonl&project=%2Frepo' },
+    });
+
+    expect(document.querySelector('.tasks-session-scope')?.getAttribute('href')).toBe(
+      '/session?id=session.jsonl',
+    );
+    expect(document.querySelector('#tasks-project')).toBeNull();
+  });
+
   it('routes /subagents to the Svelte subagents page', () => {
     document.body.innerHTML = '<div id="app"></div>';
 

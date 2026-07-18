@@ -32,8 +32,8 @@ Browser routes served by the SPA shell:
 - `/session?id=…` → `web/src/routes/SessionPage.svelte`
 - `/settings` → `web/src/routes/SettingsPage.svelte`
 - `/schedules` → `web/src/routes/SchedulesPage.svelte`
-- `/workflows?runId=…` → `web/src/routes/WorkflowsPage.svelte`
-- `/tasks?project=…` → `web/src/routes/TasksPage.svelte`
+- `/workflows?runId=…&session=…` → `web/src/routes/WorkflowsPage.svelte`
+- `/tasks?project=…&session=…` → `web/src/routes/TasksPage.svelte`
 - `/subagents` → `web/src/routes/SubagentsPage.svelte`
 - `/login` → `web/src/routes/LoginPage.svelte`
 
@@ -41,7 +41,7 @@ API, SSE, PWA, sound, and static asset routes remain server-handled and are not 
 
 ## Sessions Index (`/`)
 
-`SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the sessions list, session cards, command palette, home menu, new-session modal, and project management modal. `web/src/index/` now contains pure data/API helpers (`sessions.js`) for normalization, grouping, filtering, and API calls.
+`SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the sessions list, session cards, command palette, home menu, new-session modal, and project management modal. Timeline, Projects, Schedules, and Subagents are the global index views; Workflows and Tasks are session-scoped actions in `CommandMenu.svelte`. `web/src/index/` now contains pure data/API helpers (`sessions.js`) for normalization, grouping, filtering, and API calls.
 
 Data comes from existing APIs such as `/api/sessions`, `/api/new-session`, `/api/projects`, `/api/recent-locations`, and `/events?id=__all__`. Running-session status is pushed through the shared SSE helpers and reflected reactively in the cards/counts.
 

@@ -1,12 +1,5 @@
 <script>
-  import {
-    icon,
-    MoreHorizontal,
-    CalendarClock,
-    Layers,
-    ListChecks,
-    ListTree,
-  } from '../../shared/icons.js';
+  import { icon, MoreHorizontal, CalendarClock, Layers } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
 
   let {
@@ -18,8 +11,6 @@
     onToggleMenu = () => {},
     onLayoutChange = () => {},
     onSchedules = () => {},
-    onWorkflows = () => {},
-    onTasks = () => {},
     onSubagents = () => {},
   } = $props();
 </script>
@@ -88,26 +79,6 @@
               size: 15,
             })}</span
           ><span>{t('schedules.navTitle')}</span></button
-        >
-        <button
-          type="button"
-          class="schedules-nav-btn"
-          data-workflows-btn
-          title={t('workflows.navTitle')}
-          onclick={onWorkflows}
-          ><span class="schedules-nav-icon" aria-hidden="true"
-            >{@html icon(ListTree, { size: 15 })}</span
-          ><span>{t('workflows.navTitle')}</span></button
-        >
-        <button
-          type="button"
-          class="schedules-nav-btn"
-          data-tasks-btn
-          title={t('tasks.navTitle')}
-          onclick={onTasks}
-          ><span class="schedules-nav-icon" aria-hidden="true"
-            >{@html icon(ListChecks, { size: 15 })}</span
-          ><span>{t('tasks.navTitle')}</span></button
         >
         <button
           type="button"

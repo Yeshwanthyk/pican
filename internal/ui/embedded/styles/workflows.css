@@ -20,6 +20,14 @@
   align-items: center;
 }
 
+.workflow-session-scope {
+  display: inline-flex;
+  margin-bottom: 20px;
+  color: var(--accent);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
 .workflow-page-error,
 .workflow-detail-error {
   margin: 0 0 16px;
