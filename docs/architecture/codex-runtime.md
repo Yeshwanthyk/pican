@@ -19,7 +19,7 @@ Session-directory startup behavior is runtime-specific:
 - `pi` and `both` require the configured `~/.pi/agent/sessions` directory to exist.
 - `codex` creates it when absent because it contains only pi-web's generated projections.
 
-At startup, Codex-enabled modes perform a catalog sync with a 15-second timeout and repeat it every minute. `codex` mode exits if the initial sync cannot reach Codex. `both` logs the failure and continues with Pi; the runtime selector marks Codex unavailable, Pi remains usable, and combined model discovery keeps the Pi models if Codex discovery fails. A later successful periodic sync restores Codex availability. Catalog pruning is bounded to projections that existed before the native list snapshot began, so a concurrently created thread cannot be removed merely because it was too new to appear in that snapshot.
+At startup, Codex-enabled modes perform a catalog sync with a 15-second timeout and repeat it every minute. `codex` mode exits if the initial sync cannot reach Codex. `both` logs the failure and continues with Pi; the runtime selector marks Codex unavailable, Pi remains usable, and combined model discovery keeps the Pi models if Codex discovery fails. A later successful periodic sync restores Codex availability. Catalog pruning is bounded to projections that existed before the native list snapshot began, and recently materialized projections receive a convergence grace period, so a newly created thread cannot be removed merely because it is too new to appear in that snapshot.
 
 ## Authentication and interaction policy
 
@@ -55,7 +55,7 @@ This differs from native Pi sessions:
 - Codex owns conversation state in `~/.codex`; pi-web atomically replaces the projected conversation after native thread updates.
 - Local projection metadata is preserved across replacements. Native archive/delete APIs call app-server first and remove only the validated projection after success; deleting a cache file directly still does not delete the Codex thread.
 
-Projection files intentionally use the normal session parser and cache. That gives Codex threads the unified session list, viewer, SSE reload, download, static export, and GitHub Gist share paths. If Codex later becomes unavailable, already-materialized projections remain browseable and exportable. Runtime-dependent operations are disabled with the reported unavailability reason until sync recovers. This is local cached viewing while the Codex runtime is offline; the PWA service worker does not cache session data for use when the pi-web HTTP server itself is offline.
+Projection files intentionally use the normal session parser and cache. That gives Codex threads the unified session list, viewer, SSE reload, download, static export, and GitHub Gist share paths. Live reload always performs a full entry reconciliation for Codex: Pi's `afterCount` optimization is invalid for an atomically replaced projection because new native entries can be inserted before preserved local metadata. If Codex later becomes unavailable, already-materialized projections remain browseable and exportable. Runtime-dependent operations are disabled with the reported unavailability reason until sync recovers. This is local cached viewing while the Codex runtime is offline; the PWA service worker does not cache session data for use when the pi-web HTTP server itself is offline.
 
 ## Worker and thread lifecycle
 

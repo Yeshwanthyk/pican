@@ -32,6 +32,10 @@ func TestSyncPrunesOnlyValidatedCodexProjectionAfterSuccessfulList(t *testing.T)
 	if _, err = os.Stat(codexProjection.Path); err != nil {
 		t.Fatalf("pruned after failed list: %v", err)
 	}
+	old := time.Now().Add(-projectionPruneGrace - time.Minute)
+	if err := os.Chtimes(codexProjection.Path, old, old); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = Sync(context.Background(), root, helperCommand("empty-list")); err != nil {
 		t.Fatal(err)
 	}
@@ -40,6 +44,20 @@ func TestSyncPrunesOnlyValidatedCodexProjectionAfterSuccessfulList(t *testing.T)
 	}
 	if _, err = os.Stat(piPath); err != nil {
 		t.Fatalf("Pi file pruned: %v", err)
+	}
+}
+
+func TestSyncKeepsRecentProjectionMissingFromList(t *testing.T) {
+	root := t.TempDir()
+	projection, err := Materialize(root, Thread{ID: "recent", CWD: t.TempDir(), CreatedAt: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Sync(context.Background(), root, helperCommand("empty-list")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(projection.Path); err != nil {
+		t.Fatalf("recent projection was pruned before Codex list convergence: %v", err)
 	}
 }
 

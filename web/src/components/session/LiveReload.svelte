@@ -20,7 +20,11 @@
     renderChatPreviewState,
     renderPendingChatState,
   } from '../../session/live/chat-preview.js';
-  import { getSessionIdFromLocation, handleSessionReload } from '../../session/live/live-events.js';
+  import {
+    getReloadEntryCount,
+    getSessionIdFromLocation,
+    handleSessionReload,
+  } from '../../session/live/live-events.js';
   import { setupSessionLiveConnection } from '../../session/live/live-connection.js';
   import { createFollowScrollController } from '../../session/live/live-follow.js';
   import { updateStatsDom } from '../../session/live/live-stats.js';
@@ -159,7 +163,7 @@
     // tail-windowed/paginated (model.truncated) — model.entries.length isn't a
     // from-0 prefix count in that case, so the delta request is disabled and a
     // full reconcile is used instead.
-    const getEntryCount = () => (model.truncated ? null : model.entries.length);
+    const getEntryCount = () => getReloadEntryCount(model);
 
     function triggerReload() {
       return handleSessionReload({

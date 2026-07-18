@@ -6,6 +6,11 @@ export function createSessionEventSource(sessionId, { EventSourceImpl = EventSou
   return new EventSourceImpl('/events?id=' + encodeURIComponent(sessionId));
 }
 
+export function getReloadEntryCount(model) {
+  if (!model || model.truncated || model.header?.runtime === 'codex') return null;
+  return model.entries.length;
+}
+
 export async function handleSessionReload({
   sessionId,
   fetchImpl = fetch,

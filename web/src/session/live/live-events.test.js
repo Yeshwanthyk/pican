@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createSessionEventSource,
+  getReloadEntryCount,
   getSessionIdFromLocation,
   handleSessionReload,
   wireSessionEvents,
@@ -12,6 +13,16 @@ describe('live events', () => {
     const EventSourceImpl = vi.fn();
     createSessionEventSource('a b', { EventSourceImpl });
     expect(EventSourceImpl).toHaveBeenCalledWith('/events?id=a%20b');
+  });
+
+  it('disables count deltas for replaceable Codex projections', () => {
+    expect(getReloadEntryCount({ header: { runtime: 'pi' }, entries: [{ id: 'a' }] })).toBe(1);
+    expect(
+      getReloadEntryCount({ header: { runtime: 'codex' }, entries: [{ id: 'a' }] }),
+    ).toBeNull();
+    expect(
+      getReloadEntryCount({ header: { runtime: 'pi' }, entries: [], truncated: true }),
+    ).toBeNull();
   });
 
   it('handles reload entries, title, and follow behavior', async () => {

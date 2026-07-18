@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 )
 
 type SyncResult struct {
 	IDs    []string          `json:"ids"`
 	Errors map[string]string `json:"errors,omitempty"`
 }
+
+const projectionPruneGrace = 2 * time.Minute
 
 // Sync imports every visible, non-archived Codex thread. A successful complete
 // list is authoritative for membership: validated Codex projections absent
@@ -53,6 +56,12 @@ func Sync(ctx context.Context, sessionsDir string, command []string) (SyncResult
 	} else {
 		for nativeID, path := range initialProjections {
 			if _, visible := listedIDs[nativeID]; visible {
+				continue
+			}
+			// A freshly created thread can lag behind thread/list even when the
+			// projection predates this sync's snapshot. Keep recent/active caches;
+			// a later catalog pass can prune them once Codex has converged.
+			if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) < projectionPruneGrace {
 				continue
 			}
 			if removeErr := RemoveProjection(path, nativeID); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {

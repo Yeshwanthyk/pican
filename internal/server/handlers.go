@@ -320,20 +320,21 @@ func (s *Server) handleApiSession(w http.ResponseWriter, r *http.Request) {
 	isDeltaRequest := afterCountStr != ""
 	deltaOk := false
 	if isDeltaRequest {
-		// ?afterCount=N asks for only the entries appended since the client's
-		// last known count (used by the live-reload SSE handler so a stream of
-		// small appends doesn't re-send the whole conversation each time). n
-		// must parse as an int in [0, total] to serve a delta; anything else
-		// (a stale/invalid n, or n > total meaning entries were removed or the
-		// client's count is out of sync — session files are append-only per
-		// AGENTS.md, so this should only happen after a reload/reconnect) falls
-		// back to the full entries slice with deltaOk: false so the client can
-		// self-heal by replacing its state wholesale instead of merging.
-		n, errN := strconv.Atoi(afterCountStr)
-		if errN == nil && n >= 0 && n <= total {
-			entries = entries[n:]
-			from = n
-			deltaOk = true
+		// Codex projections are atomically replaced caches, not append-only
+		// transcripts. Entries can be inserted before preserved local metadata,
+		// so an entry count is not a valid delta cursor; force a full reconcile.
+		if resolved.Session.Runtime != "codex" {
+			// ?afterCount=N asks for only the entries appended since the client's
+			// last known count (used by the live-reload SSE handler so a stream of
+			// small appends doesn't re-send the whole conversation each time). n
+			// must parse as an int in [0, total] to serve a delta; anything else
+			// falls back to the full entries slice with deltaOk: false.
+			n, errN := strconv.Atoi(afterCountStr)
+			if errN == nil && n >= 0 && n <= total {
+				entries = entries[n:]
+				from = n
+				deltaOk = true
+			}
 		}
 	} else if fromStr != "" && countStr != "" {
 		f, errF := strconv.Atoi(fromStr)

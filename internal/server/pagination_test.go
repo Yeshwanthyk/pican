@@ -207,6 +207,40 @@ func TestHandleApiSession_AfterCountReturnsDelta(t *testing.T) {
 	}
 }
 
+func TestHandleApiSession_CodexAfterCountForcesFullReconcile(t *testing.T) {
+	root := t.TempDir()
+	const messages = 10
+	const totalEntries = messages + 1
+	path := writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"cwd":`, `"runtime":"codex","nativeId":"native","modelProvider":"openai-codex","cwd":`, 1))
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=5", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.DeltaOk {
+		t.Fatal("deltaOk = true, want false for replaceable Codex projection")
+	}
+	if resp.From != 0 || len(resp.Entries) != totalEntries {
+		t.Fatalf("from=%d entries=%d, want full %d-entry reconcile", resp.From, len(resp.Entries), totalEntries)
+	}
+}
+
 func TestHandleApiSession_AfterCountEqualToTotalReturnsEmptyDelta(t *testing.T) {
 	root := t.TempDir()
 	const messages = 10
