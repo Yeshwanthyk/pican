@@ -34,10 +34,17 @@ export function createStatusEvents({
   onMessage = () => {},
   onWorkflowUpdate = () => {},
   onTasksUpdate = () => {},
+  onReconnect = () => {},
 } = {}) {
   let stream = null;
   let pagehideHandler = null;
   let pageshowHandler = null;
+  // Native EventSource fires 'open' both on the initial connection and on
+  // every automatic browser-driven reconnect, so it doubles as a reconnect
+  // signal once we've seen the first one. Without this, a page left open
+  // through a network blip (or backgrounded and resumed via pageshow) shows
+  // a stale list until some unrelated broadcast happens to arrive.
+  let everConnected = false;
 
   function closeStream() {
     if (stream) {
@@ -64,6 +71,10 @@ export function createStatusEvents({
     const es = new EventSourceImpl(`/events?id=${encodeURIComponent(topic)}`);
     stream = es;
 
+    es.addEventListener('open', () => {
+      if (everConnected) onReconnect();
+      everConnected = true;
+    });
     es.onmessage = (event) => onMessage(event.data);
     es.addEventListener('status-snapshot', (event) => {
       const snapshot = normalizeRunning(parseJSON(event.data));

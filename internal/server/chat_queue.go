@@ -112,12 +112,17 @@ func (s *Server) handleChatQueueDelete(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "position must be an integer")
 		return
 	}
-	if err := s.chatQueue.Remove(sessionID, pos); err != nil {
+	removed, err := s.chatQueue.Remove(sessionID, pos)
+	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "remove queue item: "+err.Error())
 		return
 	}
+	// removed=false means the autonomous drainer's PopHead already claimed
+	// this row (racing the browser's "send now"/"edit" delete). The caller
+	// must not also dispatch the message locally in that case, or it sends
+	// twice — see steer-queue.js's sendNow/edit.
 	s.notifyQueueChanged(sessionID)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": removed})
 }
 
 func (s *Server) handleChatQueuePatch(w http.ResponseWriter, r *http.Request) {

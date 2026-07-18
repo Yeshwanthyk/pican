@@ -39,15 +39,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case msg, open := <-client.ch:
+		case token, open := <-client.ch:
 			if !open {
 				return
 			}
-			if key := eventKey(msg); key != "" {
-				client.mu.Lock()
-				delete(client.queued, key)
-				client.mu.Unlock()
-			}
+			msg := client.resolveToken(token)
 			if strings.HasPrefix(msg, "event: ") {
 				// Already-formatted named SSE event; pass through with the
 				// terminating blank line.

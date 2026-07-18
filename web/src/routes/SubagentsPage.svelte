@@ -58,6 +58,9 @@
       },
       onSnapshot: scheduleRefresh,
       onDelta: scheduleRefresh,
+      // Catch up on reconnect the same way SessionsPage does — otherwise the
+      // list stays stale until an unrelated broadcast happens to arrive.
+      onReconnect: scheduleRefresh,
     });
     try {
       statusEvents.connect();

@@ -61,17 +61,33 @@ export function setupSteerQueue({
     return true;
   }
 
+  // Resolves whether it's safe to act on a queued row locally after pulling
+  // it from the server queue. Returns false when the row is gone for a
+  // reason OTHER than us just having removed it (server-side drainer already
+  // claimed it, or the delete failed) — in that case the caller must not
+  // dispatch/edit locally, or it races the drainer into double-dispatching
+  // the same message. store.removeById() drops the now-stale local row so
+  // the panel doesn't keep showing an item the server no longer has.
+  async function claimQueuedRow(focused) {
+    if (!queueApi || !Number.isInteger(focused.position)) return true;
+    try {
+      const result = await queueApi.remove(focused.position);
+      if (result?.removed === true) return true;
+      store.removeById(focused.id);
+      return false;
+    } catch {
+      // Request failed outright (network/server error): treat as unclaimed
+      // rather than risk a double-dispatch against a row we're not sure we
+      // own.
+      return false;
+    }
+  }
+
   async function sendNow(id) {
     const focused = store.items.find((it) => it.id === id);
     if (!focused || focused.kind !== 'queued') return;
     // Pull from the server first so the drainer doesn't race us.
-    if (queueApi && Number.isInteger(focused.position)) {
-      try {
-        await queueApi.remove(focused.position);
-      } catch {
-        /* best-effort — proceed even if the server-side delete fails */
-      }
-    }
+    if (!(await claimQueuedRow(focused))) return;
     store.takeLocalById(id);
     void sendChatMessage(focused.text, focused.files || []);
   }
@@ -79,13 +95,7 @@ export function setupSteerQueue({
   async function edit(id) {
     const focused = store.items.find((it) => it.id === id);
     if (!focused || focused.kind !== 'queued') return;
-    if (queueApi && Number.isInteger(focused.position)) {
-      try {
-        await queueApi.remove(focused.position);
-      } catch {
-        /* ignore — local-only edit still works */
-      }
-    }
+    if (!(await claimQueuedRow(focused))) return;
     store.takeLocalById(id);
     if (textarea) {
       textarea.value = focused.displayText || focused.text || '';

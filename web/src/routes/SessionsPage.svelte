@@ -250,6 +250,10 @@
         if (message === 'new-session') refreshSessions({ preserveWindow: true });
         if (message === 'reload') scheduleReload();
       },
+      // Catch up on reconnect (network blip, or tab resumed via pageshow):
+      // without this the list stays stale until an unrelated broadcast
+      // happens to arrive.
+      onReconnect: () => refreshSessions({ preserveWindow: true }),
     });
     try {
       statusEvents.connect();

@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"pi-web/internal/sessions"
@@ -72,7 +73,30 @@ func laterSubagentTime(a, b time.Time) time.Time {
 	return a
 }
 
-func scanSubagentParent(path string, parent sessions.SessionSummary, parentRunning bool) []subagentSummary {
+// scanSubagentParent returns per-session subagent records for path, applying
+// parentRunning-derived status on top of a cached pure scan (see
+// subagentScanCache): the file scan itself never depends on parentRunning, so
+// repeated calls (e.g. one per browser poll) reuse the same parsed records as
+// long as the file's mtime/size haven't changed, and only the cheap status
+// derivation below re-runs every time.
+func scanSubagentParent(path string, parent sessions.SessionSummary, parentRunning bool, cache *subagentScanCache) []subagentSummary {
+	records := cache.parentRecords(path, func() []subagentSummary {
+		return rawScanSubagentParent(path, parent)
+	})
+	for i := range records {
+		records[i].parentRunning = parentRunning
+		if records[i].resultStatus == "" && parentRunning {
+			records[i].Status = "running"
+		}
+	}
+	return records
+}
+
+// rawScanSubagentParent does the actual file scan. Its output is independent
+// of parentRunning (Status is only ever "unknown" or a resultStatus here),
+// which is what makes it safe to cache and reuse across calls with different
+// parentRunning values.
+func rawScanSubagentParent(path string, parent sessions.SessionSummary) []subagentSummary {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -115,7 +139,6 @@ func scanSubagentParent(path string, parent sessions.SessionSummary, parentRunni
 				spawnCWD:      details.CWD,
 				spawnedTime:   spawnedTime,
 				activityTime:  spawnedTime,
-				parentRunning: parentRunning,
 			})
 			if details.ID != "" {
 				byID[details.ID] = len(records) - 1
@@ -141,16 +164,10 @@ func scanSubagentParent(path string, parent sessions.SessionSummary, parentRunni
 			records[index].LastActivity = formatSubagentTime(records[index].activityTime)
 		}
 	}
-
-	for i := range records {
-		if records[i].resultStatus == "" && records[i].parentRunning {
-			records[i].Status = "running"
-		}
-	}
 	return records
 }
 
-func readSubagentHeaderTime(path string) time.Time {
+func readSubagentHeaderTimeUncached(path string) time.Time {
 	file, err := os.Open(path)
 	if err != nil {
 		return time.Time{}
@@ -169,6 +186,98 @@ func readSubagentHeaderTime(path string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+// readSubagentHeaderTime returns the session header timestamp for path,
+// reusing the cached value while the file's mtime/size are unchanged.
+func readSubagentHeaderTime(path string, cache *subagentScanCache) time.Time {
+	return cache.headerTime(path, func() time.Time {
+		return readSubagentHeaderTimeUncached(path)
+	})
+}
+
+// subagentScanCache memoizes the pure (parentRunning-independent) parts of
+// subagent scanning — parsing subagent_spawn/subagent-result records out of a
+// parent session file, and reading a child session's header timestamp — so
+// /api/subagents doesn't re-scan every candidate file on every hit. Entries
+// are invalidated by mtime+size, matching the mtime-keyed cache pattern used
+// by fileWalkCache (see files.go).
+type subagentScanCache struct {
+	mu      sync.Mutex
+	parents map[string]subagentParentCacheEntry
+	headers map[string]subagentHeaderCacheEntry
+}
+
+type subagentParentCacheEntry struct {
+	modTime time.Time
+	size    int64
+	records []subagentSummary
+}
+
+type subagentHeaderCacheEntry struct {
+	modTime    time.Time
+	size       int64
+	headerTime time.Time
+}
+
+func newSubagentScanCache() *subagentScanCache {
+	return &subagentScanCache{
+		parents: make(map[string]subagentParentCacheEntry),
+		headers: make(map[string]subagentHeaderCacheEntry),
+	}
+}
+
+// parentRecords returns a fresh copy of the cached scan for path, re-scanning
+// via scan on a miss or mtime/size change. Callers are free to mutate the
+// returned slice (e.g. to derive parentRunning-dependent Status) without
+// corrupting the cache, since both the cached copy and the returned copy are
+// independent of scan's original result.
+func (c *subagentScanCache) parentRecords(path string, scan func() []subagentSummary) []subagentSummary {
+	info, statErr := os.Stat(path)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if statErr == nil {
+		if entry, ok := c.parents[path]; ok && entry.modTime.Equal(info.ModTime()) && entry.size == info.Size() {
+			out := make([]subagentSummary, len(entry.records))
+			copy(out, entry.records)
+			return out
+		}
+	}
+	records := scan()
+	if statErr == nil {
+		stored := make([]subagentSummary, len(records))
+		copy(stored, records)
+		c.parents[path] = subagentParentCacheEntry{modTime: info.ModTime(), size: info.Size(), records: stored}
+	}
+	return records
+}
+
+// headerTime returns the cached header timestamp for path, re-scanning via
+// scan on a miss or mtime/size change.
+func (c *subagentScanCache) headerTime(path string, scan func() time.Time) time.Time {
+	info, statErr := os.Stat(path)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if statErr == nil {
+		if entry, ok := c.headers[path]; ok && entry.modTime.Equal(info.ModTime()) && entry.size == info.Size() {
+			return entry.headerTime
+		}
+	}
+	t := scan()
+	if statErr == nil {
+		c.headers[path] = subagentHeaderCacheEntry{modTime: info.ModTime(), size: info.Size(), headerTime: t}
+	}
+	return t
+}
+
+// subagentScanCache lazily initializes and returns the server's shared cache.
+func (s *Server) subagentScanCache() *subagentScanCache {
+	s.subagentScanOnce.Do(func() {
+		s.subagentScan = newSubagentScanCache()
+	})
+	return s.subagentScan
 }
 
 func subagentTimeGap(parent, child subagentSummary) time.Duration {
@@ -284,7 +393,7 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 			ChildProject: summary.Project,
 			LastActivity: formatSubagentTime(activityTime),
 			activityTime: activityTime,
-			headerTime:   readSubagentHeaderTime(path),
+			headerTime:   readSubagentHeaderTime(path, s.subagentScanCache()),
 			childRunning: running,
 		})
 	}
@@ -308,7 +417,7 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		parentFiles++
-		parents = append(parents, scanSubagentParent(path, summary, s.computeRunningStatus(summary.Filename))...)
+		parents = append(parents, scanSubagentParent(path, summary, s.computeRunningStatus(summary.Filename), s.subagentScanCache())...)
 	}
 
 	items := mergeSubagentSummaries(parents, children)

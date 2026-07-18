@@ -115,4 +115,58 @@ describe('createStatusEvents', () => {
     expect(removeEventListener).toHaveBeenCalledWith('pagehide', expect.any(Function));
     expect(removeEventListener).toHaveBeenCalledWith('pageshow', expect.any(Function));
   });
+
+  it('does not fire onReconnect for the initial connection', () => {
+    const onReconnect = vi.fn();
+    const sub = createStatusEvents({ EventSourceImpl: FakeEventSource, onReconnect });
+    sub.connect();
+
+    FakeEventSource.instances[0].emit('open');
+
+    expect(onReconnect).not.toHaveBeenCalled();
+  });
+
+  // Regression test: the home page used to sit on a stale list after a
+  // reconnect (network blip, or pageshow after the tab was backgrounded)
+  // until an unrelated broadcast happened to arrive. onReconnect fires on
+  // every 'open' after the first, whether the browser auto-reconnected the
+  // existing EventSource or connect() was called again explicitly.
+  it('fires onReconnect when the underlying EventSource reopens after the first connection', () => {
+    const onReconnect = vi.fn();
+    const sub = createStatusEvents({ EventSourceImpl: FakeEventSource, onReconnect });
+    sub.connect();
+    const es = FakeEventSource.instances[0];
+
+    es.emit('open'); // initial connect — no reconnect callback
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    es.emit('open'); // browser auto-reconnected the same EventSource
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+
+    es.emit('open'); // and again
+    expect(onReconnect).toHaveBeenCalledTimes(2);
+  });
+
+  it('fires onReconnect after a pageshow-triggered reconnect', () => {
+    const listeners = {};
+    const windowImpl = {
+      addEventListener: (name, fn) => {
+        listeners[name] = fn;
+      },
+      removeEventListener: () => {},
+    };
+    const onReconnect = vi.fn();
+    const sub = createStatusEvents({ EventSourceImpl: FakeEventSource, windowImpl, onReconnect });
+    sub.connect();
+    FakeEventSource.instances[0].emit('open');
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    // pagehide closes the stream (stream becomes null); pageshow reconnects.
+    listeners.pagehide();
+    listeners.pageshow();
+
+    expect(FakeEventSource.instances).toHaveLength(2);
+    FakeEventSource.instances[1].emit('open');
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
 });
