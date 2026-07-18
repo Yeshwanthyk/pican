@@ -110,6 +110,7 @@ func Main(version string) {
 	mux := http.NewServeMux()
 	srv.Register(mux)
 	ui.RegisterPWAHandlers(mux)
+	mux.HandleFunc("/styles/app.css", ui.ServeAppStyles)
 	dfs := web.DistFS()
 	if scripts, err := frontend.LoadScripts(dfs, frontend.AppEntry); err == nil {
 		for _, script := range scripts {

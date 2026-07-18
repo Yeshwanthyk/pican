@@ -21,14 +21,31 @@ type sessionCacheEntry struct {
 	parse   fileParseState
 }
 
+// dirListing is a project directory's cached file-name list (.jsonl only),
+// valid as long as the directory's own modTime hasn't changed. A directory's
+// modTime advances when an entry is added, removed, or renamed — but NOT when
+// an existing file is merely appended to — so this only ever caches names,
+// never per-file modTime/size; those are always freshly stat'd (see LoadAll).
+type dirListing struct {
+	modTime time.Time
+	names   []string
+}
+
 type Cache struct {
 	mu           sync.Mutex
-	entries      map[string]cacheEntry      // keyed by full file path
-	pathIndex    map[string]string          // filename -> full file path
+	entries      map[string]cacheEntry        // keyed by full file path
+	pathIndex    map[string]string            // filename -> full file path
 	sessionCache map[string]sessionCacheEntry // path -> full parsed session
 
-	parses int // diagnostic: number of ParseSummary calls
-	hits   int // diagnostic: number of cache hits
+	rootDir     string
+	hasRoot     bool
+	rootModTime time.Time
+	projectDirs []string              // subdirectory names under rootDir, valid while rootModTime matches
+	dirListings map[string]dirListing // project dir name -> cached .jsonl name list
+
+	parses   int // diagnostic: number of ParseSummary calls
+	hits     int // diagnostic: number of cache hits
+	dirReads int // diagnostic: number of real os.ReadDir calls issued (root + subdirs)
 }
 
 func NewCache() *Cache {
@@ -36,15 +53,103 @@ func NewCache() *Cache {
 		entries:      make(map[string]cacheEntry),
 		pathIndex:    make(map[string]string),
 		sessionCache: make(map[string]sessionCacheEntry),
+		dirListings:  make(map[string]dirListing),
 	}
+}
+
+// discoverProjectDirs returns the subdirectory names directly under dir,
+// reusing the previous call's list when dir's own modTime hasn't changed
+// (nothing added/removed/renamed at that level) instead of issuing a fresh
+// os.ReadDir.
+func (c *Cache) discoverProjectDirs(dir string, rootModTime time.Time) ([]string, error) {
+	c.mu.Lock()
+	if c.hasRoot && c.rootDir == dir && c.rootModTime.Equal(rootModTime) {
+		cached := c.projectDirs
+		c.mu.Unlock()
+		return cached, nil
+	}
+	c.mu.Unlock()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	projectDirs := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			projectDirs = append(projectDirs, e.Name())
+		}
+	}
+
+	c.mu.Lock()
+	c.dirReads++
+	c.rootDir = dir
+	c.rootModTime = rootModTime
+	c.hasRoot = true
+	c.projectDirs = projectDirs
+	// Prune listings for project dirs that no longer exist so the map
+	// doesn't grow forever across renames/deletions.
+	keep := make(map[string]struct{}, len(projectDirs))
+	for _, name := range projectDirs {
+		keep[name] = struct{}{}
+	}
+	for name := range c.dirListings {
+		if _, ok := keep[name]; !ok {
+			delete(c.dirListings, name)
+		}
+	}
+	c.mu.Unlock()
+
+	return projectDirs, nil
+}
+
+// discoverSessionNames returns the .jsonl file names directly under subDir,
+// reusing the cached listing when subDir's own modTime hasn't changed.
+func (c *Cache) discoverSessionNames(dirName, subDir string, subModTime time.Time) ([]string, error) {
+	c.mu.Lock()
+	listing, ok := c.dirListings[dirName]
+	c.mu.Unlock()
+	if ok && listing.modTime.Equal(subModTime) {
+		return listing.names, nil
+	}
+
+	subs, err := os.ReadDir(subDir)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(subs))
+	for _, f := range subs {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".jsonl") {
+			names = append(names, f.Name())
+		}
+	}
+
+	c.mu.Lock()
+	c.dirReads++
+	c.dirListings[dirName] = dirListing{modTime: subModTime, names: names}
+	c.mu.Unlock()
+
+	return names, nil
 }
 
 // LoadAll returns summaries for every session under dir. Files whose modtime
 // hasn't changed since the previous call are returned from the cache; files
 // that are new or modified are re-parsed; files that have disappeared are
 // evicted. It also maintains a path index for O(1) lookup by filename.
+//
+// Directory discovery (which project dirs exist, which files each contains)
+// is memoized per-directory, gated by that directory's own modTime: an
+// unchanged directory skips its os.ReadDir entirely. Only the file names are
+// cached this way — every file's modTime/size is still freshly stat'd on
+// every call, because an append to an existing file does NOT change its
+// parent directory's modTime, so a cached modTime would go stale silently.
 func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
-	entries, err := os.ReadDir(dir)
+	rootInfo, err := os.Stat(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	projectDirs, err := c.discoverProjectDirs(dir, rootInfo.ModTime())
 	if err != nil {
 		return nil, err
 	}
@@ -57,27 +162,29 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 		modTime time.Time
 	}
 	var records []fileRecord
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		subDir := filepath.Join(dir, e.Name())
-		subs, err := os.ReadDir(subDir)
+	for _, dirName := range projectDirs {
+		subDir := filepath.Join(dir, dirName)
+		subInfo, err := os.Stat(subDir)
 		if err != nil {
 			continue
 		}
-		for _, f := range subs {
-			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
-				continue
-			}
-			info, err := f.Info()
+		names, err := c.discoverSessionNames(dirName, subDir, subInfo.ModTime())
+		if err != nil {
+			continue
+		}
+		for _, name := range names {
+			path := filepath.Join(subDir, name)
+			// Always stat individually: the directory's mtime only proves the
+			// set of names is unchanged, not that an existing file's own
+			// mtime/size didn't advance via an append.
+			info, err := os.Stat(path)
 			if err != nil {
 				continue
 			}
 			records = append(records, fileRecord{
-				path:    filepath.Join(subDir, f.Name()),
-				dirName: e.Name(),
-				name:    f.Name(),
+				path:    path,
+				dirName: dirName,
+				name:    name,
 				modTime: info.ModTime(),
 			})
 		}

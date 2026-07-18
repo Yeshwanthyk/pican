@@ -77,7 +77,12 @@ func (s *Server) recordModTime(sessID string, mod time.Time) {
 	s.fileModMu.Unlock()
 	if known && mod.After(lastMod) {
 		s.broadcast(sessID, "reload")
-		s.broadcast(globalSessID, "reload")
+		// The global topic carries the touched session id (rather than a bare
+		// "reload") so SessionsPage can damp its refetch: skip it entirely for
+		// a session it already knows about unless enough time has passed,
+		// instead of refetching the whole list on every append to any
+		// streaming session. The session-scoped broadcast above is untouched.
+		s.broadcast(globalSessID, "reload:"+sessID)
 		// A content change may be the first user message (or a new turn) that
 		// should get an auto-generated title. Run off this hot path; the call
 		// cheaply bails when titling is disabled or already handled.

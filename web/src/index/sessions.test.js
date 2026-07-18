@@ -9,6 +9,7 @@ import {
   sessionModelLabel,
   sessionSearchText,
   splitPinnedSessions,
+  shouldRefetchOnReload,
 } from './sessions.js';
 
 describe('index sessions helpers', () => {
@@ -107,6 +108,18 @@ describe('index sessions helpers', () => {
   it('returns empty pinned/rest for no sessions', () => {
     expect(splitPinnedSessions([])).toEqual({ pinned: [], rest: [] });
     expect(splitPinnedSessions()).toEqual({ pinned: [], rest: [] });
+  });
+
+  it('damps reload refetches for known sessions but not new ones', () => {
+    const knownIds = new Set(['a', 'b']);
+    const base = { knownIds, lastRefreshAt: 1000, throttleMs: 5000 };
+    // Unknown or missing id → always refetch (new session must appear promptly).
+    expect(shouldRefetchOnReload({ ...base, id: 'zz', now: 1001 })).toBe(true);
+    expect(shouldRefetchOnReload({ ...base, id: '', now: 1001 })).toBe(true);
+    // Known id inside the throttle window → skip.
+    expect(shouldRefetchOnReload({ ...base, id: 'a', now: 5999 })).toBe(false);
+    // Known id once the window elapses → refetch.
+    expect(shouldRefetchOnReload({ ...base, id: 'a', now: 6000 })).toBe(true);
   });
 
   it('formats token/cost metrics with k/M abbreviation and hides zeros', () => {

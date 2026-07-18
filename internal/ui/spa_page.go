@@ -12,8 +12,17 @@ var appTmplStr string
 
 var appTmpl = template.Must(template.New("app").Parse(appTmplStr))
 
+// appStylesheets returns the CSS the SPA shell needs before first paint —
+// theme.css only, inlined so its tokens (and the boot script's FOUC
+// prevention, which reads them) are available with zero extra round-trips —
+// plus a <link> to the externally cached bundle of everything else
+// (appStylesBundle in app_styles.go). Splitting it this way means the ~258KB
+// of per-route CSS is fetched once by the browser and cached across every
+// subsequent navigation instead of being re-transmitted and re-parsed inline
+// on every route.
 func appStylesheets() template.HTML {
-	return template.HTML("<style>\n" + liveThemeCss + "\n" + indexCSS + "\n" + settingsCSS + "\n" + schedulesCSS + "\n" + workflowsCSS + "\n" + tasksCSS + "\n" + subagentsCSS + "\n" + liveSessionCss + "\n" + liveMenuCss + "\n" + livePaletteCss + "\n</style>")
+	return template.HTML("<style>\n" + liveThemeCss + "\n</style>\n" +
+		`<link rel="stylesheet" href="` + template.HTMLEscapeString(appStylesHref()) + `">`)
 }
 
 // RenderAppShell renders the Svelte SPA host document. It deliberately reuses

@@ -423,6 +423,13 @@ func eventKey(msg string) string {
 	case "new-session":
 		return "new-session"
 	}
+	if strings.HasPrefix(msg, "reload:") {
+		// The whole message (not just "reload:") is the key: it carries the
+		// touched session id, so bursty appends to session A coalesce with
+		// each other but never overwrite/drop a still-pending reload for a
+		// different session B.
+		return msg
+	}
 	if strings.HasPrefix(msg, "event: workflows-updated\n") {
 		return "workflows-updated"
 	}

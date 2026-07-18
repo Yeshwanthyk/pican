@@ -39,6 +39,18 @@ export function splitPinnedSessions(sessions = []) {
   return { pinned, rest };
 }
 
+// shouldRefetchOnReload damps the reload storm: the server broadcasts a
+// global "reload:<id>" for every append to ANY streaming session, but the
+// sessions list only needs to reflect a known session's activity time
+// occasionally, not on every single append. Refetch unconditionally when id
+// is unknown/empty (a brand-new session should appear promptly); otherwise
+// only after throttleMs has elapsed since the last known-id-triggered
+// refetch.
+export function shouldRefetchOnReload({ id, knownIds, lastRefreshAt, now, throttleMs }) {
+  if (!id || !knownIds.has(id)) return true;
+  return now - lastRefreshAt >= throttleMs;
+}
+
 export function activityMs(session) {
   const ms = Date.parse(session?.lastActivity || session?.LastActivity || '');
   return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;

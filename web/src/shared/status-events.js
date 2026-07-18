@@ -14,6 +14,18 @@ function normalizeRunning(payload) {
   };
 }
 
+// parseReload extracts the touched session id from a global-topic reload
+// broadcast. The server sends "reload:<sessionID>" on the __all__ topic (see
+// internal/server/watcher.go); a bare "reload" (no id) is treated the same
+// as an unknown id so callers fall back to their safest behavior (e.g. an
+// unconditional refresh) instead of silently doing nothing.
+function parseReload(message) {
+  if (typeof message !== 'string') return null;
+  if (message === 'reload') return { id: '' };
+  if (message.startsWith('reload:')) return { id: message.slice('reload:'.length) };
+  return null;
+}
+
 function normalizeDelta(payload) {
   if (!payload || typeof payload.id !== 'string') return null;
   return {
@@ -32,6 +44,7 @@ export function createStatusEvents({
   onSnapshot = () => {},
   onDelta = () => {},
   onMessage = () => {},
+  onReload = () => {},
   onWorkflowUpdate = () => {},
   onTasksUpdate = () => {},
   onReconnect = () => {},
@@ -75,7 +88,11 @@ export function createStatusEvents({
       if (everConnected) onReconnect();
       everConnected = true;
     });
-    es.onmessage = (event) => onMessage(event.data);
+    es.onmessage = (event) => {
+      onMessage(event.data);
+      const reload = parseReload(event.data);
+      if (reload) onReload(reload);
+    };
     es.addEventListener('status-snapshot', (event) => {
       const snapshot = normalizeRunning(parseJSON(event.data));
       if (snapshot) onSnapshot(snapshot);

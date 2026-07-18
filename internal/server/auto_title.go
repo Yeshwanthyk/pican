@@ -123,7 +123,7 @@ func (s *Server) maybeAutoTitle(sessID string) {
 		return
 	}
 	s.broadcast(sessID, "reload")
-	s.broadcast(globalSessID, "reload")
+	s.broadcast(globalSessID, "reload:"+sessID)
 }
 
 // generateTitle asks the configured model for a concise title, falling back to

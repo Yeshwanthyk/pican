@@ -169,4 +169,25 @@ describe('createStatusEvents', () => {
     FakeEventSource.instances[1].emit('open');
     expect(onReconnect).toHaveBeenCalledTimes(1);
   });
+
+  it('routes reload broadcasts to onReload with the touched session id', () => {
+    const onReload = vi.fn();
+    const onMessage = vi.fn();
+    const sub = createStatusEvents({ EventSourceImpl: FakeEventSource, onReload, onMessage });
+    sub.connect();
+    const es = FakeEventSource.instances[0];
+
+    es.emit('message', 'reload:abc_123.jsonl');
+    expect(onReload).toHaveBeenCalledWith({ id: 'abc_123.jsonl' });
+
+    // Bare "reload" (legacy/session-topic form) maps to an empty id so
+    // callers fall back to an unconditional refresh.
+    es.emit('message', 'reload');
+    expect(onReload).toHaveBeenCalledWith({ id: '' });
+
+    // Non-reload messages never reach onReload but still reach onMessage.
+    es.emit('message', 'new-session');
+    expect(onReload).toHaveBeenCalledTimes(2);
+    expect(onMessage).toHaveBeenCalledWith('new-session');
+  });
 });

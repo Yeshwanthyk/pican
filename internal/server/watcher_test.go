@@ -84,6 +84,47 @@ func TestPollingFallbackBroadcastsOnAppend(t *testing.T) {
 	}
 }
 
+func TestRecordModTimeGlobalBroadcastCarriesSessionID(t *testing.T) {
+	root := t.TempDir()
+	now := time.Now()
+	s := &Server{
+		sessionsDir: root,
+		fileMod:     map[string]time.Time{"session.jsonl": now.Add(-10 * time.Second)},
+		clients:     make([]*sseClient, 0),
+		lastKnown:   make(map[string]struct{}),
+		chatSender:  &fakeSender{},
+		now:         time.Now,
+	}
+	globalClient := s.addClient(globalSessID)
+	defer s.removeClient(globalClient)
+	sessionClient := s.addClient("session.jsonl")
+	defer s.removeClient(sessionClient)
+
+	s.recordModTime("session.jsonl", time.Now())
+
+	// The session-scoped topic still gets the plain "reload" other consumers
+	// (live-events.js, btw-events.js) depend on — unchanged.
+	select {
+	case msg := <-sessionClient.ch:
+		if msg != "reload" {
+			t.Fatalf("session-scoped broadcast = %q, want plain %q", msg, "reload")
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected a reload broadcast on the session-scoped topic")
+	}
+
+	// The global (__all__) topic carries the touched session id so
+	// SessionsPage can damp its refetch instead of reloading on every append.
+	select {
+	case msg := <-globalClient.ch:
+		if msg != "reload:session.jsonl" {
+			t.Fatalf("global broadcast = %q, want %q", msg, "reload:session.jsonl")
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected a reload broadcast on the global topic")
+	}
+}
+
 func TestRecordModTimeBroadcastsStatusDelta(t *testing.T) {
 	root := t.TempDir()
 	now := time.Now()

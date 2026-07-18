@@ -26,6 +26,7 @@
     defaultUpdateProject,
     layoutStorageKey,
     normalizeSession,
+    shouldRefetchOnReload,
   } from '../index/sessions.js';
   import {
     defaultFetchPeers,
@@ -130,6 +131,31 @@
       refreshSessions({ preserveWindow: true });
       refreshPeerHosts();
     }, RELOAD_DEBOUNCE_MS);
+  }
+
+  // Damps the reload storm: a global "reload:<id>" broadcast fires on every
+  // append to any streaming session, indefinitely. A brand-new (unknown) id
+  // still refreshes right away so it appears promptly; a known id only
+  // refreshes at most once per KNOWN_ID_REFRESH_THROTTLE_MS, since all a
+  // known session's reload can change here is its activity time/ordering.
+  const KNOWN_ID_REFRESH_THROTTLE_MS = 5000;
+  let lastKnownIdRefreshAt = 0;
+  function handleReload({ id }) {
+    const now = Date.now();
+    const knownIds = new Set(sessions.map((session) => session.id));
+    if (
+      !shouldRefetchOnReload({
+        id,
+        knownIds,
+        lastRefreshAt: lastKnownIdRefreshAt,
+        now,
+        throttleMs: KNOWN_ID_REFRESH_THROTTLE_MS,
+      })
+    ) {
+      return;
+    }
+    lastKnownIdRefreshAt = now;
+    scheduleReload();
   }
 
   // Peers (multi-machine "Machines" section): zero overhead for single-machine
@@ -283,8 +309,8 @@
       onDelta: (status) => setSessionRunning(status.id, status.running, status),
       onMessage: (message) => {
         if (message === 'new-session') refreshSessions({ preserveWindow: true });
-        if (message === 'reload') scheduleReload();
       },
+      onReload: handleReload,
       // Catch up on reconnect (network blip, or tab resumed via pageshow):
       // without this the list stays stale until an unrelated broadcast
       // happens to arrive.

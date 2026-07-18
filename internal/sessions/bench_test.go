@@ -167,6 +167,33 @@ func BenchmarkLoadAllCached100(b *testing.B) {
 	}
 }
 
+// BenchmarkLoadAllCached200 is the perf guardrail for the directory-walk
+// memoization change: 200 sessions spread across 20 project dirs, repeatedly
+// re-loaded with nothing on disk actually changed. Before the fix this issued
+// a full os.ReadDir of the root plus all 20 project dirs on every call;
+// after, an unchanged dir skips its ReadDir entirely and only per-file
+// os.Stat calls remain.
+func BenchmarkLoadAllCached200(b *testing.B) {
+	tmp := b.TempDir()
+	cwd := filepath.Join(tmp, "cwd")
+	os.MkdirAll(cwd, 0755)
+	for i := 0; i < 200; i++ {
+		dir := filepath.Join(tmp, fmt.Sprintf("--project-%02d--", i%20))
+		os.MkdirAll(dir, 0755)
+		path := filepath.Join(dir, fmt.Sprintf("session-%03d.jsonl", i))
+		os.WriteFile(path, []byte(generateLargeSessionContent(50, cwd)), 0644)
+	}
+	c := NewCache()
+	c.LoadAll(tmp) // warm
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := c.LoadAll(tmp)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkResolveByID(b *testing.B) {
 	tmp := b.TempDir()
 	cwd := filepath.Join(tmp, "cwd")
