@@ -96,6 +96,13 @@ type Server struct {
 	fileWalk     *fileWalkCache
 	fileWalkOnce sync.Once
 
+	// subagentScan caches per-file subagent scan results (see
+	// subagents_api.go) keyed by mtime/size, since /api/subagents otherwise
+	// does a full-file scan of every candidate parent/child session on every
+	// hit.
+	subagentScan     *subagentScanCache
+	subagentScanOnce sync.Once
+
 	// Metrics dashboard (see metrics.go) and auto-title bookkeeping (see
 	// auto_title.go), grouped so each subsystem owns its own fields + lock.
 	metrics   metricsState
@@ -372,18 +379,32 @@ func (s *Server) loadSummaries() ([]sessions.SessionSummary, error) {
 
 // ── SSE clients ────────────────────────────────────────────────────────────
 
+// sseClient is one open /events connection. Delivery goes through ch, a
+// small buffered mailbox of "tokens": for keyless messages the token IS the
+// payload (pushed and, on a full channel, dropped — harmless, since the
+// reconnect snapshot recovers that state); for keyed messages (see eventKey)
+// the token is just the key and the real payload lives in pending, so a
+// newer broadcast for the same key can overwrite an older one that's still
+// waiting to be delivered (REPLACEMENT semantics) instead of occupying a
+// second channel slot. signaled tracks whether a wake-up token for a key is
+// currently sitting in ch, so at most one token per key is ever queued; if
+// the channel is full when a key is first signaled, the payload stays in
+// pending and flushPending retries it on the client's next dequeue — so a
+// keyed event is delayed by backpressure, never silently lost.
 type sseClient struct {
-	ch     chan string
-	sessID string
-	mu     sync.Mutex
-	queued map[string]bool
+	ch       chan string
+	sessID   string
+	mu       sync.Mutex
+	pending  map[string]string
+	signaled map[string]bool
 }
 
 func (s *Server) addClient(sessID string) *sseClient {
 	c := &sseClient{
-		ch:     make(chan string, 16),
-		sessID: sessID,
-		queued: make(map[string]bool),
+		ch:       make(chan string, 16),
+		sessID:   sessID,
+		pending:  make(map[string]string),
+		signaled: make(map[string]bool),
 	}
 	s.clientsMu.Lock()
 	s.clients = append(s.clients, c)
@@ -392,9 +413,9 @@ func (s *Server) addClient(sessID string) *sseClient {
 }
 
 // eventKey returns a coalescing key for msg. Events with the same non-empty
-// key are deduplicated while pending in a client's channel; an empty key
-// means "always deliver, drop on full" (status events self-heal via the
-// reconnect snapshot).
+// key are deduplicated while pending for a client; an empty key means
+// "always deliver, drop on full" (status events self-heal via the reconnect
+// snapshot).
 func eventKey(msg string) string {
 	switch msg {
 	case "reload":
@@ -407,6 +428,9 @@ func eventKey(msg string) string {
 	}
 	if strings.HasPrefix(msg, "event: tasks-updated\n") {
 		return msg
+	}
+	if strings.HasPrefix(msg, "event: chat-preview\n") {
+		return "chat-preview"
 	}
 	return ""
 }
@@ -454,21 +478,70 @@ func (s *Server) broadcast(sessID, msg string) {
 		if c.sessID != sessID {
 			continue
 		}
-		c.mu.Lock()
-		if key != "" && c.queued[key] {
-			c.mu.Unlock()
+		c.send(key, msg)
+	}
+}
+
+// send delivers msg to the client. Keyless messages go straight onto ch and
+// are dropped on a full buffer (see sseClient doc comment). Keyed messages
+// always overwrite pending[key] with the latest payload, and queue at most
+// one wake-up token per key.
+func (c *sseClient) send(key, msg string) {
+	if key == "" {
+		select {
+		case c.ch <- msg:
+		default:
+		}
+		return
+	}
+	c.mu.Lock()
+	c.pending[key] = msg
+	if !c.signaled[key] {
+		select {
+		case c.ch <- key:
+			c.signaled[key] = true
+		default:
+			// Channel full; flushPending retries this once the client
+			// dequeues something (see resolveToken).
+		}
+	}
+	c.mu.Unlock()
+}
+
+// resolveToken turns a dequeued channel token into the message to deliver: a
+// keyless token already IS the message, a keyed token is looked up (and
+// cleared) in pending so the client sees the newest payload for that key.
+// Always retries any keyed messages that missed their channel slot earlier.
+func (c *sseClient) resolveToken(token string) string {
+	c.mu.Lock()
+	msg, ok := c.pending[token]
+	if ok {
+		delete(c.pending, token)
+		delete(c.signaled, token)
+	} else {
+		msg = token
+	}
+	c.mu.Unlock()
+	c.flushPending()
+	return msg
+}
+
+// flushPending retries signaling any keyed messages that couldn't get a
+// channel slot when they first arrived, so a full channel only delays a
+// keyed event — it never loses it permanently.
+func (c *sseClient) flushPending() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key := range c.pending {
+		if c.signaled[key] {
 			continue
 		}
 		select {
-		case c.ch <- msg:
-			if key != "" {
-				c.queued[key] = true
-			}
+		case c.ch <- key:
+			c.signaled[key] = true
 		default:
-			// dropped — only reachable for keyless events (e.g. status-delta);
-			// snapshot-on-reconnect recovers state for those.
+			return
 		}
-		c.mu.Unlock()
 	}
 }
 

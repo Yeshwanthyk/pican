@@ -195,30 +195,46 @@ func (s *Store) Add(sessionID, message, displayText string) (Item, error) {
 	}, nil
 }
 
-// Remove deletes a single item by (sessionID, position). Returns nil if the
-// row didn't exist — idempotent so the UI can fire-and-forget without racing.
-func (s *Store) Remove(sessionID string, position int64) error {
+// Remove deletes a single item by (sessionID, position) and reports whether a
+// row actually existed. Callers that dispatch a queued item locally on
+// removal (e.g. "send now") must only do so when removed is true: if the
+// autonomous drainer's PopHead already claimed the row first, removed is
+// false and the caller must not also dispatch, or the message sends twice.
+func (s *Store) Remove(sessionID string, position int64) (bool, error) {
 	if sessionID == "" {
-		return errors.New("sessionID is required")
+		return false, errors.New("sessionID is required")
 	}
-	_, err := s.db.Exec(
+	res, err := s.db.Exec(
 		`DELETE FROM chat_queue_items WHERE session_id = ? AND position = ?`,
 		sessionID, position,
 	)
 	if err != nil {
-		return fmt.Errorf("delete item: %w", err)
+		return false, fmt.Errorf("delete item: %w", err)
 	}
-	return nil
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("rows affected: %w", err)
+	}
+	return n > 0, nil
 }
 
 // PopHead removes and returns the lowest-position item for a session. Returns
 // (Item{}, false, nil) if the queue is empty — used by the autonomous drainer
-// when the worker is idle.
+// when the worker is idle. The select-then-delete runs inside a transaction
+// so it can't race with a concurrent Remove (e.g. the browser's "send now")
+// claiming the same row: with the store's single-connection pool, the
+// transaction holds the sole connection for its duration, serializing the two.
 func (s *Store) PopHead(sessionID string) (Item, bool, error) {
 	if sessionID == "" {
 		return Item{}, false, errors.New("sessionID is required")
 	}
-	row := s.db.QueryRow(
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Item{}, false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	row := tx.QueryRow(
 		`SELECT position, message, display_text, created_at
 		 FROM chat_queue_items WHERE session_id = ? ORDER BY position ASC LIMIT 1`,
 		sessionID,
@@ -231,11 +247,14 @@ func (s *Store) PopHead(sessionID string) (Item, bool, error) {
 		}
 		return Item{}, false, fmt.Errorf("query head: %w", err)
 	}
-	if _, err := s.db.Exec(
+	if _, err := tx.Exec(
 		`DELETE FROM chat_queue_items WHERE session_id = ? AND position = ?`,
 		sessionID, item.Position,
 	); err != nil {
 		return Item{}, false, fmt.Errorf("delete head: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Item{}, false, fmt.Errorf("commit: %w", err)
 	}
 	return item, true, nil
 }

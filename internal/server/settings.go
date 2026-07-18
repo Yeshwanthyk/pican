@@ -1,8 +1,10 @@
 package server
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -28,7 +30,16 @@ func (s *Server) handleAppShell(w http.ResponseWriter, r *http.Request, bootstra
 	// cached: a stale shell would point at old (now-404) chunks and pin the
 	// browser to an outdated bundle after a rebuild.
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	if err := s.renderAppShell(w, bootstrap); err != nil {
+	w.Header().Set("Vary", "Accept-Encoding")
+
+	var dest io.Writer = w
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		dest = gz
+	}
+	if err := s.renderAppShell(dest, bootstrap); err != nil {
 		if !isBrokenPipe(err) {
 			fmt.Fprintf(os.Stderr, "app shell template error: %v\n", err)
 		}

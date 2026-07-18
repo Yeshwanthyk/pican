@@ -28,9 +28,12 @@ function makeApi(initial = { items: [], paused: false }) {
       for (let i = 0; i < items.length; i++) {
         if (items[i].position === position) {
           items.splice(i, 1);
-          return;
+          return { ok: true, removed: true };
         }
       }
+      // Mirrors the server: DELETE on a row that's already gone (e.g. the
+      // drainer's PopHead won the race) reports removed=false, not an error.
+      return { ok: true, removed: false };
     }),
     setPaused: vi.fn(async (value) => {
       paused = !!value;
@@ -143,6 +146,39 @@ describe('setupSteerQueue (server-backed)', () => {
     expect(api.remove).toHaveBeenCalledWith(store.items[0]?.position ?? 1);
     expect(sendChatMessage).toHaveBeenCalledWith('queue-me', []);
     expect(store.queuedCount).toBe(0);
+  });
+
+  it('sendNow does not dispatch locally when the server reports the row was already claimed', async () => {
+    const { queueButton, textarea } = makeDom();
+    const api = makeApi();
+    const store = new QueueStore({ api });
+    const sendChatMessage = vi.fn(async () => true);
+    const handle = setupSteerQueue({
+      store,
+      queueButton,
+      textarea,
+      sendChatMessage,
+      queueApi: api,
+    });
+
+    type(textarea, 'queue-me');
+    queueButton.click();
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.queuedCount).toBe(1);
+
+    // Simulate the autonomous drainer's PopHead winning the race: the row is
+    // gone server-side by the time our DELETE lands, so remove() reports
+    // removed=false.
+    api.remove.mockImplementationOnce(async () => ({ ok: true, removed: false }));
+
+    const id = store.items[0].id;
+    await handle.sendNow(id);
+
+    expect(api.remove).toHaveBeenCalled();
+    // Must NOT dispatch locally — the drainer already sent it. Dispatching
+    // here would double-send the same message.
+    expect(sendChatMessage).not.toHaveBeenCalled();
   });
 
   it('edit DELETEs the row server-side and pops the text back into the textarea', async () => {

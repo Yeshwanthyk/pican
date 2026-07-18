@@ -88,14 +88,21 @@ func TestHandleRPCLineTracksTurnEndAsStreamActivity(t *testing.T) {
 
 func TestHandleRPCLineEmitsStreamPreviewCallbacks(t *testing.T) {
 	var previews []StreamPreview
+	fakeNow := time.Unix(1000, 0)
 	w := &piRPCWorker{
 		status:        workers.WorkerStatus{State: workers.WorkerStateIdle},
 		pending:       make(map[string]chan response),
 		streamSink:    func(preview StreamPreview) { previews = append(previews, preview) },
 		streamPreview: &streamPreviewAccumulator{},
+		previewClock:  func() time.Time { return fakeNow },
 	}
 
+	// Space the two deltas apart by more than streamPreviewMinInterval so
+	// the emission throttle (added alongside coalesced chat-preview SSE
+	// pushes) doesn't collapse them — this test is about plumbing and
+	// cumulative content, not throttling, which has its own tests.
 	w.handleRPCLine(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"hel"}}`)
+	fakeNow = fakeNow.Add(streamPreviewMinInterval)
 	w.handleRPCLine(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"lo"}}`)
 
 	if len(previews) != 2 {
@@ -300,5 +307,67 @@ func TestExtensionUINotifyEmitsWithoutStoring(t *testing.T) {
 	}
 	if got := w.PendingExtensionUI(); len(got) != 0 {
 		t.Fatalf("notify stored as pending: %s", got)
+	}
+}
+
+// TestEmitStreamPreviewThrottlesBurstButAlwaysEmitsDone is a regression test
+// for the upstream token-flood: a burst of text_delta events emitted faster
+// than streamPreviewMinInterval apart should be coalesced by the throttle
+// (only the deltas that land on/after an allowed tick get pushed), while the
+// terminal text_end preview must always be emitted regardless of timing.
+func TestEmitStreamPreviewThrottlesBurstButAlwaysEmitsDone(t *testing.T) {
+	// Started away from the Unix epoch; see comment in
+	// TestEmitStreamPreviewAllowsSteadyRateAboveMinInterval.
+	fakeNow := time.Unix(1000, 0)
+	var previews []StreamPreview
+	w := &piRPCWorker{
+		pending:       make(map[string]chan response),
+		streamPreview: &streamPreviewAccumulator{},
+		streamSink:    func(p StreamPreview) { previews = append(previews, p) },
+		previewClock:  func() time.Time { return fakeNow },
+	}
+
+	// 10 deltas, each 10ms apart (100ms total) — well under the ~50ms min
+	// interval means only ~2-3 should get through, not all 10.
+	for i := 0; i < 10; i++ {
+		w.emitStreamPreview(assistantMessageEvent{Type: "text_delta", Delta: "x"})
+		fakeNow = fakeNow.Add(10 * time.Millisecond)
+	}
+	if len(previews) >= 10 {
+		t.Fatalf("expected throttling to drop some deltas, got %d/10 emitted", len(previews))
+	}
+	if len(previews) == 0 {
+		t.Fatal("expected at least one preview to be emitted")
+	}
+
+	// The final text_end must always be emitted even though it lands
+	// immediately after a throttled delta (no time advance).
+	w.emitStreamPreview(assistantMessageEvent{Type: "text_end", Content: "xxxxxxxxxx"})
+	last := previews[len(previews)-1]
+	if !last.Done || last.Content != "xxxxxxxxxx" {
+		t.Fatalf("expected final done preview with full content, got %+v", last)
+	}
+}
+
+func TestEmitStreamPreviewAllowsSteadyRateAboveMinInterval(t *testing.T) {
+	// Start away from the Unix epoch: lastPreviewEmit's zero-value sentinel
+	// (meaning "never emitted") would otherwise collide with a fake clock
+	// that starts at exactly time.Unix(0, 0), an artifact of this test's
+	// fake clock rather than anything reachable with a real wall clock.
+	fakeNow := time.Unix(1000, 0)
+	var previews []StreamPreview
+	w := &piRPCWorker{
+		pending:       make(map[string]chan response),
+		streamPreview: &streamPreviewAccumulator{},
+		streamSink:    func(p StreamPreview) { previews = append(previews, p) },
+		previewClock:  func() time.Time { return fakeNow },
+	}
+
+	for i := 0; i < 5; i++ {
+		w.emitStreamPreview(assistantMessageEvent{Type: "text_delta", Delta: "x"})
+		fakeNow = fakeNow.Add(streamPreviewMinInterval)
+	}
+	if len(previews) != 5 {
+		t.Fatalf("expected all 5 deltas at >= min interval to be emitted, got %d", len(previews))
 	}
 }

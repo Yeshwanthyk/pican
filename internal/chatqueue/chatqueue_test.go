@@ -49,8 +49,8 @@ func TestAddListRemove(t *testing.T) {
 		t.Fatalf("expected paused=false")
 	}
 
-	if err := s.Remove("sess-1", 1); err != nil {
-		t.Fatalf("Remove: %v", err)
+	if removed, err := s.Remove("sess-1", 1); err != nil || !removed {
+		t.Fatalf("Remove: removed=%v err=%v", removed, err)
 	}
 	snap, _ = s.List("sess-1")
 	if len(snap.Items) != 1 || snap.Items[0].Message != "world" {
@@ -61,8 +61,8 @@ func TestAddListRemove(t *testing.T) {
 func TestPositionsAreNotReused(t *testing.T) {
 	s := newTestStore(t)
 	a, _ := s.Add("sess-1", "a", "a")
-	if err := s.Remove("sess-1", a.Position); err != nil {
-		t.Fatalf("remove a: %v", err)
+	if removed, err := s.Remove("sess-1", a.Position); err != nil || !removed {
+		t.Fatalf("remove a: removed=%v err=%v", removed, err)
 	}
 	b, err := s.Add("sess-1", "b", "b")
 	if err != nil {
@@ -169,7 +169,37 @@ func TestAddRejectsEmptyMessage(t *testing.T) {
 
 func TestRemoveMissingIsNoop(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.Remove("sess", 99); err != nil {
+	removed, err := s.Remove("sess", 99)
+	if err != nil {
 		t.Fatalf("remove missing should be no-op, got %v", err)
+	}
+	if removed {
+		t.Fatalf("expected removed=false for a missing row")
+	}
+}
+
+// TestRemoveDoesNotDoubleDispatchAgainstPopHead is a regression test for the
+// chat-queue double-dispatch race: if PopHead (the autonomous drainer) claims
+// a row first, a concurrent Remove (the browser's "send now"/"edit") for the
+// same position must observe removed=false, not silently succeed as if it
+// had won the race.
+func TestRemoveDoesNotDoubleDispatchAgainstPopHead(t *testing.T) {
+	s := newTestStore(t)
+	item, err := s.Add("sess-1", "hello", "hello")
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	popped, ok, err := s.PopHead("sess-1")
+	if err != nil || !ok || popped.Position != item.Position {
+		t.Fatalf("PopHead: ok=%v err=%v item=%#v", ok, err, popped)
+	}
+
+	removed, err := s.Remove("sess-1", item.Position)
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if removed {
+		t.Fatal("expected removed=false: PopHead already claimed this row, dispatching again would double-send")
 	}
 }

@@ -38,6 +38,8 @@ type piRPCWorker struct {
 	lastStreamActivity   atomic.Int64 // unix nanos; stream/turn events keep worker visually running
 	streamSink           StreamEventSink
 	streamPreview        *streamPreviewAccumulator
+	lastPreviewEmit      atomic.Int64 // unix nanos; throttles non-final preview emission
+	previewClock         func() time.Time
 	extensionUISink      ExtensionUIEventSink
 	pendingExtensionUI   map[string]pendingExtensionUIRequest
 }
@@ -572,13 +574,42 @@ func (w *piRPCWorker) noteStreamActivity() {
 	w.lastStreamActivity.Store(time.Now().UnixNano())
 }
 
+// streamPreviewMinInterval caps non-final preview emission to roughly 20/sec
+// per worker, so an upstream token flood can't overwhelm the SSE fan-out.
+// The accumulator always returns the full cumulative content, so skipped
+// emits are never lost — the next allowed emit includes everything.
+const streamPreviewMinInterval = 50 * time.Millisecond
+
+func (w *piRPCWorker) now() time.Time {
+	if w.previewClock != nil {
+		return w.previewClock()
+	}
+	return time.Now()
+}
+
+// allowPreviewEmit reports whether enough time has passed since the last
+// throttled preview emission, atomically reserving this instant if so.
+func (w *piRPCWorker) allowPreviewEmit() bool {
+	now := w.now().UnixNano()
+	last := w.lastPreviewEmit.Load()
+	if now-last < int64(streamPreviewMinInterval) {
+		return false
+	}
+	return w.lastPreviewEmit.CompareAndSwap(last, now)
+}
+
 func (w *piRPCWorker) emitStreamPreview(event assistantMessageEvent) {
 	if w.streamSink == nil || w.streamPreview == nil {
 		return
 	}
-	if preview, ok := w.streamPreview.handleAssistantEvent(event); ok {
-		w.streamSink(preview)
+	preview, ok := w.streamPreview.handleAssistantEvent(event)
+	if !ok {
+		return
 	}
+	if !preview.Done && !w.allowPreviewEmit() {
+		return
+	}
+	w.streamSink(preview)
 }
 
 func (w *piRPCWorker) completeStreamPreview() {

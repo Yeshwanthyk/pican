@@ -131,6 +131,16 @@ func TestChatQueueDelete(t *testing.T) {
 	if delW.Code != http.StatusOK {
 		t.Fatalf("DELETE: code=%d body=%s", delW.Code, delW.Body.String())
 	}
+	var delBody struct {
+		OK      bool `json:"ok"`
+		Removed bool `json:"removed"`
+	}
+	if err := json.Unmarshal(delW.Body.Bytes(), &delBody); err != nil {
+		t.Fatalf("decode delete response: %v body=%s", err, delW.Body.String())
+	}
+	if !delBody.Removed {
+		t.Fatalf("expected removed=true for an existing item, body=%s", delW.Body.String())
+	}
 
 	getW2 := httptest.NewRecorder()
 	s.handleChatQueue(getW2, httptest.NewRequest(http.MethodGet, "/api/chat/queue?id="+id, nil))
@@ -142,6 +152,47 @@ func TestChatQueueDelete(t *testing.T) {
 		if it.Message == "b" {
 			t.Fatalf("deleted item still present: %#v", snap2.Items)
 		}
+	}
+}
+
+// TestChatQueueDeleteReportsNotRemovedWhenAlreadyPopped is a regression test
+// for the double-dispatch race: if the autonomous drainer's PopHead already
+// claimed a row (simulated here directly against the store, same as the
+// drainer would do), a client's DELETE for that same position must report
+// removed=false so steer-queue.js's sendNow/edit knows not to also dispatch
+// the message locally.
+func TestChatQueueDeleteReportsNotRemovedWhenAlreadyPopped(t *testing.T) {
+	s, id := newQueueServer(t)
+	postReq := httptest.NewRequest(http.MethodPost,
+		"/api/chat/queue?id="+id, strings.NewReader(`{"message":"a"}`))
+	s.handleChatQueue(httptest.NewRecorder(), postReq)
+
+	getW := httptest.NewRecorder()
+	s.handleChatQueue(getW, httptest.NewRequest(http.MethodGet, "/api/chat/queue?id="+id, nil))
+	snap := decodeSnapshot(t, getW)
+	if len(snap.Items) != 1 {
+		t.Fatalf("want 1 item, got %#v", snap.Items)
+	}
+	pos := snap.Items[0].Position
+
+	if _, ok, err := s.chatQueue.PopHead(id); err != nil || !ok {
+		t.Fatalf("PopHead: ok=%v err=%v", ok, err)
+	}
+
+	delURL := "/api/chat/queue?id=" + id + "&position=" + strconv.FormatInt(pos, 10)
+	delW := httptest.NewRecorder()
+	s.handleChatQueue(delW, httptest.NewRequest(http.MethodDelete, delURL, nil))
+	if delW.Code != http.StatusOK {
+		t.Fatalf("DELETE: code=%d body=%s", delW.Code, delW.Body.String())
+	}
+	var delBody struct {
+		Removed bool `json:"removed"`
+	}
+	if err := json.Unmarshal(delW.Body.Bytes(), &delBody); err != nil {
+		t.Fatalf("decode delete response: %v body=%s", err, delW.Body.String())
+	}
+	if delBody.Removed {
+		t.Fatal("expected removed=false: PopHead already claimed this row")
 	}
 }
 
