@@ -166,7 +166,9 @@ export default {
   'workflows.error': 'Error',
   'workflows.status.running': 'Running',
   'workflows.status.completed': 'Completed',
+  'workflows.status.done': 'Done',
   'workflows.status.failed': 'Failed',
+  'workflows.status.error': 'Error',
   'workflows.status.unknown': 'Unknown',
 
   // ── Tasks ──

@@ -93,7 +93,7 @@
               >{String(agent?.label || t('workflows.agentFallback', { index: index + 1 }))}</strong
             >
             {#if agent?.phase}<span>{String(agent.phase)}</span>{/if}
-            {#if agent?.status}<WorkflowStatusChip status={String(agent.status)} />{/if}
+            {#if agent?.state ?? agent?.status}<WorkflowStatusChip status={String(agent.state ?? agent.status)} />{/if}
             {#if agent?.model}<code>{String(agent.model)}</code>{/if}
           </div>
         {/each}

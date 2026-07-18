@@ -29,7 +29,7 @@
           <summary>
             <span class="workflow-transcript-agent">{agentLabel(group)}</span>
             {#if group.agent?.phase}<span>{String(group.agent.phase)}</span>{/if}
-            {#if group.agent?.status}<WorkflowStatusChip status={String(group.agent.status)} />{/if}
+            {#if group.agent?.state ?? group.agent?.status}<WorkflowStatusChip status={String(group.agent.state ?? group.agent.status)} />{/if}
             <span>{t('workflows.entryCount', { count: group.entries.length })}</span>
           </summary>
           <div class="workflow-transcript-entries">

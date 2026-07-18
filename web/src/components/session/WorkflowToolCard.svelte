@@ -18,7 +18,7 @@
           (agent) =>
             agent &&
             typeof agent === 'object' &&
-            ['label', 'phase', 'status', 'model'].some((key) => agent[key] != null),
+            ['label', 'phase', 'status', 'state', 'model'].some((key) => agent[key] != null),
         )
       : [],
   );
@@ -84,9 +84,9 @@
         <div class="workflow-agent-row">
           {#if agent.label}<span class="workflow-agent-label">{String(agent.label)}</span>{/if}
           {#if agent.phase}<span class="workflow-agent-meta">{String(agent.phase)}</span>{/if}
-          {#if agent.status}
-            <span class="workflow-status status-{String(agent.status)}">
-              {statusLabel(String(agent.status))}
+          {#if agent.state ?? agent.status}
+            <span class="workflow-status status-{String(agent.state ?? agent.status)}">
+              {statusLabel(String(agent.state ?? agent.status))}
             </span>
           {/if}
           {#if agent.model}<span class="workflow-agent-meta">{String(agent.model)}</span>{/if}
