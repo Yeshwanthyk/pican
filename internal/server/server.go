@@ -311,6 +311,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/recent-locations", s.auth.Wrap(s.handleRecentLocations))
 	mux.HandleFunc("/api/projects", s.getPostHandler(s.handleApiProjects, s.handleUpdateProject))
 	mux.HandleFunc("/api/files", s.auth.Wrap(s.handleApiFiles))
+	mux.HandleFunc("/api/fs/browse", s.auth.Wrap(s.handleFSBrowse))
 	mux.HandleFunc("/api/git/info", s.auth.Wrap(s.handleGitInfo))
 	mux.HandleFunc("/api/git/rename-branch", s.auth.Wrap(s.handleGitRenameBranch))
 	mux.HandleFunc("/api/git/diff", s.auth.Wrap(s.handleGitDiff))

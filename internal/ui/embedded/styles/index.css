@@ -597,6 +597,79 @@ body.modal-sheet-open { overflow: hidden; }
     border-color: var(--muted);
     background: var(--surface-2);
 }
+.dir-input-wrap { position: relative; }
+.dir-listbox {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    max-height: 220px;
+    overflow-y: auto;
+    margin: -10px 0 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--surface);
+    border: 1px solid var(--dim);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+.dir-option {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: 4px;
+    color: var(--text-soft);
+    font-size: 12px;
+    cursor: pointer;
+}
+.dir-option-name { flex-shrink: 0; }
+.dir-option-path {
+    color: var(--muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dir-option:hover,
+.dir-option--highlighted {
+    background: var(--surface-2);
+    color: var(--text);
+}
+.dir-hint {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    margin: -10px 0 0;
+    padding: 7px 9px;
+    color: var(--muted);
+    font-size: 11px;
+    background: var(--surface);
+    border: 1px solid var(--dim);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+.new-session-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    color: var(--muted);
+    font-size: 11px;
+    margin: -6px 0 14px;
+}
+.new-session-hint span { display: inline-flex; align-items: center; gap: 4px; }
+.new-session-hint kbd {
+    border: 1px solid var(--dim);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font: inherit;
+    font-size: 10px;
+    color: color-mix(in srgb, var(--muted) 88%, var(--text));
+    background: var(--surface-2);
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .btn-primary {
     border: 1px solid var(--accent);
@@ -1053,6 +1126,12 @@ body.modal-sheet-open { overflow: hidden; }
         flex-shrink: 0;
         margin-bottom: 16px;
     }
+    .modal .dir-input-wrap {
+        order: 1;
+        flex-shrink: 0;
+    }
+    .modal .dir-input-wrap input { margin-bottom: 0; }
+    .new-session-hint { display: none; }
     .recent-locations {
         order: 2;
         flex: 1;

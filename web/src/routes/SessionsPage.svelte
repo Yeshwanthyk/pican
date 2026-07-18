@@ -40,6 +40,7 @@
   const runningStatuses = new SvelteMap();
   let newSessionOpen = $state(false);
   let newSessionPath = $state('');
+  let newSessionDropdownOpen = $state(false);
   let recentLocations = $state([]);
   let creating = $state(false);
   let newSessionError = $state('');
@@ -132,6 +133,7 @@
     projectsOpen = false;
     newSessionOpen = true;
     newSessionPath = '';
+    newSessionDropdownOpen = false;
     newSessionError = '';
     document.body?.classList.add('modal-sheet-open');
     try {
@@ -146,6 +148,7 @@
 
   function closeNewSessionModal() {
     newSessionOpen = false;
+    newSessionDropdownOpen = false;
     document.body?.classList.remove('modal-sheet-open');
   }
 
@@ -268,7 +271,12 @@
       if (e.key === 'Escape') {
         if (menuOpen) closeMenu();
         else if (projectsOpen) closeProjectsModal();
-        else if (newSessionOpen) closeNewSessionModal();
+        else if (newSessionOpen) {
+          // Two-step: first Escape dismisses the directory/project dropdown,
+          // second Escape (dropdown already closed) closes the modal.
+          if (newSessionDropdownOpen) newSessionDropdownOpen = false;
+          else closeNewSessionModal();
+        }
       }
     };
     window.addEventListener('keydown', keydown, { capture: true });
@@ -334,6 +342,7 @@
   open={newSessionOpen}
   recent={recentLocations}
   bind:path={newSessionPath}
+  bind:dropdownOpen={newSessionDropdownOpen}
   {creating}
   error={newSessionError}
   onClose={closeNewSessionModal}
