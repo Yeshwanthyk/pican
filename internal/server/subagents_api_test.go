@@ -79,6 +79,36 @@ func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
 	}
 }
 
+func TestHandleApiSubagentsMergesChildWrittenBeforeSpawnResult(t *testing.T) {
+	// The child session header is written a beat before the parent records the
+	// subagent_spawn result. The merge must still pair them (regression: an
+	// earlier one-directional window split every pi subagent into two rows).
+	s := newTestServer(t)
+	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	project := filepath.Join(t.TempDir(), "proj")
+	parent := fmt.Sprintf(
+		"{\"type\":\"session\",\"id\":\"parent-id\",\"timestamp\":\"2026-07-17T11:59:00Z\",\"cwd\":%q}\n"+
+			"{\"type\":\"message\",\"timestamp\":\"2026-07-17T12:00:00.222Z\",\"message\":{\"role\":\"toolResult\",\"toolName\":\"subagent_spawn\",\"details\":{\"id\":\"sa-1\",\"title\":\"Scan\",\"cwd\":%q,\"harness\":\"pi\"}}}\n",
+		project,
+		project,
+	)
+	child := fmt.Sprintf(
+		"{\"type\":\"session\",\"id\":\"child-id\",\"timestamp\":\"2026-07-17T12:00:00.209Z\",\"cwd\":%q}\n"+
+			"{\"type\":\"session_info\",\"timestamp\":\"2026-07-17T12:00:00.219Z\",\"name\":\"subagent: Scan\"}\n",
+		project,
+	)
+	writeSubagentSession(t, s.sessionsDir, project, "parent.jsonl", parent)
+	writeSubagentSession(t, s.sessionsDir, project, "child.jsonl", child)
+
+	items := fetchSubagents(t, s)
+	if len(items) != 1 {
+		t.Fatalf("subagents = %d, want 1 (should merge): %+v", len(items), items)
+	}
+	if got := items[0]; got.Harness != "pi" || got.ChildSession != "child.jsonl" || got.ParentSession != "parent.jsonl" {
+		t.Fatalf("child written before spawn result did not merge: %+v", got)
+	}
+}
+
 func TestHandleApiSubagentsMapsRunningErrorAndUnknownStatuses(t *testing.T) {
 	s := newTestServer(t)
 	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }

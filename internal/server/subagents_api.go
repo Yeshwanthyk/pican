@@ -171,6 +171,14 @@ func readSubagentHeaderTime(path string) time.Time {
 	return time.Time{}
 }
 
+func subagentTimeGap(parent, child subagentSummary) time.Duration {
+	gap := child.headerTime.Sub(parent.spawnedTime)
+	if gap < 0 {
+		gap = -gap
+	}
+	return gap
+}
+
 func matchSubagentChild(parent, child subagentSummary) bool {
 	if parent.Title == "" || parent.Title != child.Title || parent.spawnedTime.IsZero() || child.headerTime.IsZero() {
 		return false
@@ -178,7 +186,11 @@ func matchSubagentChild(parent, child subagentSummary) bool {
 	if parent.spawnCWD != "" && parent.spawnCWD != child.ChildProject {
 		return false
 	}
-	return !child.headerTime.Before(parent.spawnedTime) && !child.headerTime.After(parent.spawnedTime.Add(subagentMatchWindow))
+	// The child session header is written a beat before the parent records the
+	// subagent_spawn result, so the child can be slightly earlier than the
+	// spawn timestamp. Match on absolute distance within the window rather than
+	// requiring the child to come strictly after.
+	return subagentTimeGap(parent, child) <= subagentMatchWindow
 }
 
 func mergeSubagentSummaries(parents, children []subagentSummary) []subagentSummary {
@@ -190,7 +202,7 @@ func mergeSubagentSummaries(parents, children []subagentSummary) []subagentSumma
 			if usedChildren[i] || !matchSubagentChild(parent, children[i]) {
 				continue
 			}
-			if match == -1 || children[i].headerTime.Before(children[match].headerTime) {
+			if match == -1 || subagentTimeGap(parent, children[i]) < subagentTimeGap(parent, children[match]) {
 				match = i
 			}
 		}
