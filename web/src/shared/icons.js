@@ -9,7 +9,6 @@
 import {
   ArrowDown,
   ArrowUp,
-  BookOpen,
   CalendarClock,
   ChartColumn,
   Check,
@@ -22,7 +21,6 @@ import {
   Copy,
   CornerDownRight,
   Download,
-  Ellipsis,
   ExternalLink,
   FileDiff,
   FolderGit2,
@@ -150,7 +148,6 @@ export function setThemeIconElement(el, theme, opts = {}) {
 export {
   ArrowDown,
   ArrowUp,
-  BookOpen,
   CalendarClock,
   ChartColumn,
   Check,
@@ -163,7 +160,6 @@ export {
   Copy,
   CornerDownRight,
   Download,
-  Ellipsis,
   ExternalLink,
   FileDiff,
   FolderGit2,
