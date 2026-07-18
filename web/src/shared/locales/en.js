@@ -403,6 +403,8 @@ export default {
   'settings.themeDark': 'Dark',
   'settings.themeLight': 'Light',
   'settings.themeCustom': 'Custom',
+  'settings.themeBuiltIn': 'Built-in',
+  'settings.themeCommunity': 'Community',
   'settings.interfaceFont': 'Interface font',
   'settings.interfaceFontHint': 'Font for the app UI — menus, lists, headers.',
   'settings.contentFont': 'Content font',

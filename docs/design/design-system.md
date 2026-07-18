@@ -36,6 +36,25 @@ This document details the core design system for `pi-web`. The design system is 
 
 ---
 
+## 2b. Community Themes
+
+Ten additional themes ported from popular VS Code color themes, available from the theme picker in **Settings → Appearance** (not part of the `⌘⇧L` quick-cycle, which stays on the five themes above plus `custom`). Each derives its full token set — surfaces, syntax highlighting, diff colors, markdown accents — from the source theme's `colors`/`tokenColors`, following the same token taxonomy as the built-in themes above.
+
+| Theme | `data-theme` | Style | Accent |
+| --- | --- | --- | --- |
+| Catppuccin Mocha | `catppuccin-mocha` | Soft pastel dark | `#89b4fa` |
+| Catppuccin Latte | `catppuccin-latte` | Soft pastel light | `#1e66f5` |
+| Gruvbox Dark | `gruvbox-dark` | Warm retro-contrast dark | `#83a598` |
+| Tokyo Night | `tokyo-night` | Cool neon-city dark | `#7aa2f7` |
+| Rosé Pine | `rose-pine` | Muted rose/pine dark | `#c4a7e7` |
+| GitHub Dark | `github-dark` | GitHub's default dark | `#2f81f7` |
+| GitHub Light | `github-light` | GitHub's default light | `#0969da` |
+| One Dark Pro | `one-dark-pro` | Atom's classic dark | `#61afef` |
+| Everforest Dark | `everforest-dark` | Warm forest-green dark | `#a7c080` |
+| Kanagawa Wave | `kanagawa-wave` | Japanese ink-painting dark | `#7e9cd8` |
+
+---
+
 ## 3. Dynamic Custom Themes
 
 You can inject **your own themes** into `pi-web`!

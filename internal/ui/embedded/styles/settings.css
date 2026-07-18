@@ -304,6 +304,50 @@
   flex-direction: column;
   gap: 8px;
 }
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.settings-theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  background: var(--swatch-bg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9em;
+  color: var(--swatch-fg);
+}
+
+.settings-theme-swatch:hover {
+  border-color: var(--swatch-accent);
+}
+
+.settings-theme-swatch.active {
+  border-color: var(--swatch-accent);
+  box-shadow: 0 0 0 1px var(--swatch-accent);
+}
+
+.settings-theme-swatch-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--swatch-accent);
+}
+
+.settings-theme-swatch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-custom-languages {
   box-sizing: border-box;
   width: 100%;

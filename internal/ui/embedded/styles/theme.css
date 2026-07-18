@@ -401,3 +401,913 @@
     --userMessageText: #f8f8f2;
     --customMessageText: #f8f8f2;
 }
+
+[data-theme="catppuccin-mocha"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Catppuccin Mocha) ── */
+    --body-bg: #1e1e2e;
+    --surface: #181825;
+    --surface-2: #313244;
+    --text: #cdd6f4;
+    --text-soft: #b8c0dc;
+    --muted: #7f849c;
+    --dim: #585b70;
+    --dim-2: #45475a;
+    --accent: #89b4fa;
+    --border-accent: #89b4fa;
+    --danger: #f38ba8;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #313244;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #94e2d5;
+    --blue: #89b4fa;
+    --green: #a6e3a1;
+    --red: #f38ba8;
+    --yellow: #f9e2af;
+    --gray: #cdd6f4;
+    --dimGray: #7f849c;
+    --darkGray: #585b70;
+    --accent-color: #89b4fa;
+    --selectedBg: #313244;
+    --userMessageBg: #313244;
+    --toolPendingBg: #313244;
+    --toolSuccessBg: #313244;
+    --toolErrorBg: #585b70;
+    --customMessageBg: #313244;
+    --customMessageLabel: #cba6f7;
+    --thinkingText: #cdd6f4;
+    --mdHeading: #cba6f7;
+    --mdLink: #89b4fa;
+    --mdLinkUrl: #7f849c;
+    --mdCode: #94e2d5;
+    --mdCodeBlock: #a6e3a1;
+    --mdCodeBlockBorder: #7f849c;
+    --code-bg: #1e1e2e;
+    --mdQuote: #cdd6f4;
+    --mdQuoteBorder: #7f849c;
+    --mdHr: #7f849c;
+    --mdListBullet: #89b4fa;
+    --toolDiffAdded: #a6e3a1;
+    --toolDiffRemoved: #f38ba8;
+    --toolDiffContext: #7f849c;
+    --syntaxComment: #9399b2;
+    --syntaxKeyword: #cba6f7;
+    --syntaxFunction: #89b4fa;
+    --syntaxVariable: #89b4fa;
+    --syntaxString: #a6e3a1;
+    --syntaxNumber: #fab387;
+    --syntaxType: #cba6f7;
+    --syntaxOperator: #cba6f7;
+    --syntaxPunctuation: #cdd6f4;
+    --thinkingOff: #585b70;
+    --thinkingMinimal: #313244;
+    --thinkingLow: #89b4fa;
+    --thinkingMedium: #89b4fa;
+    --thinkingHigh: #cba6f7;
+    --thinkingXhigh: #cba6f7;
+    --bashMode: #a6e3a1;
+    --success: #a6e3a1;
+    --error: #f38ba8;
+    --warning: #f9e2af;
+    --border: #89b4fa;
+    --borderAccent: #89b4fa;
+    --borderMuted: #7f849c;
+    --toolOutput: #cdd6f4;
+    --bg: var(--body-bg);
+    --selected-bg: #313244;
+    --border-accent: #89b4fa;
+    --userMessageText: #cdd6f4;
+    --customMessageText: #cdd6f4;
+}
+
+[data-theme="catppuccin-latte"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Catppuccin Latte) ── */
+    --body-bg: #eff1f5;
+    --surface: #e6e9ef;
+    --surface-2: #dce0e8;
+    --text: #4c4f69;
+    --text-soft: #60627a;
+    --muted: #8c8fa1;
+    --dim: #acb0be;
+    --dim-2: #ccd0da;
+    --accent: #1e66f5;
+    --border-accent: #1e66f5;
+    --danger: #d20f39;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #dce0e8;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #179299;
+    --blue: #1e66f5;
+    --green: #40a02b;
+    --red: #d20f39;
+    --yellow: #df8e1d;
+    --gray: #4c4f69;
+    --dimGray: #8c8fa1;
+    --darkGray: #acb0be;
+    --accent-color: #1e66f5;
+    --selectedBg: #dce0e8;
+    --userMessageBg: #dce0e8;
+    --toolPendingBg: #dce0e8;
+    --toolSuccessBg: #dce0e8;
+    --toolErrorBg: #acb0be;
+    --customMessageBg: #dce0e8;
+    --customMessageLabel: #8839ef;
+    --thinkingText: #4c4f69;
+    --mdHeading: #8839ef;
+    --mdLink: #1e66f5;
+    --mdLinkUrl: #8c8fa1;
+    --mdCode: #179299;
+    --mdCodeBlock: #40a02b;
+    --mdCodeBlockBorder: #8c8fa1;
+    --code-bg: #eff1f5;
+    --mdQuote: #4c4f69;
+    --mdQuoteBorder: #8c8fa1;
+    --mdHr: #8c8fa1;
+    --mdListBullet: #1e66f5;
+    --toolDiffAdded: #40a02b;
+    --toolDiffRemoved: #d20f39;
+    --toolDiffContext: #8c8fa1;
+    --syntaxComment: #7c7f93;
+    --syntaxKeyword: #8839ef;
+    --syntaxFunction: #1e66f5;
+    --syntaxVariable: #1e66f5;
+    --syntaxString: #40a02b;
+    --syntaxNumber: #fe640b;
+    --syntaxType: #8839ef;
+    --syntaxOperator: #8839ef;
+    --syntaxPunctuation: #4c4f69;
+    --thinkingOff: #acb0be;
+    --thinkingMinimal: #dce0e8;
+    --thinkingLow: #1e66f5;
+    --thinkingMedium: #1e66f5;
+    --thinkingHigh: #8839ef;
+    --thinkingXhigh: #8839ef;
+    --bashMode: #40a02b;
+    --success: #40a02b;
+    --error: #d20f39;
+    --warning: #df8e1d;
+    --border: #1e66f5;
+    --borderAccent: #1e66f5;
+    --borderMuted: #8c8fa1;
+    --toolOutput: #4c4f69;
+    --bg: var(--body-bg);
+    --selected-bg: #dce0e8;
+    --border-accent: #1e66f5;
+    --userMessageText: #4c4f69;
+    --customMessageText: #4c4f69;
+}
+
+[data-theme="gruvbox-dark"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Gruvbox Dark) ── */
+    --body-bg: #282828;
+    --surface: #32302f;
+    --surface-2: #3c3836;
+    --text: #ebdbb2;
+    --text-soft: #d4c6a1;
+    --muted: #928374;
+    --dim: #504945;
+    --dim-2: #3c3836;
+    --accent: #83a598;
+    --border-accent: #83a598;
+    --danger: #fb4934;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #3c3836;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #689d6a;
+    --blue: #458588;
+    --green: #b8bb26;
+    --red: #fb4934;
+    --yellow: #d79921;
+    --gray: #ebdbb2;
+    --dimGray: #928374;
+    --darkGray: #504945;
+    --accent-color: #83a598;
+    --selectedBg: #3c3836;
+    --userMessageBg: #3c3836;
+    --toolPendingBg: #3c3836;
+    --toolSuccessBg: #3c3836;
+    --toolErrorBg: #504945;
+    --customMessageBg: #3c3836;
+    --customMessageLabel: #d3869b;
+    --thinkingText: #ebdbb2;
+    --mdHeading: #d3869b;
+    --mdLink: #83a598;
+    --mdLinkUrl: #928374;
+    --mdCode: #689d6a;
+    --mdCodeBlock: #b8bb26;
+    --mdCodeBlockBorder: #928374;
+    --code-bg: #282828;
+    --mdQuote: #ebdbb2;
+    --mdQuoteBorder: #928374;
+    --mdHr: #928374;
+    --mdListBullet: #83a598;
+    --toolDiffAdded: #b8bb26;
+    --toolDiffRemoved: #fb4934;
+    --toolDiffContext: #928374;
+    --syntaxComment: #928374;
+    --syntaxKeyword: #fb4934;
+    --syntaxFunction: #689d6a;
+    --syntaxVariable: #83a598;
+    --syntaxString: #b8bb26;
+    --syntaxNumber: #d3869b;
+    --syntaxType: #689d6a;
+    --syntaxOperator: #8ec07c;
+    --syntaxPunctuation: #ebdbb2;
+    --thinkingOff: #504945;
+    --thinkingMinimal: #3c3836;
+    --thinkingLow: #458588;
+    --thinkingMedium: #83a598;
+    --thinkingHigh: #d3869b;
+    --thinkingXhigh: #d3869b;
+    --bashMode: #b8bb26;
+    --success: #b8bb26;
+    --error: #fb4934;
+    --warning: #d79921;
+    --border: #458588;
+    --borderAccent: #83a598;
+    --borderMuted: #928374;
+    --toolOutput: #ebdbb2;
+    --bg: var(--body-bg);
+    --selected-bg: #3c3836;
+    --border-accent: #83a598;
+    --userMessageText: #ebdbb2;
+    --customMessageText: #ebdbb2;
+}
+
+[data-theme="tokyo-night"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Tokyo Night) ── */
+    --body-bg: #1a1b26;
+    --surface: #16161e;
+    --surface-2: #1f2335;
+    --text: #a9b1d6;
+    --text-soft: #989fc1;
+    --muted: #565f89;
+    --dim: #292e42;
+    --dim-2: #20222f;
+    --accent: #7aa2f7;
+    --border-accent: #7aa2f7;
+    --danger: #f7768e;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #1f2335;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #7dcfff;
+    --blue: #7aa2f7;
+    --green: #9ece6a;
+    --red: #f7768e;
+    --yellow: #e0af68;
+    --gray: #a9b1d6;
+    --dimGray: #565f89;
+    --darkGray: #292e42;
+    --accent-color: #7aa2f7;
+    --selectedBg: #1f2335;
+    --userMessageBg: #1f2335;
+    --toolPendingBg: #1f2335;
+    --toolSuccessBg: #1f2335;
+    --toolErrorBg: #292e42;
+    --customMessageBg: #1f2335;
+    --customMessageLabel: #bb9af7;
+    --thinkingText: #a9b1d6;
+    --mdHeading: #bb9af7;
+    --mdLink: #7aa2f7;
+    --mdLinkUrl: #565f89;
+    --mdCode: #7dcfff;
+    --mdCodeBlock: #9ece6a;
+    --mdCodeBlockBorder: #565f89;
+    --code-bg: #1a1b26;
+    --mdQuote: #a9b1d6;
+    --mdQuoteBorder: #565f89;
+    --mdHr: #565f89;
+    --mdListBullet: #7aa2f7;
+    --toolDiffAdded: #9ece6a;
+    --toolDiffRemoved: #f7768e;
+    --toolDiffContext: #565f89;
+    --syntaxComment: #565f89;
+    --syntaxKeyword: #bb9af7;
+    --syntaxFunction: #7aa2f7;
+    --syntaxVariable: #c0caf5;
+    --syntaxString: #9ece6a;
+    --syntaxNumber: #ff9e64;
+    --syntaxType: #2ac3de;
+    --syntaxOperator: #89ddff;
+    --syntaxPunctuation: #a9b1d6;
+    --thinkingOff: #292e42;
+    --thinkingMinimal: #1f2335;
+    --thinkingLow: #7aa2f7;
+    --thinkingMedium: #7aa2f7;
+    --thinkingHigh: #bb9af7;
+    --thinkingXhigh: #bb9af7;
+    --bashMode: #9ece6a;
+    --success: #9ece6a;
+    --error: #f7768e;
+    --warning: #e0af68;
+    --border: #7aa2f7;
+    --borderAccent: #7aa2f7;
+    --borderMuted: #565f89;
+    --toolOutput: #a9b1d6;
+    --bg: var(--body-bg);
+    --selected-bg: #1f2335;
+    --border-accent: #7aa2f7;
+    --userMessageText: #a9b1d6;
+    --customMessageText: #a9b1d6;
+}
+
+[data-theme="rose-pine"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Rose Pine) ── */
+    --body-bg: #191724;
+    --surface: #1f1d2e;
+    --surface-2: #26233a;
+    --text: #e0def4;
+    --text-soft: #c8c6db;
+    --muted: #908caa;
+    --dim: #403d52;
+    --dim-2: #2a273f;
+    --accent: #c4a7e7;
+    --border-accent: #c4a7e7;
+    --danger: #eb6f92;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #26233a;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #9ccfd8;
+    --blue: #9ccfd8;
+    --green: #31748f;
+    --red: #eb6f92;
+    --yellow: #f6c177;
+    --gray: #e0def4;
+    --dimGray: #908caa;
+    --darkGray: #403d52;
+    --accent-color: #c4a7e7;
+    --selectedBg: #26233a;
+    --userMessageBg: #26233a;
+    --toolPendingBg: #26233a;
+    --toolSuccessBg: #26233a;
+    --toolErrorBg: #403d52;
+    --customMessageBg: #26233a;
+    --customMessageLabel: #ebbcba;
+    --thinkingText: #e0def4;
+    --mdHeading: #ebbcba;
+    --mdLink: #c4a7e7;
+    --mdLinkUrl: #908caa;
+    --mdCode: #9ccfd8;
+    --mdCodeBlock: #31748f;
+    --mdCodeBlockBorder: #908caa;
+    --code-bg: #191724;
+    --mdQuote: #e0def4;
+    --mdQuoteBorder: #908caa;
+    --mdHr: #908caa;
+    --mdListBullet: #c4a7e7;
+    --toolDiffAdded: #31748f;
+    --toolDiffRemoved: #eb6f92;
+    --toolDiffContext: #908caa;
+    --syntaxComment: #6e6a86;
+    --syntaxKeyword: #c4a7e7;
+    --syntaxFunction: #eb6f92;
+    --syntaxVariable: #e0def4;
+    --syntaxString: #f6c177;
+    --syntaxNumber: #ebbcba;
+    --syntaxType: #9ccfd8;
+    --syntaxOperator: #908caa;
+    --syntaxPunctuation: #e0def4;
+    --thinkingOff: #403d52;
+    --thinkingMinimal: #26233a;
+    --thinkingLow: #9ccfd8;
+    --thinkingMedium: #c4a7e7;
+    --thinkingHigh: #ebbcba;
+    --thinkingXhigh: #ebbcba;
+    --bashMode: #31748f;
+    --success: #31748f;
+    --error: #eb6f92;
+    --warning: #f6c177;
+    --border: #9ccfd8;
+    --borderAccent: #c4a7e7;
+    --borderMuted: #908caa;
+    --toolOutput: #e0def4;
+    --bg: var(--body-bg);
+    --selected-bg: #26233a;
+    --border-accent: #c4a7e7;
+    --userMessageText: #e0def4;
+    --customMessageText: #e0def4;
+}
+
+[data-theme="github-dark"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (GitHub Dark) ── */
+    --body-bg: #0d1117;
+    --surface: #010409;
+    --surface-2: #161b22;
+    --text: #e6edf3;
+    --text-soft: #ccd3d9;
+    --muted: #6e7681;
+    --dim: #30363d;
+    --dim-2: #21262d;
+    --accent: #2f81f7;
+    --border-accent: #2f81f7;
+    --danger: #f85149;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #161b22;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #39c5cf;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --gray: #e6edf3;
+    --dimGray: #6e7681;
+    --darkGray: #30363d;
+    --accent-color: #2f81f7;
+    --selectedBg: #161b22;
+    --userMessageBg: #161b22;
+    --toolPendingBg: #161b22;
+    --toolSuccessBg: #161b22;
+    --toolErrorBg: #30363d;
+    --customMessageBg: #161b22;
+    --customMessageLabel: #d2a8ff;
+    --thinkingText: #e6edf3;
+    --mdHeading: #d2a8ff;
+    --mdLink: #2f81f7;
+    --mdLinkUrl: #6e7681;
+    --mdCode: #39c5cf;
+    --mdCodeBlock: #3fb950;
+    --mdCodeBlockBorder: #6e7681;
+    --code-bg: #0d1117;
+    --mdQuote: #e6edf3;
+    --mdQuoteBorder: #6e7681;
+    --mdHr: #6e7681;
+    --mdListBullet: #2f81f7;
+    --toolDiffAdded: #3fb950;
+    --toolDiffRemoved: #f85149;
+    --toolDiffContext: #6e7681;
+    --syntaxComment: #8b949e;
+    --syntaxKeyword: #ff7b72;
+    --syntaxFunction: #d2a8ff;
+    --syntaxVariable: #ffa657;
+    --syntaxString: #a5d6ff;
+    --syntaxNumber: #79c0ff;
+    --syntaxType: #7ee787;
+    --syntaxOperator: #c9d1d9;
+    --syntaxPunctuation: #e6edf3;
+    --thinkingOff: #30363d;
+    --thinkingMinimal: #161b22;
+    --thinkingLow: #58a6ff;
+    --thinkingMedium: #2f81f7;
+    --thinkingHigh: #d2a8ff;
+    --thinkingXhigh: #d2a8ff;
+    --bashMode: #3fb950;
+    --success: #3fb950;
+    --error: #f85149;
+    --warning: #d29922;
+    --border: #58a6ff;
+    --borderAccent: #2f81f7;
+    --borderMuted: #6e7681;
+    --toolOutput: #e6edf3;
+    --bg: var(--body-bg);
+    --selected-bg: #161b22;
+    --border-accent: #2f81f7;
+    --userMessageText: #e6edf3;
+    --customMessageText: #e6edf3;
+}
+
+[data-theme="github-light"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (GitHub Light) ── */
+    --body-bg: #ffffff;
+    --surface: #f6f8fa;
+    --surface-2: #eaeef2;
+    --text: #1f2328;
+    --text-soft: #3a3d42;
+    --muted: #8c959f;
+    --dim: #d0d7de;
+    --dim-2: #d8dee4;
+    --accent: #0969da;
+    --border-accent: #0969da;
+    --danger: #cf222e;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #eaeef2;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #1b7c83;
+    --blue: #0969da;
+    --green: #1a7f37;
+    --red: #cf222e;
+    --yellow: #9a6700;
+    --gray: #1f2328;
+    --dimGray: #8c959f;
+    --darkGray: #d0d7de;
+    --accent-color: #0969da;
+    --selectedBg: #eaeef2;
+    --userMessageBg: #eaeef2;
+    --toolPendingBg: #eaeef2;
+    --toolSuccessBg: #eaeef2;
+    --toolErrorBg: #d0d7de;
+    --customMessageBg: #eaeef2;
+    --customMessageLabel: #8250df;
+    --thinkingText: #1f2328;
+    --mdHeading: #8250df;
+    --mdLink: #0969da;
+    --mdLinkUrl: #8c959f;
+    --mdCode: #1b7c83;
+    --mdCodeBlock: #1a7f37;
+    --mdCodeBlockBorder: #8c959f;
+    --code-bg: #ffffff;
+    --mdQuote: #1f2328;
+    --mdQuoteBorder: #8c959f;
+    --mdHr: #8c959f;
+    --mdListBullet: #0969da;
+    --toolDiffAdded: #1a7f37;
+    --toolDiffRemoved: #cf222e;
+    --toolDiffContext: #8c959f;
+    --syntaxComment: #6e7781;
+    --syntaxKeyword: #cf222e;
+    --syntaxFunction: #8250df;
+    --syntaxVariable: #953800;
+    --syntaxString: #0a3069;
+    --syntaxNumber: #0550ae;
+    --syntaxType: #116329;
+    --syntaxOperator: #57606a;
+    --syntaxPunctuation: #1f2328;
+    --thinkingOff: #d0d7de;
+    --thinkingMinimal: #eaeef2;
+    --thinkingLow: #0969da;
+    --thinkingMedium: #0969da;
+    --thinkingHigh: #8250df;
+    --thinkingXhigh: #8250df;
+    --bashMode: #1a7f37;
+    --success: #1a7f37;
+    --error: #cf222e;
+    --warning: #9a6700;
+    --border: #0969da;
+    --borderAccent: #0969da;
+    --borderMuted: #8c959f;
+    --toolOutput: #1f2328;
+    --bg: var(--body-bg);
+    --selected-bg: #eaeef2;
+    --border-accent: #0969da;
+    --userMessageText: #1f2328;
+    --customMessageText: #1f2328;
+}
+
+[data-theme="one-dark-pro"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (One Dark Pro) ── */
+    --body-bg: #282c34;
+    --surface: #21252b;
+    --surface-2: #2c313a;
+    --text: #abb2bf;
+    --text-soft: #9ba2ae;
+    --muted: #5c6370;
+    --dim: #3e4452;
+    --dim-2: #353b45;
+    --accent: #61afef;
+    --border-accent: #61afef;
+    --danger: #e06c75;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #2c313a;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #56b6c2;
+    --blue: #61afef;
+    --green: #98c379;
+    --red: #e06c75;
+    --yellow: #e5c07b;
+    --gray: #abb2bf;
+    --dimGray: #5c6370;
+    --darkGray: #3e4452;
+    --accent-color: #61afef;
+    --selectedBg: #2c313a;
+    --userMessageBg: #2c313a;
+    --toolPendingBg: #2c313a;
+    --toolSuccessBg: #2c313a;
+    --toolErrorBg: #3e4452;
+    --customMessageBg: #2c313a;
+    --customMessageLabel: #c678dd;
+    --thinkingText: #abb2bf;
+    --mdHeading: #c678dd;
+    --mdLink: #61afef;
+    --mdLinkUrl: #5c6370;
+    --mdCode: #56b6c2;
+    --mdCodeBlock: #98c379;
+    --mdCodeBlockBorder: #5c6370;
+    --code-bg: #282c34;
+    --mdQuote: #abb2bf;
+    --mdQuoteBorder: #5c6370;
+    --mdHr: #5c6370;
+    --mdListBullet: #61afef;
+    --toolDiffAdded: #98c379;
+    --toolDiffRemoved: #e06c75;
+    --toolDiffContext: #5c6370;
+    --syntaxComment: #7f848e;
+    --syntaxKeyword: #c678dd;
+    --syntaxFunction: #61afef;
+    --syntaxVariable: #c678dd;
+    --syntaxString: #98c379;
+    --syntaxNumber: #d19a66;
+    --syntaxType: #56b6c2;
+    --syntaxOperator: #c678dd;
+    --syntaxPunctuation: #abb2bf;
+    --thinkingOff: #3e4452;
+    --thinkingMinimal: #2c313a;
+    --thinkingLow: #61afef;
+    --thinkingMedium: #61afef;
+    --thinkingHigh: #c678dd;
+    --thinkingXhigh: #c678dd;
+    --bashMode: #98c379;
+    --success: #98c379;
+    --error: #e06c75;
+    --warning: #e5c07b;
+    --border: #61afef;
+    --borderAccent: #61afef;
+    --borderMuted: #5c6370;
+    --toolOutput: #abb2bf;
+    --bg: var(--body-bg);
+    --selected-bg: #2c313a;
+    --border-accent: #61afef;
+    --userMessageText: #abb2bf;
+    --customMessageText: #abb2bf;
+}
+
+[data-theme="everforest-dark"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Everforest Dark) ── */
+    --body-bg: #2d353b;
+    --surface: #232a2e;
+    --surface-2: #374247;
+    --text: #d3c6aa;
+    --text-soft: #bfb59d;
+    --muted: #859289;
+    --dim: #4f585e;
+    --dim-2: #3a464c;
+    --accent: #a7c080;
+    --border-accent: #a7c080;
+    --danger: #e67e80;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #374247;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #83c092;
+    --blue: #7fbbb3;
+    --green: #a7c080;
+    --red: #e67e80;
+    --yellow: #dbbc7f;
+    --gray: #d3c6aa;
+    --dimGray: #859289;
+    --darkGray: #4f585e;
+    --accent-color: #a7c080;
+    --selectedBg: #374247;
+    --userMessageBg: #374247;
+    --toolPendingBg: #374247;
+    --toolSuccessBg: #374247;
+    --toolErrorBg: #4f585e;
+    --customMessageBg: #374247;
+    --customMessageLabel: #d699b6;
+    --thinkingText: #d3c6aa;
+    --mdHeading: #d699b6;
+    --mdLink: #a7c080;
+    --mdLinkUrl: #859289;
+    --mdCode: #83c092;
+    --mdCodeBlock: #a7c080;
+    --mdCodeBlockBorder: #859289;
+    --code-bg: #2d353b;
+    --mdQuote: #d3c6aa;
+    --mdQuoteBorder: #859289;
+    --mdHr: #859289;
+    --mdListBullet: #a7c080;
+    --toolDiffAdded: #a7c080;
+    --toolDiffRemoved: #e67e80;
+    --toolDiffContext: #859289;
+    --syntaxComment: #859289;
+    --syntaxKeyword: #e69875;
+    --syntaxFunction: #a7c080;
+    --syntaxVariable: #83c092;
+    --syntaxString: #dbbc7f;
+    --syntaxNumber: #d699b6;
+    --syntaxType: #83c092;
+    --syntaxOperator: #e67e80;
+    --syntaxPunctuation: #d3c6aa;
+    --thinkingOff: #4f585e;
+    --thinkingMinimal: #374247;
+    --thinkingLow: #7fbbb3;
+    --thinkingMedium: #a7c080;
+    --thinkingHigh: #d699b6;
+    --thinkingXhigh: #d699b6;
+    --bashMode: #a7c080;
+    --success: #a7c080;
+    --error: #e67e80;
+    --warning: #dbbc7f;
+    --border: #7fbbb3;
+    --borderAccent: #a7c080;
+    --borderMuted: #859289;
+    --toolOutput: #d3c6aa;
+    --bg: var(--body-bg);
+    --selected-bg: #374247;
+    --border-accent: #a7c080;
+    --userMessageText: #d3c6aa;
+    --customMessageText: #d3c6aa;
+}
+
+[data-theme="kanagawa-wave"] {
+    /* ── Typography & Layout ── */
+    --line-height: 1.5;
+
+    /* ── Color Palette (Kanagawa Wave) ── */
+    --body-bg: #1f1f28;
+    --surface: #16161d;
+    --surface-2: #2a2a37;
+    --text: #dcd7ba;
+    --text-soft: #c5c1a8;
+    --muted: #727169;
+    --dim: #54546d;
+    --dim-2: #363646;
+    --accent: #7e9cd8;
+    --border-accent: #7e9cd8;
+    --danger: #e82424;
+
+    --pi-menu-bg: var(--surface);
+    --pi-menu-border: var(--dim);
+    --pi-menu-item-color: var(--text-soft);
+    --pi-menu-item-hover-color: var(--text);
+    --pi-menu-muted-color: var(--muted);
+    --pi-menu-accent-color: var(--accent);
+    --pi-menu-hover-bg: var(--surface-2);
+
+    /* ── Workspace / Session Visual Tokens ── */
+    --container-bg: var(--surface);
+    --info-bg: #2a2a37;
+    --hover: color-mix(in srgb, var(--selectedBg) 50%, transparent);
+
+    --cyan: #6a9589;
+    --blue: #7e9cd8;
+    --green: #98bb6c;
+    --red: #e82424;
+    --yellow: #c0a36e;
+    --gray: #dcd7ba;
+    --dimGray: #727169;
+    --darkGray: #54546d;
+    --accent-color: #7e9cd8;
+    --selectedBg: #2a2a37;
+    --userMessageBg: #2a2a37;
+    --toolPendingBg: #2a2a37;
+    --toolSuccessBg: #2a2a37;
+    --toolErrorBg: #54546d;
+    --customMessageBg: #2a2a37;
+    --customMessageLabel: #957fb8;
+    --thinkingText: #dcd7ba;
+    --mdHeading: #957fb8;
+    --mdLink: #7e9cd8;
+    --mdLinkUrl: #727169;
+    --mdCode: #6a9589;
+    --mdCodeBlock: #98bb6c;
+    --mdCodeBlockBorder: #727169;
+    --code-bg: #1f1f28;
+    --mdQuote: #dcd7ba;
+    --mdQuoteBorder: #727169;
+    --mdHr: #727169;
+    --mdListBullet: #7e9cd8;
+    --toolDiffAdded: #98bb6c;
+    --toolDiffRemoved: #e82424;
+    --toolDiffContext: #727169;
+    --syntaxComment: #727169;
+    --syntaxKeyword: #957fb8;
+    --syntaxFunction: #7e9cd8;
+    --syntaxVariable: #ffa066;
+    --syntaxString: #98bb6c;
+    --syntaxNumber: #ffa066;
+    --syntaxType: #7aa89f;
+    --syntaxOperator: #e6c384;
+    --syntaxPunctuation: #dcd7ba;
+    --thinkingOff: #54546d;
+    --thinkingMinimal: #2a2a37;
+    --thinkingLow: #7e9cd8;
+    --thinkingMedium: #7e9cd8;
+    --thinkingHigh: #957fb8;
+    --thinkingXhigh: #957fb8;
+    --bashMode: #98bb6c;
+    --success: #98bb6c;
+    --error: #e82424;
+    --warning: #c0a36e;
+    --border: #7e9cd8;
+    --borderAccent: #7e9cd8;
+    --borderMuted: #727169;
+    --toolOutput: #dcd7ba;
+    --bg: var(--body-bg);
+    --selected-bg: #2a2a37;
+    --border-accent: #7e9cd8;
+    --userMessageText: #dcd7ba;
+    --customMessageText: #dcd7ba;
+}

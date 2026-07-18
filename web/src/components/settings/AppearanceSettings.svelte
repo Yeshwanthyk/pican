@@ -5,6 +5,62 @@
   import { valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {}, onSaved = () => {} } = $props();
+  // Swatch colors are each theme's own --body-bg/--text/--accent so a grid
+  // tile renders in its real palette without needing data-theme applied to it.
+  const COMMUNITY_THEMES = [
+    {
+      value: 'catppuccin-mocha',
+      label: 'Catppuccin Mocha',
+      bg: '#1e1e2e',
+      fg: '#cdd6f4',
+      accent: '#89b4fa',
+    },
+    {
+      value: 'catppuccin-latte',
+      label: 'Catppuccin Latte',
+      bg: '#eff1f5',
+      fg: '#4c4f69',
+      accent: '#1e66f5',
+    },
+    {
+      value: 'gruvbox-dark',
+      label: 'Gruvbox Dark',
+      bg: '#282828',
+      fg: '#ebdbb2',
+      accent: '#83a598',
+    },
+    { value: 'tokyo-night', label: 'Tokyo Night', bg: '#1a1b26', fg: '#a9b1d6', accent: '#7aa2f7' },
+    { value: 'rose-pine', label: 'Rosé Pine', bg: '#191724', fg: '#e0def4', accent: '#c4a7e7' },
+    { value: 'github-dark', label: 'GitHub Dark', bg: '#0d1117', fg: '#e6edf3', accent: '#2f81f7' },
+    {
+      value: 'github-light',
+      label: 'GitHub Light',
+      bg: '#ffffff',
+      fg: '#1f2328',
+      accent: '#0969da',
+    },
+    {
+      value: 'one-dark-pro',
+      label: 'One Dark Pro',
+      bg: '#282c34',
+      fg: '#abb2bf',
+      accent: '#61afef',
+    },
+    {
+      value: 'everforest-dark',
+      label: 'Everforest Dark',
+      bg: '#2d353b',
+      fg: '#d3c6aa',
+      accent: '#a7c080',
+    },
+    {
+      value: 'kanagawa-wave',
+      label: 'Kanagawa Wave',
+      bg: '#1f1f28',
+      fg: '#dcd7ba',
+      accent: '#7e9cd8',
+    },
+  ];
   const FONT_KEYS = {
     ui: 'pi-web:v1:font-ui',
     content: 'pi-web:v1:font-content',
@@ -118,12 +174,35 @@
         data-setting-theme
         value={theme}
         onchange={(e) => commitTheme(e.currentTarget.value)}
-        ><option value="dark">{t('settings.themeDark')}</option><option value="light"
-          >{t('settings.themeLight')}</option
-        ><option value="nord">Nord</option><option value="dracula">Dracula</option><option
-          value="custom">{t('settings.themeCustom')}</option
+        ><optgroup label={t('settings.themeBuiltIn')}
+          ><option value="dark">{t('settings.themeDark')}</option><option value="light"
+            >{t('settings.themeLight')}</option
+          ><option value="nord">Nord</option><option value="dracula">Dracula</option><option
+            value="custom">{t('settings.themeCustom')}</option
+          ></optgroup
+        ><optgroup label={t('settings.themeCommunity')}
+          >{#each COMMUNITY_THEMES as opt (opt.value)}<option value={opt.value}>{opt.label}</option
+            >{/each}</optgroup
         ></select
       >
+    </div>
+  </div>
+
+  <div class="settings-row settings-row-stacked">
+    <div class="settings-control-stacked settings-theme-grid">
+      {#each COMMUNITY_THEMES as opt (opt.value)}
+        <button
+          type="button"
+          class="settings-theme-swatch"
+          class:active={theme === opt.value}
+          style="--swatch-bg: {opt.bg}; --swatch-fg: {opt.fg}; --swatch-accent: {opt.accent}"
+          aria-pressed={theme === opt.value}
+          onclick={() => commitTheme(opt.value)}
+        >
+          <span class="settings-theme-swatch-dot"></span>
+          <span class="settings-theme-swatch-name">{opt.label}</span>
+        </button>
+      {/each}
     </div>
   </div>
 
