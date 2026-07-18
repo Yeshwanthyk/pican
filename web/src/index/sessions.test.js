@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   dateBucketFor,
   formatRelativeTime,
+  formatSessionMetrics,
   groupSessionsByDate,
   groupSessionsByProject,
   normalizeSession,
   sessionModelLabel,
   sessionSearchText,
+  splitPinnedSessions,
 } from './sessions.js';
 
 describe('index sessions helpers', () => {
@@ -19,7 +21,10 @@ describe('index sessions helpers', () => {
       modelProvider: 'p',
       model: 'm',
       chatAvailable: true,
+      pinned: false,
     });
+    expect(normalizeSession({ id: 'a', pinned: true })).toMatchObject({ pinned: true });
+    expect(normalizeSession({ ID: 'a', Pinned: true })).toMatchObject({ pinned: true });
   });
 
   it('formats relative times', () => {
@@ -86,5 +91,30 @@ describe('index sessions helpers', () => {
     );
     expect(groups.map((g) => g.bucket)).toEqual(['today', 'yesterday', 'older']);
     expect(groups[0].sessions.map((s) => s.id)).toEqual(['today-a', 'today-b']);
+  });
+
+  it('splits pinned sessions out, sorted by activity, and leaves the rest untouched', () => {
+    const { pinned, rest } = splitPinnedSessions([
+      { id: 'a', pinned: false, lastActivity: '2024-01-03T00:00:00Z' },
+      { id: 'b', pinned: true, lastActivity: '2024-01-01T00:00:00Z' },
+      { id: 'c', pinned: true, lastActivity: '2024-01-02T00:00:00Z' },
+      { id: 'd', pinned: false, lastActivity: '2024-01-04T00:00:00Z' },
+    ]);
+    expect(pinned.map((s) => s.id)).toEqual(['c', 'b']);
+    expect(rest.map((s) => s.id)).toEqual(['a', 'd']);
+  });
+
+  it('returns empty pinned/rest for no sessions', () => {
+    expect(splitPinnedSessions([])).toEqual({ pinned: [], rest: [] });
+    expect(splitPinnedSessions()).toEqual({ pinned: [], rest: [] });
+  });
+
+  it('formats token/cost metrics with k/M abbreviation and hides zeros', () => {
+    expect(formatSessionMetrics({ tokenTotal: 12345, costTotal: 0.42 })).toBe('12.3k tok · $0.42');
+    expect(formatSessionMetrics({ tokenTotal: 1500000, costTotal: 2 })).toBe('1.5M tok · $2.00');
+    expect(formatSessionMetrics({ tokenTotal: 500, costTotal: 0 })).toBe('500 tok');
+    expect(formatSessionMetrics({ tokenTotal: 0, costTotal: 1.5 })).toBe('$1.50');
+    expect(formatSessionMetrics({ tokenTotal: 0, costTotal: 0 })).toBe('');
+    expect(formatSessionMetrics({})).toBe('');
   });
 });

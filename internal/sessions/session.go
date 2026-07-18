@@ -66,6 +66,9 @@ type SessionSummary struct {
 	ModelProvider      string
 	ChatAvailable      bool
 	ChatDisabledReason string
+	// Pinned is set by the server from pi-web's SQLite session_pins table; it
+	// is never derived from the session file itself.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 type Session struct {

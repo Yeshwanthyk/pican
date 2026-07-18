@@ -55,6 +55,9 @@ export default {
   'index.noSessionsYetHint': 'Start a new session to begin.',
   'index.importSession': 'Import session',
   'index.sessionLayout': 'Session layout',
+  'index.pinned': 'Pinned',
+  'index.pinSession': 'Pin session',
+  'index.unpinSession': 'Unpin session',
   'index.closeNewSession': 'Close Start a new session',
   'index.closeManageProjects': 'Close Manage projects',
   'index.noProjectsMatch': 'No projects match your search.',
@@ -482,7 +485,6 @@ export default {
   'settings.notifyReadyHint': 'Plays a sound and shows a notification when chat completes.',
   'settings.doneSound': 'Done sound',
   'settings.doneSoundHint': 'Sound played when a response is ready.',
-
 
   'settings.about': 'About',
   'settings.docs': 'Documentation',

@@ -7,6 +7,7 @@
     groupSessionsByDate,
     groupSessionsByProject,
     sessionsCountLabel,
+    splitPinnedSessions,
   } from '../../index/sessions.js';
   import SessionCard from './SessionCard.svelte';
 
@@ -34,8 +35,10 @@
   let collapsed = $state({});
 
   const isTimeline = $derived(layout === 'timeline');
+  const split = $derived(splitPinnedSessions(sessions));
+  const pinnedSessions = $derived(split.pinned);
   const groups = $derived(
-    isTimeline ? groupSessionsByDate(sessions, now) : groupSessionsByProject(sessions),
+    isTimeline ? groupSessionsByDate(split.rest, now) : groupSessionsByProject(split.rest),
   );
 
   function readCollapsed() {
@@ -97,6 +100,24 @@
       <p>{t('index.noSessionsYetHint')}</p>
     </div>
   {:else}
+    {#if pinnedSessions.length > 0}
+      <div class="timeline-section" data-bucket="pinned">
+        <div class="date-separator">
+          <span class="date-separator-label">{t('index.pinned')}</span>
+          <span class="date-separator-count">{sessionsCountLabel(pinnedSessions.length)}</span>
+        </div>
+        <div class="session-grid">
+          {#each pinnedSessions as session (session.id)}
+            <SessionCard
+              {session}
+              running={runningSessionIds.has(session.id)}
+              runningStatus={runningStatuses.get(session.id)}
+              {now}
+            />
+          {/each}
+        </div>
+      </div>
+    {/if}
     {#if isTimeline}
       {#each groups as group (group.bucket)}
         {@const runningCount = runningCountFor(group)}
