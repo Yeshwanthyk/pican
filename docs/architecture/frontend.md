@@ -93,7 +93,7 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 - `web/src/shared/status-events.js` — shared status SSE lifecycle
 - `web/src/shared/storage.js` — localStorage helpers
 - `web/src/shared/escape.js` — HTML escaping
-- `web/src/shared/theme.js` — theme toggle (dark/light/nord/dracula/custom)
+- `web/src/shared/theme.js` — authoritative live theme registry, switching, and browser-chrome synchronization for built-in, community, and custom themes
 - `web/src/shared/version.js` — pure version formatting/changelog/fetch helpers; `VersionController.svelte` owns the update modal/status UI
 - `web/src/shared/keyboard-nav.js` — vim-style j/k/gg/G navigation
 - `web/src/components/shared/CommandPalette.svelte` — shared ⌘K session search palette
@@ -124,3 +124,5 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 ## Theme System
 
 The live SPA shell uses `theme.css`, `index.css`, `settings.css`, `schedules.css`, `workflows.css`, `tasks.css`, `subagents.css`, `session.css`, `menu.css`, and `palette.css` from `internal/ui/embedded/styles/`. The shell still injects the server-backed theme and font variables before the app starts so first paint matches the installed PWA theme without a flash.
+
+`internal/ui/embedded/styles/theme.css` is the sole owner of named-theme palette variables. Route styles consume those variables but must not redeclare `[data-theme]` palettes. The inline first-paint boot code and the live JavaScript switcher both resolve `--body-bg` / `--chrome-bg` from the active CSS theme, so adding a named theme does not require another hardcoded color map. `web/src/shared/theme.js` owns the ordered browser theme registry; the Go boot registry must stay aligned because static exports use it without loading the SPA bundle.

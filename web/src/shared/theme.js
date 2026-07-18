@@ -1,18 +1,27 @@
 import { writeSetting } from './settings-store.js';
 import { setThemeIconElement } from './icons.js';
 
-// Body/chrome background colors per theme, kept in sync with the inline boot
-// scripts in internal/ui/live_page.go. The boot script sets an inline
-// background-color on <html> before first paint; applyTheme must update that
-// same inline style on a live theme switch, otherwise the page surround keeps
-// the previous theme's color until the next reload.
-const BODY_BGS = { dark: '#111116', light: '#f6f5f2', nord: '#2e3440', dracula: '#282a36' };
-const CHROME_BGS = { dark: '#0f0f14', light: '#ddddda', nord: '#292f3a', dracula: '#242631' };
+export const BUILTIN_THEME_IDS = ['dark', 'light', 'nord', 'dracula', 'custom'];
+export const COMMUNITY_THEME_IDS = [
+  'catppuccin-mocha',
+  'catppuccin-latte',
+  'gruvbox-dark',
+  'tokyo-night',
+  'rose-pine',
+  'github-dark',
+  'github-light',
+  'one-dark-pro',
+  'everforest-dark',
+  'kanagawa-wave',
+];
+export const THEME_IDS = [...BUILTIN_THEME_IDS, ...COMMUNITY_THEME_IDS];
 
-function readThemeBg(windowImpl, documentImpl) {
+const DARK_BODY_BG = '#111116';
+
+function readThemeColor(windowImpl, documentImpl, property) {
   try {
     const cs = windowImpl.getComputedStyle(documentImpl.documentElement);
-    return cs.getPropertyValue('--body-bg').trim() || '';
+    return cs.getPropertyValue(property).trim() || '';
   } catch (e) {
     return '';
   }
@@ -31,11 +40,10 @@ export function applyTheme(windowImpl, documentImpl, next) {
     windowImpl.navigator.windowControlsOverlay &&
     windowImpl.navigator.windowControlsOverlay.visible
   );
-  // Built-in themes have a hardcoded background; the user-defined custom theme
-  // (loaded via /custom-themes.css) instead exposes its background through the
-  // --body-bg CSS variable, so read it back after the data-theme switch.
+  // theme.css is the sole palette owner. Reading the active CSS variable here
+  // keeps built-in, community, and user-defined custom themes on one path.
   const color =
-    (wco ? CHROME_BGS : BODY_BGS)[next] || readThemeBg(windowImpl, documentImpl) || BODY_BGS.dark;
+    readThemeColor(windowImpl, documentImpl, wco ? '--chrome-bg' : '--body-bg') || DARK_BODY_BG;
   try {
     documentImpl.documentElement.style.backgroundColor = color;
   } catch (e) {}
@@ -44,11 +52,9 @@ export function applyTheme(windowImpl, documentImpl, next) {
 }
 
 export function toggleTheme(windowImpl, documentImpl) {
-  const themes = ['dark', 'light', 'nord', 'dracula', 'custom'];
   const current = documentImpl.documentElement.dataset.theme || 'dark';
-  let idx = themes.indexOf(current);
-  if (idx === -1) idx = 0;
-  const next = themes[(idx + 1) % themes.length];
+  const idx = THEME_IDS.indexOf(current);
+  const next = idx === -1 ? THEME_IDS[0] : THEME_IDS[(idx + 1) % THEME_IDS.length];
   applyTheme(windowImpl, documentImpl, next);
 }
 

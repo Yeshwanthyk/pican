@@ -56,13 +56,10 @@ func SetFontProvider(fn func() (string, string, string, string, string)) {
 //   1. Sets data-theme + an inline background-color on <html> matching the
 //      current theme and WCO state so the correct colour is present from the
 //      very first paint, eliminating the white/gray flash in the title-bar
-//      area. Built-in themes use the hardcoded maps; the custom theme reads
-//      its --body-bg from the loaded stylesheet.
+//      area. Every theme resolves through the palette variables loaded above.
 //   2. Toggles the `wco` class when Window Controls Overlay is active.
 const wcoBootScript = `<script>
 (function(){
-  var chromeBgs = {dark:'#0f0f14',light:'#ddddda',nord:'#292f3a',dracula:'#242631'};
-  var bodyBgs   = {dark:'#111116',light:'#f6f5f2',nord:'#2e3440',dracula:'#282a36'};
   // Detect WCO via the display-mode media query — the reliable, synchronous
   // signal. navigator.windowControlsOverlay.visible is commonly false during
   // initial load (and the SPA shell renders an empty body first), so relying on
@@ -90,14 +87,13 @@ const wcoBootScript = `<script>
     // the stylesheets — including the user-defined /custom-themes.css this script
     // follows in <head> and therefore waits for — resolve the active theme.
     if(!document.documentElement.dataset.theme){ document.documentElement.dataset.theme = t; }
-    var map = isWCO() ? chromeBgs : bodyBgs;
-    var color = map[t];
-    if(!color){
-      // User-defined custom theme: its background lives in /custom-themes.css
-      // as the --body-bg variable rather than this hardcoded map.
-      try{ color = getComputedStyle(document.documentElement).getPropertyValue('--body-bg').trim(); }catch(e){}
-    }
-    document.documentElement.style.backgroundColor = color || map.dark;
+    // theme.css is the sole palette owner. All built-in, community, and custom
+    // themes expose these variables, so first paint follows the same contract
+    // as a live theme switch without maintaining a second color registry here.
+    var prop = isWCO() ? '--chrome-bg' : '--body-bg';
+    var color = '';
+    try{ color = getComputedStyle(document.documentElement).getPropertyValue(prop).trim(); }catch(e){}
+    document.documentElement.style.backgroundColor = color || (isWCO() ? '#0f0f14' : '#111116');
   }
   function sync(){
     document.documentElement.classList.toggle('wco', isWCO());
@@ -180,7 +176,7 @@ func themeBootScript(defaultTheme string) template.HTML {
 	return template.HTML(fmt.Sprintf(`<script>
 (function(){
   var STORAGE_KEY = 'pi-web-theme';
-  var themes = ['dark', 'light', 'nord', 'dracula', 'custom'];
+  var themes = ['dark', 'light', 'nord', 'dracula', 'custom', 'catppuccin-mocha', 'catppuccin-latte', 'gruvbox-dark', 'tokyo-night', 'rose-pine', 'github-dark', 'github-light', 'one-dark-pro', 'everforest-dark', 'kanagawa-wave'];
   function applyTheme(t){ document.documentElement.dataset.theme = t || 'dark'; }
   function currentTheme(){ return document.documentElement.dataset.theme || 'dark'; }
   // Lucide theme icons, inlined so the indicator is painted before the JS
@@ -192,30 +188,24 @@ func themeBootScript(defaultTheme string) template.HTML {
     dracula: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><path d="M9 10h.01" /><path d="M15 10h.01" /><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" /></svg>',
     custom: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg>'
   };
+  var communityThemeIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>';
   function updateBtn(){
     var t = currentTheme();
-    var iconSvg = themeIcons[t] || themeIcons.dark;
+    var iconSvg = themeIcons[t] || (themes.indexOf(t) >= 5 ? communityThemeIcon : themeIcons.dark);
     document.querySelectorAll('[data-theme-icon]').forEach(function(el){ el.innerHTML = iconSvg; });
     document.querySelectorAll('[data-command-theme-icon]').forEach(function(el){ el.innerHTML = iconSvg; });
     var isWCO = (window.matchMedia && window.matchMedia('(display-mode: window-controls-overlay)').matches) || (navigator.windowControlsOverlay && navigator.windowControlsOverlay.visible);
-    var chromeBg = '#0f0f14', bodyBg = '#111116';
-    if(t === 'light')   { chromeBg = '#ddddda'; bodyBg = '#f6f5f2'; }
-    else if(t === 'nord')    { chromeBg = '#292f3a'; bodyBg = '#2e3440'; }
-    else if(t === 'dracula') { chromeBg = '#242631'; bodyBg = '#282a36'; }
-    else if(t !== 'dark') {
-      // User-defined custom theme: read its background from the loaded
-      // /custom-themes.css (--body-bg) instead of the hardcoded built-ins.
-      try{ var cb = getComputedStyle(document.documentElement).getPropertyValue('--body-bg').trim(); if(cb){ chromeBg = cb; bodyBg = cb; } }catch(e){}
-    }
-    var color = isWCO ? chromeBg : bodyBg;
+    var prop = isWCO ? '--chrome-bg' : '--body-bg';
+    var color = '';
+    try{ color = getComputedStyle(document.documentElement).getPropertyValue(prop).trim(); }catch(e){}
+    if(!color){ color = isWCO ? '#0f0f14' : '#111116'; }
     document.documentElement.style.backgroundColor = color;
     var meta = document.querySelector('meta[name="theme-color"]');
     if(meta) { meta.content = color; }
   }
   function toggleTheme(){
     var idx = themes.indexOf(currentTheme());
-    if(idx === -1) idx = 0;
-    var next = themes[(idx + 1) %% themes.length];
+    var next = idx === -1 ? themes[0] : themes[(idx + 1) %% themes.length];
     applyTheme(next);
     try{ localStorage.setItem(STORAGE_KEY, next); }catch(e){}
     try{ document.cookie = 'pi-web-theme=' + next + ';path=/;SameSite=Lax;max-age=31536000'; }catch(e){}

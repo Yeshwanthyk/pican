@@ -34,6 +34,7 @@ import {
   Maximize2,
   Moon,
   MoreHorizontal,
+  Palette,
   PanelLeft,
   PanelLeftClose,
   Paperclip,
@@ -134,6 +135,16 @@ const THEME_ICONS = {
   nord: Snowflake,
   dracula: Ghost,
   custom: Settings,
+  'catppuccin-mocha': Palette,
+  'catppuccin-latte': Palette,
+  'gruvbox-dark': Palette,
+  'tokyo-night': Palette,
+  'rose-pine': Palette,
+  'github-dark': Palette,
+  'github-light': Palette,
+  'one-dark-pro': Palette,
+  'everforest-dark': Palette,
+  'kanagawa-wave': Palette,
 };
 
 /** SVG markup string for a theme's indicator icon. */
