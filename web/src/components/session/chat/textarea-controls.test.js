@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { setupTextareaControls } from './textarea-controls.js';
 
 function createParts() {
+  document.body.innerHTML = '';
   const textarea = document.createElement('textarea');
   const shell = document.createElement('div');
   const form = document.createElement('form');
+  shell.append(textarea);
+  form.append(shell);
+  document.body.append(form);
   form.requestSubmit = vi.fn();
   Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 120 });
   return { textarea, shell, form };
@@ -29,6 +33,30 @@ describe('setupTextareaControls', () => {
     expect(parts.textarea.style.height).toBe('120px');
     expect(updateSendEnabled).toHaveBeenCalled();
     expect(updateComposerHeight).toHaveBeenCalled();
+  });
+
+  it('collapses while empty and blurred, then stays expanded with text', () => {
+    const parts = createParts();
+    setupTextareaControls({
+      ...parts,
+      windowImpl: {
+        getComputedStyle: () => ({ maxHeight: '200px', minHeight: '48px' }),
+      },
+    });
+
+    expect(parts.shell.classList.contains('composer-collapsed')).toBe(true);
+
+    parts.textarea.focus();
+    expect(parts.shell.classList.contains('composer-collapsed')).toBe(false);
+
+    parts.textarea.blur();
+    expect(parts.shell.classList.contains('composer-collapsed')).toBe(true);
+
+    parts.textarea.focus();
+    parts.textarea.value = 'draft';
+    parts.textarea.dispatchEvent(new Event('input'));
+    parts.textarea.blur();
+    expect(parts.shell.classList.contains('composer-collapsed')).toBe(false);
   });
 
   it('submits on desktop Enter but not mobile Enter', () => {

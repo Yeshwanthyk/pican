@@ -157,7 +157,7 @@
     </div>
   {/if}
   <QueuePanel store={queueStore} />
-  <div class="pi-chat-shell">
+  <div class="pi-chat-shell composer-collapsed">
     <ChatExpandButton {chatAvailable} />
     {#if cwd}<div class="pi-chat-toolbar pi-chat-cwd-bar">
         <span class="pi-chat-cwd" title={t('composer.copyPath')} data-cwd={cwd}>cwd: {cwd}</span

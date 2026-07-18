@@ -4,7 +4,8 @@
   // renderToolCall(). {@html} is used only for pre-rendered (ANSI) custom-tool
   // HTML; everything else is escaped Svelte template. The result element keeps
   // the `entry-<resultId>` anchor so annotations + scroll still work.
-  import { shortenPath } from '../../session/render/session-format.js';
+  import { formatToolFoldSummary, shortenPath } from '../../session/render/session-format.js';
+  import { t } from '../../shared/i18n.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
   import AskQuestion from './AskQuestion.svelte';
@@ -39,6 +40,7 @@
   );
   const resultImages = $derived(result ? result.content.filter((c) => c.type === 'image') : []);
   const rendered = $derived(model?.renderedTools?.[call.id] || null);
+  const toolSummary = $derived(formatToolFoldSummary(call.name, args, result));
 
   // read/write/edit/ls share a file-path arg; compute it once.
   const filePath = $derived(str(args.file_path ?? args.path));
@@ -71,6 +73,14 @@
 -->
 <div class="tool-call-collapsed">Tool: {call.name} ...</div>
 <div class="tool-execution {statusClass}" id={resultEntry ? `entry-${resultEntry.id}` : undefined}>
+  <details class="tool-fold" open={result?.isError || undefined}>
+    <summary class="tool-fold-summary">
+      <span class="tool-fold-status {statusClass}" aria-hidden="true"></span>
+      <span class="tool-fold-name">{call.name}</span>
+      {#if toolSummary}<span class="tool-fold-description">{toolSummary}</span>{/if}
+      {#if result?.isError}<span class="tool-fold-error">{t('session.error')}</span>{/if}
+    </summary>
+    <div class="tool-fold-body">
   {#if call.name === 'bash'}
     {@const command = str(args.command)}
     <div class="tool-command">
@@ -190,4 +200,6 @@
     <div class="tool-output"><pre>{JSON.stringify(args, null, 2)}</pre></div>
     {#if result && resultText}<ToolOutput text={resultText} maxLines={10} />{/if}
   {/if}
+    </div>
+  </details>
 </div>

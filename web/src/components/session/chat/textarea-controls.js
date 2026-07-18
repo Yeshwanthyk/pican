@@ -11,8 +11,8 @@ export function setupTextareaControls({
   updateSendEnabled = () => {},
   updateComposerHeight = () => {},
 } = {}) {
-  function autoResize() {
-    if (!textarea || (shell && shell.classList.contains('expanded'))) return;
+  function resizeTextarea() {
+    if (!textarea || shell?.classList.contains('expanded')) return;
     textarea.style.height = 'auto';
     const cs = windowImpl.getComputedStyle(textarea);
     const max = parseFloat(cs.maxHeight) || 200;
@@ -22,9 +22,31 @@ export function setupTextareaControls({
     updateComposerHeight();
   }
 
+  function syncCollapsedState() {
+    if (!textarea || !shell) return;
+    const hasComposerFocus = shell.contains(textarea.ownerDocument?.activeElement);
+    shell.classList.toggle('composer-collapsed', !textarea.value && !hasComposerFocus);
+  }
+
+  function autoResize() {
+    syncCollapsedState();
+    resizeTextarea();
+  }
+
   const onInput = () => {
     autoResize();
     updateSendEnabled();
+  };
+
+  const onFocusIn = () => {
+    shell?.classList.remove('composer-collapsed');
+    resizeTextarea();
+  };
+
+  const onFocusOut = (event) => {
+    if (shell?.contains(event.relatedTarget)) return;
+    shell?.classList.toggle('composer-collapsed', !textarea?.value);
+    resizeTextarea();
   };
 
   const onKeydown = (event) => {
@@ -48,6 +70,8 @@ export function setupTextareaControls({
   if (textarea) {
     textarea.addEventListener('input', onInput);
     textarea.addEventListener('keydown', onKeydown);
+    shell?.addEventListener('focusin', onFocusIn);
+    shell?.addEventListener('focusout', onFocusOut);
     autoResize();
   }
   updateSendEnabled();
@@ -57,6 +81,8 @@ export function setupTextareaControls({
     dispose: () => {
       textarea?.removeEventListener('input', onInput);
       textarea?.removeEventListener('keydown', onKeydown);
+      shell?.removeEventListener('focusin', onFocusIn);
+      shell?.removeEventListener('focusout', onFocusOut);
     },
   };
 }

@@ -81,6 +81,37 @@ export function formatToolCall(name, args = {}) {
   }
 }
 
+export function formatToolFoldSummary(name, args = {}, result = null) {
+  const truncateInline = (value, maxLength) => {
+    const text = String(value ?? '')
+      .replace(/[\n\t]/g, ' ')
+      .trim();
+    return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+  };
+
+  if (name === 'bash') return truncateInline(args.command, 80);
+
+  if (['read', 'write', 'edit', 'ls'].includes(name)) {
+    const path = shortenPath(String(args.file_path ?? args.path ?? (name === 'ls' ? '.' : '')));
+    if (name !== 'edit') return path;
+
+    const patch = result?.details?.diff ?? result?.details?.patch;
+    if (typeof patch !== 'string') return path;
+    const lines = patch.split('\n');
+    const added = lines.filter((line) => /^\+(?!\+\+)/.test(line)).length;
+    const removed = lines.filter((line) => /^-(?!--)/.test(line)).length;
+    return `${path} (+${added} -${removed})`;
+  }
+
+  if (name.startsWith('Task') || name.startsWith('subagent_') || name === 'workflow') {
+    const formatted = formatToolCall(name, args).replace(/^\[|\]$/g, '');
+    const prefix = `${name}: `;
+    return formatted.startsWith(prefix) ? formatted.slice(prefix.length) : '';
+  }
+
+  return truncateInline(JSON.stringify(args), 60);
+}
+
 export function escapeHtml(text, { documentImpl = globalThis.document } = {}) {
   if (documentImpl?.createElement) {
     const div = documentImpl.createElement('div');

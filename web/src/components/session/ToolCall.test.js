@@ -9,6 +9,41 @@ function model({ entries = [], renderedTools = null } = {}) {
 }
 
 describe('ToolCall', () => {
+  it('renders a collapsed native disclosure with a compact status summary', () => {
+    const call = { id: 'b', name: 'bash', arguments: { command: 'echo hello\nworld' } };
+    const { container } = render(ToolCall, { props: { call, model: model() } });
+    const fold = container.querySelector('.tool-fold');
+
+    expect(fold?.tagName).toBe('DETAILS');
+    expect(fold?.open).toBe(false);
+    expect(container.querySelector('.tool-fold-summary')?.textContent).toContain(
+      'bash echo hello world',
+    );
+    expect(container.querySelector('.tool-fold-status')?.classList).toContain('pending');
+  });
+
+  it('opens failed tool calls and keeps the result anchor on the outer wrapper', () => {
+    const call = { id: 'b', name: 'bash', arguments: { command: 'false' } };
+    const result = {
+      id: 'result-1',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'b',
+        isError: true,
+        content: [{ type: 'text', text: 'failed' }],
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelector('.tool-fold')?.open).toBe(true);
+    expect(container.querySelector('.tool-fold-summary')?.textContent).toContain('error');
+    expect(container.querySelector('.tool-execution')?.id).toBe('entry-result-1');
+    expect(container.querySelector('.tool-fold')?.id).toBe('');
+  });
+
   it('renders a custom tool as escaped JSON when no pre-rendered HTML exists', () => {
     const call = { id: 'call-1', name: 'custom_tool', arguments: { value: '<x>' } };
     const { container } = render(ToolCall, { props: { call, model: model() } });
@@ -86,6 +121,9 @@ describe('ToolCall', () => {
     expect(container.querySelector('.task-tool-row')?.textContent).toContain('#12');
     expect(container.querySelector('.status-pending')?.textContent).toBe('pending');
     expect(container.querySelector('.extension-tool-plain')?.textContent).toBe('Created:');
+    expect(container.querySelector('.tool-fold-summary')?.textContent).toContain(
+      'TaskCreate Build task cards',
+    );
   });
 
   it('renders structured subagent rows and keeps wait output collapsed', () => {
@@ -110,7 +148,7 @@ describe('ToolCall', () => {
     expect(container.querySelectorAll('.subagent-row')).toHaveLength(2);
     expect(container.querySelector('.status-done')?.textContent.trim()).toBe('done');
     expect(container.querySelector('.status-running')?.textContent.trim()).toBe('running');
-    expect(container.querySelector('details')?.open).toBe(false);
+    expect(container.querySelector('.extension-output-details')?.open).toBe(false);
     expect(container.querySelector('.extension-markdown')?.textContent).toContain(
       'Finished the review.',
     );
@@ -165,6 +203,6 @@ describe('ToolCall', () => {
     expect(container.querySelector('.phase-done')?.textContent).toContain('Build');
     expect(container.querySelector('.phase-current')?.textContent).toContain('Test');
     expect(container.querySelector('.workflow-agent-row')?.textContent).toContain('Reviewer');
-    expect(container.querySelector('details')?.open).toBe(false);
+    expect(container.querySelector('.extension-output-details')?.open).toBe(false);
   });
 });

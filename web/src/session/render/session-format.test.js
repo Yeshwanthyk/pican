@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   escapeHtml,
   formatToolCall,
+  formatToolFoldSummary,
   getTreeNodeDisplayHtml,
   shortenPath,
   truncate,
@@ -38,6 +39,29 @@ describe('session format helpers', () => {
     expect(formatToolCall('workflow', { name: 'Release', status: 'running' })).toBe(
       '[workflow: Release (running)]',
     );
+  });
+
+  it('formats one-line tool fold summaries', () => {
+    expect(formatToolFoldSummary('bash', { command: 'echo hello\nworld' })).toBe(
+      'echo hello world',
+    );
+    expect(formatToolFoldSummary('read', { file_path: '/Users/alice/project/file.js' })).toBe(
+      '~/project/file.js',
+    );
+    expect(
+      formatToolFoldSummary(
+        'edit',
+        { path: '/tmp/file.js' },
+        {
+          details: { diff: '--- a/file.js\n+++ b/file.js\n-old\n+new\n+another' },
+        },
+      ),
+    ).toBe('/tmp/file.js (+2 -1)');
+    expect(formatToolFoldSummary('TaskCreate', { subject: 'Ship renderer' })).toBe('Ship renderer');
+    expect(formatToolFoldSummary('workflow', { name: 'Release', status: 'running' })).toBe(
+      'Release (running)',
+    );
+    expect(formatToolFoldSummary('custom', { value: 'ok' })).toBe('{"value":"ok"}');
   });
 
   it('renders tree display html for messages and tool results', () => {

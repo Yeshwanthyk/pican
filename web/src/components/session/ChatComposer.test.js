@@ -373,6 +373,33 @@ describe('chat composer runner', () => {
     expect(focusSpy).toHaveBeenCalled();
   });
 
+  it('does not focus the message textarea on mobile page load', () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><div class="pi-chat-shell composer-collapsed"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send"></button><span id="pi-chat-status"></span></div></form></body>',
+    );
+    dom.window.matchMedia = vi.fn((query) => ({
+      matches: query === '(max-width: 900px)',
+    }));
+    const textarea = dom.window.document.getElementById('pi-chat-message');
+    const focusSpy = vi.spyOn(textarea, 'focus');
+
+    runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      chatApi: { getWorkerStatus: () => Promise.resolve(new Response('{}', { status: 500 })) },
+      chatSelectors: { THINKING_LEVELS: [] },
+      modelSelector: { setupModelSelector: vi.fn() },
+      thinkingSelector: { setupThinkingLevelSelector: vi.fn() },
+      setIntervalImpl: () => {},
+    });
+    dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
+
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(dom.window.document.querySelector('.pi-chat-shell').classList).toContain(
+      'composer-collapsed',
+    );
+  });
+
   it('Shift+Tab in the textarea cycles thinking level', () => {
     const dom = new JSDOM(
       '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send"></button><span id="pi-chat-status"></span></form></body>',

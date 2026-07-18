@@ -238,8 +238,10 @@ export function runChatComposer({
     });
     submission.setRefreshWorkerStatus(workerStatus.refresh);
 
-    // Focus the message textarea on page load so the user can start typing immediately.
-    if (textarea && typeof textarea.focus === 'function') {
+    // Keep phones compact until the user taps the input; desktop retains its
+    // existing ready-to-type autofocus behavior.
+    const isMobileLayout = !!window.matchMedia?.('(max-width: 900px)').matches;
+    if (!isMobileLayout && textarea && typeof textarea.focus === 'function') {
       textarea.focus();
     }
 
