@@ -183,8 +183,13 @@
     fileCount = 0;
   }
 
+  // Built-in themes with a light canvas; every other theme (including any
+  // future community theme not listed here) renders the diff with the dark
+  // pierre bundle, so this only needs the light ones.
+  const LIGHT_THEMES = ['light', 'catppuccin-latte', 'github-light'];
+
   function currentThemeType() {
-    return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    return LIGHT_THEMES.includes(document.documentElement.dataset.theme) ? 'light' : 'dark';
   }
 
   function buildCodeView(files) {

@@ -404,6 +404,8 @@ export default {
   'settings.themeDark': 'Dark',
   'settings.themeLight': 'Light',
   'settings.themeCustom': 'Custom',
+  'settings.themeBuiltIn': 'Built-in',
+  'settings.themeCommunity': 'Community',
   'settings.interfaceFont': 'Interface font',
   'settings.interfaceFontHint': 'Font for the app UI — menus, lists, headers.',
   'settings.contentFont': 'Content font',
@@ -482,7 +484,6 @@ export default {
   'settings.notifyReadyHint': 'Plays a sound and shows a notification when chat completes.',
   'settings.doneSound': 'Done sound',
   'settings.doneSoundHint': 'Sound played when a response is ready.',
-
 
   'settings.about': 'About',
   'settings.docs': 'Documentation',

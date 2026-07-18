@@ -201,7 +201,11 @@ func TestGenerateExportHtmlOmitsResumeButtonForShare(t *testing.T) {
 }
 
 func TestSanitizeTheme(t *testing.T) {
-	valid := []string{"dark", "light", "nord", "dracula", "custom"}
+	valid := []string{
+		"dark", "light", "nord", "dracula", "custom",
+		"catppuccin-mocha", "catppuccin-latte", "gruvbox-dark", "tokyo-night", "rose-pine",
+		"github-dark", "github-light", "one-dark-pro", "everforest-dark", "kanagawa-wave",
+	}
 	for _, theme := range valid {
 		if got := sanitizeTheme(theme); got != theme {
 			t.Errorf("sanitizeTheme(%q) = %q, want %q", theme, got, theme)
