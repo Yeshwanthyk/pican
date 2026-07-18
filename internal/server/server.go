@@ -333,6 +333,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/workflows/run", s.auth.Wrap(s.handleApiWorkflowRun))
 	mux.HandleFunc("/api/tasks", s.auth.Wrap(s.handleApiTasks))
 	mux.HandleFunc("/api/tasks/output", s.auth.Wrap(s.handleApiTaskOutput))
+	mux.HandleFunc("/api/subagents", s.auth.Wrap(s.handleApiSubagents))
 	mux.HandleFunc("/metrics", s.auth.Wrap(s.handleMetricsPage))
 	mux.HandleFunc("/api/metrics", s.auth.Wrap(s.handleMetrics))
 	s.registerPprof(mux)

@@ -2,6 +2,7 @@
   import { marked } from 'marked';
   import { icon, ListTree } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
+  import { navigate } from '../../shared/navigation.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
   import ToolOutput from './ToolOutput.svelte';
 
@@ -105,6 +106,15 @@
     </details>
   {:else if !details && resultText.trim()}
     <ToolOutput text={resultText} maxLines={10} />
+  {/if}
+
+  {#if details?.runId}
+    <button
+      type="button"
+      class="extension-dashboard-link"
+      onclick={() => navigate('/workflows?runId=' + encodeURIComponent(details.runId))}
+      >{t('session.openDashboard')}</button
+    >
   {/if}
 </div>
 
@@ -228,5 +238,22 @@
   .extension-markdown {
     margin-top: 8px;
     color: var(--toolOutput);
+  }
+
+  .extension-dashboard-link {
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .extension-dashboard-link:hover,
+  .extension-dashboard-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 </style>

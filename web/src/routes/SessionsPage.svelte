@@ -299,6 +299,7 @@
   onSchedules={() => navigate('/schedules')}
   onWorkflows={() => navigate('/workflows')}
   onTasks={() => navigate('/tasks')}
+  onSubagents={() => navigate('/subagents')}
 />
 
 <HomeMenu

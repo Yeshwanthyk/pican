@@ -1,0 +1,252 @@
+/* Read-only subagent review list. Kept route-scoped and aligned with the
+   Workflows and Tasks dashboard vocabulary. */
+
+.subagents-page {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding: calc(52px + env(safe-area-inset-top) + 24px) 20px 80px;
+  box-sizing: border-box;
+}
+
+.subagents-back {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.subagents-back > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.subagents-page-error {
+  margin: 0 0 16px;
+  color: var(--danger, var(--red));
+  overflow-wrap: anywhere;
+}
+
+.subagents-loading,
+.subagents-empty {
+  padding: 64px 20px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.subagents-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--dim) 70%, transparent);
+  border-radius: 14px;
+}
+
+.subagents-empty > span {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.subagents-empty h1,
+.subagents-empty p {
+  margin: 0;
+}
+
+.subagents-empty h1 {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.subagents-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid color-mix(in srgb, var(--dim) 72%, transparent);
+}
+
+.subagent-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  padding: 16px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dim) 72%, transparent);
+}
+
+.subagent-list-primary,
+.subagent-list-secondary {
+  display: flex;
+  min-width: 0;
+}
+
+.subagent-list-primary {
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subagent-list-secondary {
+  flex: 0 0 auto;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.subagent-list-title-row,
+.subagent-list-times,
+.subagent-list-actions {
+  display: flex;
+  align-items: center;
+}
+
+.subagent-list-title-row {
+  gap: 8px;
+  min-width: 0;
+}
+
+.subagent-list-title-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-list-id,
+.subagent-list-project,
+.subagent-list-times {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.subagent-list-id {
+  flex: 0 0 auto;
+  font-family: var(--font-code, var(--mono));
+}
+
+.subagent-list-project {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-list-times {
+  justify-content: flex-end;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.subagent-status-chip,
+.subagent-harness-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.subagent-status-chip[data-status='running'] {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  color: var(--accent);
+}
+
+.subagent-status-chip[data-status='done'] {
+  border-color: color-mix(in srgb, var(--success) 70%, transparent);
+  color: var(--success);
+}
+
+.subagent-status-chip[data-status='error'] {
+  border-color: color-mix(in srgb, var(--danger, var(--red)) 70%, transparent);
+  color: var(--danger, var(--red));
+}
+
+.subagent-status-pulse {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: subagent-list-pulse 1.5s ease-in-out infinite;
+}
+
+.subagent-list-actions {
+  gap: 12px;
+}
+
+.subagent-list-actions a {
+  color: var(--accent);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.subagent-list-actions a:hover,
+.subagent-list-actions a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.subagent-list-actions-mobile {
+  display: none;
+}
+
+@keyframes subagent-list-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 700px) {
+  .subagents-page {
+    padding-right: 14px;
+    padding-left: 14px;
+    overflow-x: hidden;
+  }
+
+  .subagent-list-row {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 2px;
+  }
+
+  .subagent-list-title-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .subagent-list-title-row strong {
+    flex-basis: calc(100% - 90px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .subagent-list-secondary {
+    align-items: flex-end;
+  }
+
+  .subagent-list-times {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .subagent-list-secondary .subagent-list-actions {
+    display: none;
+  }
+
+  .subagent-list-actions-mobile {
+    display: flex;
+    margin-top: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-status-pulse {
+    animation: none;
+  }
+}

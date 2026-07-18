@@ -15,3 +15,5 @@ This directory documents the key runtime sequences in pi-web.
 | [share.md](./share.md) | Exporting a session to a private GitHub Gist |
 | [schedules.md](./schedules.md) | Cron/preset schedules that auto-create pi sessions and push on completion |
 | [workflows.md](./workflows.md) | Read-only workflow run dashboard, filesystem watcher, and SSE refresh |
+| [tasks.md](./tasks.md) | Read-only task stores, output inspection, and SSE refresh |
+| [subagents.md](./subagents.md) | Merge child sessions with parent spawn/result records for review |

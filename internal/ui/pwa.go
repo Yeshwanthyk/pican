@@ -49,6 +49,9 @@ var workflowsCSS string
 //go:embed embedded/styles/tasks.css
 var tasksCSS string
 
+//go:embed embedded/styles/subagents.css
+var subagentsCSS string
+
 // registerPWAHandlers serves the manifest, service worker, and icons.
 // Routes are registered without auth: a manifest/icon leaks nothing
 // sensitive, and the service worker must be reachable for installability

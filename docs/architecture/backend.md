@@ -71,6 +71,7 @@ pi-web/
 │   │   ├── scheduler.go        # Cron tick loop + fireSchedule runner (creates a session, sends instructions)
 │   │   ├── schedules_api.go    # /api/schedules + /api/schedule(/run|/runs) handlers
 │   │   ├── workflows_api.go    # Read-only workflow list/detail handlers
+│   │   ├── subagents_api.go    # Merge child sessions with parent spawn/result records
 │   │   ├── workflows_watcher.go # fsnotify + polling workflow run updates
 │   │   ├── update.go           # /api/version, check-update, update, restart handlers
 │   │   ├── events.go           # SSE endpoint (/events)

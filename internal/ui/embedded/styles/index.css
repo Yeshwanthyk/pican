@@ -856,6 +856,14 @@ body.modal-sheet-open { overflow: hidden; }
         padding: 0 8px;
         font-size: 11px;
     }
+    .schedules-nav-btn {
+        width: 28px;
+        padding: 0;
+        justify-content: center;
+    }
+    .schedules-nav-btn > span:last-child {
+        display: none;
+    }
 
     .modal-overlay {
         align-items: flex-end;

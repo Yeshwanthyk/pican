@@ -2,6 +2,7 @@
   import { marked } from 'marked';
   import { icon, Layers } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
+  import { navigate } from '../../shared/navigation.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
   import ToolOutput from './ToolOutput.svelte';
 
@@ -77,6 +78,10 @@
   {:else if resultText.trim() && !hasStructuredDetails}
     <ToolOutput text={resultText} maxLines={10} />
   {/if}
+
+  <button type="button" class="subagent-dashboard-link" onclick={() => navigate('/subagents')}
+    >{t('session.viewAll')}</button
+  >
 </div>
 
 <style>
@@ -169,6 +174,23 @@
   .extension-markdown {
     margin-top: 8px;
     color: var(--toolOutput);
+  }
+
+  .subagent-dashboard-link {
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .subagent-dashboard-link:hover,
+  .subagent-dashboard-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   @keyframes subagent-pulse {

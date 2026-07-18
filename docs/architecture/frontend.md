@@ -33,6 +33,8 @@ Browser routes served by the SPA shell:
 - `/settings` → `web/src/routes/SettingsPage.svelte`
 - `/schedules` → `web/src/routes/SchedulesPage.svelte`
 - `/workflows?runId=…` → `web/src/routes/WorkflowsPage.svelte`
+- `/tasks?project=…` → `web/src/routes/TasksPage.svelte`
+- `/subagents` → `web/src/routes/SubagentsPage.svelte`
 - `/login` → `web/src/routes/LoginPage.svelte`
 
 API, SSE, PWA, sound, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
@@ -83,6 +85,8 @@ The index route listens to `/events?id=__all__` for `new-session`, `status-snaps
 
 The workflows route uses the same `__all__` connection for named `workflows-updated` events, then refetches `/api/workflows` and the selected `/api/workflows/run` detail after a short debounce.
 
+The subagents route also uses the `__all__` connection. It refetches `/api/subagents` after `new-session`, `status-snapshot`, and `status-delta` events so newly created child sessions and running-state transitions appear without a new event type.
+
 ## Shared Frontend Modules
 
 - `web/src/shared/api.js` — JSON fetch helpers
@@ -107,6 +111,8 @@ The workflows route uses the same `__all__` connection for named `workflows-upda
 | Menu CSS | `internal/ui/embedded/styles/menu.css` | `/menu.css` and inlined in SPA shell |
 | Palette CSS | `internal/ui/embedded/styles/palette.css` | `/palette.css` and inlined in SPA shell |
 | Workflows CSS | `internal/ui/embedded/styles/workflows.css` | inlined in SPA shell |
+| Tasks CSS | `internal/ui/embedded/styles/tasks.css` | inlined in SPA shell |
+| Subagents CSS | `internal/ui/embedded/styles/subagents.css` | inlined in SPA shell |
 | Custom themes | `~/.pi/agent/pi-web/custom-themes.css` (optional) | `/custom-themes.css` |
 | PWA manifest | `internal/ui/embedded/assets/manifest.webmanifest` | `/manifest.webmanifest` |
 | Service worker | `internal/ui/embedded/assets/sw.js` | `/sw.js` |
@@ -116,4 +122,4 @@ The workflows route uses the same `__all__` connection for named `workflows-upda
 
 ## Theme System
 
-The live SPA shell uses `theme.css`, `index.css`, `settings.css`, `schedules.css`, `workflows.css`, `session.css`, `menu.css`, and `palette.css` from `internal/ui/embedded/styles/`. The shell still injects the server-backed theme and font variables before the app starts so first paint matches the installed PWA theme without a flash.
+The live SPA shell uses `theme.css`, `index.css`, `settings.css`, `schedules.css`, `workflows.css`, `tasks.css`, `subagents.css`, `session.css`, `menu.css`, and `palette.css` from `internal/ui/embedded/styles/`. The shell still injects the server-backed theme and font variables before the app starts so first paint matches the installed PWA theme without a flash.

@@ -33,6 +33,8 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   │     components + reactive model)      │  │  • status-delta         │  │
 │   │  /settings → SettingsPage (Svelte)    │  │  • status-snapshot      │  │
 │   │  /workflows → WorkflowsPage (Svelte)  │  │  • workflows-updated    │  │
+│   │  /tasks → TasksPage (Svelte)           │  │                         │  │
+│   │  /subagents → SubagentsPage (Svelte)   │  │                         │  │
 │   │  /login → LoginPage                   │  │  • annotations, btw…    │  │
 │   │  shared: CommandPalette, Version UI   │  │                         │  │
 │   └──────────────────────────────────────┘  └─────────────────────────┘  │
@@ -68,6 +70,8 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   GET/POST /api/settings → user settings (SQLite, write-through cache)   │
 │   GET/POST /api/projects → project visibility prefs (SQLite)             │
 │   GET  /api/workflows{,/run} → external workflow run snapshots            │
+│   GET  /api/tasks{,/output} → external task stores and output              │
+│   GET  /api/subagents → merged child sessions and parent records           │
 │   GET  /api/sounds  /  GET /sounds/…   (notification sounds)             │
 │   POST /share         →  handleShare         (GitHub Gist)               │
 │   GET  /events        →  handleEvents        (SSE)                       │

@@ -56,6 +56,15 @@ describe('App', () => {
     expect(document.querySelector('[data-workflows-page]')).toBeTruthy();
   });
 
+  it('routes /subagents to the Svelte subagents page', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+
+    mounted = mountApp({ props: { path: '/subagents' } });
+
+    expect(document.querySelector('.session-header-title')?.textContent).toBe('Subagents');
+    expect(document.querySelector('[data-subagents-page]')).toBeTruthy();
+  });
+
   it('renders the 404 page for unknown routes', () => {
     document.body.innerHTML = '<div id="app"></div>';
 

@@ -196,6 +196,22 @@ export default {
   'tasks.execution.stopped': 'Stopped',
   'tasks.execution.unknown': 'Unknown',
 
+  // ── Subagents ──
+  'subagents.navTitle': 'Subagents',
+  'subagents.title': 'Subagents',
+  'subagents.loading': 'Loading subagents…',
+  'subagents.emptyTitle': 'No subagents yet',
+  'subagents.emptyHint': 'Subagents will appear here when the pi-subagents extension runs them.',
+  'subagents.untitled': 'Untitled subagent',
+  'subagents.spawned': 'Spawned {time}',
+  'subagents.active': 'Active {time}',
+  'subagents.transcript': 'Transcript',
+  'subagents.parent': 'Parent',
+  'subagents.status.running': 'Running',
+  'subagents.status.done': 'Done',
+  'subagents.status.error': 'Error',
+  'subagents.status.unknown': 'Unknown',
+
   // ── Command palette ──
   'palette.listSessions': 'List sessions',
   'palette.closeSearch': 'Close search',
@@ -253,6 +269,8 @@ export default {
   'session.turns': '{count} turns',
   'session.showOutput': 'Show output',
   'session.subagentResult': 'Subagent {id} — {title}',
+  'session.openDashboard': 'Open dashboard',
+  'session.viewAll': 'View all',
 
   // ── Session command menu ──
   'menu.searchSessions': 'Search Sessions',

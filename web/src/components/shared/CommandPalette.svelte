@@ -372,6 +372,15 @@
       }}>{t('tasks.navTitle')}</button
     >
     <button
+      class="palette-action"
+      type="button"
+      data-subagents-btn
+      onclick={() => {
+        close();
+        go('/subagents');
+      }}>{t('subagents.navTitle')}</button
+    >
+    <button
       class="palette-action muted"
       type="button"
       data-import-session-btn

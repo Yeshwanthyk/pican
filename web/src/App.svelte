@@ -6,6 +6,7 @@
   import SchedulesPage from './routes/SchedulesPage.svelte';
   import WorkflowsPage from './routes/WorkflowsPage.svelte';
   import TasksPage from './routes/TasksPage.svelte';
+  import SubagentsPage from './routes/SubagentsPage.svelte';
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
 
@@ -82,6 +83,8 @@
   <WorkflowsPage runId={workflowRunId} />
 {:else if path === '/tasks'}
   <TasksPage project={tasksProject} />
+{:else if path === '/subagents'}
+  <SubagentsPage />
 {:else}
   <NotFoundPage />
 {/if}
