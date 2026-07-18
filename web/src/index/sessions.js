@@ -1,5 +1,5 @@
 import { getJSON, postJSON } from '../shared/api.js';
-import { t } from '../shared/i18n.js';
+import { t } from '../shared/strings.js';
 
 export const layoutStorageKey = 'pi-sessions:view-layout';
 export const collapsedProjectsStorageKey = 'pi-sessions:collapsed-projects';
@@ -11,6 +11,8 @@ export function normalizeSession(raw = {}) {
   return {
     id: raw.id || raw.ID || '',
     sessionUUID: raw.sessionUUID || raw.SessionUUID || '',
+    runtime: String(raw.runtime || raw.Runtime || 'pi').toLowerCase(),
+    nativeId: raw.nativeId || raw.NativeID || '',
     project: raw.project || raw.Project || '',
     lastActivity: raw.lastActivity || raw.LastActivity || '',
     name: raw.name || raw.Name || raw.id || raw.ID || '',
@@ -81,7 +83,35 @@ export function sessionModelLabel(session = {}) {
 }
 
 export function sessionSearchText(session = {}) {
-  return `${session.name || ''} ${session.project || ''} ${sessionModelLabel(session)} ${session.sessionUUID || ''}`.trim();
+  return `${session.name || ''} ${session.project || ''} ${sessionModelLabel(session)} ${session.sessionUUID || ''} ${session.runtime || 'pi'} ${session.nativeId || ''}`.trim();
+}
+
+export function normalizeRuntimesResponse(raw = {}) {
+  const runtimes = (Array.isArray(raw.runtimes) ? raw.runtimes : [])
+    .map((entry) => ({
+      id: String(entry?.id || '')
+        .trim()
+        .toLowerCase(),
+      available: entry?.available !== false,
+      reason: String(entry?.reason || '').trim(),
+    }))
+    .filter((entry) => entry.id);
+  const normalizedRuntimes = runtimes.length
+    ? runtimes
+    : [{ id: 'pi', available: true, reason: '' }];
+  const requestedDefault = String(raw.defaultRuntime || 'pi')
+    .trim()
+    .toLowerCase();
+  const defaultEntry = normalizedRuntimes.find(
+    (entry) => entry.id === requestedDefault && entry.available,
+  );
+  const selectedRuntime =
+    defaultEntry?.id || normalizedRuntimes.find((entry) => entry.available)?.id || '';
+  return {
+    defaultRuntime: requestedDefault || 'pi',
+    runtimes: normalizedRuntimes,
+    selectedRuntime,
+  };
 }
 
 // formatTokenAbbrev renders a token count with a k/M suffix (one decimal,
@@ -179,8 +209,11 @@ export function defaultFetchSessions({ limit, offset, query } = {}) {
 export function defaultFetchRecent() {
   return getJSON('/api/recent-locations');
 }
-export function defaultCreateSession(path) {
-  return postJSON('/api/new-session', { path });
+export function defaultFetchRuntimes(options) {
+  return getJSON('/api/runtimes', options);
+}
+export function defaultCreateSession(path, runtime = 'pi', options) {
+  return postJSON('/api/new-session', { path, runtime: runtime || 'pi' }, options);
 }
 export function defaultFetchProjects() {
   return getJSON('/api/projects');

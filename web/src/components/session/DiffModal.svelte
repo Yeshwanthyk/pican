@@ -4,7 +4,7 @@
   // uncommitted diff, and renders a split/unified CodeView.
   import { tick, onMount } from 'svelte';
   import FullScreenSheet from './FullScreenSheet.svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { ChevronDown, ChevronRight, iconNode } from '../../shared/icons.js';
   import { getDiff } from '../../session/chat/diff-api.js';
 

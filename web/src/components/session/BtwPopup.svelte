@@ -6,7 +6,7 @@
   // the export bundle. See docs/sequence-flows/btw.md.
   import { onMount } from 'svelte';
   import { getSpinnerConfig } from '../../session/live/chat-preview.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { icon, X, Square, Send } from '../../shared/icons.js';
   import {
     enableBtwDrag,

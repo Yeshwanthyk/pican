@@ -9,6 +9,25 @@ import (
 	"testing"
 )
 
+func TestCodexIconIsServed(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterPWAHandlers(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/codex-icon.svg", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/svg+xml" {
+		t.Fatalf("Content-Type = %q, want image/svg+xml", got)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "<title>Codex</title>") || !strings.Contains(body, "#6F8CFF") {
+		t.Fatalf("unexpected Codex icon: %q", body)
+	}
+}
+
 func TestAppIconIsServedAndInstalled(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterPWAHandlers(mux)

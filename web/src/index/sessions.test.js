@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   dateBucketFor,
+  defaultCreateSession,
   formatRelativeTime,
   formatSessionMetrics,
   groupSessionsByDate,
   groupSessionsByProject,
+  normalizeRuntimesResponse,
   normalizeSession,
   sessionModelLabel,
   sessionSearchText,
@@ -21,11 +23,51 @@ describe('index sessions helpers', () => {
       project: '/repo',
       modelProvider: 'p',
       model: 'm',
+      runtime: 'pi',
+      nativeId: '',
       chatAvailable: true,
       pinned: false,
     });
     expect(normalizeSession({ id: 'a', pinned: true })).toMatchObject({ pinned: true });
     expect(normalizeSession({ ID: 'a', Pinned: true })).toMatchObject({ pinned: true });
+    expect(normalizeSession({ ID: 'c', Runtime: 'CODEX', NativeID: 'thread-1' })).toMatchObject({
+      runtime: 'codex',
+      nativeId: 'thread-1',
+    });
+  });
+
+  it('normalizes runtime responses and selects an available default', () => {
+    expect(
+      normalizeRuntimesResponse({
+        defaultRuntime: 'codex',
+        runtimes: [
+          { id: 'pi', available: false, reason: 'pi missing' },
+          { id: 'codex', available: true },
+        ],
+      }),
+    ).toEqual({
+      defaultRuntime: 'codex',
+      selectedRuntime: 'codex',
+      runtimes: [
+        { id: 'pi', available: false, reason: 'pi missing' },
+        { id: 'codex', available: true, reason: '' },
+      ],
+    });
+    expect(normalizeRuntimesResponse()).toMatchObject({
+      defaultRuntime: 'pi',
+      selectedRuntime: 'pi',
+      runtimes: [{ id: 'pi', available: true, reason: '' }],
+    });
+  });
+
+  it('includes the selected runtime when creating a session', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true, id: 'new' })));
+    await defaultCreateSession('/repo', 'codex', { fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith('/api/new-session', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '/repo', runtime: 'codex' }),
+    });
   });
 
   it('formats relative times', () => {
@@ -42,9 +84,11 @@ describe('index sessions helpers', () => {
       modelProvider: 'openai',
       model: 'gpt',
       sessionUUID: 'uuid',
+      runtime: 'codex',
+      nativeId: 'thread-1',
     };
     expect(sessionModelLabel(session)).toBe('openai/gpt');
-    expect(sessionSearchText(session)).toContain('Fix bug /repo openai/gpt uuid');
+    expect(sessionSearchText(session)).toContain('Fix bug /repo openai/gpt uuid codex thread-1');
   });
 
   it('groups project layout by latest activity', () => {

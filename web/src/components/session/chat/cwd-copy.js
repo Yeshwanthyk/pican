@@ -1,4 +1,4 @@
-import { t } from '../../../shared/i18n.js';
+import { t } from '../../../shared/strings.js';
 import { copyToClipboard } from '../../../shared/clipboard.js';
 
 export function showCwdToast(

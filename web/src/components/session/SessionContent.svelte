@@ -7,7 +7,7 @@
   // imperative layer still owns. Shared by the live app + the static export.
   import { getSessionModel } from '../../session/session-context.js';
   import { formatToolRunBreakdown, groupToolRuns } from '../../session/render/group-tool-runs.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import SessionEntry from './SessionEntry.svelte';
 
   let { model = getSessionModel(), afterRender = null, live = false } = $props();

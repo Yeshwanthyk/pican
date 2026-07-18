@@ -5,7 +5,7 @@
   // HTML; everything else is escaped Svelte template. The result element keeps
   // the `entry-<resultId>` anchor so scroll still works.
   import { formatToolFoldSummary, shortenPath } from '../../session/render/session-format.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
   import AskQuestion from './AskQuestion.svelte';

@@ -8,17 +8,15 @@
 [![Telegram](https://img.shields.io/badge/Telegram-Join-26A5E4?logo=telegram&logoColor=white)](https://t.me/+NJvFOTTa0wNjNTc9)
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-555)
 
-**English** · [Español](user-docs/readme/README.es.md) · [Français](user-docs/readme/README.fr.md) · [Deutsch](user-docs/readme/README.de.md) · [中文](user-docs/readme/README.zh.md) · [日本語](user-docs/readme/README.ja.md) · [Bahasa Indonesia](user-docs/readme/README.id.md) · [Bahasa Melayu](user-docs/readme/README.ms.md) · [Tiếng Việt](user-docs/readme/README.vi.md) · [ไทย](user-docs/readme/README.th.md) · [Filipino](user-docs/readme/README.fil.md) · [မြန်မာ](user-docs/readme/README.my.md) · [ភាសាខ្មែរ](user-docs/readme/README.km.md) · [ລາວ](user-docs/readme/README.lo.md)
-
 </div>
 
 <div align="center">
 
-Drive your [pi](https://pi.dev) coding agent from your phone, tablet, or laptop — anywhere on your network, or remotely over Tailscale.
+Drive your [pi](https://pi.dev) sessions or installed [Codex CLI](https://developers.openai.com/codex/cli/) threads from your phone, tablet, or laptop — anywhere on your network, or remotely over Tailscale.
 
 It's a full PWA, so you can install it and use it like a native app on any device. Think of it as your own personal AI workspace — like Claude's Cowork, but with different models — chat across models, code from your phone, or turn it into a [personal assistant](user-docs/en/personal-assistant.md) that lives on your machine.
 
-Make it yours: switch themes and fonts, and use it in your own language — pi-web ships with multiple languages and you can add your own. More features are on the way, but it won't get bloated: anything you don't need can be turned off in settings.
+Make it yours: switch themes and fonts, and turn off anything you do not need in settings. More features are on the way, but pi-web will not get bloated.
 
 </div>
 
@@ -26,7 +24,7 @@ Make it yours: switch themes and fonts, and use it in your own language — pi-w
 > pi-web is currently in **beta**. Things will change and break!
 
 > [!TIP]
-> New here? **[Read the user guide →](user-docs/en/README.md)** for a full tour of features, install steps, and tips. ([Other languages →](user-docs/README.md))
+> New here? **[Read the user guide →](user-docs/en/README.md)** for a full tour of features, install steps, and tips.
 
 ## Screenshots
 
@@ -41,23 +39,22 @@ Make it yours: switch themes and fonts, and use it in your own language — pi-w
 ## How It Fits Together
 
 ```
- pi (terminal)                 Browser (phone / tablet / laptop)
+ Pi / Codex CLI               Browser (phone / tablet / laptop)
       │                                │
-      │  writes JSONL                  │  HTTP + SSE
+      │ native state                   │ HTTP + SSE
       ▼                                ▼
- ~/.pi/agent/sessions/  ←───  pi-web (Go HTTP server)
+ Pi JSONL / ~/.codex  ←──────  pi-web (Go HTTP server)
                                       │
-                    ┌─────────────────┼─────────────────┐
-                    │                 │                 │
-              pi --mode rpc      fsnotify         tailscale serve
-            (per‑session       (live reload)      (remote HTTPS
-             chat worker)                           via MagicDNS)
+                    ┌─────────────────┼──────────────────┐
+                    │                 │                  │
+             runtime workers      projections      tailscale serve
+       (pi RPC / Codex app-server) (live reload)    (remote HTTPS)
 ```
 
-- **pi** writes conversation JSONL to `~/.pi/agent/sessions/` as it works.
-- **pi-web** is a Go server that reads those files, renders them in the browser, and streams live updates via SSE.
-- **pi --mode rpc** workers handle browser-initiated chat — one per session, reaped after 10 min idle.
-- **fsnotify** watches the sessions directory so the browser reloads within milliseconds of new output.
+- **Pi** owns append-only JSONL transcripts under `~/.pi/agent/sessions/`.
+- **Codex** remains authoritative under `~/.codex`; pi-web uses the installed CLI and atomically builds disposable `codex-<thread>.jsonl` projections for the common viewer/export path.
+- One binary runs `-runtime=pi|codex|both` (default `pi`). Active sessions get one reusable `pi --mode rpc` or `codex app-server --stdio` worker, reaped after 10 minutes idle.
+- **fsnotify + SSE** propagate transcript/projection and status changes to browsers.
 - **Tailscale Serve** publishes the localhost server as an HTTPS endpoint on your tailnet.
 
 ## Install
@@ -70,7 +67,19 @@ That's it — it downloads the matching binary, sets up auto‑start, and regist
 
 Once installed, open `http://127.0.0.1:31415` in your browser. From pi, use `/web` to open the current session in your browser instantly. If Tailscale is running on your machine, pi-web automatically publishes an HTTPS endpoint on your tailnet — use `/remote` from pi to get a QR code and URL for any device on your tailnet.
 
-For manual installs, binary downloads, or building from source, see [user-docs/install.md](user-docs/en/install.md).
+For manual installs, binary downloads, building from source, or enabling Codex/both mode, see [user-docs/install.md](user-docs/en/install.md).
+
+### Enable Codex (optional)
+
+Install and sign in with the Codex CLI first, then start the same binary in Codex or dual-runtime mode:
+
+```bash
+pi-web -runtime=codex
+pi-web -runtime=both
+PI_WEB_CODEX_COMMAND=/absolute/path/to/codex pi-web -runtime=both
+```
+
+`-codex-command` and `PI_WEB_CODEX_COMMAND` are executable paths. pi-web preserves `HOME` so Codex uses its normal authentication; it never reads `~/.codex/auth.json`. **Codex sessions run in YOLO mode** (`approvalPolicy: never` plus `danger-full-access`), equivalent to `codex --yolo`: model-generated commands can access the whole host filesystem and network without confirmation. In `both` mode, Pi continues to work if Codex is temporarily unavailable, and existing Codex projections remain viewable/exportable. Generated auto-start entries omit `-runtime`, so add the desired runtime flag to the service command to make Codex mode persistent.
 
 ## Pi Integration
 
@@ -114,5 +123,8 @@ For more details (manual setup, custom ports, non-loopback binds), see [user-doc
 make setup   # install frontend deps and download Go modules
 make check   # frontend test/build + Go test/vet
 make build   # setup if needed, build frontend, then build ./pi-web
+
+# exercise the built binary with an installed Codex CLI
+./pi-web -runtime=both
 ```
 

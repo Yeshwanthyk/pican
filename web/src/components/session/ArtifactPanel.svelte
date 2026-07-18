@@ -9,7 +9,7 @@
     readArtifactSettings,
     ARTIFACT_SETTING_KEYS,
   } from '../../session/artifacts/artifact-filter.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionRuntime } from '../../session/session-runtime.js';
 

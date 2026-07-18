@@ -4,6 +4,7 @@ import {
   firstMessageStub,
   loadSessionPageState,
   newestLeaf,
+  normalizeSessionRuntime,
 } from './session-page-data.js';
 import { prefetchSession, resetSessionPrefetch } from './session-prefetch.js';
 
@@ -32,6 +33,24 @@ describe('session-page-data', () => {
     expect(html).not.toContain('<hello>');
   });
 
+  it('normalizes runtime metadata from payload/header and defaults old sessions to Pi', () => {
+    expect(normalizeSessionRuntime({ header: { id: 'pi-uuid' } })).toEqual({
+      runtime: 'pi',
+      nativeId: '',
+      sessionUUID: 'pi-uuid',
+    });
+    expect(
+      normalizeSessionRuntime({
+        runtime: 'codex',
+        nativeId: 'thread-1',
+        header: { id: 'projection-id' },
+      }),
+    ).toEqual({ runtime: 'codex', nativeId: 'thread-1', sessionUUID: 'projection-id' });
+    expect(
+      normalizeSessionRuntime({ header: { runtime: 'codex', nativeId: 'thread-header' } }),
+    ).toMatchObject({ runtime: 'codex', nativeId: 'thread-header' });
+  });
+
   it('builds state and encoded payload from API data', () => {
     const state = buildSessionPageState({
       sessionId: 's.jsonl',
@@ -46,6 +65,8 @@ describe('session-page-data', () => {
         chatAvailable: false,
         model: 'sonnet',
         modelProvider: 'anthropic',
+        runtime: 'codex',
+        nativeId: 'thread-1',
       },
     });
 
@@ -55,12 +76,15 @@ describe('session-page-data', () => {
     expect(state.chatAvailable).toBe(false);
     expect(state.chatDisabledReason).toContain('chat is disabled');
     expect(state.modelLabel).toBe('sonnet @ anthropic');
+    expect(state.runtime).toBe('codex');
+    expect(state.nativeId).toBe('thread-1');
     expect(decodePayload(state.payloadBase64)).toMatchObject({
       name: 'Title',
       leafId: 'b',
       total: 5,
       from: 3,
       truncated: true,
+      header: { cwd: '/tmp/project', runtime: 'codex', nativeId: 'thread-1' },
     });
   });
 

@@ -24,15 +24,19 @@ const (
 
 // Typed structs for ParseSummary — avoid map[string]any per line.
 type summaryLine struct {
-	Type      string      `json:"type"`
-	Timestamp string      `json:"timestamp"`
-	Name      string      `json:"name"`
-	CWD       string      `json:"cwd"`
-	ID        string      `json:"id"`
-	Provider  string      `json:"provider"`
-	ModelID   string      `json:"modelId"`
-	AutoTitle bool        `json:"autoTitle"`
-	Message   *summaryMsg `json:"message"`
+	Type          string      `json:"type"`
+	Timestamp     string      `json:"timestamp"`
+	Name          string      `json:"name"`
+	CWD           string      `json:"cwd"`
+	ID            string      `json:"id"`
+	Provider      string      `json:"provider"`
+	ModelID       string      `json:"modelId"`
+	Model         string      `json:"model"`
+	ModelProvider string      `json:"modelProvider"`
+	Runtime       string      `json:"runtime"`
+	NativeID      string      `json:"nativeId"`
+	AutoTitle     bool        `json:"autoTitle"`
+	Message       *summaryMsg `json:"message"`
 }
 
 type summaryMsg struct {
@@ -64,6 +68,8 @@ type SessionSummary struct {
 	CostTotal          float64
 	Model              string
 	ModelProvider      string
+	Runtime            string `json:"runtime"`
+	NativeID           string `json:"nativeId,omitempty"`
 	ChatAvailable      bool
 	ChatDisabledReason string
 	// Pinned is set by the server from pi-web's SQLite session_pins table; it
@@ -169,6 +175,7 @@ func newSessionSummary(dirName, fileName string) SessionSummary {
 		ID:            fileName,
 		Filename:      fileName,
 		Project:       cleanProjectName(dirName),
+		Runtime:       "pi",
 		ChatAvailable: true,
 	}
 }
@@ -234,6 +241,17 @@ func (fs *summaryFoldState) foldLine(raw summaryLine) {
 		}
 		if raw.ID != "" {
 			fs.s.SessionUUID = raw.ID
+		}
+		if raw.Runtime != "" {
+			fs.s.Runtime = raw.Runtime
+		}
+		fs.s.NativeID = raw.NativeID
+		if raw.Model != "" {
+			fs.s.Model = raw.Model
+			fs.s.ModelProvider = raw.ModelProvider
+			if fs.s.ModelProvider == "" {
+				fs.s.ModelProvider = raw.Provider
+			}
 		}
 	case "session_info":
 		if raw.Name != "" {
@@ -569,6 +587,17 @@ func (fs *fileFoldState) foldLine(raw map[string]any) {
 		if sid, _ := raw["id"].(string); sid != "" {
 			fs.s.SessionUUID = sid
 		}
+		if runtime, _ := raw["runtime"].(string); runtime != "" {
+			fs.s.Runtime = runtime
+		}
+		fs.s.NativeID, _ = raw["nativeId"].(string)
+		if model, _ := raw["model"].(string); model != "" {
+			fs.s.Model = model
+			fs.s.ModelProvider, _ = raw["modelProvider"].(string)
+			if fs.s.ModelProvider == "" {
+				fs.s.ModelProvider, _ = raw["provider"].(string)
+			}
+		}
 	case "session_info":
 		if n, _ := raw["name"].(string); n != "" {
 			fs.sessionInfoName = n
@@ -870,7 +899,8 @@ type InitialSettings struct {
 	ThinkingLevel string
 }
 
-func CreateSessionFileWithSettings(sessionsDir, path string, settings InitialSettings) (string, error) {
+// PrepareSessionPath applies the path contract shared by all runtimes.
+func PrepareSessionPath(path string) (string, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return "", errors.New("path is required")
@@ -890,6 +920,16 @@ func CreateSessionFileWithSettings(sessionsDir, path string, settings InitialSet
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return "", err
 		}
+	} else if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func CreateSessionFileWithSettings(sessionsDir, path string, settings InitialSettings) (string, error) {
+	path, err := PrepareSessionPath(path)
+	if err != nil {
+		return "", err
 	}
 
 	projectDir := filepath.Join(sessionsDir, EncodeProjectName(path))

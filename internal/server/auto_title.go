@@ -116,7 +116,14 @@ func (s *Server) maybeAutoTitle(sessID string) {
 	if title == "" {
 		return
 	}
-	if err := sessions.AutoTitleSession(resolved.Path, title, s.now); err != nil {
+	var titleErr error
+	if resolved.Session.Runtime == "codex" && s.codex != nil {
+		titleErr = s.codex.AutoTitleSession(resolved.Path, title, s.now)
+	} else {
+		titleErr = sessions.AutoTitleSession(resolved.Path, title, s.now)
+	}
+	if titleErr != nil {
+		err := titleErr
 		if !isBrokenPipe(err) {
 			fmt.Fprintf(os.Stderr, "auto-title rename failed for %s: %v\n", sessID, err)
 		}

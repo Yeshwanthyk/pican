@@ -39,6 +39,49 @@ func TestSessionCacheReusesParsedSessions(t *testing.T) {
 	}
 }
 
+func TestSessionCacheInvalidateForcesResolveAtSameModTime(t *testing.T) {
+	root := t.TempDir()
+	path := writeSessionFile(t, root, "--tmp--project--", "session.jsonl")
+	originalInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewCache()
+	first, err := c.Resolve(root, "session.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Session.Name == "updated" {
+		t.Fatal("unexpected initial title")
+	}
+
+	updated := `{"type":"session","id":"session","cwd":"/tmp/project","name":"updated"}` + "\n"
+	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, originalInfo.ModTime(), originalInfo.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+
+	cached, err := c.Resolve(root, "session.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached.Session.Name == "updated" {
+		t.Fatal("same-modtime rewrite unexpectedly bypassed cache")
+	}
+
+	c.Invalidate("session.jsonl")
+	refreshed, err := c.Resolve(root, "session.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.Session.Name != "updated" {
+		t.Fatalf("name after invalidation = %q", refreshed.Session.Name)
+	}
+}
+
 func TestSessionCacheReparsesOnModTimeChange(t *testing.T) {
 	root := t.TempDir()
 	path := writeSessionFile(t, root, "--tmp--project--", "session.jsonl")

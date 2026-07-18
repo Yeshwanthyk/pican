@@ -43,11 +43,11 @@ API, SSE, PWA, sound, and static asset routes remain server-handled and are not 
 
 `SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the sessions list, session cards, command palette, home menu, new-session modal, and project management modal. Timeline, Projects, Schedules, and Subagents are the global index views; Workflows and Tasks are session-scoped actions in `CommandMenu.svelte`. `web/src/index/` now contains pure data/API helpers (`sessions.js`) for normalization, grouping, filtering, and API calls.
 
-Data comes from existing APIs such as `/api/sessions`, `/api/new-session`, `/api/projects`, `/api/recent-locations`, and `/events?id=__all__`. Running-session status is pushed through the shared SSE helpers and reflected reactively in the cards/counts.
+Data comes from APIs such as `/api/sessions`, `/api/runtimes`, `/api/new-session`, `/api/projects`, `/api/recent-locations`, and `/events?id=__all__`. Summaries normalize `runtime`/`nativeId`; Codex cards show a runtime badge, and runtime plus native ID participate in search. The new-session modal selects among configured, currently available runtimes and sends the choice to `/api/new-session`. Running-session status is pushed through the shared SSE helpers and reflected reactively in the cards/counts.
 
 ## Session Viewer (`/session?id=…`)
 
-`SessionPage.svelte` owns the route, fetches session JSON from `/api/session?id=…`, and **orchestrates the whole viewer as Svelte components**. It creates the reactive `SessionDataModel` once, provides it via context, and installs the live session runtime context (`model`, navigator, `navigateTo`, `reconcileEntries`, content runtime) before child components mount. Live components read that explicit runtime context instead of `window.__pi*` aliases. `SessionPage`'s `onMount` runs `startSessionPageRuntime()` (bootstrap, `setupSessionUi`, content-runtime wiring, header handlers, initial nav) and `setupSessionGlobals()` (page-global glue). There is **no `session.js` orchestrator** — see `docs/dev/templates-vs-web.md` § Current Migration State.
+`SessionPage.svelte` owns the route, fetches session JSON from `/api/session?id=…`, and **orchestrates the whole viewer as Svelte components**. It propagates normalized `runtime`, native thread ID, and projected session UUID from the response/header. Runtime is retained when creating a sibling session; terminal resume copies `codex resume <nativeId>` for Codex or `pi --session <sessionUUID>` for Pi. It creates the reactive `SessionDataModel` once, provides it via context, and installs the live session runtime context (`model`, navigator, `navigateTo`, `reconcileEntries`, content runtime) before child components mount. Live components read that explicit runtime context instead of `window.__pi*` aliases. `SessionPage`'s `onMount` runs `startSessionPageRuntime()` (bootstrap, `setupSessionUi`, content-runtime wiring, header handlers, initial nav) and `setupSessionGlobals()` (page-global glue). There is **no `session.js` orchestrator** — see `docs/dev/templates-vs-web.md` § Current Migration State.
 
 The message pane is rendered by Svelte components (no string-building renderer): `SessionContent` → `SessionEntry` → `ToolCall` → `ToolOutput`/`AskQuestion` or the extension-specific `TaskToolCard`/`SubagentToolCard`/`WorkflowToolCard`, with `{@html}` used only for markdown + pre-rendered ANSI tool output. The conversation-branch tree (`SessionTree`/`SessionTreeNodes`/`TreeNode`) is an on-demand overlay, not a persistent panel: `SessionTree` wraps its search/filter/tree content in `FullScreenSheet` (centered dialog on desktop, bottom sheet on mobile — the same pattern as `DiffModal`), toggled via `sessionModals.tree` (`openTree`/`closeTree`/`toggleTree` in `session-modals.svelte.js`) from ⌘B, the header `#tree-toggle` button, and the `CommandMenu` "tree" action; its open state mirrors to `?tree=open` for deep-linking, and selecting a node navigates then closes the overlay on every viewport. Other session UI components: `SessionInfoHeader`, `SessionHeader`, `RightSidebar` (+ `ArtifactPanel`), `ChatComposer` (+ `GitFooter`), `LiveReload`, `CommandMenu`, `ImageModal`, the modals (`ShortcutsModal`/`ModelUsageModal`/`ForkModal`/`LabelModal`/`ShareDialog`), and `BtwPopup`.
 
@@ -58,7 +58,7 @@ The old runners/renderers have been replaced by Svelte components plus focused h
 - `data/` — payload decoding + the reactive `SessionDataModel` (`session-data.svelte.js`, the single source of truth: entries/lookups/tree/active-path/view-state, `reconcile()`)
 - `tree/`, `render/`, `navigation/` — **pure** tree/format/markdown/navigation helpers consumed by the Svelte components (and the export). The message renderer is now `<SessionEntry>`/`<ToolCall>`; `render/` keeps `session-format`, `markdown`, `entry-format`, `session-entry-actions` (download/share/copy)
 - `session-globals.js`, `session-content-runtime.js`, `lazy-highlight.js` — the relocated live glue (see above)
-- `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/sound/push util, also used by the settings page). Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
+- `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/sound/push util, also used by the settings page). Model discovery is session-scoped (`/api/models?id=<sessionId>`) so Pi and Codex selectors cannot mix providers. Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
 - `live/` — live-only helpers used by `<LiveReload>`: `live-connection.js` (SSE connection/reconnect lifecycle), `live-events.js` (SSE/reload primitives), `live-scroll.js` (low-level scroll primitives), `live-follow.js` (`createFollowScrollController` — follow-mode decision state + follow button), `live-stats.js` (header stats), and `chat-preview.js` (streaming-preview helper, also used by `<BtwPopup>`)
 - `ui/` — search/toggle/session-ui-runner helpers used by `setupSessionUi` and `RightSidebar`, plus `sidebar.js`'s mobile-breakpoint helpers (`isMobileLayout`) and the docked-sidebar drawer toggle (`setSidebarOpen`) still used by the static export (see below)
 - `artifacts/` — pure registries/filters + the fetch API wrappers; the panel itself is `ArtifactPanel.svelte`
@@ -82,8 +82,10 @@ The export's session tree stays a docked `<aside id="sidebar">` (in `internal/ui
 
 The session route listens to `/events?id=<sessionId>` via `web/src/session/live/` helpers for:
 
-- `reload` / canonical session updates
+- `reload` / canonical transcript or projection updates
 - `chat-preview` streaming preview updates
+
+Codex worker callbacks use the same contract: app-server notifications update status/preview, projection replacement emits reload, and the browser reconciles from `/api/session`.
 
 The index route listens to `/events?id=__all__` for `new-session`, `status-snapshot`, and `status-delta`.
 
@@ -108,7 +110,7 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 
 - ESLint allows `lucide` imports only in `web/src/shared/icons.js`, rejects inline SVG in Svelte components, and rejects Unicode back/chevron glyphs used as span icons. `ContextUsage.svelte` has the sole inline-SVG exception because its ring is data visualization rather than an icon.
 - `web/src/export/export-boundary.test.js` walks the export dependency graph and rejects live chat, SSE, and live-only session modules.
-- `web/src/shared/locales/locales-contract.test.js` makes `en.js` authoritative by rejecting non-English keys that do not exist in English and non-string locale values.
+- `web/src/shared/strings.test.js` verifies the English string lookup and parameter interpolation used by Svelte, vanilla-JS runtime code, and static exports.
 - Knip, Prettier, the frontend build, Vitest, Go tests, installer tests, and `go vet` run through the same `make check` gate.
 
 ## Static Assets

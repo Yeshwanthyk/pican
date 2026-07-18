@@ -3,14 +3,13 @@
   import AboutSettings from '../components/settings/AboutSettings.svelte';
   import AppearanceSettings from '../components/settings/AppearanceSettings.svelte';
   import ArtifactSettings from '../components/settings/ArtifactSettings.svelte';
-  import LanguageSettings from '../components/settings/LanguageSettings.svelte';
   import MachinesSettings from '../components/settings/MachinesSettings.svelte';
   import NotificationSettings from '../components/settings/NotificationSettings.svelte';
   import SessionDisplayDefaultsSettings from '../components/settings/SessionDisplayDefaultsSettings.svelte';
   import SessionsListSettings from '../components/settings/SessionsListSettings.svelte';
   import SessionTitleSettings from '../components/settings/SessionTitleSettings.svelte';
   import { icon, ArrowLeft, ChevronRight } from '../shared/icons.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
   import { navigate } from '../shared/navigation.js';
   import { loadSettings, persistSetting } from '../settings/settings-support.js';
 
@@ -20,7 +19,6 @@
 
   const sections = [
     { id: 'appearance', labelKey: 'settings.appearance' },
-    { id: 'language', labelKey: 'settings.language' },
     { id: 'sessionsList', labelKey: 'settings.sessionsList' },
     { id: 'sessionTitles', labelKey: 'settings.sessionTitles' },
     { id: 'sessionDisplay', labelKey: 'settings.sessionDisplay' },
@@ -180,8 +178,6 @@
   <div class="settings-pane">
     {#if activeSection === 'appearance'}
       <AppearanceSettings {settings} onSave={saveSetting} onSaved={flashSaved} />
-    {:else if activeSection === 'language'}
-      <LanguageSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'sessionsList'}
       <SessionsListSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'sessionTitles'}

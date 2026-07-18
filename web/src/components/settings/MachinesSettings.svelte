@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { icon, Trash2 } from '../../shared/icons.js';
   import {
     defaultFetchPeers,
@@ -155,7 +155,7 @@
         >
       </div>
       {#if error}
-        <div class="settings-custom-languages-status is-error">{error}</div>
+        <div class="settings-machines-error">{error}</div>
       {/if}
     </div>
   </div>

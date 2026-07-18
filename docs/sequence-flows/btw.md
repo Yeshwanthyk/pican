@@ -8,7 +8,7 @@ so it can be **hidden from the index** and **reaped when its parent disappears**
 
 Backend: `internal/server/btw.go`. Frontend: `web/src/session/` btw window (user
 strings under the `btw.*` / `settings.showBtw*` keys in
-`web/src/shared/locales/en.js`).
+`web/src/shared/english.js`).
 
 ## Data model
 

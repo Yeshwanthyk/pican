@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { icon, CircleHelp, Maximize2, X } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import ArtifactPanel from './ArtifactPanel.svelte';
   import { sessionRuntime } from '../../session/session-runtime.js';
   import { createScratchpadController } from './right-sidebar-scratchpad.js';

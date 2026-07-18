@@ -1,8 +1,10 @@
 # Sequence Flow: Chat Message
 
-This flow covers a user typing a message (with optional image attachment) in the session page chat composer and sending it.
+This flow covers a user typing a message (with optional image attachment) in the session page chat composer and sending it through the session's Pi or Codex runtime.
 
 ## Sequence Diagram
+
+The HTTP handler resolves and validates the request, starts `chatSender.Send` in a goroutine, and immediately returns HTTP 202 `queued`. The worker portion below is the asynchronous path after that response; worker startup or prompt failures are logged and reflected by subsequent status/reload behavior, not returned by the accepted request.
 
 ```
 ┌─────────┐   ┌─────────┐   ┌────────────┐   ┌──────────────┐   ┌─────────────┐   ┌──────────┐
@@ -76,7 +78,7 @@ This flow covers a user typing a message (with optional image attachment) in the
      │             │              │                  │                  │               │
      │             │◀───────────── nil ──────────────│                  │               │
      │             │              │                  │                  │               │
-     │◀──────────── {ok: true, status: "accepted"} ─│                  │               │
+     │◀──────────── 202 {ok: true, status: "queued"} ─│                  │               │
      │             │              │                  │                  │               │
      │             │              │                  │                  │               │
      │             │              │                  │                  │               │
@@ -138,37 +140,36 @@ Content-Type: image/png
 
 `workers.Manager.workerFor(sessionID, sessionPath)`:
 
-```
-Lock mutex
-  Check existing worker for sessionID
-    If exists and not error → return it
-    If exists and error → close and delete
-Unlock mutex
-
-Create new worker: factory(sessionID, sessionPath)
-  → rpc.NewPiWorkerWithStream(sessionPath, streamSink)
-
-Lock mutex
-  Double-check no race winner created one
-  Store new worker
-Unlock mutex
-
-Return worker
+```text
+lock → reuse healthy worker / evict error worker / join in-flight creation
+  → parse session runtime
+      → Pi: start `pi --mode rpc`, then switch_session
+      → Codex: validate projection, start `codex app-server --stdio`, then thread/resume
+  → store one worker for the session
 ```
 
-### 4. RPC Prompt Command
+The manager reuses that worker until it fails, the server exits, or it has been idle for 10 minutes. Codex resume uses the projection's native thread ID and refreshes from authoritative thread state; it does not replay the projection.
 
-`piRPCWorker.Prompt` builds and sends:
+### 4. Runtime prompt
+
+For Pi, `piRPCWorker.Prompt` builds and sends:
 
 ```json
 {"id":"req-1","type":"prompt","message":"Hello, can you refactor this function?","images":[{"type":"image","data":"iVBORw0…","mimeType":"image/png"}],"streamingBehavior":"steer"}
 ```
 
-If the worker is already in `running` state, `streamingBehavior` is `"steer"` to steer an ongoing stream instead of starting a new turn.
+If the Pi worker is already running, `streamingBehavior` is `"steer"`.
 
-### 5. Response Handling
+For Codex, `codex.Worker.Prompt` converts text and attachments to app-server input (`text` and image data URLs):
 
-The `consume()` goroutine reads JSONL lines from `pi`'s stdout:
+- no active turn → `turn/start`, with the selected model and reasoning effort;
+- active turn → `turn/steer` with the expected native turn ID;
+- `/review` → `review/start` targeting uncommitted changes;
+- `/compact` → `thread/compact/start`.
+
+### 5. Response handling
+
+For Pi, the `consume()` goroutine reads JSONL lines from `pi`'s stdout:
 
 ```
 {"type":"response","id":"req-1","success":true}
@@ -176,9 +177,11 @@ The `consume()` goroutine reads JSONL lines from `pi`'s stdout:
 
 It matches by `id` and delivers to the waiting `pending` channel. The worker then updates its status to `idle`.
 
-### 6. Streaming Events
+Codex uses JSON-RPC responses plus notifications. `turn/started`, item deltas/completions, `turn/completed`, and thread-status notifications update worker state, emit best-effort `chat-preview`, refresh the projection, and trigger canonical `reload` reconciliation.
 
-While the AI is generating, `pi` may emit stream events:
+### 6. Streaming events
+
+While the AI is generating, Pi may emit stream events:
 
 ```
 {"type":"message_update", …}
@@ -199,7 +202,9 @@ These update `lastStreamActivity` so `Status()` continues to report `running` un
 | Unsupported image type | 415 `{"error": "only image attachments are supported"}` |
 | Session not found | 404 `{"error": "not found"}` |
 | Chat disabled | 409 `{"error": "This session can be viewed, but chat is disabled because its working directory no longer exists."}` |
-| RPC failure | 500 `{"error": "…"}` |
+| Runtime unavailable | 409 with the session's disabled reason |
+
+Codex workers use `approvalPolicy: "never"`. Server requests for command/file approval are declined, permissions and user-input answers are empty, and MCP elicitation is declined; no approval dialog is exposed in the browser.
 
 ### 8. Worker Lifecycle
 
@@ -207,11 +212,11 @@ After 10 minutes of idle time (no user-initiated actions), the reaper goroutine 
 
 ### 9. Cancelling a Chat
 
-`POST /api/chat/cancel?id=<id>` aborts the running worker, removes the terminal's session-status file, broadcasts a `reload` event, and returns `{"ok": true, "status": "cancelled"}`.
+`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt` for the active native turn.
 
-### 10. Model Switch Side Effect
+### 10. Model and effort
 
-`handleSetModel` updates the worker model via RPC. On success, the worker automatically refreshes its thinking level (`refreshThinkingLevel`) so the UI stays consistent.
+The browser requests `/api/models?id=<sessionId>`, which selects the session runtime. Pi retains its existing model behavior. Codex uses app-server `model/list`; model and effort selections are appended as local projection metadata, preserved across refresh, and applied to later turns. The selected model is also supplied when a reaped worker resumes.
 
 ### 11. Steering and Queuing
 

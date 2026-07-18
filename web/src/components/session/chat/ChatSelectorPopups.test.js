@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@testing-library/svelte';
-import { t } from '../../../shared/i18n.js';
+import { t } from '../../../shared/strings.js';
 import ChatSelectorPopups from './ChatSelectorPopups.svelte';
 
 afterEach(() => {

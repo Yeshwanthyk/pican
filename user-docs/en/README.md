@@ -1,14 +1,8 @@
 # Welcome to pi-web 🖥️
 
-<div align="center">
-
-**English** · [Español](../es/README.md) · [Français](../fr/README.md) · [Deutsch](../de/README.md) · [中文](../zh/README.md) · [日本語](../ja/README.md) · [Bahasa Indonesia](../id/README.md) · [Bahasa Melayu](../ms/README.md) · [Tiếng Việt](../vi/README.md) · [ไทย](../th/README.md) · [Filipino](../fil/README.md) · [မြန်မာ](../my/README.md) · [ភាសាខ្មែរ](../km/README.md) · [ລາວ](../lo/README.md)
-
-</div>
-
 **Thinking about trying pi-web? Go for it — you'll fall in love.**
 
-pi-web is a beautiful web UI and PWA for [pi](https://pi.dev) — the open-source AI coding agent. It lets you browse, read, and continue your pi sessions from any browser, on any device, with thoughtful features at every turn.
+pi-web is a web UI and PWA for [pi](https://pi.dev) sessions and installed Codex CLI threads. One binary can browse, read, and continue either runtime—or both—from any browser.
 
 **pi-web is built for two kinds of people:**
 
@@ -23,7 +17,7 @@ You're already deep in the flow with pi in your terminal. pi-web keeps that mome
 
 - **Resume from anywhere** — continue a session from your phone, tablet, or another computer. No SSH, no Termius — just open your browser.
 - **Multi-session dashboard** — kick off work in one session while watching another stream. Search across projects, filter by branch, find what you need fast.
-- **Open-source foundation** — pi is fully open source and provider-agnostic. You're not locked into a single model or vendor. pi-web is open source too.
+- **Runtime choice** — use Pi, Codex, or both. Pi remains provider-agnostic; Codex uses your installed CLI and its existing authentication/state.
 - **Safe remote access** — built-in token auth so you can expose it on your LAN or Tailscale without worry.
 - **Share your work** — export sessions as static snapshots or secret GitHub Gists in one click.
 
@@ -52,17 +46,16 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | | |
 |---|---|
 | 📱 **PWA** | Install pi-web as a Progressive Web App on desktop, phone, or tablet for a native feel. |
-| 🔄 **Continue sessions** | Pick up any conversation right where you left off — text, images, model switching, all from the browser. |
+| 🔄 **Continue sessions** | Pick up Pi sessions or native Codex threads — text, images, runtime-scoped model/effort controls, steering, queues, and cancel. |
 | 🆕 **Start new sessions** | Create fresh sessions against any project path, straight from the web UI. |
-| 📡 **Live streaming** | Watch pi responses stream in real time with ~ms latency. Follow mode keeps you locked on the latest. |
-| 🌲 **Tree view** | Navigate pi's native message tree — see the full conversation structure, jump to any branch, and fork from any point. |
-| 🔀 **Fork sessions** | Fork a session from any message or even a specific tool call — explore different directions without losing your place. |
-| 🔍 **Browse & search** | Filter sessions across projects, search by name, navigate branches — your full session history at a glance. |
+| 📡 **Live streaming** | Watch runtime responses stream in real time. Follow mode keeps you locked on the latest. |
+| 🌲 **Tree view** | Navigate the projected conversation structure and jump to an entry; Pi retains its native message tree. |
+| 🔀 **Fork sessions** | Fork Pi at an entry; Codex maps the selected projected entry to its containing native turn. |
+| 🔍 **Browse & search** | Browse both runtimes together; Codex badges and native thread IDs make mixed histories searchable. |
 | 🌿 **Git integration** | See the current branch and open a GitHub PR right from the session viewer. |
 | 📝 **Scratchpad** | Jot down notes, todos, or quick thoughts alongside your sessions without switching apps. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pi-web feel like *yours*. |
-| 🌐 **Multi-language** | 14 built-in languages (English, Español, Français, Deutsch, 中文, 日本語, Bahasa Indonesia, Bahasa Melayu, Tiếng Việt, ไทย, Filipino, မြန်မာ, ភាសាខ្មែរ, ລາວ). Add your own custom language from Settings. |
-| 📤 **Share & export** | Download JSONL, export static snapshots rendered with pi's native `pi.dev` look, or share as private GitHub Gists — all rendered client-side. |
+| 📤 **Share & export** | Download JSONL projections/transcripts, export static snapshots, or share as private GitHub Gists. |
 | 🔔 **Notification sounds** | Customizable notification chimes for session events — stay in the loop even when pi-web is in another tab. |
 | ⌨️ **Keyboard shortcuts** | Vim-style navigation, quick actions — [full reference →](keyboard-shortcuts.md) |
 | 🤖 **Personal assistant** | Turn pi-web into your own AI assistant that lives on your computer — like OpenClaw or Hermes. [Set it up →](personal-assistant.md) |
@@ -73,7 +66,7 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 
 | If you're looking for… | Read |
 |---|---|
-| How to install, configure, and use pi-web | [install.md](install.md) |
+| How to install, configure, enable Codex/both mode, and use pi-web | [install.md](install.md) |
 | Use pi-web as a personal assistant | [personal-assistant.md](personal-assistant.md) |
 | Keyboard shortcuts reference | [keyboard-shortcuts.md](keyboard-shortcuts.md) |
 | Why pi-web exists | [why.md](why.md) |

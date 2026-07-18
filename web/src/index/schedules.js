@@ -69,7 +69,7 @@ function numOrNull(s) {
 }
 
 // describeFrequency renders a short human label for a schedule's cadence. tr is
-// the t() translator; passing it keeps this module free of an i18n import.
+// the t() string lookup; passing it keeps this module free of a copy dependency.
 export function describeFrequency(schedule, tr) {
   const t = tr || ((k) => k);
   const expr = (schedule.cronExpr || '').trim();

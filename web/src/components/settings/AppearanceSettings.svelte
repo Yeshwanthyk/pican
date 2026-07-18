@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { applyTheme } from '../../shared/theme.js';
   import { applyFonts } from '../../shared/fonts.js';
   import { valueFor } from '../../settings/settings-support.js';

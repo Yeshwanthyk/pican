@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../../shared/i18n.js';
+  import { t } from '../../../shared/strings.js';
   import { icon, X } from '../../../shared/icons.js';
 </script>
 

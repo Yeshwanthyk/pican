@@ -18,6 +18,7 @@ describe('SettingsPage tab persistence', () => {
     render(SettingsPage);
     await tick();
     expect(activeNav()).toBe('appearance');
+    expect(document.querySelector('[data-settings-nav="language"]')).toBeNull();
   });
 
   it('restores the active tab from the ?section= query param on mount', async () => {
@@ -50,7 +51,7 @@ describe('SettingsPage tab persistence', () => {
     await tick();
     const lengthBefore = window.history.length;
 
-    await fireEvent.click(document.querySelector('[data-settings-nav="language"]'));
+    await fireEvent.click(document.querySelector('[data-settings-nav="notifications"]'));
     await tick();
     await fireEvent.click(document.querySelector('[data-settings-nav="about"]'));
     await tick();

@@ -1,7 +1,7 @@
 <script>
   import { marked } from 'marked';
   import { icon, ListTree } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { navigate } from '../../shared/navigation.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
   import ToolOutput from './ToolOutput.svelte';
@@ -35,8 +35,8 @@
   const md = (text) => safeMarkedParse(text, { marked });
   const statusLabel = (status) => {
     const key = `session.${status}`;
-    const translated = t(key);
-    return translated === key ? status.replaceAll('_', ' ') : translated;
+    const label = t(key);
+    return label === key ? status.replaceAll('_', ' ') : label;
   };
 
   function phaseState(index) {

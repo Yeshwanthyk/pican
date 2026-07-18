@@ -16,7 +16,7 @@
 <script>
   import { onMount } from 'svelte';
   import { icon, ChevronDown, ExternalLink } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import * as defaultGitApi from '../../session/chat/git-api.js';
 
   // The branch indicator + smart git action control beneath the chat composer.

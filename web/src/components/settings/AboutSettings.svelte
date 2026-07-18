@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { REPO_URL, USER_DOCS_URL } from '../../shared/links.js';
   import { applyVersionStatus } from '../../shared/version.js';
 

@@ -19,13 +19,13 @@ import (
 // subscriptions. Subscriptions are persisted as JSON on disk so they
 // survive restarts; one file under ~/.pi/agent/web/.
 type PushManager struct {
-	mu        sync.Mutex
-	publicKey string
+	mu         sync.Mutex
+	publicKey  string
 	privateKey string
-	subject   string
-	storeDir  string
-	subs      map[string]pushSub
-	client    *http.Client
+	subject    string
+	storeDir   string
+	subs       map[string]pushSub
+	client     *http.Client
 }
 
 type pushSub struct {

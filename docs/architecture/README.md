@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-This directory contains the architecture documentation for **pi-web**, a local web viewer for pi coding-agent sessions.
+This directory contains the architecture documentation for **pi-web**, a local web viewer and controller for Pi sessions and Codex threads.
 
 ## Documents
 
@@ -9,7 +9,8 @@ This directory contains the architecture documentation for **pi-web**, a local w
 | [system-overview.md](./system-overview.md) | High-level system architecture, component diagram, and tech stack |
 | [backend.md](./backend.md) | Go backend: packages, responsibilities, and key types |
 | [frontend.md](./frontend.md) | Frontend architecture: embedded templates, Vite build, and vanilla JS |
-| [data-flow.md](./data-flow.md) | Session file format, data model, and storage layout |
+| [data-flow.md](./data-flow.md) | Session file formats, projections, data model, and storage layout |
+| [codex-runtime.md](./codex-runtime.md) | Codex app-server integration, authority boundaries, projections, and lifecycle |
 
 ## Architecture at a Glance
 
@@ -18,8 +19,8 @@ This directory contains the architecture documentation for **pi-web**, a local w
 │                           Browser                                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐  │
 │  │  / (index)  │  │ /session?id │  │      SSE /events            │  │
-│  │  vanilla JS │  │  Embedded   │  │   Live reload + status      │  │
-│  │   (Vite)    │  │   HTML/CSS  │  │        updates              │  │
+│  │  Svelte SPA │  │  Svelte SPA │  │ projections + previews +    │  │
+│  │   (Vite)    │  │   (Vite)    │  │        status               │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
@@ -31,26 +32,26 @@ This directory contains the architecture documentation for **pi-web**, a local w
 │  │Middleware  │ │  (server)  │ │ (events)   │ │ (fsnotify/poll)  │  │
 │  └────────────┘ └────────────┘ └────────────┘ └──────────────────┘  │
 │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────────┐  │
-│  │  Sessions  │ │  Workers   │ │   RPC      │ │  Share (gh)      │  │
-│  │  (cache)   │ │  (manager) │ │  (pi CLI)  │ │  (gist create)   │  │
+│  │  Sessions  │ │  Workers   │ │  Runtime   │ │  Share (gh)      │  │
+│  │  (cache)   │ │  (manager) │ │ adapters   │ │  (gist create)   │  │
 │  └────────────┘ └────────────┘ └────────────┘ └──────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼ filesystem
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    ~/.pi/agent/sessions/                             │
-│         Project dirs  →  JSONL session files                         │
-│         (--name--)        (timestamp_uuid.jsonl)                     │
+│  Pi transcripts: timestamp_uuid.jsonl                                │
+│  Codex projections: codex-<thread-id>.jsonl (authority: ~/.codex)    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Design Decisions
 
-1. **Append-only session metadata**: pi-web reads from `~/.pi/agent/sessions/` and avoids rewriting session history. New sessions can be created via the web UI, and browser rename appends a `session_info` metadata line to the existing JSONL file.
+1. **Runtime-specific authority**: Native Pi transcripts are append-only; Pi supplies conversation entries and pi-web appends supported metadata. Codex remains authoritative in `~/.codex`; pi-web atomically rebuilds `codex-<thread-id>.jsonl` projections while preserving local metadata.
 
 2. **Live updates via SSE**: The browser opens an EventSource connection. The server watches session files via `fsnotify` (with polling fallback) and pushes `reload` events; session pages fetch `/api/session` to reconcile canonical JSONL entries. Browser chat can also receive best-effort `chat-preview` SSE events before JSONL reconciliation.
 
-3. **Chat via RPC workers**: Each session gets a dedicated `pi --mode rpc` subprocess. Workers are cached and reaped after 10 minutes of idle time.
+3. **Runtime workers**: Each active session gets one reusable worker selected from its header: `pi --mode rpc` or `codex app-server --stdio`. Crashed workers are evicted and idle workers are reaped after 10 minutes.
 
 4. **Dual frontend strategy**:
    - **Index page** (`/`): Built with Vite + vanilla JS, served from embedded `web/dist`

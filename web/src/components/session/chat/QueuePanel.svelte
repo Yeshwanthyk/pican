@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { icon, Play, Pause, X, CornerDownRight, Layers } from '../../../shared/icons.js';
-  import { t } from '../../../shared/i18n.js';
+  import { t } from '../../../shared/strings.js';
 
   let { store } = $props();
 

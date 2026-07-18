@@ -1,5 +1,5 @@
 <script module>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { runChatComposer } from './chat/chat-composer-runtime.js';
   // runChatComposer is the live-only DOM/runtime glue (used by onMount below).
   // Re-exported so existing imports and tests can reach it via this module.
@@ -72,6 +72,7 @@
       windowImpl: target,
       locationImpl: target.location,
       localEntries: model?.entries || [],
+      sessionId,
       leafId: model?.leafId || '',
       urlTargetId: model?.urlTargetId || '',
       byId: model?.byId || new Map(),

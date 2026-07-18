@@ -1,6 +1,6 @@
 # Sequence Flow: Share to GitHub Gist
 
-This flow covers a user clicking the **Share** button on a session page, which creates a private GitHub Gist containing a standalone HTML export of the session.
+This flow covers a user clicking **Share** on a Pi or Codex session page, creating a private GitHub Gist containing a standalone HTML snapshot.
 
 ## Sequence Diagram
 
@@ -88,7 +88,7 @@ If not logged in → `400` error: `"GitHub CLI not logged in. Run 'gh auth login
 
 ### 4. Find and Render Session
 
-The handler resolves the session by ID and then calls:
+The handler resolves the session by ID through the common parser. For Codex this reads the latest local projection; sharing does not contact app-server. It then calls:
 
 ```go
 renderExportSessionPage(session, theme)
@@ -147,3 +147,4 @@ The shared HTML is completely **self-contained**:
 - Markdown rendering via inline `marked.min.js`
 - Syntax highlighting via inline `highlight.min.js`
 - No server dependencies — it works if saved and opened locally
+- Snapshot-only runtime metadata; no Pi RPC, Codex app-server, chat, or SSE behavior

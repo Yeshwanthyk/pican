@@ -2,7 +2,7 @@
   // Keyboard Shortcuts modal — Svelte port of live/shortcuts-modal.js. Renders
   // inside <FullScreenSheet> with reactive search filtering. Display-only
   // (no callbacks); opened via the bindable `open` prop.
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import FullScreenSheet from './FullScreenSheet.svelte';
 
   let { open = $bindable(false) } = $props();
@@ -11,7 +11,7 @@
     typeof navigator !== 'undefined' &&
     (navigator.platform || '').toUpperCase().indexOf('MAC') >= 0;
 
-  // Built once at init so labels reflect the active locale (fixed per page load).
+  // Built once at initialization; shortcut labels are static for the page.
   const groups = [
     {
       category: t('shortcuts.catGeneral'),

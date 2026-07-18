@@ -1,5 +1,5 @@
 import { icon, TextQuote, X } from '../../../shared/icons.js';
-import { t } from '../../../shared/i18n.js';
+import { t } from '../../../shared/strings.js';
 import { setupTextAttachmentViewer } from './text-attachment-viewer.js';
 import { composeMessageWithTextAttachments, textAttachmentLabel } from './text-attachments.js';
 

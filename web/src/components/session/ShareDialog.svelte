@@ -5,7 +5,7 @@
   // Live-only (the export snapshot omits #share-btn). See svelte-migration-plan.
   import { onMount } from 'svelte';
   import { icon, Share2 } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
 

@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { boolFor, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();

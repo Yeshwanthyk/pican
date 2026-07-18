@@ -15,17 +15,21 @@ import (
 	"pi-web/internal/sessions"
 )
 
-func newTestServer(t *testing.T) *Server {
+func newTestServer(t *testing.T, nowFn ...func() time.Time) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	s, err := New(Deps{
+	deps := Deps{
 		AgentDir:            dir,
 		SessionsDir:         dir,
 		Auth:                auth.New(""),
 		Cache:               sessions.NewCache(),
 		RenderExportSession: func(s sessions.Session, theme string) string { return "" },
 		Models:              func(ctx context.Context) (json.RawMessage, error) { return nil, nil },
-	})
+	}
+	if len(nowFn) > 0 {
+		deps.Now = nowFn[0]
+	}
+	s, err := New(deps)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

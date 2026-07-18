@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"pi-web/internal/agentdir"
+	"pi-web/internal/codex"
 	"pi-web/internal/sessions"
 	"pi-web/internal/ui"
 )
@@ -92,10 +93,37 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := sessions.ForkSessionFile(s.sessionsDir, resolved.Path, body.EntryID, s.now)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
-		return
+	var id string
+	if resolved.Session.Runtime == "codex" {
+		if available, reason := s.runtimeStatus("codex"); !available {
+			writeJSONError(w, http.StatusServiceUnavailable, reason)
+			return
+		}
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
+		turnID, turnErr := s.codex.ResolveTurnID(resolved.Path, body.EntryID)
+		if errors.Is(turnErr, codex.ErrNoTurnBoundary) {
+			writeJSONError(w, http.StatusConflict, "Codex entry has no turn boundary and cannot be forked")
+			return
+		}
+		if turnErr != nil {
+			writeJSONError(w, http.StatusNotFound, turnErr.Error())
+			return
+		}
+		projection, forkErr := s.codex.ForkSession(r.Context(), resolved.Session.NativeID, &turnID)
+		if forkErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, forkErr.Error())
+			return
+		}
+		id = projection.ID
+	} else {
+		id, err = sessions.ForkSessionFile(s.sessionsDir, resolved.Path, body.EntryID, s.now)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	if s.chatSender != nil {
@@ -135,15 +163,33 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if leafID == "" {
+	if leafID == "" && resolved.Session.Runtime != "codex" {
 		writeJSONError(w, http.StatusBadRequest, "no leaf entry available")
 		return
 	}
 
-	id, err := sessions.CloneSessionFile(s.sessionsDir, resolved.Path, leafID, s.now)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
-		return
+	var id string
+	if resolved.Session.Runtime == "codex" {
+		if available, reason := s.runtimeStatus("codex"); !available {
+			writeJSONError(w, http.StatusServiceUnavailable, reason)
+			return
+		}
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
+		projection, cloneErr := s.codex.ForkSession(r.Context(), resolved.Session.NativeID, nil)
+		if cloneErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, cloneErr.Error())
+			return
+		}
+		id = projection.ID
+	} else {
+		id, err = sessions.CloneSessionFile(s.sessionsDir, resolved.Path, leafID, s.now)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	if s.chatSender != nil {
@@ -160,6 +206,9 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	for i := range summaries {
+		s.applyRuntimeAvailability(&summaries[i])
 	}
 
 	q := r.URL.Query()
@@ -304,6 +353,7 @@ func (s *Server) handleApiSession(w http.ResponseWriter, r *http.Request) {
 		entries, total, from = paginatedEntries(resolved.Session.Entries)
 	}
 
+	s.applyRuntimeAvailability(&resolved.Session.SessionSummary)
 	resp := sessionResponseMap(resolved.Session, entries, total, from)
 	if isDeltaRequest {
 		resp["deltaOk"] = deltaOk
@@ -340,6 +390,8 @@ func sessionResponseMap(session sessions.Session, entries []map[string]any, tota
 		"chatDisabledReason": session.ChatDisabledReason,
 		"model":              session.Model,
 		"modelProvider":      session.ModelProvider,
+		"runtime":            session.Runtime,
+		"nativeId":           session.NativeID,
 	}
 }
 
@@ -380,6 +432,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Path            string `json:"path"`
 		SourceSessionID string `json:"sourceSessionId"`
+		Runtime         string `json:"runtime"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid json body")
@@ -390,11 +443,63 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	settings := s.initialSettingsFromSource(r.Context(), body.SourceSessionID)
-	id, err := sessions.CreateSessionFileWithSettings(s.sessionsDir, body.Path, settings)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
+	runtime := strings.TrimSpace(body.Runtime)
+	if runtime == "" && body.SourceSessionID != "" {
+		var source sessions.ResolvedSession
+		var resolveErr error
+		if s.cache != nil {
+			source, resolveErr = s.cache.Resolve(s.sessionsDir, body.SourceSessionID)
+		} else {
+			source, resolveErr = sessions.ResolveByID(s.sessionsDir, body.SourceSessionID)
+		}
+		if resolveErr == nil {
+			runtime = source.Session.Runtime
+		}
+	}
+	if runtime == "" {
+		runtime = s.defaultRuntime
+		if runtime == "" {
+			runtime = "pi"
+		}
+	}
+	if !s.runtimeEnabled(runtime) {
+		writeJSONError(w, http.StatusBadRequest, "runtime must be an enabled runtime")
 		return
+	}
+	if available, reason := s.runtimeStatus(runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+
+	settings := s.initialSettingsFromSource(r.Context(), body.SourceSessionID, runtime)
+	var id string
+	var err error
+	if runtime == "codex" {
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
+		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		if pathErr != nil {
+			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
+			return
+		}
+		model := settings.ModelID
+		if settings.ModelProvider != "" && settings.ModelProvider != codex.Provider {
+			model = ""
+		}
+		projection, startErr := s.codex.StartSession(r.Context(), cwd, model, settings.ThinkingLevel)
+		if startErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, startErr.Error())
+			return
+		}
+		id = projection.ID
+	} else {
+		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, body.Path, settings)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	// Pre-initialize a worker so the session page can read default model and
@@ -440,7 +545,22 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := sessions.RenameSession(resolved.Path, name, s.now); err != nil {
+	var renameErr error
+	if resolved.Session.Runtime == "codex" {
+		if available, reason := s.runtimeStatus("codex"); !available {
+			writeJSONError(w, http.StatusServiceUnavailable, reason)
+			return
+		}
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
+		_, renameErr = s.codex.RenameSession(r.Context(), resolved.Session.NativeID, name)
+	} else {
+		renameErr = sessions.RenameSession(resolved.Path, name, s.now)
+	}
+	if renameErr != nil {
+		err := renameErr
 		if errors.Is(err, sessions.ErrEmptySessionName) {
 			writeJSONError(w, http.StatusBadRequest, "name is required")
 			return
@@ -489,7 +609,14 @@ func (s *Server) handleLabelSessionEntry(w http.ResponseWriter, r *http.Request)
 	}
 
 	label := strings.TrimSpace(body.Label)
-	if err := sessions.LabelSessionEntry(resolved.Path, entryID, label, s.now); err != nil {
+	var labelErr error
+	if resolved.Session.Runtime == "codex" && s.codex != nil {
+		labelErr = s.codex.LabelSessionEntry(resolved.Path, entryID, label, s.now)
+	} else {
+		labelErr = sessions.LabelSessionEntry(resolved.Path, entryID, label, s.now)
+	}
+	if labelErr != nil {
+		err := labelErr
 		if errors.Is(err, sessions.ErrSessionEntryNotFound) {
 			writeJSONError(w, http.StatusNotFound, "entry not found")
 			return
@@ -523,7 +650,14 @@ func (s *Server) handleAvailableModels(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	data, err := s.models(ctx)
+	query := ModelQuery{Runtime: strings.TrimSpace(r.URL.Query().Get("runtime")), SessionID: strings.TrimSpace(r.URL.Query().Get("id"))}
+	var data json.RawMessage
+	var err error
+	if s.modelsFor != nil {
+		data, err = s.modelsFor(ctx, query)
+	} else {
+		data, err = s.models(ctx)
+	}
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			writeJSONError(w, http.StatusGatewayTimeout, "timed out waiting for model list")

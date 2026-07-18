@@ -1,6 +1,6 @@
 <script>
   import { icon, Paperclip } from '../../../shared/icons.js';
-  import { t } from '../../../shared/i18n.js';
+  import { t } from '../../../shared/strings.js';
   import { ChatToolbarState } from './chat-toolbar-state.svelte.js';
   import ContextUsage from './ContextUsage.svelte';
 

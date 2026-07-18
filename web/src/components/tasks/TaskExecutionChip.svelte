@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let { status = '' } = $props();
   const normalized = $derived(String(status || '').toLowerCase());

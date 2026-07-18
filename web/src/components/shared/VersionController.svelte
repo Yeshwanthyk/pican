@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { icon, ExternalLink, X } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import {
     cleanVersion,
     fetchVersionInfo,

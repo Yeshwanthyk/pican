@@ -1,6 +1,6 @@
 # Sequence Flow: Viewing a Session
 
-This flow covers a user clicking a session card on the index page (or visiting `/session?id=…` directly).
+This flow covers a user opening either a native Pi transcript or a materialized Codex thread projection.
 
 ## Sequence Diagram
 
@@ -28,7 +28,7 @@ Browser ── GET /events?id=abc ──────▶ Server (SSE)
 GET /api/session?id=<session-id>
 ```
 
-The route then builds the session payload expected by the existing session rendering/runtime modules and mounts the session UI.
+The route normalizes `runtime`, `nativeId`, and the projected/native session UUID from the API/header, builds the renderer payload, and mounts the session UI. Codex pages retain the runtime when creating siblings and copy `codex resume <nativeId>` for terminal resume; Pi pages copy `pi --session <sessionUUID>`.
 
 `SessionContent` derives render items from the active root-to-leaf path. Consecutive tool-only activity stays as individual entries through four tool calls; longer runs render inside a collapsed native `<details>` while preserving the original entry components and `entry-<id>` anchors. Navigation opens ancestor details before scrolling to a nested anchor.
 
@@ -61,9 +61,10 @@ Security: `filepath.Base(id) != id` prevents path traversal.
    - `type == "session_info"` → latest metadata such as renamed display title
    - `type == "message"` → increment `MessageCount`, sum `TokenTotal`/`CostTotal`
    - all lines → `sess.Entries`
-4. Set display name: latest `session_info.name`, else header `session.name`, else first user message, else filename
-5. Set `LastActivity` to latest timestamp (or file modtime as fallback)
-6. Check chat availability: if `cwd` from header no longer exists, disable chat
+4. Read `runtime`/`nativeId` from the session header (`runtime` defaults to `pi`)
+5. Set display name: latest `session_info.name`, else header `session.name`, else first user message, else filename
+6. Set `LastActivity` to latest timestamp (or file modtime as fallback)
+7. Check chat availability: disable it when the working directory or selected runtime is unavailable
 
 ### 5. API Response
 
@@ -79,7 +80,9 @@ Security: `filepath.Base(id) != id` prevents path traversal.
   "chatAvailable": true,
   "chatDisabledReason": "",
   "model": "...",
-  "modelProvider": "..."
+  "modelProvider": "...",
+  "runtime": "pi|codex",
+  "nativeId": "<Codex thread id, when applicable>"
 }
 ```
 
@@ -99,7 +102,7 @@ The server:
 2. Sends `:ok\n\n` (SSE comment to confirm connection)
 3. Blocks reading from `client.ch` or `r.Context().Done()`
 
-When the session file changes, the file watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>` from the returned `name`, appends new canonical entries, upserts live-rendered entries, and clears any temporary chat preview.
+When a Pi transcript append or atomic Codex projection replacement changes the file, the watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, reconciles canonical entries, and clears temporary chat preview. Codex worker callbacks also request reload directly after projection updates.
 
 ## Rename Flow
 
@@ -110,4 +113,8 @@ POST /api/rename-session?id=<session-id>
 { "name": "New title" }
 ```
 
-The server appends a `session_info` line with the new name. This preserves the append-only rule for existing session files while allowing the cache/API/UI to surface the latest title.
+For Pi, the server appends a `session_info` line, preserving the append-only transcript rule. For Codex, it calls `thread/name/set` on the authoritative thread and atomically refreshes the projection; local projection metadata remains preserved.
+
+## Runtime unavailable / cached viewing
+
+Availability is applied after parsing. If Codex is unavailable, an existing projection still loads through the normal cache and renderer, including download, export, and share. Chat and runtime-dependent mutations are disabled with the current reason until periodic sync recovers. This does not mean the browser works without the pi-web HTTP server: the service worker intentionally does not cache session pages or JSON.

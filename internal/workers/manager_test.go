@@ -428,3 +428,35 @@ func TestEnsureWorkerCreatesWorkerWithoutSendingMessage(t *testing.T) {
 		t.Fatalf("status = %q, want idle", status.State)
 	}
 }
+
+func TestManagerCloseWaitsForAndRejectsInFlightCreation(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	manager := NewManager(func(string, string) (ChatWorker, error) {
+		close(started)
+		<-release
+		return &fakeChatWorker{}, nil
+	})
+	ensureDone := make(chan error, 1)
+	go func() {
+		ensureDone <- manager.EnsureWorker(context.Background(), "a.jsonl", "/tmp/a.jsonl")
+	}()
+	<-started
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- manager.Close() }()
+	select {
+	case <-closeDone:
+		t.Fatal("Close returned before in-flight creation finished")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	if err := <-ensureDone; !errors.Is(err, ErrManagerClosed) {
+		t.Fatalf("EnsureWorker error = %v, want ErrManagerClosed", err)
+	}
+	if err := <-closeDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := manager.Snapshot(); len(got) != 0 {
+		t.Fatalf("workers survived Close: %+v", got)
+	}
+}

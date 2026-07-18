@@ -20,6 +20,7 @@ import (
 	"pi-web/internal/agentdir"
 	"pi-web/internal/auth"
 	"pi-web/internal/chatqueue"
+	"pi-web/internal/codex"
 	"pi-web/internal/render"
 	"pi-web/internal/rpc"
 	"pi-web/internal/schedules"
@@ -38,6 +39,24 @@ const globalSessID = "__all__"
 // rendering (which depends on embedded templates in package main), the model
 // list (which depends on a process-wide cache), and the chat sender (which
 // owns rpc workers).
+type ModelQuery struct {
+	Runtime   string
+	SessionID string
+}
+
+type CodexService interface {
+	StartSession(context.Context, string, string, string) (codex.Projection, error)
+	RenameSession(context.Context, string, string) (codex.Projection, error)
+	ForkSession(context.Context, string, *string) (codex.Projection, error)
+	RefreshThread(context.Context, string) (codex.Projection, error)
+	ArchiveSession(context.Context, string) error
+	UnarchiveSession(context.Context, string) (codex.Projection, error)
+	DeleteSession(context.Context, string) error
+	ResolveTurnID(string, string) (string, error)
+	LabelSessionEntry(string, string, string, func() time.Time) error
+	AutoTitleSession(string, string, func() time.Time) error
+}
+
 type Deps struct {
 	AgentDir            string
 	SessionsDir         string
@@ -47,6 +66,11 @@ type Deps struct {
 	RenderExportSession func(s sessions.Session, theme string) string
 	RenderAppShell      func(w io.Writer, bootstrap string) error
 	Models              func(ctx context.Context) (json.RawMessage, error)
+	ModelsFor           func(ctx context.Context, query ModelQuery) (json.RawMessage, error)
+	DefaultRuntime      string
+	EnabledRuntimes     []string
+	RuntimeAvailable    func(runtime string) (bool, string)
+	Codex               CodexService
 	Now                 func() time.Time
 	// Updater reports current/latest version + changelog. Optional; when nil
 	// the version endpoints are not registered.
@@ -76,6 +100,11 @@ type Server struct {
 	renderExportSession func(s sessions.Session, theme string) string
 	renderAppShell      func(w io.Writer, bootstrap string) error
 	models              func(ctx context.Context) (json.RawMessage, error)
+	modelsFor           func(ctx context.Context, query ModelQuery) (json.RawMessage, error)
+	defaultRuntime      string
+	enabledRuntimes     map[string]bool
+	runtimeAvailable    func(runtime string) (bool, string)
+	codex               CodexService
 	lastKnown           map[string]struct{} // session ids currently broadcast as running
 	lastKnownMu         sync.Mutex
 	push                *PushManager
@@ -161,6 +190,11 @@ func New(deps Deps) (*Server, error) {
 		renderExportSession: deps.RenderExportSession,
 		renderAppShell:      deps.RenderAppShell,
 		models:              deps.Models,
+		modelsFor:           deps.ModelsFor,
+		defaultRuntime:      deps.DefaultRuntime,
+		enabledRuntimes:     make(map[string]bool),
+		runtimeAvailable:    deps.RuntimeAvailable,
+		codex:               deps.Codex,
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),
 		db:                  db,
@@ -179,6 +213,15 @@ func New(deps Deps) (*Server, error) {
 			count:     make(map[string]int),
 			userOwned: make(map[string]bool),
 		},
+	}
+	if s.defaultRuntime == "" {
+		s.defaultRuntime = "pi"
+	}
+	if len(deps.EnabledRuntimes) == 0 {
+		deps.EnabledRuntimes = []string{"pi"}
+	}
+	for _, runtime := range deps.EnabledRuntimes {
+		s.enabledRuntimes[runtime] = true
 	}
 	s.schedules.Now = now
 	s.chatQueue.Now = now
@@ -302,6 +345,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/set-model", s.auth.Wrap(s.handleSetModel))
 	mux.HandleFunc("/api/set-thinking-level", s.auth.Wrap(s.handleSetThinkingLevel))
 	mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
+	mux.HandleFunc("/api/runtimes", s.auth.Wrap(s.handleRuntimes))
+	mux.HandleFunc("/api/codex/thread/archive", s.auth.Wrap(s.handleCodexThreadArchive))
+	mux.HandleFunc("/api/codex/thread/unarchive", s.auth.Wrap(s.handleCodexThreadUnarchive))
+	mux.HandleFunc("/api/codex/thread/delete", s.auth.Wrap(s.handleCodexThreadDelete))
 	mux.HandleFunc("/api/worker-status", s.auth.Wrap(s.handleWorkerStatus))
 	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
 	mux.HandleFunc("/api/extension-ui/pending", s.auth.Wrap(s.handlePendingExtensionUI))

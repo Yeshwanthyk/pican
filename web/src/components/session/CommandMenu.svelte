@@ -5,7 +5,7 @@
   // shared live runtime helpers or click hidden relay buttons (share/new/terminal).
   import { onMount } from 'svelte';
   import CommandPalette from '../shared/CommandPalette.svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import {
     icon,
     Search,

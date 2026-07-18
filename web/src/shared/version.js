@@ -1,5 +1,5 @@
 import { escapeHtml } from './escape.js';
-import { t } from './i18n.js';
+import { t } from './strings.js';
 
 let active = null;
 

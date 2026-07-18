@@ -166,7 +166,9 @@ func (s *Server) handleFsEvent(w *fsnotify.Watcher, ev fsnotify.Event, deb *debo
 	if !strings.HasSuffix(ev.Name, ".jsonl") {
 		return
 	}
-	if ev.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+	// Atomic projection updates replace the target with rename(2). Depending on
+	// the platform fsnotify reports the target as Create or Rename, not Write.
+	if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
 		return
 	}
 	if ev.Op&fsnotify.Create != 0 {

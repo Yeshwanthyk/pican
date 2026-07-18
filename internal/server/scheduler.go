@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"pi-web/internal/chat"
+	"pi-web/internal/codex"
 	"pi-web/internal/schedules"
 	"pi-web/internal/sessions"
 )
@@ -143,10 +144,48 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 		ModelID:       sc.ModelID,
 		ThinkingLevel: sc.ThinkingLevel,
 	}
-	filename, err := sessions.CreateSessionFileWithSettings(s.sessionsDir, path, settings)
-	if err != nil {
+	runtime := s.defaultRuntime
+	if runtime == "" {
+		runtime = "pi"
+	}
+	if sc.ModelProvider == codex.Provider && s.runtimeEnabled("codex") {
+		runtime = "codex"
+	}
+	if available, reason := s.runtimeStatus(runtime); !available {
+		err := errors.New(reason)
 		_ = s.schedules.FailRun(runID, err.Error())
-		return "", fmt.Errorf("create session: %w", err)
+		return "", err
+	}
+	var filename string
+	if runtime == "codex" {
+		if s.codex == nil {
+			err := errors.New("Codex runtime is unavailable")
+			_ = s.schedules.FailRun(runID, err.Error())
+			return "", err
+		}
+		cwd, pathErr := sessions.PrepareSessionPath(path)
+		if pathErr != nil {
+			_ = s.schedules.FailRun(runID, pathErr.Error())
+			return "", pathErr
+		}
+		model := settings.ModelID
+		if settings.ModelProvider != "" && settings.ModelProvider != codex.Provider {
+			model = ""
+		}
+		createCtx, cancelCreate := context.WithTimeout(context.Background(), scheduleWorkerTimeout)
+		projection, startErr := s.codex.StartSession(createCtx, cwd, model, settings.ThinkingLevel)
+		cancelCreate()
+		if startErr != nil {
+			_ = s.schedules.FailRun(runID, startErr.Error())
+			return "", fmt.Errorf("create Codex session: %w", startErr)
+		}
+		filename = projection.ID
+	} else {
+		filename, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, settings)
+		if err != nil {
+			_ = s.schedules.FailRun(runID, err.Error())
+			return "", fmt.Errorf("create session: %w", err)
+		}
 	}
 	resolved, err := sessions.ResolveByID(s.sessionsDir, filename)
 	if err != nil {

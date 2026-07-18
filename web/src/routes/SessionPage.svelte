@@ -17,7 +17,7 @@
   import { resetSessionModals } from '../session/session-modals.svelte.js';
   import { resetSessionRuntime } from '../session/session-runtime.js';
   import { resetSessionRuntimeContext } from '../session/session-runtime-context.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
 
   // The reactive session model (docs/dev/svelte-migration-plan.md): created once
   // and provided via context so descendant components read from it. Hydrated
@@ -42,10 +42,15 @@
   let chatAvailable = $state(true);
   let chatDisabledReason = $state('');
   let modelLabel = $state('');
+  let runtime = $state('pi');
+  let nativeId = $state('');
+  let sessionUUID = $state('');
   let dataEl = $state(null);
 
   onMount(() => {
     const previousTitle = document.title;
+    const previousRuntime = document.body?.dataset.runtime;
+    const previousNativeId = document.body?.dataset.nativeId;
     let active = true;
     let disposeRuntime = null;
     const disposeBodyClasses = applySessionPageBodyClasses({ documentImpl: document });
@@ -70,7 +75,18 @@
         if (!active) return;
         sessionId = state.sessionId;
         title = state.title;
-        document.title = title;
+        runtime = state.runtime;
+        nativeId = state.nativeId;
+        sessionUUID = state.sessionUUID;
+        document.title =
+          runtime === 'codex'
+            ? t('session.runtimePageTitle', { title, runtime: t('runtime.codex') })
+            : title;
+        if (document.body) {
+          document.body.dataset.runtime = runtime;
+          if (nativeId) document.body.dataset.nativeId = nativeId;
+          else delete document.body.dataset.nativeId;
+        }
         cwd = state.cwd;
         scratchpad = state.scratchpad;
         payloadBase64 = state.payloadBase64;
@@ -114,6 +130,12 @@
       resetSessionRuntime();
       resetSessionRuntimeContext();
       document.title = previousTitle;
+      if (document.body) {
+        if (previousRuntime === undefined) delete document.body.dataset.runtime;
+        else document.body.dataset.runtime = previousRuntime;
+        if (previousNativeId === undefined) delete document.body.dataset.nativeId;
+        else document.body.dataset.nativeId = previousNativeId;
+      }
       disposeBodyClasses();
     };
   });
@@ -142,6 +164,9 @@
     {chatAvailable}
     {chatDisabledReason}
     {modelLabel}
+    {runtime}
+    {nativeId}
+    {sessionUUID}
     bind:dataEl
   />
 {/if}

@@ -4,6 +4,7 @@
 |---|---|
 | How to install, configure, and use pi-web | [../user-docs/en/install.md](../user-docs/en/install.md) |
 | How the system is built (packages, data flow, frontend/backend) | [architecture/](architecture/) |
+| How Codex app-server integration works | [architecture/codex-runtime.md](architecture/codex-runtime.md) |
 | What happens at runtime (startup, chat, live reload, sharing) | [sequence-flows/](sequence-flows/) |
 | Frontend build details (templates vs. web, export design) | [dev/](dev/) |
 | End-to-end browser testing (Playwright) | [dev/e2e-testing.md](dev/e2e-testing.md) |

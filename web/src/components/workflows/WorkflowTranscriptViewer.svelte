@@ -2,7 +2,7 @@
   import { marked } from 'marked';
   import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown.js';
   import { escapeHtml } from '../../shared/escape.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import WorkflowStatusChip from './WorkflowStatusChip.svelte';
   import { workflowTranscriptGroups } from '../../workflows/workflows.js';
 

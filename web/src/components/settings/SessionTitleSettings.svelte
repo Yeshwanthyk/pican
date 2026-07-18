@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { boolFor, fetchModelGroups, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();

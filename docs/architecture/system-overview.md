@@ -2,7 +2,7 @@
 
 ## What pi-web Does
 
-pi-web is a local HTTP server that lets you browse and interact with your pi coding-agent sessions in a web browser. It scans `~/.pi/agent/sessions/`, renders a dark-themed UI, and supports live-reloading, chat continuation, and session sharing.
+pi-web is a local HTTP server that lets you browse and interact with Pi sessions and Codex threads in a web browser. It presents both runtimes through one session list, viewer, live-update path, and export surface.
 
 ## Tech Stack
 
@@ -13,8 +13,8 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 | Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained Gist) |
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
-| Chat RPC | JSONL over stdin/stdout via `pi --mode rpc` |
-| Session Storage | JSONL files on disk; pi-web creates new session files and appends `session_info` for browser rename |
+| Agent runtime | JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio` |
+| Session Storage | Native Pi JSONL transcripts plus rebuildable Codex projections under `~/.pi/agent/sessions`; Codex remains authoritative in `~/.codex` |
 | Local DB | SQLite (`~/.pi/agent/pi-web.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
@@ -101,8 +101,9 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
    ┌──────────────────────────────────────────────────────────────────┐
    │                    External Processes                             │
    │                                                                   │
-   │   pi --mode rpc          (per-session chat worker subprocess)     │
-   │   gh gist create         (share session as private gist)          │
+   │   pi --mode rpc              (per-active-Pi-session worker)        │
+   │   codex app-server --stdio   (per-active-Codex-session worker)     │
+   │   gh gist create             (share session as private gist)       │
    │                                                                   │
    └──────────────────────────────────────────────────────────────────┘
 ```
@@ -134,8 +135,8 @@ name, while pi-web itself continues listening only on localhost.
 ~/.pi/agent/
 ├── sessions/
 │   ├── --project-name--/
-│   │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl
-│   │   ├── 2026-01-15T11-00-00.000Z_e5f6g7h8.jsonl
+│   │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl  ← Pi transcript
+│   │   ├── codex-019abc….jsonl                        ← Codex projection
 │   │   └── …
 │   └── --another--project--/
 │       └── …
@@ -173,16 +174,13 @@ across devices. See `internal/server/projects.go`.
 
 ## Startup Order
 
-1. Parse CLI flags (`-p`, `-host`, `-o`, `-insecure`, `-version`)
-2. Validate sessions directory exists
-3. Determine bind host (flag → localhost)
-4. Enforce auth for explicit non-loopback binds
-5. Build `server.Deps` (renderers, cache, workers, auth)
-6. Create `Server` → starts file watcher + status watcher + sweeper
-7. Register routes on `http.ServeMux`
-8. Load Vite manifest and register static assets
-9. Optionally configure Tailscale Serve HTTPS for localhost
-10. Write state file to `~/.pi/agent/pi-web/pi-web-state.json` (with flock)
-11. Optionally open browser
-12. Warm models cache (async)
-13. Start `http.Server` with timeouts; graceful shutdown on `SIGINT`/`SIGTERM`
+1. Parse CLI flags, including `-runtime=pi|codex|both` (default `pi`) and `-codex-command`.
+2. Resolve `~/.pi/agent/sessions`: Codex-only mode creates it; Pi/both mode requires it.
+3. In Codex-enabled modes, run the initial catalog sync. Codex-only startup fails closed; both mode logs failure and continues with Pi. Start the one-minute periodic sync.
+4. Determine bind host and enforce auth for explicit non-loopback binds.
+5. Build `server.Deps` with runtime-aware model discovery, Codex service, and the shared worker manager.
+6. Create `Server` → starts file/status watchers, sweepers, scheduler, and queue drainer.
+7. Register routes and embedded Vite assets.
+8. Optionally configure Tailscale Serve HTTPS for localhost.
+9. Write `~/.pi/agent/pi-web/pi-web-state.json` (with flock), optionally open a browser, and warm the Pi model cache when enabled.
+10. Start `http.Server`; on `SIGINT`/`SIGTERM`, stop catalog sync, workers, server goroutines, and HTTP gracefully.

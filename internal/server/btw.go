@@ -245,10 +245,38 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 		path, _ = os.UserHomeDir()
 	}
 
-	id, err := sessions.CreateSessionFileWithSettings(s.sessionsDir, path, sessions.InitialSettings{})
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
+	runtime := s.defaultRuntime
+	if runtime == "" {
+		runtime = "pi"
+	}
+	if available, reason := s.runtimeStatus(runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
 		return
+	}
+	var id string
+	if runtime == "codex" {
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
+		cwd, err := sessions.PrepareSessionPath(path)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		projection, err := s.codex.StartSession(r.Context(), cwd, "", "")
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		id = projection.ID
+	} else {
+		var err error
+		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, sessions.InitialSettings{})
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	s.setBtwSessionID(body.Parent, id)
 

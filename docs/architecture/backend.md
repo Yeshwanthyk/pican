@@ -15,7 +15,8 @@ pi-web/
 │   │   ├── app.go              # CLI flags, dependency wiring, HTTP mux setup
 │   │   ├── network.go          # Bind host / loopback helpers
 │   │   ├── tailscale.go        # Tailscale Serve detection/configuration
-│   │   ├── models_cache.go     # Process-wide coalesced cache for model list
+│   │   ├── models_cache.go     # Process-wide coalesced cache for Pi model list
+│   │   ├── runtime.go          # Runtime mode, Codex service/catalog sync, model aggregation
 │   │   ├── browser.go          # Open the default browser at startup
 │   │   ├── sounds.go           # Seed default notification sounds into the agent dir
 │   │   ├── update.go           # runInstall / runRestart for self-update
@@ -44,6 +45,13 @@ pi-web/
 │   │   └── git.go              # git branch info, rename, PR URL detection
 │   ├── updater/
 │   │   └── updater.go          # Background version checker + changelog fetch
+│   ├── codex/
+│   │   ├── client.go           # Concurrent JSONL JSON-RPC app-server client
+│   │   ├── rpc.go              # Thread/turn/model protocol calls
+│   │   ├── catalog.go          # Thread catalog sync and short-lived operations
+│   │   ├── projection.go       # Atomic Codex → session projection materialization
+│   │   ├── worker.go           # Resumed per-session app-server worker
+│   │   └── types.go            # Stable protocol subset and model mapping
 │   ├── rpc/
 │   │   ├── client.go           # JSONL RPC command builders
 │   │   ├── worker.go           # pi --mode rpc subprocess worker
@@ -52,7 +60,8 @@ pi-web/
 │   │   └── oneshot.go          # One-shot RPC for model enumeration
 │   ├── server/
 │   │   ├── server.go           # Server type, deps, SSE registry, route registration, SQLite open
-│   │   ├── handlers.go         # index, session, api/session(s), new, fork/clone, rename, locations, models, custom-themes
+│   │   ├── handlers.go         # index, runtime-aware session CRUD, models, custom-themes
+│   │   ├── runtime.go          # Runtime availability and /api/runtimes
 │   │   ├── chat.go             # Chat, set-model, set-thinking, worker-status, commands handlers
 │   │   ├── new_session.go      # New-session creation logic
 │   │   ├── git.go              # /api/git/info, /api/git/rename-branch handlers
@@ -181,6 +190,8 @@ type SessionSummary struct {
     CostTotal          float64
     Model              string  // last-known model from messages or model_change
     ModelProvider      string  // provider for the last-known model
+    Runtime            string  // pi (default) or codex
+    NativeID           string  // authoritative Codex thread id, when applicable
     ChatAvailable      bool
     ChatDisabledReason string
 }
@@ -194,7 +205,7 @@ type Session struct {
 
 ### `workers.Manager`
 
-Manages `pi --mode rpc` subprocesses per session.
+Manages runtime-specific subprocesses per session. The factory chooses `pi --mode rpc` or `codex app-server --stdio` from validated session metadata; the manager owns reuse, single-flight creation, error eviction, and the shared 10-minute idle reap policy.
 
 ```go
 type Manager struct {
@@ -213,9 +224,13 @@ state, model, plus PID/uptime/idle for workers implementing the optional
 `inspector` interface). The metrics dashboard consumes it — see
 `docs/dev/metrics-dashboard.md`.
 
-### `rpc.piRPCWorker`
+### Runtime workers
 
-A single `pi --mode rpc` subprocess. Communicates via JSONL on stdin/stdout.
+`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process, resumes the projection's native thread ID, and communicates with Codex JSON-RPC. Both implement `workers.ChatWorker`, so chat, queueing, cancellation, model/effort changes, status, metrics, and lifecycle management share the server surface.
+
+The Codex worker consumes ordered app-server notifications, emits preview/status callbacks, and atomically refreshes the projection. It never treats projected JSONL as authoritative conversation state. See [codex-runtime.md](./codex-runtime.md).
+
+The Pi worker shape is:
 
 ```go
 type piRPCWorker struct {
@@ -255,7 +270,8 @@ type piRPCWorker struct {
 | `/api/chat/cancel` | POST | `handleCancelChat` | Abort running chat worker |
 | `/api/set-model` | POST | `handleSetModel` | Change model for session |
 | `/api/set-thinking-level` | POST | `handleSetThinkingLevel` | Change thinking level |
-| `/api/models` | GET | `handleAvailableModels` | List available AI models |
+| `/api/models` | GET | `handleAvailableModels` | List models for `runtime` or session `id` |
+| `/api/runtimes` | GET | `handleRuntimes` | Configured runtimes and current availability |
 | `/api/worker-status` | GET | `handleWorkerStatus` | Get worker state for session |
 | `/api/commands` | GET | `handleCommands` | List slash commands exposed by the session worker |
 | `/metrics` | GET | `handleMetricsPage` | Worker metrics dashboard (self-contained HTML) |
@@ -345,8 +361,8 @@ Broadcasting is fire-and-forget with a buffered channel (16). If the client is s
 
 Three signals are OR'd together to determine if a session is "running":
 
-1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by the terminal pi process
-2. **In-process chat worker**: `chatSender.Status(id).State == running`
-3. **Recent file activity**: modtime within 3 seconds
+1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by terminal Pi; ignored for Codex projections
+2. **In-process runtime worker**: `chatSender.Status(id).State == running`
+3. **Recent projection/transcript activity**: modtime within the short activity window
 
 Status changes are broadcast as SSE `status-delta` events to `__all__` subscribers. A 1-second sweeper periodically revalidates all known running sessions to clean up stale states.

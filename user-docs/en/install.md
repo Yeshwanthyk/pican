@@ -4,16 +4,17 @@
 
 ### Remote control
 
-- Continue any session from the browser with text or image attachments
+- Run one binary in Pi, Codex, or dual-runtime mode (`-runtime=pi|codex|both`; default `pi`)
+- Continue Pi sessions or Codex threads from the browser with text or image attachments
 - Start a brand-new session against any project path, right from the web UI
 - In-browser model switching and thinking-level selector, per session
-- Per-session worker status (idle / running / error) with auto-recovery on crash
+- Per-session worker status (idle / running / error) with crashed-worker eviction and 10-minute idle reaping
 - Multiple sessions run in parallel — kick off work in one, watch another stream
 - `PI_WEB_TOKEN` for safe LAN exposure — required by default for any explicit non-loopback bind
 
 ### Reading sessions
 
-- Browse sessions across projects with filters, search, and full branch navigation
+- Browse Pi transcripts and materialized Codex threads together, with runtime badges, filters, search, and branch navigation
 - Live incremental updates while pi is still running (via fsnotify; ~ms latency)
 - Follow mode for tailing active sessions
 - Deep links to individual messages
@@ -24,7 +25,8 @@
 ## Requirements
 
 - [Go](https://go.dev) 1.25+ (only for building from source)
-- `pi` on your `PATH` for browser chat/model switching
+- `pi` on your `PATH` when Pi runtime is enabled
+- Codex CLI installed and signed in when Codex runtime is enabled
 - Optional: `gh` for sharing
 - On Windows: pi needs a bash shell for its shell tool — [Git for Windows](https://git-scm.com/download/win) is enough (see pi's Windows docs)
 
@@ -164,6 +166,14 @@ pi-web -o
 # Custom port
 pi-web -p 8080
 
+# Runtime: pi (default), codex, or both
+pi-web -runtime=both
+
+# Explicit Codex executable path (not a shell command)
+pi-web -runtime=both -codex-command=/absolute/path/to/codex
+# equivalent fallback when the flag is absent:
+PI_WEB_CODEX_COMMAND=/absolute/path/to/codex pi-web -runtime=both
+
 # Override bind host (loopback is unauthenticated by default)
 pi-web --host 127.0.0.1
 
@@ -171,7 +181,7 @@ pi-web --host 127.0.0.1
 PI_WEB_TOKEN=$(openssl rand -hex 16) pi-web --host 192.168.1.50
 ```
 
-By default, pi-web binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pi-web also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PI_WEB_TOKEN` to be set; pass `--insecure` to override for local testing.
+By default, pi-web enables only Pi and binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pi-web also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PI_WEB_TOKEN` to be set; pass `--insecure` to override for local testing.
 
 ## Remote Access
 
@@ -195,14 +205,34 @@ pi-web
 >
 > Clients can pass the token via the `Authorization: Bearer <token>` header, the `X-Pi-Token` header, or once via `?token=<token>` (which sets a `pi_token` cookie for subsequent requests). Tokens passed via `?token=` end up in browser history, server access logs, and `Referer` headers from any links on the page — prefer the header form for anything beyond the initial bookmark.
 
+## Codex runtime
+
+The installed Codex CLI owns sign-in and persistent thread state. pi-web starts `codex app-server --stdio` with the current environment unchanged, including `HOME`; it never reads `~/.codex/auth.json`. Run `codex` normally first to install/sign in, then choose `-runtime=codex` or `-runtime=both`.
+
+> **Warning:** pi-web always runs Codex sessions in YOLO mode (`approvalPolicy: never` with `danger-full-access`), equivalent to `codex --yolo`. Model-generated commands can access the whole host filesystem and network without confirmation.
+
+Startup behavior:
+
+- `codex` mode creates `~/.pi/agent/sessions` if absent and exits if its initial Codex catalog sync fails.
+- `both` mode requires the existing sessions directory. If Codex is unavailable, Pi keeps working and the UI reports Codex unavailable; sync retries every minute.
+- A Codex executable override is one path via `-codex-command` (preferred) or `PI_WEB_CODEX_COMMAND`. pi-web appends `app-server --stdio` itself.
+- Generated auto-start entries invoke pi-web without `-runtime`, so they remain Pi-only by default. To persist `codex`/`both`, add `-runtime=…` (and optional `-codex-command=…`) to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command.
+
+Codex remains authoritative under `~/.codex`. pi-web creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, export, and share paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
+
+Existing projections remain viewable, downloadable, exportable, and shareable while Codex is unavailable. Chat, create, rename, fork/clone, and model/effort operations require the runtime. This is cached local viewing, not browser-offline support: pi-web intentionally does not service-worker-cache session data.
+
+Codex sessions support text/images, steering an active turn, persistent queues, cancel, model and reasoning effort, `/review`, `/compact`, rename, labels, fork/clone, status/SSE, and `codex resume <thread-id>` copying from the session header. YOLO mode bypasses command/file approvals. Unexpected approval requests are declined defensively; permission and user-input requests receive empty responses, and MCP elicitation is declined.
+
 ## Browser Chat
 
-Open a session page and use the composer at the bottom to continue that exact session.
+Open a session page and use the composer at the bottom to continue that exact Pi or Codex session.
 
 - `Enter` sends, `Shift+Enter` inserts a newline
 - Drag-and-drop or paste images directly into the composer
-- The model picker and thinking-level selector live in the header — changes apply to the underlying pi worker immediately
-- Each active session gets its own dedicated `pi --mode rpc` worker, so different sessions don't block each other
+- The model picker and thinking/reasoning-level selector are scoped to the session runtime
+- Each active session gets one dedicated, reusable `pi --mode rpc` or `codex app-server --stdio` worker, so different sessions do not block each other
+- While a turn runs, send can steer immediately or place work in the persistent server-side queue
 
 ## Sharing Sessions
 

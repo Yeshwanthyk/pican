@@ -6,7 +6,7 @@
 // needs. Live-only — the static export wires its own afterRender in export-entry.
 
 import { setIconElement, Loader } from '../shared/icons.js';
-import { t } from '../shared/i18n.js';
+import { t } from '../shared/strings.js';
 import { openLabel } from './session-modals.svelte.js';
 import { navigate } from '../shared/navigation.js';
 import { sessionRuntime } from './session-runtime.js';

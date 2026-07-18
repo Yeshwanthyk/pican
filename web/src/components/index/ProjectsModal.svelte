@@ -1,6 +1,6 @@
 <script>
   import { icon, ArrowLeft } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { sessionsCountLabel } from '../../index/sessions.js';
 
   let {

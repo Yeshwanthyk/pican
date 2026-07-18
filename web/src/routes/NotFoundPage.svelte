@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
 
   onMount(() => {
     const previousTitle = document.title;
