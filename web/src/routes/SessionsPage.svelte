@@ -27,6 +27,11 @@
     layoutStorageKey,
     normalizeSession,
   } from '../index/sessions.js';
+  import {
+    defaultFetchPeers,
+    defaultFetchPeerSessions,
+    normalizePeerHost,
+  } from '../index/peers.js';
 
   const PAGE_SIZE = 100;
 
@@ -51,6 +56,9 @@
   let projectsBusy = $state(false);
   let projectsError = $state('');
   let refreshInflight = false;
+  let peersConfigured = false;
+  let peerHosts = $state([]);
+  let peersRefreshInflight = false;
 
   const totalSessionsLabel = $derived(
     total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total }),
@@ -120,7 +128,34 @@
     reloadTimer = setTimeout(() => {
       reloadTimer = null;
       refreshSessions({ preserveWindow: true });
+      refreshPeerHosts();
     }, RELOAD_DEBOUNCE_MS);
+  }
+
+  // Peers (multi-machine "Machines" section): zero overhead for single-machine
+  // users — /api/peers/sessions is only ever fetched once at least one peer is
+  // registered, and initPeers() runs that check exactly once per page load.
+  async function refreshPeerHosts() {
+    if (!peersConfigured || peersRefreshInflight) return;
+    peersRefreshInflight = true;
+    try {
+      const response = await defaultFetchPeerSessions();
+      peerHosts = (response.hosts || []).map(normalizePeerHost);
+    } catch {
+      // Keep last-known state if a poll fails.
+    } finally {
+      peersRefreshInflight = false;
+    }
+  }
+
+  async function initPeers() {
+    try {
+      const response = await defaultFetchPeers();
+      peersConfigured = (response.peers || []).length > 0;
+    } catch {
+      peersConfigured = false;
+    }
+    if (peersConfigured) await refreshPeerHosts();
   }
 
   function setLayout(nextLayout) {
@@ -288,6 +323,7 @@
     window.addEventListener('click', click);
 
     refreshSessions();
+    initPeers();
 
     return () => {
       document.title = previousTitle;
@@ -340,6 +376,7 @@
   {hasMore}
   {loadingMore}
   onLoadMore={loadMore}
+  {peerHosts}
 />
 
 <NewSessionModal

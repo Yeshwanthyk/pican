@@ -254,6 +254,7 @@ func initDB(agentDir string) (*sql.DB, error) {
 		{"project_prefs table", projectPrefsSchema},
 		{"app_settings table", appSettingsSchema},
 		{"session_pins table", sessionPinsSchema},
+		{"peer_hosts table", peerHostsSchema},
 		{"btw_sessions table", btwSessionsSchema},
 		{"schedules table", schedules.SchedulesTableDDL},
 		{"schedule_runs table", schedules.RunsTableDDL},
@@ -315,6 +316,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/recent-locations", s.auth.Wrap(s.handleRecentLocations))
 	mux.HandleFunc("/api/projects", s.getPostHandler(s.handleApiProjects, s.handleUpdateProject))
 	mux.HandleFunc("/api/pins", s.getPostHandler(s.handleListPins, s.handleSetPin))
+	mux.HandleFunc("/api/peers", s.getPostHandler(s.handleApiPeers, s.handleUpdatePeer))
+	mux.HandleFunc("/api/peers/sessions", s.auth.Wrap(s.handlePeersSessions))
 	mux.HandleFunc("/api/files", s.auth.Wrap(s.handleApiFiles))
 	mux.HandleFunc("/api/fs/browse", s.auth.Wrap(s.handleFSBrowse))
 	mux.HandleFunc("/api/git/info", s.auth.Wrap(s.handleGitInfo))

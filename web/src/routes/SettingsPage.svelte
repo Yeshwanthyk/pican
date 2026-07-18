@@ -4,6 +4,7 @@
   import AppearanceSettings from '../components/settings/AppearanceSettings.svelte';
   import ArtifactSettings from '../components/settings/ArtifactSettings.svelte';
   import LanguageSettings from '../components/settings/LanguageSettings.svelte';
+  import MachinesSettings from '../components/settings/MachinesSettings.svelte';
   import NotificationSettings from '../components/settings/NotificationSettings.svelte';
   import SessionDisplayDefaultsSettings from '../components/settings/SessionDisplayDefaultsSettings.svelte';
   import SessionsListSettings from '../components/settings/SessionsListSettings.svelte';
@@ -24,6 +25,7 @@
     { id: 'sessionDisplay', labelKey: 'settings.sessionDisplay' },
     { id: 'artifacts', labelKey: 'settings.artifacts' },
     { id: 'notifications', labelKey: 'settings.notifications' },
+    { id: 'machines', labelKey: 'settings.machines' },
     { id: 'about', labelKey: 'settings.about' },
   ];
   const sectionIds = new Set(sections.map((s) => s.id));
@@ -185,6 +187,8 @@
       <ArtifactSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'notifications'}
       <NotificationSettings {settings} onSave={saveSetting} onSaved={flashSaved} />
+    {:else if activeSection === 'machines'}
+      <MachinesSettings />
     {:else if activeSection === 'about'}
       <AboutSettings />
     {/if}

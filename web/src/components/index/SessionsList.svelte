@@ -9,6 +9,7 @@
     sessionsCountLabel,
     splitPinnedSessions,
   } from '../../index/sessions.js';
+  import MachinesSection from './MachinesSection.svelte';
   import SessionCard from './SessionCard.svelte';
 
   const dateBucketLabels = {
@@ -29,6 +30,7 @@
     hasMore = false,
     loadingMore = false,
     onLoadMore = () => {},
+    peerHosts = [],
   } = $props();
 
   let now = $state(Date.now());
@@ -117,6 +119,9 @@
           {/each}
         </div>
       </div>
+    {/if}
+    {#if peerHosts.length > 0}
+      <MachinesSection hosts={peerHosts} {now} />
     {/if}
     {#if isTimeline}
       {#each groups as group (group.bucket)}
