@@ -56,7 +56,7 @@ pi-web/
 │   │   ├── chat.go             # Chat, set-model, set-thinking, worker-status, commands handlers
 │   │   ├── new_session.go      # New-session creation logic
 │   │   ├── git.go              # /api/git/info, /api/git/rename-branch handlers
-│   │   ├── diff.go             # /api/git/diff, /api/diff/reviews handlers
+│   │   ├── diff.go             # /api/git/diff handler
 │   │   ├── files.go            # /api/files handler + per-cwd file-walk cache
 │   │   ├── settings.go         # Server-backed user settings (/api/settings) + SPA shell helpers
 │   │   ├── btw.go              # btw scratch-chat registry: get/new + legacy migration (SQLite)
@@ -64,7 +64,6 @@ pi-web/
 │   │   ├── auto_title_heuristic.go # Heuristic fallback title from first user message
 │   │   ├── metrics.go          # /metrics + /api/metrics + pprof registration (gopsutil sampler)
 │   │   ├── scratchpad.go       # Per-project scratchpad get/save (SQLite)
-│   │   ├── annotations.go      # Per-session review annotations: list/create/delete + SSE snapshot (SQLite)
 │   │   ├── projects.go         # Project visibility prefs: list/toggle/register + index filtering (SQLite)
 │   │   ├── sound.go            # /api/sounds + /sounds/ asset serving
 │   │   ├── push.go             # PushManager: VAPID, subscribe/unsubscribe, NotifyDone, NotifyScheduleDone
@@ -154,11 +153,10 @@ type Server struct {
 `RunInstall`/`RunRestart` are nil the corresponding endpoints respond `503`.
 
 On `New`, the server opens (and migrates) a SQLite database at
-`~/.pi/agent/pi-web.sqlite` with six tables: `scratchpads` (per project path),
+`~/.pi/agent/pi-web.sqlite` with five tables: `scratchpads` (per project path),
 `settings` (server-backed user settings key/value), `project_prefs` (which
 projects are enabled), `app_settings` (the project-filter master switch, default
-off), `btw_sessions` (the btw scratch-chat registry), and `annotations`
-(per-session review notes keyed by session id; see `annotations.go`). See
+off), and `btw_sessions` (the btw scratch-chat registry). See
 `projects.go`, `settings.go`, and `btw.go`. The pool is capped to a single
 connection (`SetMaxOpenConns(1)`) so concurrent writers queue instead of failing
 with "database is locked". A `PushManager` (when configured) persists web-push
@@ -275,9 +273,7 @@ type piRPCWorker struct {
 | `/api/git/info` | GET | `handleGitInfo` | Branch / dirty / PR-URL info for a project |
 | `/api/git/rename-branch` | POST | `handleGitRenameBranch` | Rename the current git branch |
 | `/api/git/diff` | GET | `handleGitDiff` | Uncommitted working-tree diff (tracked + untracked) for the session cwd |
-| `/api/diff/reviews` | GET/POST/DELETE | `handleReviewComments` | Per-session diff review comments for the diff modal (SQLite) |
 | `/api/scratchpad` | GET/POST | `handleGetScratchpad` / `handleSaveScratchpad` | Per-project scratchpad (SQLite) |
-| `/api/annotations` | GET/POST/DELETE | `handleAnnotations` | Per-session review annotations; mutations broadcast an `annotations` SSE snapshot (SQLite) |
 | `/api/settings` | GET/POST | `handleGetSettings` / `handleSaveSettings` | Server-backed user settings (SQLite) |
 | `/api/btw` | GET | `handleGetBtw` | Resolve the btw scratch-chat session for a parent (SQLite) |
 | `/api/btw/new` | POST | `handleNewBtw` | Create a new btw scratch-chat session (SQLite) |
@@ -338,7 +334,7 @@ Request ──▶ auth.Wrap(handler)
 The server maintains a slice of `sseClient` structs. Each client subscribes to a `sessID`:
 
 - `__all__` — index and workflows pages subscribe here; receives `new-session`, `status-snapshot`, `status-delta`, and named `workflows-updated` events
-- Specific session ID — session page subscribes here; receives `reload` when the file changes, `chat-preview` during streaming, and `annotations` (a full annotation snapshot) whenever a note is created/deleted for that session
+- Specific session ID — session page subscribes here; receives `reload` when the file changes and `chat-preview` during streaming
 
 Broadcasting is fire-and-forget with a buffered channel (16). If the client is slow, keyless events are dropped rather than blocking. Duplicate `reload` and `new-session` events are coalesced per-client while pending.
 

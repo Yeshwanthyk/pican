@@ -8,8 +8,8 @@ export default async function globalSetup() {
 
   // Disable auto-titling: with the stub model it appends a session_info
   // line and broadcasts a "reload" at an unpredictable moment, re-rendering
-  // #messages and racing tests that assert on freshly-created DOM (e.g.
-  // annotation highlights). Deterministic test env > background titling.
+  // #messages and racing tests that assert on freshly-created DOM.
+  // Deterministic test env > background titling.
   const res = await fetch(`${baseURL}/api/settings`, {
     method: "POST",
     headers: { "content-type": "application/json" },

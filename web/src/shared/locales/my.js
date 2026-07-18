@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'git repository မဟုတ်ပါ',
   'diff.split': 'ခွဲ၍ပြ',
   'diff.unified': 'ပေါင်းစည်း၍ပြ',
-  'diff.commentPlaceholder': 'မှတ်ချက်ရေးပါ…',
-  'diff.save': 'သိမ်းဆည်းရန်',
-  'diff.cancel': 'ပယ်ဖျက်ရန်',
-  'diff.delete': 'ဖျက်ရန်',
-  'diff.edit': 'တည်းဖြတ်ရန်',
-  'diff.submitReview': 'သုံးသပ်ချက် တင်သွင်းရန်',
-  'diff.reviewSubmitted': 'သုံးသပ်ချက်ကို စကားပြောခန်းသို့ ထည့်ပြီးပါပြီ',
-  'diff.noComments': 'တင်သွင်းရန် မှတ်ချက် မရှိပါ',
-  'diff.saveFailed': 'မှတ်ချက် သိမ်းဆည်း၍ မရပါ',
   'diff.collapseAll': 'အားလုံး ပြန်ခေါက်',
   'diff.expandAll': 'အားလုံး ဖြန့်ပြ',
   'diff.collapseFile': 'ဖိုင်ကို ပြန်ခေါက်',
@@ -145,7 +136,6 @@ export default {
   'menu.modelUsage': 'မော်ဒယ် အသုံးပြုမှု',
 
   'sidebar.scratchpad': 'မှတ်စုစာရွက်',
-  'sidebar.annotations': 'မှတ်ချက်များ',
   'sidebar.artifacts': 'အာတိဖက်များ',
   'sidebar.howArtifactsWork': 'အာတိဖက်များ မည်သို့လုပ်ဆောင်သနည်း',
   'sidebar.expandPanel': 'အကန့် ချဲ့',
@@ -286,7 +276,6 @@ export default {
   'settings.doneSound': 'ပြီးဆုံး အသံ',
   'settings.doneSoundHint': 'တုံ့ပြန်မှု အသင့်ဖြစ်သောအခါ ဖွင့်သော အသံ။',
 
-
   'settings.about': 'အကြောင်း',
   'settings.docs': 'စာရွက်စာတမ်း',
   'settings.docsHint': 'pi-web အတွက် လမ်းညွှန်များနှင့် ဗိသုကာ စာရွက်စာတမ်းများ။',
@@ -347,8 +336,6 @@ export default {
     '<strong>အာတိဖက်များ</strong> သည် အေးဂျင့်ရေးသားသော ဖိုင်များနှင့် ၎င်းမျှဝေသော ကြီးမားသော ကုဒ်ဘလောက်များဖြစ်ပြီး စကားဝိုင်းမှ ဆွဲထုတ်ထားသဖြင့် နေရာတစ်ခုတည်းတွင် ရှာဖွေ၊ ဖတ်ရှု၊ ကူးယူ သို့မဟုတ် ဒေါင်းလုဒ်လုပ်နိုင်သည်။',
   'artifactHelp.viewing':
     '<strong>ကြည့်ရှုခြင်း။</strong> ၎င်း၏ source ကိုကြည့်ရန် စာရင်းမှ တစ်ခု ရွေးပါ။ HTML, SVG နှင့် Markdown ဖိုင်များတွင် <em>အစမ်းကြည့်</em> ခလုတ်လည်း ရှိသည် — HTML/SVG သည် လုံခြုံသော sandbox တွင် လုပ်ဆောင်ပြီး Markdown ကို ပုံစံချထားသော စာသားအဖြစ် ပြသသည်။',
-  'artifactHelp.annotating':
-    '<strong>မှတ်ချက်ရေးခြင်း။</strong> မှတ်ချက်ထားရန် အာတိဖက်တစ်ခု၏ source ရှိ စာသားကို ရွေးပါ။ သင့်မှတ်ချက်များသည် <em>မှတ်ချက်များ</em> တက်ဘ်တွင် စုဆောင်းပြီး ၎င်းတို့သို့ ပြန်သွားနိုင်သည် သို့မဟုတ် အေးဂျင့်ထံ ပို့နိုင်သည်။',
   'artifactHelp.upToDate':
     '<strong>အမြဲမွမ်းမံထားခြင်း။</strong> အေးဂျင့် <em>ရေးသား</em> သို့မဟုတ် <em>တည်းဖြတ်</em> သော ဖိုင်များသည် အလိုအလျောက် မွမ်းမံပြီး ရိုးရှင်းသော အမည်ပြောင်းခြင်း သို့မဟုတ် ဖျက်ခြင်း (<code>mv</code>, <code>git mv</code>, <code>rm</code>) ကိုလည်း ခြေရာခံသည်။ သို့သော် အခြား shell command များ — <code>sed</code> သို့မဟုတ် output redirect ကဲ့သို့ — မှ ပြုလုပ်သော ပြောင်းလဲမှုများကို စကားဝိုင်းမှ မခြေရာခံနိုင်သဖြင့် တစ်ခါတစ်ရံ အာတိဖက်သည် ဗားရှင်းဟောင်းကို ပြသနိုင်သည်။ သံသယရှိပါက ဒစ်ခ်ပေါ်ရှိ ဖိုင်ကို စစ်ဆေးပါ။',
   'artifactHelp.note':
@@ -382,17 +369,6 @@ export default {
   'artifact.emptyNone': 'ဤ session တွင် အာတိဖက် မရှိသေးပါ။',
   'artifact.nounOne': 'အာတိဖက်',
   'artifact.nounMany': 'အာတိဖက်များ',
-  'annotation.empty': 'မှတ်ချက်ထည့်ရန် မက်ဆေ့ခ်ျ သို့မဟုတ် အာတိဖက်ရှိ စာသားကို ရွေးပါ။',
-  'annotation.deleteNote': 'မှတ်ချက်ဖျက်မည်',
-  'annotation.sendNotesToPi': '{count} {noun} ကို pi သို့ ပို့မည်',
-  'annotation.noteOne': 'မှတ်ချက်',
-  'annotation.noteMany': 'မှတ်ချက်များ',
-  'annotation.addNote': 'မှတ်ချက်ထည့်မည်',
-  'annotation.addNotePlaceholder': 'မှတ်ချက်ထည့်မည်…',
-  'annotation.cancel': 'ပယ်ဖျက်',
-  'annotation.saveNote': 'မှတ်ချက်သိမ်းမည်',
-  'annotation.addToChat': 'ဆက်စကားသို့ ထည့်မည်',
-  'annotation.comment': 'မှတ်ချက်ပြုမည်',
   'version.unavailable': 'ဗားရှင်း အချက်အလက် မရရှိနိုင်ပါ။',
   'version.checkForUpdates': 'အပ်ဒိတ်များ စစ်ဆေး',
   'version.checking': 'စစ်ဆေးနေ…',

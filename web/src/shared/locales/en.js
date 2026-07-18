@@ -305,15 +305,6 @@ export default {
   'diff.notRepo': 'Not a git repository',
   'diff.split': 'Split',
   'diff.unified': 'Unified',
-  'diff.commentPlaceholder': 'Leave a comment…',
-  'diff.save': 'Save',
-  'diff.cancel': 'Cancel',
-  'diff.delete': 'Delete',
-  'diff.edit': 'Edit',
-  'diff.submitReview': 'Submit review',
-  'diff.reviewSubmitted': 'Review added to chat',
-  'diff.noComments': 'No comments to submit',
-  'diff.saveFailed': 'Failed to save comment',
   'diff.collapseAll': 'Collapse all',
   'diff.expandAll': 'Expand all',
   'diff.collapseFile': 'Collapse file',
@@ -321,7 +312,6 @@ export default {
 
   // ── Right sidebar ──
   'sidebar.scratchpad': 'Scratchpad',
-  'sidebar.annotations': 'Annotations',
   'sidebar.artifacts': 'Artifacts',
   'sidebar.howArtifactsWork': 'How artifacts work',
   'sidebar.expandPanel': 'Expand panel',
@@ -483,7 +473,6 @@ export default {
   'settings.doneSound': 'Done sound',
   'settings.doneSoundHint': 'Sound played when a response is ready.',
 
-
   'settings.about': 'About',
   'settings.docs': 'Documentation',
   'settings.docsHint': 'Guides and architecture docs for pi-web.',
@@ -554,25 +543,12 @@ export default {
   'artifact.emptyNone': 'No artifacts in this session yet.',
   'artifact.nounOne': 'artifact',
   'artifact.nounMany': 'artifacts',
-  'annotation.empty': 'Select text in a message or artifact to add a note.',
-  'annotation.deleteNote': 'Delete note',
-  'annotation.sendNotesToPi': 'Send {count} {noun} to pi',
-  'annotation.noteOne': 'note',
-  'annotation.noteMany': 'notes',
-  'annotation.addNote': 'Add a note',
-  'annotation.addNotePlaceholder': 'Add a note…',
-  'annotation.cancel': 'Cancel',
-  'annotation.saveNote': 'Save note',
-  'annotation.addToChat': 'Add to chat',
-  'annotation.comment': 'Annotate',
 
   // ── Artifacts help modal (HTML — rendered via {@html}) ──
   'artifactHelp.intro':
     '<strong>Artifacts</strong> are the files the agent wrote and the larger code blocks it shared, pulled out of the conversation so you can find, read, copy, or download them in one place.',
   'artifactHelp.viewing':
     '<strong>Viewing.</strong> Pick one from the list to see its source. HTML, SVG, and Markdown files also have a <em>Preview</em> toggle — HTML/SVG run in a secure sandbox, Markdown renders as formatted text.',
-  'artifactHelp.annotating':
-    "<strong>Annotating.</strong> Select text in an artifact's source to leave a note. Your notes collect in the <em>Annotations</em> tab, where you can jump back to them or send them to the agent.",
   'artifactHelp.upToDate':
     "<strong>Staying up to date.</strong> Files the agent <em>writes</em> or <em>edits</em> update automatically, and simple renames or deletes (<code>mv</code>, <code>git mv</code>, <code>rm</code>) are tracked too. But changes made through other shell commands — like <code>sed</code> or output redirects — can't be followed from the conversation, so once in a while an artifact may show an older version. When in doubt, check the file on disk.",
   'artifactHelp.note':

@@ -3,8 +3,8 @@
 // Renders a self-contained session snapshot (GitHub Gist) using the SAME
 // rendering modules as the live app (web/src/session/*). It deliberately omits
 // every live-only concern: no SSE/live-reload, no chat composer, no
-// artifacts/annotations, no fetch-backed features. Those DOM hosts are not
-// emitted by the server when IsLive is false, so the shared UI helpers no-op.
+// artifacts, no fetch-backed features. Those DOM hosts are not emitted by the
+// server when IsLive is false, so the shared UI helpers no-op.
 //
 // marked and highlight.js are provided as window globals by the inlined vendor
 // <script> tags (see internal/ui/export.go); they are marked external in the

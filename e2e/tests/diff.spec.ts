@@ -39,21 +39,6 @@ function gitRepoWithChanges(): string {
   return dir;
 }
 
-/** A temp git repo where three consecutive lines (2-4) are modified. */
-function gitRepoWithBlockChange(): string {
-  const dir = mkdtempSync(join(tmpdir(), "pi-web-e2e-gitblock-"));
-  const git = (...args: string[]) =>
-    execFileSync("git", args, { cwd: dir, stdio: "pipe" });
-  git("init", "-q");
-  git("config", "user.email", "t@e2e.test");
-  git("config", "user.name", "E2E");
-  writeFileSync(join(dir, "block.txt"), "a\nb\nc\nd\ne\nf\n");
-  git("add", "block.txt");
-  git("commit", "-q", "-m", "add block");
-  writeFileSync(join(dir, "block.txt"), "a\nB2\nC3\nD4\ne\nf\n");
-  return dir;
-}
-
 async function waitSessionReady(page: Page) {
   await page
     .locator("#tree-container .tree-node")
@@ -120,83 +105,6 @@ test.describe("diff review modal", () => {
     await expect(page.locator(".diff-status")).toContainText(
       "Not a git repository",
     );
-  });
-
-  test("adds a comment from the gutter, persists it across reload, and submits it", async ({
-    page,
-    sessionsDir,
-  }, testInfo) => {
-    const { entries } = buildSession({ cwd: gitRepoWithChanges() });
-    const name = uniqueSessionName(testInfo, "diffreview");
-    writeSession(sessionsDir, name, entries);
-
-    await page.goto(`/session?id=${encodeURIComponent(name)}`);
-    await openDiffModal(page);
-    const container = page.locator(".diff-codeview diffs-container").first();
-    await expect(container).toBeVisible({ timeout: 15000 });
-
-    // Hover the changed line, click the gutter "+", type a comment, and save.
-    await container.getByText("CHANGED two").hover();
-    await container
-      .locator("button[data-utility-button]")
-      .first()
-      .click({ force: true });
-    await container.locator("textarea").first().fill("please revert this");
-    await container.getByRole("button", { name: "Save" }).click();
-    await expect(container.locator("text=please revert this")).toBeVisible();
-
-    // Reload — the modal restores itself from the `?diff=open` URL param and
-    // the comment is still there (persisted server-side, fetched on re-init).
-    await page.reload();
-    await expect(page.locator(".diff-toolbar")).toBeVisible({ timeout: 15000 });
-    const container2 = page.locator(".diff-codeview diffs-container").first();
-    await expect(container2).toBeVisible({ timeout: 15000 });
-    await expect(container2.locator("text=please revert this")).toBeVisible();
-
-    // Submitting composes the comment into the chat composer.
-    await page.locator(".diff-submit").click();
-    await expect(page.locator("#pi-chat-message")).toHaveValue(
-      /please revert this/,
-    );
-    await expect(page.locator(".diff-toolbar")).toBeHidden();
-  });
-
-  test("reclaims the annotation's height after deleting the last comment", async ({
-    page,
-    sessionsDir,
-  }, testInfo) => {
-    const { entries } = buildSession({ cwd: gitRepoWithChanges() });
-    const name = uniqueSessionName(testInfo, "diffgap");
-    writeSession(sessionsDir, name, entries);
-
-    await page.goto(`/session?id=${encodeURIComponent(name)}`);
-    await openDiffModal(page);
-    const container = page.locator(".diff-codeview diffs-container").first();
-    await expect(container).toBeVisible({ timeout: 15000 });
-
-    // Distance from the top of the viewport to the file — must not balloon after
-    // a comment is added and removed (the virtualizer used to strand the
-    // annotation's reserved height, leaving a large gap).
-    const fileOffset = async () => {
-      const view = await page.locator(".diff-codeview").boundingBox();
-      const file = await container.boundingBox();
-      return file!.y - view!.y;
-    };
-    const baseline = await fileOffset();
-
-    await container.getByText("CHANGED two").hover();
-    await container
-      .locator("button[data-utility-button]")
-      .first()
-      .click({ force: true });
-    await container.locator("textarea").first().fill("temporary");
-    await container.getByRole("button", { name: "Save" }).click();
-    await expect(container.locator("text=temporary")).toBeVisible();
-
-    await container.getByRole("button", { name: "Delete" }).click();
-    await expect(container.locator("text=temporary")).toHaveCount(0);
-
-    await expect.poll(fileOffset).toBeLessThan(baseline + 40);
   });
 
   test("re-themes the diff when the app theme changes", async ({
@@ -285,61 +193,5 @@ test.describe("diff review modal", () => {
     await expect(toggle).toHaveText("Collapse all");
     await expect(containers.first().getByText("CHANGED two")).toBeVisible();
     await expect(containers.nth(1).getByText("fresh content")).toBeVisible();
-  });
-
-  test("comments on a multi-line range selected by dragging the gutter", async ({
-    page,
-    sessionsDir,
-    baseURL,
-  }, testInfo) => {
-    const { entries } = buildSession({ cwd: gitRepoWithBlockChange() });
-    const name = uniqueSessionName(testInfo, "diffrange");
-    writeSession(sessionsDir, name, entries);
-
-    await page.goto(`/session?id=${encodeURIComponent(name)}`);
-    await openDiffModal(page);
-    // Unified gives a single line-number column, simplest to drag-select.
-    await page.locator(".diff-toggle-btn", { hasText: "Unified" }).click();
-    const container = page.locator(".diff-codeview diffs-container").first();
-    await expect(container).toBeVisible({ timeout: 15000 });
-
-    // Drag across the line-number gutter from line 2 to line 4 to select a range.
-    const lineNumber = (n: number) =>
-      container.locator(`[data-column-number="${n}"]`).first();
-    // Wait for the unified layout's line-number elements to be laid out before
-    // reading their boxes (boundingBox returns null on unattached elements).
-    await lineNumber(2).waitFor({ state: "visible" });
-    await lineNumber(4).waitFor({ state: "visible" });
-    const top = await lineNumber(2).boundingBox();
-    const bottom = await lineNumber(4).boundingBox();
-    await page.mouse.move(top!.x + 12, top!.y + top!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(top!.x + 12, top!.y + top!.height, { steps: 3 });
-    await page.mouse.move(bottom!.x + 12, bottom!.y + bottom!.height / 2, {
-      steps: 12,
-    });
-    await page.mouse.up();
-    // Nudge to surface the gutter "+" over the selection, then open the composer.
-    await page.mouse.move(bottom!.x + 80, bottom!.y + bottom!.height / 2);
-    await container
-      .locator("button[data-utility-button]")
-      .first()
-      .click({ force: true });
-    await container
-      .locator("textarea")
-      .first()
-      .fill("address this whole block");
-    await container.getByRole("button", { name: "Save" }).click();
-    await expect(
-      container.locator("text=address this whole block"),
-    ).toBeVisible();
-
-    // The persisted comment spans more than one line.
-    const res = await page.request.get(
-      `${baseURL}/api/diff/reviews?session=${encodeURIComponent(name)}`,
-    );
-    const { comments } = await res.json();
-    expect(comments).toHaveLength(1);
-    expect(comments[0].endLine).toBeGreaterThan(comments[0].startLine);
   });
 });

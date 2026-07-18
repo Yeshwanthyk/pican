@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Bukan repositori git',
   'diff.split': 'Berpisah',
   'diff.unified': 'Bersatu',
-  'diff.commentPlaceholder': 'Tinggalkan komen…',
-  'diff.save': 'Simpan',
-  'diff.cancel': 'Batal',
-  'diff.delete': 'Padam',
-  'diff.edit': 'Edit',
-  'diff.submitReview': 'Hantar semakan',
-  'diff.reviewSubmitted': 'Semakan ditambah ke sembang',
-  'diff.noComments': 'Tiada komen untuk dihantar',
-  'diff.saveFailed': 'Gagal menyimpan komen',
   'diff.collapseAll': 'Runtuhkan semua',
   'diff.expandAll': 'Kembangkan semua',
   'diff.collapseFile': 'Runtuhkan fail',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'Penggunaan Model',
 
   'sidebar.scratchpad': 'Papan conteng',
-  'sidebar.annotations': 'Anotasi',
   'sidebar.artifacts': 'Artifak',
   'sidebar.howArtifactsWork': 'Cara artifak berfungsi',
   'sidebar.expandPanel': 'Kembangkan panel',
@@ -284,7 +274,6 @@ export default {
   'settings.doneSound': 'Bunyi selesai',
   'settings.doneSoundHint': 'Bunyi yang dimainkan apabila respons sedia.',
 
-
   'settings.about': 'Perihal',
   'settings.docs': 'Dokumentasi',
   'settings.docsHint': 'Panduan dan dokumen seni bina untuk pi-web.',
@@ -344,8 +333,6 @@ export default {
     '<strong>Artifak</strong> ialah fail yang ditulis ejen dan blok kod besar yang dikongsikannya, ditarik keluar daripada perbualan supaya anda boleh mencari, membaca, menyalin atau memuat turunnya di satu tempat.',
   'artifactHelp.viewing':
     '<strong>Melihat.</strong> Pilih satu daripada senarai untuk melihat sumbernya. Fail HTML, SVG dan Markdown juga mempunyai togol <em>Pratonton</em> — HTML/SVG berjalan dalam kotak pasir selamat, Markdown dipaparkan sebagai teks berformat.',
-  'artifactHelp.annotating':
-    '<strong>Anotasi.</strong> Pilih teks dalam sumber artifak untuk meninggalkan nota. Nota anda terkumpul dalam tab <em>Anotasi</em>, di mana anda boleh kembali kepadanya atau menghantarnya kepada ejen.',
   'artifactHelp.upToDate':
     '<strong>Kekal terkini.</strong> Fail yang <em>ditulis</em> atau <em>disunting</em> ejen dikemas kini secara automatik, dan penamaan semula atau pemadaman mudah (<code>mv</code>, <code>git mv</code>, <code>rm</code>) turut dijejaki. Tetapi perubahan melalui perintah shell lain — seperti <code>sed</code> atau pengalihan output — tidak dapat diikuti daripada perbualan, jadi sekali-sekala artifak mungkin memaparkan versi lama. Jika ragu, periksa fail pada cakera.',
   'artifactHelp.note':
@@ -379,17 +366,6 @@ export default {
   'artifact.emptyNone': 'Belum ada artifak dalam sesi ini.',
   'artifact.nounOne': 'artifak',
   'artifact.nounMany': 'artifak',
-  'annotation.empty': 'Pilih teks dalam mesej atau artifak untuk menambah nota.',
-  'annotation.deleteNote': 'Padam nota',
-  'annotation.sendNotesToPi': 'Hantar {count} {noun} kepada pi',
-  'annotation.noteOne': 'nota',
-  'annotation.noteMany': 'nota',
-  'annotation.addNote': 'Tambah nota',
-  'annotation.addNotePlaceholder': 'Tambah nota…',
-  'annotation.cancel': 'Batal',
-  'annotation.saveNote': 'Simpan nota',
-  'annotation.addToChat': 'Tambah ke sembang',
-  'annotation.comment': 'Anotasi',
   'version.unavailable': 'Maklumat versi tidak tersedia.',
   'version.checkForUpdates': 'Semak kemas kini',
   'version.checking': 'Menyemak…',

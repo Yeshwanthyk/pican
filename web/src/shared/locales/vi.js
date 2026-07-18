@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Không phải kho lưu trữ git',
   'diff.split': 'Chia đôi',
   'diff.unified': 'Hợp nhất',
-  'diff.commentPlaceholder': 'Để lại bình luận…',
-  'diff.save': 'Lưu',
-  'diff.cancel': 'Hủy',
-  'diff.delete': 'Xóa',
-  'diff.edit': 'Sửa',
-  'diff.submitReview': 'Gửi đánh giá',
-  'diff.reviewSubmitted': 'Đã thêm đánh giá vào trò chuyện',
-  'diff.noComments': 'Không có bình luận để gửi',
-  'diff.saveFailed': 'Không thể lưu bình luận',
   'diff.collapseAll': 'Thu gọn tất cả',
   'diff.expandAll': 'Mở rộng tất cả',
   'diff.collapseFile': 'Thu gọn tập tin',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'Mức dùng mô hình',
 
   'sidebar.scratchpad': 'Giấy nháp',
-  'sidebar.annotations': 'Chú thích',
   'sidebar.artifacts': 'Tạo phẩm',
   'sidebar.howArtifactsWork': 'Cách tạo phẩm hoạt động',
   'sidebar.expandPanel': 'Mở rộng bảng',
@@ -281,7 +271,6 @@ export default {
   'settings.doneSound': 'Âm thanh hoàn tất',
   'settings.doneSoundHint': 'Âm thanh phát khi phản hồi sẵn sàng.',
 
-
   'settings.about': 'Giới thiệu',
   'settings.docs': 'Tài liệu',
   'settings.docsHint': 'Hướng dẫn và tài liệu kiến trúc cho pi-web.',
@@ -341,8 +330,6 @@ export default {
     '<strong>Tạo phẩm</strong> là các tệp mà tác nhân đã viết và những khối mã lớn hơn nó đã chia sẻ, được rút ra khỏi cuộc trò chuyện để bạn có thể tìm, đọc, sao chép hoặc tải xuống ở một nơi.',
   'artifactHelp.viewing':
     '<strong>Xem.</strong> Chọn một mục từ danh sách để xem nguồn của nó. Các tệp HTML, SVG và Markdown cũng có nút <em>Xem trước</em> — HTML/SVG chạy trong hộp cát an toàn, Markdown hiển thị dưới dạng văn bản định dạng.',
-  'artifactHelp.annotating':
-    '<strong>Chú thích.</strong> Chọn văn bản trong nguồn của tạo phẩm để để lại ghi chú. Ghi chú của bạn được tập hợp trong tab <em>Chú thích</em>, nơi bạn có thể quay lại chúng hoặc gửi chúng cho tác nhân.',
   'artifactHelp.upToDate':
     '<strong>Luôn cập nhật.</strong> Các tệp mà tác nhân <em>viết</em> hoặc <em>chỉnh sửa</em> được cập nhật tự động, và việc đổi tên hay xóa đơn giản (<code>mv</code>, <code>git mv</code>, <code>rm</code>) cũng được theo dõi. Nhưng những thay đổi qua các lệnh shell khác — như <code>sed</code> hoặc chuyển hướng đầu ra — không thể theo dõi từ cuộc trò chuyện, nên thỉnh thoảng một tạo phẩm có thể hiển thị phiên bản cũ. Khi nghi ngờ, hãy kiểm tra tệp trên đĩa.',
   'artifactHelp.note':
@@ -376,17 +363,6 @@ export default {
   'artifact.emptyNone': 'Chưa có tạo phẩm nào trong phiên này.',
   'artifact.nounOne': 'tạo phẩm',
   'artifact.nounMany': 'tạo phẩm',
-  'annotation.empty': 'Chọn văn bản trong tin nhắn hoặc tạo phẩm để thêm ghi chú.',
-  'annotation.deleteNote': 'Xóa ghi chú',
-  'annotation.sendNotesToPi': 'Gửi {count} {noun} tới pi',
-  'annotation.noteOne': 'ghi chú',
-  'annotation.noteMany': 'ghi chú',
-  'annotation.addNote': 'Thêm ghi chú',
-  'annotation.addNotePlaceholder': 'Thêm ghi chú…',
-  'annotation.cancel': 'Hủy',
-  'annotation.saveNote': 'Lưu ghi chú',
-  'annotation.addToChat': 'Thêm vào trò chuyện',
-  'annotation.comment': 'Chú thích',
   'version.unavailable': 'Thông tin phiên bản không khả dụng.',
   'version.checkForUpdates': 'Kiểm tra cập nhật',
   'version.checking': 'Đang kiểm tra…',

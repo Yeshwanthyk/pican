@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'មិនមែនជា git repository ទេ',
   'diff.split': 'បំបែក',
   'diff.unified': 'រួមបញ្ចូលគ្នា',
-  'diff.commentPlaceholder': 'ទុកមតិយោបល់…',
-  'diff.save': 'រក្សាទុក',
-  'diff.cancel': 'បោះបង់',
-  'diff.delete': 'លុប',
-  'diff.edit': 'កែសម្រួល',
-  'diff.submitReview': 'ដាក់ស្នើការត្រួតពិនិត្យ',
-  'diff.reviewSubmitted': 'បានបន្ថែមការត្រួតពិនិត្យទៅការជជែក',
-  'diff.noComments': 'គ្មានមតិយោបល់ដើម្បីដាក់ស្នើ',
-  'diff.saveFailed': 'បរាជ័យក្នុងការរក្សាទុកមតិយោបល់',
   'diff.collapseAll': 'បង្រួមទាំងអស់',
   'diff.expandAll': 'ពង្រីកទាំងអស់',
   'diff.collapseFile': 'បង្រួមឯកសារ',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'ការប្រើប្រាស់ម៉ូដែល',
 
   'sidebar.scratchpad': 'ក្រដាសព្រាង',
-  'sidebar.annotations': 'ចំណារ',
   'sidebar.artifacts': 'អាទីហ្វាក់',
   'sidebar.howArtifactsWork': 'របៀបដែលអាទីហ្វាក់ដំណើរការ',
   'sidebar.expandPanel': 'ពង្រីកផ្ទាំង',
@@ -280,7 +270,6 @@ export default {
   'settings.doneSound': 'សំឡេងបញ្ចប់',
   'settings.doneSoundHint': 'សំឡេងដែលចាក់ពេលការឆ្លើយតបរួចរាល់។',
 
-
   'settings.about': 'អំពី',
   'settings.docs': 'ឯកសារ',
   'settings.docsHint': 'មគ្គុទេសក៍ និងឯកសារស្ថាបត្យកម្មសម្រាប់ pi-web។',
@@ -340,8 +329,6 @@ export default {
     '<strong>អាទីហ្វាក់</strong> គឺជាឯកសារដែលភ្នាក់ងារបានសរសេរ និងប្លុកកូដធំៗដែលវាបានចែករំលែក ដកចេញពីការសន្ទនា ដើម្បីឱ្យអ្នកអាចស្វែងរក អាន ចម្លង ឬទាញយកពួកវានៅកន្លែងតែមួយ។',
   'artifactHelp.viewing':
     '<strong>ការមើល។</strong> ជ្រើសមួយពីបញ្ជីដើម្បីមើល source របស់វា។ ឯកសារ HTML, SVG និង Markdown ក៏មានប៊ូតុង <em>មើលជាមុន</em> ផងដែរ — HTML/SVG ដំណើរការក្នុង sandbox សុវត្ថិភាព ហើយ Markdown បង្ហាញជាអត្ថបទមានទម្រង់។',
-  'artifactHelp.annotating':
-    '<strong>ការដាក់ចំណារ។</strong> ជ្រើសអត្ថបទក្នុង source របស់អាទីហ្វាក់ដើម្បីទុកកំណត់ចំណាំ។ កំណត់ចំណាំរបស់អ្នកប្រមូលផ្ដុំក្នុងផ្ទាំង <em>ចំណារ</em> ដែលអ្នកអាចត្រឡប់ទៅពួកវា ឬផ្ញើទៅភ្នាក់ងារ។',
   'artifactHelp.upToDate':
     '<strong>ការរក្សាឱ្យទាន់សម័យ។</strong> ឯកសារដែលភ្នាក់ងារ <em>សរសេរ</em> ឬ <em>កែសម្រួល</em> ធ្វើបច្ចុប្បន្នភាពស្វ័យប្រវត្តិ ហើយការប្ដូរឈ្មោះ ឬលុបសាមញ្ញ (<code>mv</code>, <code>git mv</code>, <code>rm</code>) ក៏ត្រូវបានតាមដានដែរ។ ប៉ុន្តែការផ្លាស់ប្ដូរតាមរយៈពាក្យបញ្ជា shell ផ្សេងៗ — ដូចជា <code>sed</code> ឬការប្ដូរទិសលទ្ធផល — មិនអាចតាមដានពីការសន្ទនាបានទេ ដូច្នេះម្ដងម្កាលអាទីហ្វាក់អាចបង្ហាញកំណែចាស់។ នៅពេលសង្ស័យ សូមពិនិត្យឯកសារនៅលើថាស។',
   'artifactHelp.note':
@@ -375,17 +362,6 @@ export default {
   'artifact.emptyNone': 'មិនទាន់មានអាទីហ្វាក់ក្នុង session នេះទេ។',
   'artifact.nounOne': 'អាទីហ្វាក់',
   'artifact.nounMany': 'អាទីហ្វាក់',
-  'annotation.empty': 'ជ្រើសអត្ថបទក្នុងសារ ឬអាទីហ្វាក់ ដើម្បីបន្ថែមកំណត់ចំណាំ។',
-  'annotation.deleteNote': 'លុបកំណត់ចំណាំ',
-  'annotation.sendNotesToPi': 'ផ្ញើ {count} {noun} ទៅ pi',
-  'annotation.noteOne': 'កំណត់ចំណាំ',
-  'annotation.noteMany': 'កំណត់ចំណាំ',
-  'annotation.addNote': 'បន្ថែមកំណត់ចំណាំ',
-  'annotation.addNotePlaceholder': 'បន្ថែមកំណត់ចំណាំ…',
-  'annotation.cancel': 'បោះបង់',
-  'annotation.saveNote': 'រក្សាទុកកំណត់ចំណាំ',
-  'annotation.addToChat': 'បញ្ចូលទៅជជែក',
-  'annotation.comment': 'ដាក់ចំណារ',
   'version.unavailable': 'ព័ត៌មានកំណែមិនមានទេ។',
   'version.checkForUpdates': 'ពិនិត្យបច្ចុប្បន្នភាព',
   'version.checking': 'កំពុងពិនិត្យ…',

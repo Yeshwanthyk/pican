@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Bukan repositori git',
   'diff.split': 'Terpisah',
   'diff.unified': 'Terpadu',
-  'diff.commentPlaceholder': 'Tinggalkan komentar…',
-  'diff.save': 'Simpan',
-  'diff.cancel': 'Batal',
-  'diff.delete': 'Hapus',
-  'diff.edit': 'Edit',
-  'diff.submitReview': 'Kirim tinjauan',
-  'diff.reviewSubmitted': 'Tinjauan ditambahkan ke obrolan',
-  'diff.noComments': 'Tidak ada komentar untuk dikirim',
-  'diff.saveFailed': 'Gagal menyimpan komentar',
   'diff.collapseAll': 'Ciutkan semua',
   'diff.expandAll': 'Bentangkan semua',
   'diff.collapseFile': 'Ciutkan berkas',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'Penggunaan Model',
 
   'sidebar.scratchpad': 'Papan coret',
-  'sidebar.annotations': 'Anotasi',
   'sidebar.artifacts': 'Artefak',
   'sidebar.howArtifactsWork': 'Cara kerja artefak',
   'sidebar.expandPanel': 'Perluas panel',
@@ -282,7 +272,6 @@ export default {
   'settings.doneSound': 'Suara selesai',
   'settings.doneSoundHint': 'Suara yang diputar saat respons siap.',
 
-
   'settings.about': 'Tentang',
   'settings.docs': 'Dokumentasi',
   'settings.docsHint': 'Panduan dan dokumentasi arsitektur untuk pi-web.',
@@ -343,8 +332,6 @@ export default {
     '<strong>Artefak</strong> adalah file yang ditulis agen dan blok kode besar yang dibagikannya, ditarik keluar dari percakapan agar Anda dapat menemukan, membaca, menyalin, atau mengunduhnya di satu tempat.',
   'artifactHelp.viewing':
     '<strong>Melihat.</strong> Pilih salah satu dari daftar untuk melihat sumbernya. File HTML, SVG, dan Markdown juga memiliki tombol <em>Pratinjau</em> — HTML/SVG berjalan di sandbox aman, Markdown ditampilkan sebagai teks berformat.',
-  'artifactHelp.annotating':
-    '<strong>Anotasi.</strong> Pilih teks di sumber artefak untuk meninggalkan catatan. Catatan Anda terkumpul di tab <em>Anotasi</em>, tempat Anda dapat kembali ke catatan tersebut atau mengirimnya ke agen.',
   'artifactHelp.upToDate':
     '<strong>Tetap terkini.</strong> File yang <em>ditulis</em> atau <em>diedit</em> agen diperbarui otomatis, dan penggantian nama atau penghapusan sederhana (<code>mv</code>, <code>git mv</code>, <code>rm</code>) juga dilacak. Namun perubahan melalui perintah shell lain — seperti <code>sed</code> atau pengalihan keluaran — tidak dapat diikuti dari percakapan, jadi sesekali artefak mungkin menampilkan versi lama. Jika ragu, periksa file di disk.',
   'artifactHelp.note':
@@ -379,17 +366,6 @@ export default {
   'artifact.emptyNone': 'Belum ada artefak di sesi ini.',
   'artifact.nounOne': 'artefak',
   'artifact.nounMany': 'artefak',
-  'annotation.empty': 'Pilih teks di pesan atau artefak untuk menambahkan catatan.',
-  'annotation.deleteNote': 'Hapus catatan',
-  'annotation.sendNotesToPi': 'Kirim {count} {noun} ke pi',
-  'annotation.noteOne': 'catatan',
-  'annotation.noteMany': 'catatan',
-  'annotation.addNote': 'Tambahkan catatan',
-  'annotation.addNotePlaceholder': 'Tambahkan catatan…',
-  'annotation.cancel': 'Batal',
-  'annotation.saveNote': 'Simpan catatan',
-  'annotation.addToChat': 'Tambah ke chat',
-  'annotation.comment': 'Anotasi',
   'version.unavailable': 'Informasi versi tidak tersedia.',
   'version.checkForUpdates': 'Periksa pembaruan',
   'version.checking': 'Memeriksa…',

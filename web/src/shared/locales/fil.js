@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Hindi isang git repository',
   'diff.split': 'Hati',
   'diff.unified': 'Pinagsama',
-  'diff.commentPlaceholder': 'Mag-iwan ng komento…',
-  'diff.save': 'I-save',
-  'diff.cancel': 'Kanselahin',
-  'diff.delete': 'Burahin',
-  'diff.edit': 'I-edit',
-  'diff.submitReview': 'Isumite ang review',
-  'diff.reviewSubmitted': 'Naidagdag ang review sa chat',
-  'diff.noComments': 'Walang komento na isusumite',
-  'diff.saveFailed': 'Hindi na-save ang komento',
   'diff.collapseAll': 'I-collapse lahat',
   'diff.expandAll': 'I-expand lahat',
   'diff.collapseFile': 'I-collapse ang file',
@@ -145,7 +136,6 @@ export default {
   'menu.modelUsage': 'Paggamit ng Model',
 
   'sidebar.scratchpad': 'Scratchpad',
-  'sidebar.annotations': 'Mga Anotasyon',
   'sidebar.artifacts': 'Mga Artifact',
   'sidebar.howArtifactsWork': 'Paano gumagana ang mga artifact',
   'sidebar.expandPanel': 'Palawakin ang panel',
@@ -288,7 +278,6 @@ export default {
   'settings.doneSound': 'Tunog ng pagkatapos',
   'settings.doneSoundHint': 'Tunog na pinapatugtog kapag handa na ang tugon.',
 
-
   'settings.about': 'Tungkol',
   'settings.docs': 'Dokumentasyon',
   'settings.docsHint': 'Mga gabay at dokumento ng arkitektura para sa pi-web.',
@@ -349,8 +338,6 @@ export default {
     'Ang <strong>mga artifact</strong> ay ang mga file na isinulat ng agent at ang mas malalaking code block na ibinahagi nito, kinuha mula sa usapan para mahanap, mabasa, makopya, o ma-download mo ang mga ito sa isang lugar.',
   'artifactHelp.viewing':
     '<strong>Pagtingin.</strong> Pumili ng isa mula sa listahan para makita ang source nito. Ang mga HTML, SVG, at Markdown na file ay may toggle ding <em>Preview</em> — tumatakbo ang HTML/SVG sa secure na sandbox, at ang Markdown ay nire-render bilang naka-format na teksto.',
-  'artifactHelp.annotating':
-    '<strong>Pag-annotate.</strong> Pumili ng teksto sa source ng isang artifact para mag-iwan ng tala. Naiipon ang iyong mga tala sa tab na <em>Annotations</em>, kung saan maaari kang bumalik sa kanila o ipadala ang mga ito sa agent.',
   'artifactHelp.upToDate':
     '<strong>Pananatiling napapanahon.</strong> Ang mga file na <em>isinusulat</em> o <em>ine-edit</em> ng agent ay awtomatikong nag-a-update, at sinusubaybayan din ang simpleng pagpapalit ng pangalan o pagtanggal (<code>mv</code>, <code>git mv</code>, <code>rm</code>). Pero ang mga pagbabagong ginawa sa ibang shell command — tulad ng <code>sed</code> o output redirect — ay hindi masusubaybayan mula sa usapan, kaya minsan ay maaaring magpakita ang artifact ng mas lumang bersyon. Kapag may pag-aalinlangan, tingnan ang file sa disk.',
   'artifactHelp.note':
@@ -385,17 +372,6 @@ export default {
   'artifact.emptyNone': 'Wala pang artifact sa session na ito.',
   'artifact.nounOne': 'artifact',
   'artifact.nounMany': 'artifact',
-  'annotation.empty': 'Pumili ng teksto sa mensahe o artifact para magdagdag ng tala.',
-  'annotation.deleteNote': 'Burahin ang tala',
-  'annotation.sendNotesToPi': 'Ipadala ang {count} {noun} sa pi',
-  'annotation.noteOne': 'tala',
-  'annotation.noteMany': 'tala',
-  'annotation.addNote': 'Magdagdag ng tala',
-  'annotation.addNotePlaceholder': 'Magdagdag ng tala…',
-  'annotation.cancel': 'Kanselahin',
-  'annotation.saveNote': 'I-save ang tala',
-  'annotation.addToChat': 'Idagdag sa chat',
-  'annotation.comment': 'Mag-annotate',
   'version.unavailable': 'Hindi available ang impormasyon ng bersyon.',
   'version.checkForUpdates': 'Maghanap ng update',
   'version.checking': 'Sinusuri…',

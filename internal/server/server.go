@@ -214,8 +214,8 @@ func initDB(agentDir string) (*sql.DB, error) {
 	}
 	// SQLite allows only one writer at a time; multiple pooled connections
 	// racing to write surface as "database is locked" errors (e.g. concurrent
-	// annotation writes). Serialize on a single connection so writes queue
-	// instead of failing.
+	// schedule or share writes). Serialize on a single connection so writes
+	// queue instead of failing.
 	db.SetMaxOpenConns(1)
 	// WAL mode lets readers and the (single) writer make progress concurrently,
 	// which keeps GET /api/chat/queue snappy when the autonomous drainer is
@@ -247,14 +247,10 @@ func initDB(agentDir string) (*sql.DB, error) {
 		{"project_prefs table", projectPrefsSchema},
 		{"app_settings table", appSettingsSchema},
 		{"btw_sessions table", btwSessionsSchema},
-		{"annotations table", annotationsSchema},
-		{"annotations index", annotationsIndex},
 		{"schedules table", schedules.SchedulesTableDDL},
 		{"schedule_runs table", schedules.RunsTableDDL},
 		{"schedule_runs schedule index", schedules.RunsScheduleIndexDDL},
 		{"schedule_runs session index", schedules.RunsSessionIndexDDL},
-		{"review_comments table", reviewCommentsSchema},
-		{"review_comments index", reviewCommentsIndex},
 		{"chat_queue_items table", chatqueue.ItemsTableDDL},
 		{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
 		{"chat_queue_state table", chatqueue.StateTableDDL},
@@ -314,14 +310,12 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/git/info", s.auth.Wrap(s.handleGitInfo))
 	mux.HandleFunc("/api/git/rename-branch", s.auth.Wrap(s.handleGitRenameBranch))
 	mux.HandleFunc("/api/git/diff", s.auth.Wrap(s.handleGitDiff))
-	mux.HandleFunc("/api/diff/reviews", s.auth.Wrap(s.handleReviewComments))
 	// Public (no auth): the login gate needs the custom palette to theme
 	// correctly before the user authenticates. Contents are non-secret color
 	// variables only.
 	mux.HandleFunc("/custom-themes.css", s.handleCustomThemes)
 	mux.HandleFunc("/api/scratchpad", s.getPostHandler(s.handleGetScratchpad, s.handleSaveScratchpad))
 	mux.HandleFunc("/api/chat/queue", s.auth.Wrap(s.handleChatQueue))
-	mux.HandleFunc("/api/annotations", s.auth.Wrap(s.handleAnnotations))
 	mux.HandleFunc("/api/settings", s.getPostHandler(s.handleGetSettings, s.handleSaveSettings))
 	mux.HandleFunc("/api/btw", s.auth.Wrap(s.handleGetBtw))
 	mux.HandleFunc("/api/btw/new", s.auth.Wrap(s.handleNewBtw))

@@ -15,7 +15,7 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 | Live Updates | Server-Sent Events (SSE) |
 | Chat RPC | JSONL over stdin/stdout via `pi --mode rpc` |
 | Session Storage | JSONL files on disk; pi-web creates new session files and appends `session_info` for browser rename |
-| Local DB | SQLite (`~/.pi/agent/pi-web.sqlite`) for per-project scratchpads, per-session review annotations, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
+| Local DB | SQLite (`~/.pi/agent/pi-web.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
 ## Component Diagram
@@ -35,7 +35,7 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   │  /workflows → WorkflowsPage (Svelte)  │  │  • workflows-updated    │  │
 │   │  /tasks → TasksPage (Svelte)           │  │                         │  │
 │   │  /subagents → SubagentsPage (Svelte)   │  │                         │  │
-│   │  /login → LoginPage                   │  │  • annotations, btw…    │  │
+│   │  /login → LoginPage                   │  │  • btw…                 │  │
 │   │  shared: CommandPalette, Version UI   │  │                         │  │
 │   └──────────────────────────────────────┘  └─────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -64,9 +64,7 @@ pi-web is a local HTTP server that lets you browse and interact with your pi cod
 │   GET  /api/files     →  handleApiFiles       (@mention autocomplete)    │
 │   GET  /api/git/info  / POST /api/git/rename-branch                      │
 │   GET  /api/git/diff → working-tree diff for the diff modal              │
-│   GET/POST/DELETE /api/diff/reviews → diff review comments (SQLite)      │
 │   GET/POST /api/scratchpad → scratchpad (SQLite)                         │
-│   GET/POST/DELETE /api/annotations → review annotations (SQLite, SSE)    │
 │   GET/POST /api/settings → user settings (SQLite, write-through cache)   │
 │   GET/POST /api/projects → project visibility prefs (SQLite)             │
 │   GET  /api/workflows{,/run} → external workflow run snapshots            │
@@ -144,7 +142,7 @@ name, while pi-web itself continues listening only on localhost.
 ├── session-status/
 │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl   ← terminal writes here
 │   └── …
-├── pi-web.sqlite           ← scratchpads + annotations + project visibility prefs + user settings + btw registry
+├── pi-web.sqlite           ← scratchpads + project visibility prefs + user settings + btw registry
 └── pi-web/
     ├── pi-web-state.json   ← server state file
     ├── custom-themes.css   ← optional user custom theme

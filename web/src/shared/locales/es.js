@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'No es un repositorio git',
   'diff.split': 'Dividida',
   'diff.unified': 'Unificada',
-  'diff.commentPlaceholder': 'Deja un comentario…',
-  'diff.save': 'Guardar',
-  'diff.cancel': 'Cancelar',
-  'diff.delete': 'Eliminar',
-  'diff.edit': 'Editar',
-  'diff.submitReview': 'Enviar revisión',
-  'diff.reviewSubmitted': 'Revisión añadida al chat',
-  'diff.noComments': 'No hay comentarios para enviar',
-  'diff.saveFailed': 'No se pudo guardar el comentario',
   'diff.collapseAll': 'Contraer todo',
   'diff.expandAll': 'Expandir todo',
   'diff.collapseFile': 'Contraer archivo',
@@ -145,7 +136,6 @@ export default {
   'menu.modelUsage': 'Uso del modelo',
 
   'sidebar.scratchpad': 'Bloc de notas',
-  'sidebar.annotations': 'Anotaciones',
   'sidebar.artifacts': 'Artefactos',
   'sidebar.howArtifactsWork': 'Cómo funcionan los artefactos',
   'sidebar.expandPanel': 'Expandir panel',
@@ -287,7 +277,6 @@ export default {
   'settings.doneSound': 'Sonido de finalización',
   'settings.doneSoundHint': 'Sonido reproducido cuando una respuesta está lista.',
 
-
   'settings.about': 'Acerca de',
   'settings.docs': 'Documentación',
   'settings.docsHint': 'Guías y documentación de arquitectura de pi-web.',
@@ -347,8 +336,6 @@ export default {
     'Los <strong>artefactos</strong> son los archivos que el agente escribió y los bloques de código más grandes que compartió, extraídos de la conversación para que puedas encontrarlos, leerlos, copiarlos o descargarlos en un solo lugar.',
   'artifactHelp.viewing':
     '<strong>Visualización.</strong> Elige uno de la lista para ver su código fuente. Los archivos HTML, SVG y Markdown también tienen un interruptor de <em>Vista previa</em> — HTML/SVG se ejecutan en un entorno seguro, Markdown se muestra como texto con formato.',
-  'artifactHelp.annotating':
-    '<strong>Anotación.</strong> Selecciona texto en el código de un artefacto para dejar una nota. Tus notas se reúnen en la pestaña <em>Anotaciones</em>, donde puedes volver a ellas o enviarlas al agente.',
   'artifactHelp.upToDate':
     '<strong>Mantenerse al día.</strong> Los archivos que el agente <em>escribe</em> o <em>edita</em> se actualizan automáticamente, y los renombrados o borrados simples (<code>mv</code>, <code>git mv</code>, <code>rm</code>) también se rastrean. Pero los cambios hechos mediante otros comandos de shell — como <code>sed</code> o redirecciones de salida — no se pueden seguir desde la conversación, así que de vez en cuando un artefacto puede mostrar una versión anterior. En caso de duda, revisa el archivo en disco.',
   'artifactHelp.note':
@@ -382,17 +369,6 @@ export default {
   'artifact.emptyNone': 'Aún no hay artefactos en esta sesión.',
   'artifact.nounOne': 'artefacto',
   'artifact.nounMany': 'artefactos',
-  'annotation.empty': 'Selecciona texto en un mensaje o artefacto para añadir una nota.',
-  'annotation.deleteNote': 'Eliminar nota',
-  'annotation.sendNotesToPi': 'Enviar {count} {noun} a pi',
-  'annotation.noteOne': 'nota',
-  'annotation.noteMany': 'notas',
-  'annotation.addNote': 'Añadir una nota',
-  'annotation.addNotePlaceholder': 'Añadir una nota…',
-  'annotation.cancel': 'Cancelar',
-  'annotation.saveNote': 'Guardar nota',
-  'annotation.addToChat': 'Añadir al chat',
-  'annotation.comment': 'Anotar',
   'version.unavailable': 'La información de versión no está disponible.',
   'version.checkForUpdates': 'Buscar actualizaciones',
   'version.checking': 'Comprobando…',

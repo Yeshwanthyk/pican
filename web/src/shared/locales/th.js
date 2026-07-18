@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'ไม่ใช่ git repository',
   'diff.split': 'แยก',
   'diff.unified': 'รวม',
-  'diff.commentPlaceholder': 'แสดงความคิดเห็น…',
-  'diff.save': 'บันทึก',
-  'diff.cancel': 'ยกเลิก',
-  'diff.delete': 'ลบ',
-  'diff.edit': 'แก้ไข',
-  'diff.submitReview': 'ส่งการรีวิว',
-  'diff.reviewSubmitted': 'เพิ่มการรีวิวลงในแชทแล้ว',
-  'diff.noComments': 'ไม่มีความคิดเห็นที่จะส่ง',
-  'diff.saveFailed': 'บันทึกความคิดเห็นไม่สำเร็จ',
   'diff.collapseAll': 'ยุบทั้งหมด',
   'diff.expandAll': 'ขยายทั้งหมด',
   'diff.collapseFile': 'ยุบไฟล์',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'การใช้งานโมเดล',
 
   'sidebar.scratchpad': 'สมุดทด',
-  'sidebar.annotations': 'คำอธิบายประกอบ',
   'sidebar.artifacts': 'อาร์ติแฟกต์',
   'sidebar.howArtifactsWork': 'อาร์ติแฟกต์ทำงานอย่างไร',
   'sidebar.expandPanel': 'ขยายแผง',
@@ -280,7 +270,6 @@ export default {
   'settings.doneSound': 'เสียงเสร็จสิ้น',
   'settings.doneSoundHint': 'เสียงที่เล่นเมื่อการตอบพร้อม',
 
-
   'settings.about': 'เกี่ยวกับ',
   'settings.docs': 'เอกสาร',
   'settings.docsHint': 'คู่มือและเอกสารสถาปัตยกรรมสำหรับ pi-web',
@@ -340,8 +329,6 @@ export default {
     '<strong>อาร์ติแฟกต์</strong> คือไฟล์ที่เอเจนต์เขียนและบล็อกโค้ดขนาดใหญ่ที่มันแชร์ ดึงออกจากการสนทนาเพื่อให้คุณค้นหา อ่าน คัดลอก หรือดาวน์โหลดได้ในที่เดียว',
   'artifactHelp.viewing':
     '<strong>การดู</strong> เลือกหนึ่งรายการจากรายการเพื่อดูซอร์สของมัน ไฟล์ HTML, SVG และ Markdown ยังมีปุ่มสลับ <em>ดูตัวอย่าง</em> — HTML/SVG ทำงานในแซนด์บ็อกซ์ที่ปลอดภัย ส่วน Markdown แสดงเป็นข้อความที่จัดรูปแบบ',
-  'artifactHelp.annotating':
-    '<strong>การใส่คำอธิบายประกอบ</strong> เลือกข้อความในซอร์สของอาร์ติแฟกต์เพื่อทิ้งโน้ตไว้ โน้ตของคุณจะรวมอยู่ในแท็บ <em>คำอธิบายประกอบ</em> ซึ่งคุณสามารถย้อนกลับไปหาหรือส่งให้เอเจนต์ได้',
   'artifactHelp.upToDate':
     '<strong>การอัปเดตให้ทันสมัย</strong> ไฟล์ที่เอเจนต์ <em>เขียน</em> หรือ <em>แก้ไข</em> จะอัปเดตโดยอัตโนมัติ และการเปลี่ยนชื่อหรือลบอย่างง่าย (<code>mv</code>, <code>git mv</code>, <code>rm</code>) ก็ถูกติดตามด้วย แต่การเปลี่ยนแปลงผ่านคำสั่งเชลล์อื่น — เช่น <code>sed</code> หรือการเปลี่ยนทิศทางเอาต์พุต — ไม่สามารถติดตามได้จากการสนทนา ดังนั้นบางครั้งอาร์ติแฟกต์อาจแสดงเวอร์ชันเก่ากว่า เมื่อสงสัย ให้ตรวจสอบไฟล์บนดิสก์',
   'artifactHelp.note':
@@ -375,17 +362,6 @@ export default {
   'artifact.emptyNone': 'ยังไม่มีอาร์ติแฟกต์ในเซสชันนี้',
   'artifact.nounOne': 'อาร์ติแฟกต์',
   'artifact.nounMany': 'อาร์ติแฟกต์',
-  'annotation.empty': 'เลือกข้อความในข้อความหรืออาร์ติแฟกต์เพื่อเพิ่มโน้ต',
-  'annotation.deleteNote': 'ลบโน้ต',
-  'annotation.sendNotesToPi': 'ส่ง {count} {noun} ไปยัง pi',
-  'annotation.noteOne': 'โน้ต',
-  'annotation.noteMany': 'โน้ต',
-  'annotation.addNote': 'เพิ่มโน้ต',
-  'annotation.addNotePlaceholder': 'เพิ่มโน้ต…',
-  'annotation.cancel': 'ยกเลิก',
-  'annotation.saveNote': 'บันทึกโน้ต',
-  'annotation.addToChat': 'เพิ่มในแชท',
-  'annotation.comment': 'ใส่คำอธิบาย',
   'version.unavailable': 'ไม่มีข้อมูลเวอร์ชัน',
   'version.checkForUpdates': 'ตรวจหาการอัปเดต',
   'version.checking': 'กำลังตรวจสอบ…',

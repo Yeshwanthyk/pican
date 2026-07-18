@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Git リポジトリではありません',
   'diff.split': '分割',
   'diff.unified': '統合',
-  'diff.commentPlaceholder': 'コメントを入力…',
-  'diff.save': '保存',
-  'diff.cancel': 'キャンセル',
-  'diff.delete': '削除',
-  'diff.edit': '編集',
-  'diff.submitReview': 'レビューを送信',
-  'diff.reviewSubmitted': 'レビューをチャットに追加しました',
-  'diff.noComments': '送信するコメントがありません',
-  'diff.saveFailed': 'コメントの保存に失敗しました',
   'diff.collapseAll': 'すべて折りたたむ',
   'diff.expandAll': 'すべて展開',
   'diff.collapseFile': 'ファイルを折りたたむ',
@@ -145,7 +136,6 @@ export default {
   'menu.modelUsage': 'モデル使用量',
 
   'sidebar.scratchpad': 'スクラッチパッド',
-  'sidebar.annotations': '注釈',
   'sidebar.artifacts': 'アーティファクト',
   'sidebar.howArtifactsWork': 'アーティファクトの仕組み',
   'sidebar.expandPanel': 'パネルを展開',
@@ -283,7 +273,6 @@ export default {
   'settings.doneSound': '完了音',
   'settings.doneSoundHint': '応答が準備できたときに鳴る音。',
 
-
   'settings.about': '概要',
   'settings.docs': 'ドキュメント',
   'settings.docsHint': 'pi-web のガイドとアーキテクチャドキュメント。',
@@ -343,8 +332,6 @@ export default {
     '<strong>アーティファクト</strong>は、エージェントが書いたファイルや共有した大きめのコードブロックを、会話から取り出して一か所で見つけ・読み・コピー・ダウンロードできるようにしたものです。',
   'artifactHelp.viewing':
     '<strong>表示。</strong>リストから1つ選ぶとそのソースが表示されます。HTML・SVG・Markdown ファイルには<em>プレビュー</em>切り替えもあります — HTML/SVG は安全なサンドボックスで実行され、Markdown は整形されたテキストとして表示されます。',
-  'artifactHelp.annotating':
-    '<strong>注釈。</strong>アーティファクトのソース内のテキストを選択するとメモを残せます。メモは<em>注釈</em>タブに集まり、そこから戻ったりエージェントに送ったりできます。',
   'artifactHelp.upToDate':
     '<strong>最新の状態を保つ。</strong>エージェントが<em>書き込む</em>または<em>編集する</em>ファイルは自動的に更新され、単純な名前変更や削除（<code>mv</code>、<code>git mv</code>、<code>rm</code>）も追跡されます。ただし <code>sed</code> や出力リダイレクトなど、ほかのシェルコマンドによる変更は会話から追えないため、ときどきアーティファクトが古いバージョンを表示することがあります。疑わしい場合はディスク上のファイルを確認してください。',
   'artifactHelp.note':
@@ -379,17 +366,6 @@ export default {
   'artifact.emptyNone': 'このセッションにはまだアーティファクトがありません。',
   'artifact.nounOne': 'アーティファクト',
   'artifact.nounMany': 'アーティファクト',
-  'annotation.empty': 'メッセージまたはアーティファクトのテキストを選択してメモを追加します。',
-  'annotation.deleteNote': 'メモを削除',
-  'annotation.sendNotesToPi': '{count} 件の{noun}を pi に送信',
-  'annotation.noteOne': 'メモ',
-  'annotation.noteMany': 'メモ',
-  'annotation.addNote': 'メモを追加',
-  'annotation.addNotePlaceholder': 'メモを追加…',
-  'annotation.cancel': 'キャンセル',
-  'annotation.saveNote': 'メモを保存',
-  'annotation.addToChat': 'チャットに追加',
-  'annotation.comment': '注釈',
   'version.unavailable': 'バージョン情報を利用できません。',
   'version.checkForUpdates': '更新を確認',
   'version.checking': '確認中…',

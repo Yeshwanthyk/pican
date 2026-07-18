@@ -3,18 +3,17 @@
   import { icon, CircleHelp, Maximize2, X } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
   import ArtifactPanel from './ArtifactPanel.svelte';
-  import AnnotationLayer from './AnnotationLayer.svelte';
   import { sessionRuntime } from '../../session/session-runtime.js';
   import { createScratchpadController } from './right-sidebar-scratchpad.js';
 
-  let { scratchpad = '', projectPath = '', annotationConfig = {} } = $props();
+  let { scratchpad = '', projectPath = '' } = $props();
 
   const RIGHT_SIDEBAR_COLLAPSED_KEY = 'pi-web:v1:right-sidebar-collapsed';
   const RIGHT_SIDEBAR_WIDTH_KEY = 'pi-web:v1:right-sidebar-width';
   const RIGHT_SIDEBAR_TAB_KEY = 'pi-web:v1:right-sidebar-tab';
   const MIN_CONTENT_WIDTH = 320;
   const DEFAULT_WIDTH_PX = 320; // double-click reset width
-  const TAB_PANES = ['scratchpad', 'notes', 'artifacts'];
+  const TAB_PANES = ['scratchpad', 'artifacts'];
 
   function readInitialTab() {
     try {
@@ -290,21 +289,6 @@
       >
       <button
         type="button"
-        id="right-tab-notes"
-        class="right-sidebar-tab"
-        class:active={activeTab === 'notes'}
-        role="tab"
-        data-pane="notes"
-        aria-selected={activeTab === 'notes'}
-        onclick={() => activateTab('notes')}
-        >{t('sidebar.annotations')}<span
-          id="annotation-tab-count"
-          class="right-sidebar-tab-count"
-          hidden>0</span
-        ></button
-      >
-      <button
-        type="button"
         id="right-tab-artifacts"
         class="right-sidebar-tab"
         class:active={activeTab === 'artifacts'}
@@ -365,16 +349,6 @@
       >
       <ArtifactPanel />
     </div>
-    <div
-      id="right-pane-notes"
-      class="right-sidebar-pane"
-      class:active={activeTab === 'notes'}
-      role="tabpanel"
-      aria-labelledby="right-tab-notes"
-      hidden={activeTab !== 'notes'}
-    >
-      <AnnotationLayer {...annotationConfig} />
-    </div>
   </div>
   <div class="right-sidebar-footer">
     <span id="scratchpad-status" class="scratchpad-status">{t('common.saved')}</span>
@@ -400,7 +374,6 @@
     <div class="artifact-help-body">
       <p>{@html t('artifactHelp.intro')}</p>
       <p>{@html t('artifactHelp.viewing')}</p>
-      <p>{@html t('artifactHelp.annotating')}</p>
       <p>{@html t('artifactHelp.upToDate')}</p>
       <p class="artifact-help-note">{t('artifactHelp.note')}</p>
     </div>

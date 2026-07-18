@@ -73,7 +73,7 @@ func TestExportBundleIsSelfContained(t *testing.T) {
 		"EventSource", "WebSocket",
 		"runLiveReload", "live-reload-runner", "live-reload",
 		"chatComposerRunner", "ChatComposer",
-		"ArtifactPanel", "AnnotationLayer",
+		"ArtifactPanel",
 	}
 	// NOTE: applyLiveUpdate is intentionally NOT forbidden — it is a pure
 	// state-replacement method on the SHARED SessionDataModel, which the export

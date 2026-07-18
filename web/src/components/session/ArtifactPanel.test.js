@@ -208,7 +208,7 @@ describe('ArtifactPanel', () => {
     expect(document.querySelector('.artifact-markdown h1').textContent).toBe('Hello');
   });
 
-  it('gives the source view an artifact-<id> anchor for annotations', async () => {
+  it('gives the source view an artifact-<id> anchor', async () => {
     const panel = renderPanel();
     panel.setArtifacts(arts);
     await tick();

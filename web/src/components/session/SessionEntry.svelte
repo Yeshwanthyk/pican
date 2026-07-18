@@ -2,7 +2,7 @@
   // One conversation entry in the message pane, rendered declaratively (the
   // decomposition of the former renderEntry()). {@html} is used only for markdown
   // (safeMarkedParse) — everything else is escaped Svelte template. The wrapper
-  // keeps its `entry-<id>` anchor so annotation offsets + scroll/toggle survive.
+  // keeps its `entry-<id>` anchor so scroll/toggle + deep links survive.
   // Shared by the live app and the static export (model passed as a prop).
   import { marked } from 'marked';
   import { icon, CircleCheck, CircleX, GitFork, Link2, Tag } from '../../shared/icons.js';

@@ -60,7 +60,6 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | 🔍 **Browse & search** | Filter sessions across projects, search by name, navigate branches — your full session history at a glance. |
 | 🌿 **Git integration** | See the current branch and open a GitHub PR right from the session viewer. |
 | 📝 **Scratchpad** | Jot down notes, todos, or quick thoughts alongside your sessions without switching apps. |
-| 💬 **Annotations** | Highlight and comment on any part of a session — great for code review, feedback, or bookmarking key moments. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pi-web feel like *yours*. |
 | 🌐 **Multi-language** | 14 built-in languages (English, Español, Français, Deutsch, 中文, 日本語, Bahasa Indonesia, Bahasa Melayu, Tiếng Việt, ไทย, Filipino, မြန်မာ, ភាសាខ្មែរ, ລາວ). Add your own custom language from Settings. |
 | 📤 **Share & export** | Download JSONL, export static snapshots rendered with pi's native `pi.dev` look, or share as private GitHub Gists — all rendered client-side. |

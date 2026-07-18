@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'Kein Git-Repository',
   'diff.split': 'Geteilt',
   'diff.unified': 'Vereinheitlicht',
-  'diff.commentPlaceholder': 'Kommentar hinterlassen…',
-  'diff.save': 'Speichern',
-  'diff.cancel': 'Abbrechen',
-  'diff.delete': 'Löschen',
-  'diff.edit': 'Bearbeiten',
-  'diff.submitReview': 'Review absenden',
-  'diff.reviewSubmitted': 'Review zum Chat hinzugefügt',
-  'diff.noComments': 'Keine Kommentare zum Absenden',
-  'diff.saveFailed': 'Kommentar konnte nicht gespeichert werden',
   'diff.collapseAll': 'Alle einklappen',
   'diff.expandAll': 'Alle ausklappen',
   'diff.collapseFile': 'Datei einklappen',
@@ -145,7 +136,6 @@ export default {
   'menu.modelUsage': 'Modellnutzung',
 
   'sidebar.scratchpad': 'Notizblock',
-  'sidebar.annotations': 'Anmerkungen',
   'sidebar.artifacts': 'Artefakte',
   'sidebar.howArtifactsWork': 'Wie Artefakte funktionieren',
   'sidebar.expandPanel': 'Panel erweitern',
@@ -285,7 +275,6 @@ export default {
   'settings.doneSound': 'Fertig-Ton',
   'settings.doneSoundHint': 'Ton, der abgespielt wird, wenn eine Antwort bereit ist.',
 
-
   'settings.about': 'Über',
   'settings.docs': 'Dokumentation',
   'settings.docsHint': 'Anleitungen und Architekturdokumentation für pi-web.',
@@ -347,8 +336,6 @@ export default {
     '<strong>Artefakte</strong> sind die vom Agenten geschriebenen Dateien und die größeren Codeblöcke, die er geteilt hat — aus dem Gespräch herausgezogen, damit du sie an einem Ort finden, lesen, kopieren oder herunterladen kannst.',
   'artifactHelp.viewing':
     '<strong>Ansehen.</strong> Wähle eines aus der Liste, um seinen Quelltext zu sehen. HTML-, SVG- und Markdown-Dateien haben zudem einen <em>Vorschau</em>-Schalter — HTML/SVG laufen in einer sicheren Sandbox, Markdown wird als formatierter Text dargestellt.',
-  'artifactHelp.annotating':
-    '<strong>Annotieren.</strong> Markiere Text im Quelltext eines Artefakts, um eine Notiz zu hinterlassen. Deine Notizen sammeln sich im Tab <em>Annotationen</em>, von wo aus du zu ihnen zurückspringen oder sie an den Agenten senden kannst.',
   'artifactHelp.upToDate':
     '<strong>Aktuell bleiben.</strong> Dateien, die der Agent <em>schreibt</em> oder <em>bearbeitet</em>, werden automatisch aktualisiert, und einfache Umbenennungen oder Löschungen (<code>mv</code>, <code>git mv</code>, <code>rm</code>) werden ebenfalls verfolgt. Aber Änderungen über andere Shell-Befehle — wie <code>sed</code> oder Ausgabe-Umleitungen — lassen sich aus dem Gespräch nicht nachverfolgen, sodass ein Artefakt gelegentlich eine ältere Version zeigen kann. Im Zweifel prüfe die Datei auf der Festplatte.',
   'artifactHelp.note':
@@ -382,18 +369,6 @@ export default {
   'artifact.emptyNone': 'Noch keine Artefakte in dieser Sitzung.',
   'artifact.nounOne': 'Artefakt',
   'artifact.nounMany': 'Artefakte',
-  'annotation.empty':
-    'Markiere Text in einer Nachricht oder einem Artefakt, um eine Notiz hinzuzufügen.',
-  'annotation.deleteNote': 'Notiz löschen',
-  'annotation.sendNotesToPi': '{count} {noun} an pi senden',
-  'annotation.noteOne': 'Notiz',
-  'annotation.noteMany': 'Notizen',
-  'annotation.addNote': 'Notiz hinzufügen',
-  'annotation.addNotePlaceholder': 'Notiz hinzufügen…',
-  'annotation.cancel': 'Abbrechen',
-  'annotation.saveNote': 'Notiz speichern',
-  'annotation.addToChat': 'Zum Chat hinzufügen',
-  'annotation.comment': 'Annotieren',
   'version.unavailable': 'Versionsinformationen sind nicht verfügbar.',
   'version.checkForUpdates': 'Nach Updates suchen',
   'version.checking': 'Wird geprüft…',

@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': '不是 git 仓库',
   'diff.split': '分栏',
   'diff.unified': '统一',
-  'diff.commentPlaceholder': '留下评论…',
-  'diff.save': '保存',
-  'diff.cancel': '取消',
-  'diff.delete': '删除',
-  'diff.edit': '编辑',
-  'diff.submitReview': '提交审查',
-  'diff.reviewSubmitted': '审查已添加到聊天',
-  'diff.noComments': '没有可提交的评论',
-  'diff.saveFailed': '保存评论失败',
   'diff.collapseAll': '全部折叠',
   'diff.expandAll': '全部展开',
   'diff.collapseFile': '折叠文件',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': '模型用量',
 
   'sidebar.scratchpad': '便笺',
-  'sidebar.annotations': '批注',
   'sidebar.artifacts': '产物',
   'sidebar.howArtifactsWork': '产物的工作方式',
   'sidebar.expandPanel': '展开面板',
@@ -275,7 +265,6 @@ export default {
   'settings.doneSound': '完成提示音',
   'settings.doneSoundHint': '响应就绪时播放的声音。',
 
-
   'settings.about': '关于',
   'settings.docs': '文档',
   'settings.docsHint': 'pi-web 的指南和架构文档。',
@@ -335,8 +324,6 @@ export default {
     '<strong>产物</strong>是代理写入的文件以及它分享的较大代码块，从对话中提取出来，便于你在一个地方查找、阅读、复制或下载。',
   'artifactHelp.viewing':
     '<strong>查看。</strong>从列表中选择一个以查看其源代码。HTML、SVG 和 Markdown 文件还有<em>预览</em>开关——HTML/SVG 在安全沙箱中运行，Markdown 渲染为带格式的文本。',
-  'artifactHelp.annotating':
-    '<strong>批注。</strong>在产物的源代码中选择文本即可留下批注。你的批注会汇集在<em>批注</em>标签中，你可以在那里跳回它们或将其发送给代理。',
   'artifactHelp.upToDate':
     '<strong>保持最新。</strong>代理<em>写入</em>或<em>编辑</em>的文件会自动更新，简单的重命名或删除（<code>mv</code>、<code>git mv</code>、<code>rm</code>）也会被跟踪。但通过其他 shell 命令所做的更改——例如 <code>sed</code> 或输出重定向——无法从对话中跟踪，因此产物偶尔可能显示较旧的版本。如有疑问，请检查磁盘上的文件。',
   'artifactHelp.note': '产物仅属于实时视图，不会包含在导出的快照中。',
@@ -369,17 +356,6 @@ export default {
   'artifact.emptyNone': '此会话还没有产物。',
   'artifact.nounOne': '产物',
   'artifact.nounMany': '产物',
-  'annotation.empty': '选择消息或产物中的文本来添加批注。',
-  'annotation.deleteNote': '删除批注',
-  'annotation.sendNotesToPi': '将 {count} 条{noun}发送给 pi',
-  'annotation.noteOne': '批注',
-  'annotation.noteMany': '批注',
-  'annotation.addNote': '添加批注',
-  'annotation.addNotePlaceholder': '添加批注…',
-  'annotation.cancel': '取消',
-  'annotation.saveNote': '保存批注',
-  'annotation.addToChat': '添加到对话',
-  'annotation.comment': '标注',
   'version.unavailable': '版本信息不可用。',
   'version.checkForUpdates': '检查更新',
   'version.checking': '正在检查…',

@@ -99,7 +99,6 @@ export function wireSessionEvents({
   eventSource,
   onReload,
   onChatPreview,
-  onAnnotations = null,
   onError = () => {},
   windowImpl = typeof window !== 'undefined' ? window : null,
   CustomEventImpl = typeof CustomEvent !== 'undefined' ? CustomEvent : null,
@@ -149,16 +148,6 @@ export function wireSessionEvents({
       onError(error);
     }
   });
-  if (onAnnotations) {
-    eventSource.addEventListener('annotations', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onAnnotations(Array.isArray(data.annotations) ? data.annotations : []);
-      } catch (error) {
-        onError(error);
-      }
-    });
-  }
   // 'queue' is fired by the backend whenever the per-session chat_queue
   // changes — autonomous drainer, another tab, etc. ChatComposer listens for
   // pi-queue-event on the window and refetches /api/chat/queue.

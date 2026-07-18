@@ -76,8 +76,7 @@ truth.
 ```
 
 `id` stays stable across edits/renames (it's the first write's `art-<callId>`),
-so an artifact's source-view anchor (`artifact-<id>`) and any annotations on it
-survive in-place changes.
+so an artifact's source-view anchor (`artifact-<id>`) survives in-place changes.
 
 ## Rendering pipeline
 
@@ -97,9 +96,9 @@ survive in-place changes.
 ```
 
 The list and source view live in the **Artifacts** tab of the right sidebar
-(Scratchpad / Artifacts / Annotations switcher in `web/src/session/ui/`). A
-count badge reflects the number of artifacts; the help (?) button appears only
-on the Artifacts tab.
+(Scratchpad / Artifacts switcher in `web/src/session/ui/`). A count badge
+reflects the number of artifacts; the help (?) button appears only on the
+Artifacts tab.
 
 ## Preview (Source ⇄ Preview), and its security model
 
@@ -150,14 +149,6 @@ filter never loses data. When the include list hides detected artifacts, the
 panel's empty state shows a count + a link to Settings rather than a bare "no
 artifacts" message. Settings live in the **Artifacts** section of the Svelte
 `/settings` route (`web/src/routes/SettingsPage.svelte`).
-
-## Annotating artifacts
-
-The source `<pre>` carries `id="artifact-<id>"`, making it an annotation anchor.
-The annotation layer registers the artifact panel host as a scope, so selecting
-text in an artifact's source works exactly like annotating a transcript message
-(offsets are measured against the `<pre>`'s text content). See
-[annotations.md](./annotations.md).
 
 ## Live vs. export
 

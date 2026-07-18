@@ -23,15 +23,6 @@ export default {
   'diff.notRepo': 'ບໍ່ແມ່ນ git repository',
   'diff.split': 'ແບ່ງ',
   'diff.unified': 'ລວມ',
-  'diff.commentPlaceholder': 'ໃສ່ຄຳເຫັນ…',
-  'diff.save': 'ບັນທຶກ',
-  'diff.cancel': 'ຍົກເລີກ',
-  'diff.delete': 'ລຶບ',
-  'diff.edit': 'ແກ້ໄຂ',
-  'diff.submitReview': 'ສົ່ງການກວດສອບ',
-  'diff.reviewSubmitted': 'ເພີ່ມການກວດສອບໃສ່ການສົນທະນາແລ້ວ',
-  'diff.noComments': 'ບໍ່ມີຄຳເຫັນທີ່ຈະສົ່ງ',
-  'diff.saveFailed': 'ບັນທຶກຄຳເຫັນບໍ່ສຳເລັດ',
   'diff.collapseAll': 'ຫຍໍ້ທັງໝົດ',
   'diff.expandAll': 'ຂະຫຍາຍທັງໝົດ',
   'diff.collapseFile': 'ຫຍໍ້ໄຟລ໌',
@@ -144,7 +135,6 @@ export default {
   'menu.modelUsage': 'ການໃຊ້ໂມເດວ',
 
   'sidebar.scratchpad': 'ກະດານຮ່າງ',
-  'sidebar.annotations': 'ຄຳອະທິບາຍ',
   'sidebar.artifacts': 'ອາທິແຟັກ',
   'sidebar.howArtifactsWork': 'ອາທິແຟັກເຮັດວຽກແນວໃດ',
   'sidebar.expandPanel': 'ຂະຫຍາຍແຜງ',
@@ -281,7 +271,6 @@ export default {
   'settings.doneSound': 'ສຽງສຳເລັດ',
   'settings.doneSoundHint': 'ສຽງທີ່ຫຼິ້ນເມື່ອການຕອບສະໜອງພ້ອມ.',
 
-
   'settings.about': 'ກ່ຽວກັບ',
   'settings.docs': 'ເອກະສານ',
   'settings.docsHint': 'ຄູ່ມື ແລະ ເອກະສານສະຖາປັດຕະຍະກຳສຳລັບ pi-web.',
@@ -341,8 +330,6 @@ export default {
     '<strong>ອາທິແຟັກ</strong> ແມ່ນໄຟລ໌ທີ່ເອເຈັນຂຽນ ແລະ ບລັອກໂຄ້ດຂະໜາດໃຫຍ່ກວ່າທີ່ມັນແບ່ງປັນ ດຶງອອກຈາກການສົນທະນາ ເພື່ອໃຫ້ທ່ານສາມາດຄົ້ນຫາ ອ່ານ ສຳເນົາ ຫຼື ດາວໂຫຼດໄດ້ໃນບ່ອນດຽວ.',
   'artifactHelp.viewing':
     '<strong>ການເບິ່ງ.</strong> ເລືອກໜຶ່ງຈາກລາຍການເພື່ອເບິ່ງ source ຂອງມັນ. ໄຟລ໌ HTML, SVG ແລະ Markdown ກໍມີປຸ່ມສະຫຼັບ <em>ສະແດງຕົວຢ່າງ</em> — HTML/SVG ເຮັດວຽກໃນ sandbox ທີ່ປອດໄພ, Markdown ສະແດງເປັນຂໍ້ຄວາມທີ່ຈັດຮູບແບບ.',
-  'artifactHelp.annotating':
-    '<strong>ການໝາຍເຫດ.</strong> ເລືອກຂໍ້ຄວາມໃນ source ຂອງອາທິແຟັກເພື່ອປະໝາຍເຫດໄວ້. ໝາຍເຫດຂອງທ່ານຮວບຮວມຢູ່ໃນແທັບ <em>ຄຳອະທິບາຍ</em> ບ່ອນທີ່ທ່ານສາມາດກັບໄປຫາພວກມັນ ຫຼື ສົ່ງໃຫ້ເອເຈັນ.',
   'artifactHelp.upToDate':
     '<strong>ການຮັກສາໃຫ້ທັນສະໄໝ.</strong> ໄຟລ໌ທີ່ເອເຈັນ <em>ຂຽນ</em> ຫຼື <em>ແກ້ໄຂ</em> ຈະອັບເດດອັດຕະໂນມັດ ແລະ ການປ່ຽນຊື່ ຫຼື ລຶບແບບງ່າຍໆ (<code>mv</code>, <code>git mv</code>, <code>rm</code>) ກໍຖືກຕິດຕາມເຊັ່ນກັນ. ແຕ່ການປ່ຽນແປງຜ່ານຄຳສັ່ງ shell ອື່ນໆ — ເຊັ່ນ <code>sed</code> ຫຼື output redirect — ບໍ່ສາມາດຕິດຕາມໄດ້ຈາກການສົນທະນາ ສະນັ້ນບາງຄັ້ງອາທິແຟັກອາດສະແດງເວີຊັນເກົ່າກວ່າ. ເມື່ອສົງໄສ ໃຫ້ກວດເບິ່ງໄຟລ໌ໃນດິສ.',
   'artifactHelp.note':
@@ -376,17 +363,6 @@ export default {
   'artifact.emptyNone': 'ຍັງບໍ່ມີອາທິແຟັກໃນ session ນີ້.',
   'artifact.nounOne': 'ອາທິແຟັກ',
   'artifact.nounMany': 'ອາທິແຟັກ',
-  'annotation.empty': 'ເລືອກຂໍ້ຄວາມໃນຂໍ້ຄວາມ ຫຼື ອາທິແຟັກ ເພື່ອເພີ່ມໝາຍເຫດ.',
-  'annotation.deleteNote': 'ລຶບໝາຍເຫດ',
-  'annotation.sendNotesToPi': 'ສົ່ງ {count} {noun} ໄປ pi',
-  'annotation.noteOne': 'ໝາຍເຫດ',
-  'annotation.noteMany': 'ໝາຍເຫດ',
-  'annotation.addNote': 'ເພີ່ມໝາຍເຫດ',
-  'annotation.addNotePlaceholder': 'ເພີ່ມໝາຍເຫດ…',
-  'annotation.cancel': 'ຍົກເລີກ',
-  'annotation.saveNote': 'ບັນທຶກໝາຍເຫດ',
-  'annotation.addToChat': 'ເພີ່ມໃສ່ແຊັດ',
-  'annotation.comment': 'ໃສ່ໝາຍເຫດ',
   'version.unavailable': 'ບໍ່ມີຂໍ້ມູນເວີຊັນ.',
   'version.checkForUpdates': 'ກວດຫາການອັບເດດ',
   'version.checking': 'ກຳລັງກວດສອບ…',

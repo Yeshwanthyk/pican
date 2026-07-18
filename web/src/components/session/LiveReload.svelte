@@ -24,7 +24,6 @@
   import { setupSessionLiveConnection } from '../../session/live/live-connection.js';
   import { createFollowScrollController } from '../../session/live/live-follow.js';
   import { updateStatsDom } from '../../session/live/live-stats.js';
-  import { sessionRuntime } from '../../session/session-runtime.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import { setSessionTitle } from '../../session/session-title.svelte.js';
 
@@ -189,7 +188,6 @@
       sessionId: sessId,
       onReload: triggerReload,
       onChatPreview: renderChatPreview,
-      onAnnotations: (list) => sessionRuntime.annotations?.setAnnotations(list),
     });
     liveConnection.connect();
     cleanups.push(liveConnection.dispose);
