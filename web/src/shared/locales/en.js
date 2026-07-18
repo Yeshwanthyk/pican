@@ -271,6 +271,8 @@ export default {
   'session.failed': 'failed',
   'session.error': 'error',
   'session.turns': '{count} turns',
+  'session.toolCalls': '{count} tool calls',
+  'session.moreToolNames': '+{count} more',
   'session.showOutput': 'Show output',
   'session.subagentResult': 'Subagent {id} — {title}',
   'session.openDashboard': 'Open dashboard',

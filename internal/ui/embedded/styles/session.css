@@ -1982,6 +1982,66 @@
       display: contents;
     }
 
+    .tool-run-group {
+      min-width: 0;
+    }
+
+    .tool-run-group-summary {
+      min-width: 0;
+      min-height: 32px;
+      box-sizing: border-box;
+      padding: 6px var(--line-height);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--container-bg);
+      color: var(--muted);
+      font-family: var(--font-code);
+      line-height: 18px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .tool-run-group-summary::marker {
+      color: var(--muted);
+    }
+
+    .tool-run-group-summary:hover,
+    .tool-run-group-summary:focus-visible,
+    .tool-run-group[open] > .tool-run-group-summary {
+      color: var(--text);
+      border-color: var(--dim);
+    }
+
+    .tool-run-group-summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .tool-run-group-count {
+      color: var(--text);
+      font-weight: bold;
+    }
+
+    .tool-run-group-breakdown::before {
+      content: '·';
+      margin: 0 7px;
+      color: var(--muted);
+    }
+
+    .tool-run-group:not([open]) > .tool-run-group-body {
+      display: none;
+    }
+
+    .tool-run-group-body {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: var(--line-height);
+      padding-top: var(--line-height);
+    }
+
     .message-timestamp {
       font-size: 10px;
       color: var(--muted);

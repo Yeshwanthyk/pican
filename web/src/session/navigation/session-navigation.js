@@ -5,6 +5,14 @@
 // recompute the path) and scrolls to the requested entry once Svelte has
 // flushed. Copy/fork/label buttons are handled by a single delegated click
 // listener in session-content-runtime.js.
+export function openAncestorDetails(element) {
+  let current = element?.parentElement;
+  while (current) {
+    if (current.tagName === 'DETAILS') current.open = true;
+    current = current.parentElement;
+  }
+}
+
 export function createSessionNavigator({
   documentImpl = document,
   renderTree = () => {},
@@ -29,6 +37,7 @@ export function createSessionNavigator({
         const scrollTargetId = scrollToEntryId || targetId;
         const targetEl = documentImpl.getElementById(`entry-${scrollTargetId}`);
         if (targetEl) {
+          openAncestorDetails(targetEl);
           targetEl.scrollIntoView?.({ block: 'center' });
           if (scrollToEntryId) {
             targetEl.classList.add('highlight');

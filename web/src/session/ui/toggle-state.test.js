@@ -216,6 +216,22 @@ describe('toggle state helpers', () => {
     expect(dom.window.document.querySelector('.tool-execution').style.display).toBe('');
   });
 
+  it('applies tool visibility inside a group without hiding the group summary', () => {
+    const dom = new JSDOM(`<details class="tool-run-group">
+      <summary class="tool-run-group-summary">5 tool calls</summary>
+      <div><div class="tool-call-collapsed"></div><div class="tool-execution"></div></div>
+    </details>`);
+    applyToggleStateToNode(dom.window.document, {
+      thinkingExpanded: true,
+      toolsVisible: false,
+      toolOutputsExpanded: false,
+    });
+
+    expect(dom.window.document.querySelector('.tool-run-group-summary').style.display).toBe('');
+    expect(dom.window.document.querySelector('.tool-execution').style.display).toBe('none');
+    expect(dom.window.document.querySelector('.tool-call-collapsed').style.display).toBe('block');
+  });
+
   it('controller reload picks up settings written after creation (cold-cache first paint)', () => {
     // Simulate the cold-cache case: the controller is created before
     // hydrateSettings() has populated localStorage with the server-backed

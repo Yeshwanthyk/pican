@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { openAncestorDetails } from '../../session/navigation/session-navigation.js';
   import { t } from '../../shared/i18n.js';
   import { icon, X } from '../../shared/icons.js';
   import { formatAnnotationsForPi } from '../../session/annotations/annotation-format.js';
@@ -251,6 +252,7 @@
       }
       const anchor = document.getElementById(anchorId);
       if (anchor) {
+        openAncestorDetails(anchor);
         anchor.scrollIntoView({ block: 'center', behavior: 'smooth' });
         anchor.classList.add('annotation-flash');
         window.setTimeout(() => anchor.classList.remove('annotation-flash'), FLASH_DURATION_MS);

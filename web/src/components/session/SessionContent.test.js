@@ -74,6 +74,33 @@ describe('SessionContent', () => {
     expect(container.querySelector('#entry-leaf2')).toBeInTheDocument();
   });
 
+  it('renders a long tool run in a collapsed group without changing entry anchors', () => {
+    const groupedEntries = [
+      entries[0],
+      {
+        id: 'tools',
+        parentId: 'root',
+        type: 'message',
+        message: {
+          role: 'assistant',
+          content: ['bash', 'read', 'edit', 'write', 'ls'].map((name, index) => ({
+            type: 'toolCall',
+            id: `call-${index}`,
+            name,
+            arguments: {},
+          })),
+        },
+      },
+    ];
+    const model = new SessionDataModel({ entries: groupedEntries, header: {}, leafId: 'tools' });
+    const { container } = render(SessionContent, { props: { model } });
+
+    const group = container.querySelector('.tool-run-group');
+    expect(group.open).toBe(false);
+    expect(group.querySelector('summary').textContent).toContain('5 tool calls');
+    expect(group.querySelector('#entry-tools')).toBeInTheDocument();
+  });
+
   it('runs afterRender(container) when the path changes', async () => {
     const afterRender = vi.fn();
     const model = new SessionDataModel({ entries, header: {}, leafId: 'leaf' });

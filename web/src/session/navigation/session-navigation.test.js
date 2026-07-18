@@ -48,6 +48,26 @@ describe('session navigator (nav + scroll)', () => {
     expect(target.classList.contains('highlight')).toBe(true);
   });
 
+  it('opens collapsed ancestor details before scrolling to a nested entry', () => {
+    document.body.innerHTML = `<div id="content">
+      <details class="tool-run-group">
+        <div><details class="tool-fold"><div id="entry-b"></div></details></div>
+      </details>
+    </div>`;
+    const target = document.getElementById('entry-b');
+    const group = document.querySelector('.tool-run-group');
+    const toolFold = document.querySelector('.tool-fold');
+    target.scrollIntoView = vi.fn(() => {
+      expect(group.open).toBe(true);
+      expect(toolFold.open).toBe(true);
+    });
+
+    const nav = createSessionNavigator({ setTimeoutImpl: runImmediate });
+    nav.navigateTo('b', 'target');
+
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+  });
+
   it('does not scroll in none mode', () => {
     document.body.innerHTML = '<div id="content"></div><div id="entry-b"></div>';
     const target = document.getElementById('entry-b');

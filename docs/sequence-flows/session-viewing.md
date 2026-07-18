@@ -30,6 +30,8 @@ GET /api/session?id=<session-id>
 
 The route then builds the session payload expected by the existing session rendering/runtime modules and mounts the session UI.
 
+`SessionContent` derives render items from the active root-to-leaf path. Consecutive tool-only activity stays as individual entries through four tool calls; longer runs render inside a collapsed native `<details>` while preserving the original entry components and `entry-<id>` anchors. Navigation opens ancestor details before scrolling to a nested anchor.
+
 ### 3. Session Resolution
 
 `sessions.Cache.Resolve` validates and locates the file, then returns a cached parsed session when the file modtime is unchanged:
