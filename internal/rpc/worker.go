@@ -113,7 +113,10 @@ func NewPiWorkerWithEvents(sessionPath string, streamSink StreamEventSink, exten
 	}
 	go worker.consume(stdout)
 	go worker.wait()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Cold pi startup with a heavy extension set (remote MCP servers, sandbox,
+	// mission-control) can exceed 30s; keep this generous so the first chat
+	// send after idle-reap doesn't die with "context deadline exceeded".
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	if err := worker.switchSession(ctx); err != nil {
 		_ = worker.Close()

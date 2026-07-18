@@ -50,7 +50,9 @@ func newQueueDrainer(s *Server) *queueDrainer {
 		doneCh:          make(chan struct{}),
 		tickPeriod:      5 * time.Second,
 		nowFn:           time.Now,
-		dispatchTimeout: 30 * time.Second,
+		// Must exceed the RPC worker's cold-start timeout (120s) so a queued
+		// message survives a fresh worker spawn.
+		dispatchTimeout: 150 * time.Second,
 	}
 }
 
