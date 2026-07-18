@@ -177,6 +177,7 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 		summaries = s.filterEnabledSummaries(summaries)
 	}
 	summaries = s.filterBtwSummaries(summaries)
+	summaries = filterSubagentSummaries(summaries)
 
 	if query := strings.TrimSpace(q.Get("q")); query != "" {
 		summaries = filterSummariesByQuery(summaries, query)
@@ -188,6 +189,21 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 	summaries = paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))
 
 	writeJSON(w, 0, map[string]any{"sessions": summaries, "total": total})
+}
+
+// filterSubagentSummaries drops subagent child sessions (session_info name
+// prefixed "subagent: ") from the main sessions list. They are spawned by
+// other sessions and reviewed in the dedicated /subagents panel, so they only
+// clutter the timeline/project views here.
+func filterSubagentSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
+	out := make([]sessions.SessionSummary, 0, len(summaries))
+	for _, sum := range summaries {
+		if strings.HasPrefix(sum.Name, subagentNamePrefix) {
+			continue
+		}
+		out = append(out, sum)
+	}
+	return out
 }
 
 // filterSummariesByQuery keeps summaries whose name, project, model, or UUID
