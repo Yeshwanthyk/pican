@@ -21,7 +21,22 @@ export function normalizeSession(raw = {}) {
     modelProvider: raw.modelProvider || raw.ModelProvider || '',
     chatAvailable: raw.chatAvailable ?? raw.ChatAvailable ?? true,
     chatDisabledReason: raw.chatDisabledReason || raw.ChatDisabledReason || '',
+    pinned: raw.pinned ?? raw.Pinned ?? false,
   };
+}
+
+// splitPinnedSessions separates pinned sessions from the rest, sorting the
+// pinned group by activity (newest first) so it reads like its own mini
+// timeline above the regular groups.
+export function splitPinnedSessions(sessions = []) {
+  const pinned = [];
+  const rest = [];
+  for (const session of sessions) {
+    if (session?.pinned) pinned.push(session);
+    else rest.push(session);
+  }
+  pinned.sort((a, b) => activityMs(b) - activityMs(a));
+  return { pinned, rest };
 }
 
 export function activityMs(session) {
@@ -55,6 +70,26 @@ export function sessionModelLabel(session = {}) {
 
 export function sessionSearchText(session = {}) {
   return `${session.name || ''} ${session.project || ''} ${sessionModelLabel(session)} ${session.sessionUUID || ''}`.trim();
+}
+
+// formatTokenAbbrev renders a token count with a k/M suffix (one decimal,
+// trimmed when it's a whole number), e.g. 12300 -> "12.3k", 1500000 -> "1.5M".
+function formatTokenAbbrev(n) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(Math.round(n));
+}
+
+// formatSessionMetrics renders the card's subtle "12.3k tok · $0.42" metadata
+// line from already-fetched summary fields. Either half is omitted when zero;
+// the whole line is '' when both are.
+export function formatSessionMetrics(session = {}) {
+  const tokens = Number(session.tokenTotal) || 0;
+  const cost = Number(session.costTotal) || 0;
+  const parts = [];
+  if (tokens > 0) parts.push(`${formatTokenAbbrev(tokens)} tok`);
+  if (cost > 0) parts.push(`$${cost.toFixed(2)}`);
+  return parts.join(' · ');
 }
 
 export function formatRunningModel(status) {
@@ -140,4 +175,7 @@ export function defaultFetchProjects() {
 }
 export function defaultUpdateProject(path, action) {
   return postJSON('/api/projects', { path, action });
+}
+export function defaultUpdatePin(sessionId, pinned) {
+  return postJSON('/api/pins', { sessionId, pinned });
 }

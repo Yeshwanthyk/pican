@@ -278,6 +278,7 @@ type piRPCWorker struct {
 | `/api/btw` | GET | `handleGetBtw` | Resolve the btw scratch-chat session for a parent (SQLite) |
 | `/api/btw/new` | POST | `handleNewBtw` | Create a new btw scratch-chat session (SQLite) |
 | `/api/projects` | GET/POST | `handleApiProjects` / `handleUpdateProject` | List projects + filter state; enable/disable/register/remove, bulk enable-all/disable-all, enable-filter/disable-filter (SQLite) |
+| `/api/pins` | GET/POST | `handleListPins` / `handleSetPin` | Pinned session ids (SQLite); GET reaps pins for deleted sessions, POST upserts/deletes a pin |
 | `/api/sounds` | GET | `handleApiSounds` | List available notification sounds |
 | `/sounds/` | GET | `handleSounds` | Serve a sound asset (no auth) |
 | `/custom-themes.css` | GET | `handleCustomThemes` | User custom theme CSS |

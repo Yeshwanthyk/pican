@@ -184,10 +184,14 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 
 	sessions.SortSummariesByActivity(summaries)
 
-	total := len(summaries)
-	summaries = paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))
+	pinnedIDs, _ := s.pinnedSessionIDs()
+	markPinnedSummaries(summaries, pinnedIDs)
 
-	writeJSON(w, 0, map[string]any{"sessions": summaries, "total": total})
+	total := len(summaries)
+	page := paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))
+	page = ensurePinnedOnFirstPage(page, summaries, q.Get("offset"), pinnedIDs)
+
+	writeJSON(w, 0, map[string]any{"sessions": page, "total": total})
 }
 
 // filterSubagentSummaries drops subagent child sessions (session_info name
