@@ -62,8 +62,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'pi session';
     const options = {
       body: data.body || 'Response ready',
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+      icon: '/app-icon.png',
+      badge: '/app-icon.png',
       tag: isSchedule ? `pi-schedule-${data.sessionId || ''}` : 'pi-session-done',
       renotify: true,
       data: { sessionId: data.sessionId || '' },

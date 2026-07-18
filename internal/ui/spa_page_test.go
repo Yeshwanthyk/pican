@@ -17,8 +17,8 @@ func TestAppShellPreservesPWAContract(t *testing.T) {
 	html := b.String()
 	for _, want := range []string{
 		`<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, interactive-widget=resizes-content">`,
-		`<link rel="icon" type="image/svg+xml" href="/icon.svg">`,
-		`<link rel="apple-touch-icon" href="/icon.svg">`,
+		`<link rel="icon" type="image/png" href="/app-icon.png">`,
+		`<link rel="apple-touch-icon" href="/app-icon.png">`,
 		`<link rel="manifest" href="/manifest.webmanifest">`,
 		`<meta name="theme-color" content="#0e0e13">`,
 		`<meta name="mobile-web-app-capable" content="yes">`,

@@ -20,7 +20,7 @@
   <div class="header-inner">
     <div class="header-top">
       <h1>
-        <img class="pi-logo-mark" src="/icon.svg" alt="" aria-hidden="true" /><span
+        <img class="pi-logo-mark" src="/app-icon.png" alt="" aria-hidden="true" /><span
           >{t('index.title')}</span
         >
       </h1>

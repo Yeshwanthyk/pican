@@ -55,7 +55,7 @@ export function showDoneNotification({
     const N = windowImpl.Notification;
     if (!N || N.permission !== 'granted') return;
     if (!documentImpl.hidden) return;
-    const n = new N(title, { body, icon: '/icon.svg', tag: 'pi-session-done' });
+    const n = new N(title, { body, icon: '/app-icon.png', tag: 'pi-session-done' });
     n.onclick = () => {
       try {
         windowImpl.focus();
