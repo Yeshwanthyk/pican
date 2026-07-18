@@ -55,6 +55,7 @@ import {
   Terminal,
   TextQuote,
   Trash2,
+  Workflow,
   X,
   CircleX,
 } from 'lucide';
@@ -193,6 +194,7 @@ export {
   Terminal,
   TextQuote,
   Trash2,
+  Workflow,
   X,
   CircleX,
 };

@@ -10,11 +10,17 @@ The endpoint also scans up to 100 session files active within the last seven day
 
 Explicit `done` or `error` results take precedence over live state. Without a result, a running child or parent produces `running`; otherwise the status is `unknown`. Unmatched child and parent records remain visible. Results are sorted by latest activity or spawn time, newest first, and capped at 200.
 
+With `?session=<filename-or-uuid>` the parent scan is restricted to that session and unmatched children are dropped, so the scoped view never leaks other sessions' subagents.
+
 ## HTTP endpoint
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/subagents` | List merged subagent review records |
+| GET | `/api/subagents` | List merged subagent review records (`?session=` scopes to one parent session) |
+
+## Entry points
+
+Like workflows and tasks, subagents are session-scoped: the session `⋯` menu shows a Subagents item (only when the session has spawn records), which opens `/subagents?session=<id>`. There is no global nav entry; `/subagents` without a param still renders the unscoped list for direct URLs.
 
 ## Live updates
 

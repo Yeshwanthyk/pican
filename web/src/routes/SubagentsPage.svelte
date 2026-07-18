@@ -13,6 +13,8 @@
     subagentProject,
   } from '../subagents/subagents.js';
 
+  let { session = '' } = $props();
+
   let subagents = $state([]);
   let loading = $state(true);
   let loadError = $state('');
@@ -24,7 +26,7 @@
     if (!soft) loading = true;
     loadError = '';
     try {
-      const response = await defaultFetchSubagents();
+      const response = await defaultFetchSubagents(session);
       if (loadGeneration === generation) {
         subagents = (response.subagents || []).map(normalizeSubagent);
       }
@@ -73,7 +75,11 @@
 
 <div class="session-header-bar">
   <div class="session-header-left">
-    <button type="button" class="session-header-back subagents-back" onclick={() => navigate('/')}>
+    <button
+      type="button"
+      class="session-header-back subagents-back"
+      onclick={() => navigate(session ? '/session?id=' + encodeURIComponent(session) : '/')}
+    >
       <span aria-hidden="true">{@html icon(ChevronLeft, { size: 16 })}</span>
       {t('session.back')}
     </button>
@@ -83,6 +89,12 @@
 </div>
 
 <main class="subagents-page" data-subagents-page>
+  {#if session}
+    <a class="workflow-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+      >{t('subagents.sessionScope')}</a
+    >
+  {/if}
+
   {#if loadError}<p class="subagents-page-error" role="alert">{loadError}</p>{/if}
 
   {#if loading}

@@ -30,6 +30,6 @@ export function subagentProject(subagent = {}) {
   return subagent.childProject || subagent.parentProject || '';
 }
 
-export function defaultFetchSubagents() {
-  return getJSON('/api/subagents');
+export function defaultFetchSubagents(session = '') {
+  return getJSON('/api/subagents' + (session ? '?session=' + encodeURIComponent(session) : ''));
 }

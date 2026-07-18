@@ -260,6 +260,8 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sessionUUID := sessionUUIDFromReference(r.URL.Query().Get("session"))
+
 	children := make([]subagentSummary, 0)
 	for _, summary := range summaries {
 		if !strings.HasPrefix(summary.Name, subagentNamePrefix) {
@@ -294,6 +296,9 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 		if parentFiles >= subagentParentFileLimit {
 			break
 		}
+		if sessionUUID != "" && sessionUUIDFromReference(summary.Filename) != sessionUUID {
+			continue
+		}
 		activityTime := parseSubagentTime(summary.LastActivity)
 		if activityTime.IsZero() || activityTime.Before(oldestParentActivity) {
 			continue
@@ -307,6 +312,18 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items := mergeSubagentSummaries(parents, children)
+	if sessionUUID != "" {
+		// Children that didn't match one of the requested session's spawn
+		// records can't be attributed to it — drop them instead of leaking
+		// other sessions' subagents into a scoped view.
+		scoped := items[:0]
+		for _, item := range items {
+			if item.ParentSession != "" && sessionUUIDFromReference(item.ParentSession) == sessionUUID {
+				scoped = append(scoped, item)
+			}
+		}
+		items = scoped
+	}
 	sortSubagentSummaries(items)
 	if len(items) > subagentResultLimit {
 		items = items[:subagentResultLimit]

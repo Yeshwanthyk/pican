@@ -297,7 +297,6 @@
   onToggleMenu={toggleMenu}
   onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
-  onSubagents={() => navigate('/subagents')}
 />
 
 <HomeMenu

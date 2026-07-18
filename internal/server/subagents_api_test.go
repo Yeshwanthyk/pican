@@ -24,7 +24,12 @@ func writeSubagentSession(t *testing.T, sessionsDir, projectDir, filename, conte
 
 func fetchSubagents(t *testing.T, s *Server) []subagentSummary {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/subagents", nil)
+	return fetchSubagentsURL(t, s, "/api/subagents")
+}
+
+func fetchSubagentsURL(t *testing.T, s *Server, url string) []subagentSummary {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	s.handleApiSubagents(w, req)
 	if w.Code != http.StatusOK {
@@ -76,6 +81,40 @@ func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
 	}
 	if got.SpawnedAt != "2026-07-17T12:00:00Z" || got.LastActivity != "2026-07-17T12:04:00Z" {
 		t.Fatalf("unexpected timestamps: %+v", got)
+	}
+}
+
+func TestHandleApiSubagentsFiltersBySession(t *testing.T) {
+	s := newTestServer(t)
+	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	projectA := filepath.Join(t.TempDir(), "project-a")
+	projectB := filepath.Join(t.TempDir(), "project-b")
+	parentA := fmt.Sprintf(
+		"{\"type\":\"session\",\"id\":\"a-id\",\"timestamp\":\"2026-07-17T11:59:00Z\",\"cwd\":%q}\n"+
+			"{\"type\":\"message\",\"timestamp\":\"2026-07-17T12:00:00Z\",\"message\":{\"role\":\"toolResult\",\"toolName\":\"subagent_spawn\",\"details\":{\"id\":\"sa-a\",\"title\":\"From A\",\"cwd\":%q,\"harness\":\"pi\"}}}\n",
+		projectA, projectA,
+	)
+	parentB := fmt.Sprintf(
+		"{\"type\":\"session\",\"id\":\"b-id\",\"timestamp\":\"2026-07-17T11:59:00Z\",\"cwd\":%q}\n"+
+			"{\"type\":\"message\",\"timestamp\":\"2026-07-17T12:00:00Z\",\"message\":{\"role\":\"toolResult\",\"toolName\":\"subagent_spawn\",\"details\":{\"id\":\"sa-b\",\"title\":\"From B\",\"cwd\":%q,\"harness\":\"pi\"}}}\n",
+		projectB, projectB,
+	)
+	writeSubagentSession(t, s.sessionsDir, projectA, "hash_parent-a.jsonl", parentA)
+	writeSubagentSession(t, s.sessionsDir, projectB, "hash_parent-b.jsonl", parentB)
+
+	all := fetchSubagents(t, s)
+	if len(all) != 2 {
+		t.Fatalf("unfiltered subagents = %d, want 2: %+v", len(all), all)
+	}
+
+	for _, ref := range []string{"hash_parent-a.jsonl", "parent-a"} {
+		scoped := fetchSubagentsURL(t, s, "/api/subagents?session="+ref)
+		if len(scoped) != 1 {
+			t.Fatalf("session=%s subagents = %d, want 1: %+v", ref, len(scoped), scoped)
+		}
+		if scoped[0].ID != "sa-a" || scoped[0].ParentSession != "hash_parent-a.jsonl" {
+			t.Fatalf("session=%s unexpected item: %+v", ref, scoped[0])
+		}
 	}
 }
 

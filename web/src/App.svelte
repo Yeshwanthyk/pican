@@ -30,6 +30,7 @@
   const workflowSession = $derived(new URLSearchParams(search).get('session') || '');
   const tasksProject = $derived(new URLSearchParams(search).get('project') || '');
   const tasksSession = $derived(new URLSearchParams(search).get('session') || '');
+  const subagentsSession = $derived(new URLSearchParams(search).get('session') || '');
 
   // Make in-app history navigation swap views without a full reload. popstate
   // covers back/forward; pushState/replaceState don't emit a native event, so
@@ -86,7 +87,7 @@
 {:else if path === '/tasks'}
   <TasksPage project={tasksProject} session={tasksSession} />
 {:else if path === '/subagents'}
-  <SubagentsPage />
+  <SubagentsPage session={subagentsSession} />
 {:else}
   <NotFoundPage />
 {/if}

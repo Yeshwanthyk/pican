@@ -77,7 +77,9 @@ func renderExportDocumentStart(title string, styles string, bodyAttrs string) te
 	b.WriteString("<title>")
 	b.WriteString(template.HTMLEscapeString(title))
 	b.WriteString("</title>\n")
-	b.WriteString("<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgODAwIj48cGF0aCBmaWxsPSIjMDBkN2ZmIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xNjUuMjkgMTY1LjI5IEg1MTcuMzYgVjQwMCBINDAwIFY1MTcuMzYgSDI4Mi42NSBWNjM0LjcyIEgxNjUuMjkgWiBNMjgyLjY1IDI4Mi42NSBWNDAwIEg0MDAgVjI4Mi42NSBaIi8+PHBhdGggZmlsbD0iIzAwZDdmZiIgZD0iTTUxNy4zNiA0MDAgSDYzNC43MiBWNjM0LjcyIEg1MTcuMzYgWiIvPjwvc3ZnPg==\">\n")
+	// Same composition as the live app's /icon.svg so shared exports carry the
+	// same brand mark as the app itself.
+	b.WriteString("<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgODAwIj4KICA8cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjgwMCIgcng9IjEyMCIgZmlsbD0iIzA5MDkwYiIvPgogIDxwYXRoIGZpbGw9IiNmZmYiIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iCiAgICBNMTY1LjI5IDE2NS4yOQogICAgSDUxNy4zNgogICAgVjQwMAogICAgSDQwMAogICAgVjUxNy4zNgogICAgSDI4Mi42NQogICAgVjYzNC43MgogICAgSDE2NS4yOQogICAgWgogICAgTTI4Mi42NSAyODIuNjUKICAgIFY0MDAKICAgIEg0MDAKICAgIFYyODIuNjUKICAgIFoKICAiLz4KICA8cGF0aCBmaWxsPSIjZmZmIiBkPSJNNTE3LjM2IDQwMCBINjM0LjcyIFY2MzQuNzIgSDUxNy4zNiBaIi8+Cjwvc3ZnPgo=\">\n")
 	if styles != "" {
 		b.WriteString(styles)
 		b.WriteByte('\n')

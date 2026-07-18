@@ -20,6 +20,8 @@
     Settings,
     Tag,
     ListChecks,
+    Layers,
+    Workflow,
   } from '../../shared/icons.js';
   import * as sidebarApi from '../../session/ui/sidebar.js';
   import { openVersionModal } from '../../shared/version.js';
@@ -36,11 +38,13 @@
   } from '../../session/session-menu-actions.js';
   import { defaultFetchWorkflows } from '../../workflows/workflows.js';
   import { defaultFetchTasks } from '../../tasks/tasks.js';
+  import { defaultFetchSubagents } from '../../subagents/subagents.js';
 
   let { sessionId = '', cwd = '' } = $props();
 
   let hasWorkflows = $state(false);
   let hasTasks = $state(false);
+  let hasSubagents = $state(false);
 
   // Close animations must outlast the matching CSS transitions before the panel
   // is display:none'd (see command-menu styles).
@@ -59,8 +63,9 @@
     { action: 'tree', icon: ListTree, label: 'menu.tree', kbd: '⌘B' },
     { action: 'diff', icon: FileDiff, label: 'menu.diff' },
     { action: 'model-usage', icon: ChartColumn, label: 'menu.modelUsage' },
-    { action: 'workflows', icon: ListTree, label: 'workflows.navTitle', scope: 'workflows' },
+    { action: 'workflows', icon: Workflow, label: 'workflows.navTitle', scope: 'workflows' },
     { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle', scope: 'tasks' },
+    { action: 'subagents', icon: Layers, label: 'subagents.navTitle', scope: 'subagents' },
   ];
 
   const visiblePrimaryItems = $derived(
@@ -68,7 +73,8 @@
       (item) =>
         !item.scope ||
         (item.scope === 'workflows' && hasWorkflows) ||
-        (item.scope === 'tasks' && hasTasks),
+        (item.scope === 'tasks' && hasTasks) ||
+        (item.scope === 'subagents' && hasSubagents),
     ),
   );
 
@@ -89,13 +95,16 @@
     Promise.allSettled([
       defaultFetchWorkflows(sessionId),
       cwd ? defaultFetchTasks(cwd, sessionId) : Promise.resolve({ stores: [] }),
-    ]).then(([workflowResult, taskResult]) => {
+      defaultFetchSubagents(sessionId),
+    ]).then(([workflowResult, taskResult, subagentResult]) => {
       if (!active) return;
       hasWorkflows =
         workflowResult.status === 'fulfilled' && workflowResult.value.workflows?.length > 0;
       hasTasks =
         taskResult.status === 'fulfilled' &&
         taskResult.value.stores?.some((store) => store.tasks?.length > 0);
+      hasSubagents =
+        subagentResult.status === 'fulfilled' && subagentResult.value.subagents?.length > 0;
     });
     return () => {
       active = false;
@@ -246,6 +255,10 @@
               '&project=' +
               encodeURIComponent(cwd),
           );
+          break;
+        case 'subagents':
+          closeMenu();
+          navigate('/subagents?session=' + encodeURIComponent(sessionId));
           break;
         default:
           break;

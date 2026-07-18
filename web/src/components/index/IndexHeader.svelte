@@ -1,5 +1,5 @@
 <script>
-  import { icon, MoreHorizontal, CalendarClock, Layers } from '../../shared/icons.js';
+  import { icon, MoreHorizontal, CalendarClock } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
 
   let {
@@ -11,7 +11,6 @@
     onToggleMenu = () => {},
     onLayoutChange = () => {},
     onSchedules = () => {},
-    onSubagents = () => {},
   } = $props();
 </script>
 
@@ -79,16 +78,6 @@
               size: 15,
             })}</span
           ><span>{t('schedules.navTitle')}</span></button
-        >
-        <button
-          type="button"
-          class="schedules-nav-btn"
-          data-subagents-btn
-          title={t('subagents.navTitle')}
-          onclick={onSubagents}
-          ><span class="schedules-nav-icon" aria-hidden="true"
-            >{@html icon(Layers, { size: 15 })}</span
-          ><span>{t('subagents.navTitle')}</span></button
         >
       </div>
     </div>

@@ -203,6 +203,7 @@ export default {
   // ── Subagents ──
   'subagents.navTitle': 'Subagents',
   'subagents.title': 'Subagents',
+  'subagents.sessionScope': 'Subagents for this session',
   'subagents.loading': 'Loading subagents…',
   'subagents.emptyTitle': 'No subagents yet',
   'subagents.emptyHint': 'Subagents will appear here when the pi-subagents extension runs them.',
