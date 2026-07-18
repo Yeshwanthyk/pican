@@ -330,3 +330,96 @@
 .settings-custom-languages-status.is-error {
   color: var(--danger, #e06c75);
 }
+
+/* Machines (peer host registry) */
+.settings-machines-hint {
+  color: var(--muted);
+  font-size: 0.9em;
+  padding: 0 18px 12px;
+  margin: 0;
+}
+.settings-machines-empty {
+  color: var(--muted);
+  font-size: 0.95em;
+  padding: 0 18px 14px;
+}
+.settings-machines-list {
+  display: flex;
+  flex-direction: column;
+}
+.settings-machine-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--dim);
+}
+.settings-machine-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--error, #cc6666);
+}
+.settings-machine-dot.online {
+  background: var(--success, #b5bd68);
+}
+.settings-machine-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.settings-machine-name {
+  color: var(--text);
+  font-size: 1em;
+  overflow-wrap: anywhere;
+}
+.settings-machine-url {
+  color: var(--muted);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+.settings-machine-token-state {
+  color: var(--muted);
+  font-size: 0.85em;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.settings-machine-remove {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.settings-machine-remove:hover {
+  color: var(--danger, #e06c75);
+  background: var(--hover);
+}
+.settings-machine-remove:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.settings-machine-form input[type="text"],
+.settings-machine-form input[type="password"] {
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--input-bg, var(--surface-2));
+  color: var(--text);
+  border: 1px solid var(--dim);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 1em;
+  font-family: inherit;
+}
+.settings-machines-actions {
+  display: flex;
+  justify-content: flex-end;
+}

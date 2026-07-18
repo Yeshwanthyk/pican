@@ -72,6 +72,16 @@ export default {
   'index.failedRemoveProject': 'Failed to remove project',
   'index.filterOnDesc': 'Only checked projects appear on the homepage.',
   'index.filterOffDesc': 'All projects are shown. Turn on to show only the checked ones.',
+  'index.machines': 'Machines',
+  'index.machinesOnlineCount': '{online}/{total} online',
+  'index.machineOnline': 'Online',
+  'index.machineOffline': 'Offline',
+  'index.machineSessionCount': '{count} sessions',
+  'index.machineSessionCountOne': '1 session',
+  'index.machineNoSessions': 'No sessions',
+  'index.machineExpand': 'Show sessions',
+  'index.machineCollapse': 'Hide sessions',
+  'index.machineOpenOnHost': 'Opens on {name} in a new tab',
 
   // ── Schedules ──
   'schedules.navTitle': 'Schedules',
@@ -486,6 +496,26 @@ export default {
   'settings.sponsor': 'Sponsor',
   'settings.sponsorHint': 'Support continued development of pi-web by sponsoring the creator.',
   'settings.becomeSponsor': 'Become a sponsor',
+
+  'settings.machines': 'Machines',
+  'settings.machinesHint':
+    'Other pi-web instances reached over Tailscale. Their sessions appear read-only on the homepage with a link back to that machine — nothing is proxied through this one.',
+  'settings.machineName': 'Name',
+  'settings.machineNamePlaceholder': 'mac-mini',
+  'settings.machineBaseUrl': 'Base URL',
+  'settings.machineBaseUrlPlaceholder': 'https://mac-mini.tailnet-name.ts.net:31415',
+  'settings.machineToken': 'Token',
+  'settings.machineTokenPlaceholder': 'Leave blank to keep existing token',
+  'settings.machineTokenSet': 'Token set',
+  'settings.machineTokenNotSet': 'No token',
+  'settings.machineAdd': 'Add machine',
+  'settings.machineRemove': 'Remove',
+  'settings.machineNoneYet': 'No machines added yet.',
+  'settings.machineNameRequired': 'Name is required',
+  'settings.machineUrlRequired': 'Base URL is required',
+  'settings.machineFailedLoad': 'Failed to load machines',
+  'settings.machineFailedSave': 'Failed to save machine',
+  'settings.machineFailedRemove': 'Failed to remove machine',
 
   // ── Keyboard shortcuts modal ──
   'shortcuts.title': 'Keyboard shortcuts',

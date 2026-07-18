@@ -279,6 +279,8 @@ type piRPCWorker struct {
 | `/api/btw/new` | POST | `handleNewBtw` | Create a new btw scratch-chat session (SQLite) |
 | `/api/projects` | GET/POST | `handleApiProjects` / `handleUpdateProject` | List projects + filter state; enable/disable/register/remove, bulk enable-all/disable-all, enable-filter/disable-filter (SQLite) |
 | `/api/pins` | GET/POST | `handleListPins` / `handleSetPin` | Pinned session ids (SQLite); GET reaps pins for deleted sessions, POST upserts/deletes a pin |
+| `/api/peers` | GET/POST | `handleApiPeers` / `handleUpdatePeer` | Registered peer hosts (SQLite); GET never returns tokens, POST upserts (`action:"remove"` deletes) |
+| `/api/peers/sessions` | GET | `handlePeersSessions` | Fan out to every peer's `/api/sessions` over Tailscale (3s/peer timeout); see `docs/sequence-flows/peers.md` |
 | `/api/sounds` | GET | `handleApiSounds` | List available notification sounds |
 | `/sounds/` | GET | `handleSounds` | Serve a sound asset (no auth) |
 | `/custom-themes.css` | GET | `handleCustomThemes` | User custom theme CSS |
