@@ -9,7 +9,7 @@
   // back/close buttons, mobile popstate) set `open = false` and an $effect runs
   // the open/close side effects. Body content is provided as the default snippet.
   import { onMount, tick } from 'svelte';
-  import { icon, X } from '../../shared/icons.js';
+  import { icon, ArrowLeft, X } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
 
   let {
@@ -229,7 +229,8 @@
             aria-label={t('common.closeNamed', { name: title })}
             onclick={() => (open = false)}
           >
-            <span aria-hidden="true">←</span><span>{title}</span>
+            <span aria-hidden="true">{@html icon(ArrowLeft, { size: 16 })}</span><span>{title}</span
+            >
           </button>
         {:else}
           <div></div>

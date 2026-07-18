@@ -9,6 +9,7 @@
   import SessionDisplayDefaultsSettings from '../components/settings/SessionDisplayDefaultsSettings.svelte';
   import SessionsListSettings from '../components/settings/SessionsListSettings.svelte';
   import SessionTitleSettings from '../components/settings/SessionTitleSettings.svelte';
+  import { icon, ArrowLeft, ChevronRight } from '../shared/icons.js';
   import { t } from '../shared/i18n.js';
   import { navigate } from '../shared/navigation.js';
   import { loadSettings, persistSetting } from '../settings/settings-support.js';
@@ -131,16 +132,18 @@
   });
 </script>
 
+<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG from icons.js -->
+
 <div class="session-header-bar">
   <div class="session-header-left">
     {#if isMobile && mobileShowingPane}
       <button type="button" class="session-header-back" onclick={backToList}>
-        <span>←</span>
+        <span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
         {t('settings.title')}
       </button>
     {:else}
       <a class="session-header-back" href="/" onclick={onHomeBack}>
-        <span>←</span>
+        <span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
         {cameFromApp ? t('common.back') : t('session.back')}
       </a>
     {/if}
@@ -167,7 +170,9 @@
         onclick={() => selectSection(section.id)}
       >
         <span>{t(section.labelKey)}</span>
-        <span class="settings-sidebar-chev" aria-hidden="true">›</span>
+        <span class="settings-sidebar-chev" aria-hidden="true"
+          >{@html icon(ChevronRight, { size: 14 })}</span
+        >
       </button>
     {/each}
   </nav>

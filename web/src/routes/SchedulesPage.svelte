@@ -10,6 +10,7 @@
   } from '../session/chat/chat-selectors.js';
   import {
     icon,
+    ArrowLeft,
     CalendarClock,
     Clock,
     ExternalLink,
@@ -330,7 +331,9 @@
       onclick={(e) => {
         e.preventDefault();
         navigate('/');
-      }}><span>←</span> {t('session.back')}</a
+      }}
+      ><span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
+      {t('session.back')}</a
     >
   </div>
   <span class="session-header-title">{t('schedules.title')}</span>

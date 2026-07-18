@@ -1,4 +1,5 @@
 <script>
+  import { icon, ArrowLeft } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
   import { sessionsCountLabel } from '../../index/sessions.js';
 
@@ -38,6 +39,8 @@
   }
 </script>
 
+<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG from icons.js -->
+
 <div
   class="modal-overlay"
   id="projectsModalOverlay"
@@ -57,7 +60,7 @@
         aria-label={t('index.closeManageProjects')}
         onclick={onClose}
       >
-        <span aria-hidden="true">←</span>
+        <span aria-hidden="true">{@html icon(ArrowLeft, { size: 16 })}</span>
         <span>{t('index.manageProjectsTitle')}</span>
       </button>
     </div>

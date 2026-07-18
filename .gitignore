@@ -10,6 +10,7 @@ web/dist-export/
 internal/ui/embedded/export/export.js
 .pi/extensions/node_modules/
 .pi/APPEND_SYSTEM.md
+.pi/tasks/
 
 node_modules/
 tmp/

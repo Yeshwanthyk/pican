@@ -1,6 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import { icon, PanelLeft, Plus, SquarePen, MoreHorizontal } from '../../shared/icons.js';
+  import {
+    icon,
+    ArrowLeft,
+    PanelLeft,
+    Plus,
+    SquarePen,
+    MoreHorizontal,
+  } from '../../shared/icons.js';
   import { t } from '../../shared/i18n.js';
   import { navigate, handleNavClick } from '../../shared/navigation.js';
   import { showToast } from '../../shared/toast.js';
@@ -97,7 +104,8 @@
 <div class="session-header-bar">
   <div class="session-header-left">
     <a href="/" class="session-header-back" onclick={(event) => handleNavClick(event, '/')}
-      ><span>←</span> {t('session.back')}</a
+      ><span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
+      {t('session.back')}</a
     >
     <button
       id="tree-toggle"

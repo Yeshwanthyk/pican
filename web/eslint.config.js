@@ -30,6 +30,54 @@ export default [
     },
   },
   {
+    files: ['src/**/*.{js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'lucide',
+              message: 'Import Lucide icons through src/shared/icons.js.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/icons.js'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+  {
+    files: ['src/**/*.svelte'],
+    rules: {
+      'svelte/no-restricted-html-elements': [
+        'error',
+        {
+          elements: ['svg'],
+          message:
+            'Use a Lucide icon from src/shared/icons.js. Add a targeted override only for non-icon data visualization.',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'SvelteElement[name.name="span"] > SvelteText[value=/[←›]/]',
+          message: 'Use a Lucide icon from src/shared/icons.js instead of a Unicode icon glyph.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/components/session/chat/ContextUsage.svelte'],
+    rules: {
+      'svelte/no-restricted-html-elements': 'off',
+    },
+  },
+  {
     files: ['**/*.test.js', 'vitest.setup.js'],
     languageOptions: {
       globals: {

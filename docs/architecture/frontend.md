@@ -102,6 +102,15 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 - `web/src/shared/keyboard-nav.js` — vim-style j/k/gg/G navigation
 - `web/src/components/shared/CommandPalette.svelte` — shared ⌘K session search palette
 
+## Automated Frontend Boundaries
+
+`make check` enforces the frontend rules that can be expressed mechanically:
+
+- ESLint allows `lucide` imports only in `web/src/shared/icons.js`, rejects inline SVG in Svelte components, and rejects Unicode back/chevron glyphs used as span icons. `ContextUsage.svelte` has the sole inline-SVG exception because its ring is data visualization rather than an icon.
+- `web/src/export/export-boundary.test.js` walks the export dependency graph and rejects live chat, SSE, and live-only session modules.
+- `web/src/shared/locales/locales-contract.test.js` makes `en.js` authoritative by rejecting non-English keys that do not exist in English and non-string locale values.
+- Knip, Prettier, the frontend build, Vitest, Go tests, installer tests, and `go vet` run through the same `make check` gate.
+
 ## Static Assets
 
 | Asset | Source | Served From |

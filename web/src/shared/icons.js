@@ -5,9 +5,10 @@
 // string-based view rendering.
 //
 // Do not hand-draw custom SVG icons or use unicode glyphs for icons. Import the
-// Lucide icon here and render it with icon(). See AGENTS.md.
+// Lucide icon here and render it with icon(); ESLint enforces this boundary.
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   CalendarClock,
   ChartColumn,
@@ -158,6 +159,7 @@ export function setThemeIconElement(el, theme, opts = {}) {
 
 export {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   CalendarClock,
   ChartColumn,
