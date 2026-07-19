@@ -81,5 +81,6 @@ make e2e
 ```
 
 Always use `make build`; it embeds the current frontend assets into the Go binary.
+`make check` includes Oxlint, Oxfmt/Svelte formatting checks, TypeScript and `svelte-check`, unit tests, the production build, installer tests, and `go vet`. Playwright remains a separate `make e2e` gate.
 
 Architecture documentation lives in [`docs/architecture`](docs/architecture/README.md).

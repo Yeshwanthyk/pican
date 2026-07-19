@@ -189,9 +189,9 @@
     const getEntryCount = () => getReloadEntryCount(model);
     let reloadGeneration = 0;
 
-    function triggerReload(): void {
+    function triggerReload(): Promise<void> {
       const generation = ++reloadGeneration;
-      void runPromise(
+      return runPromise(
         Effect.tryPromise({
           try: () =>
             handleSessionReload({
@@ -221,6 +221,7 @@
           catch: (cause) => new NetworkError({ cause }),
         }).pipe(
           Effect.catch((error) => Effect.sync(() => console.error('Live update failed:', error))),
+          Effect.asVoid,
         ),
       );
     }

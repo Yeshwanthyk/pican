@@ -108,6 +108,7 @@
   class:content--timeline={isTimeline}
   class:index-layout-ready={layoutReady}
   data-sessions-content
+  data-layout={layout}
 >
   {#if loading && sessions.length === 0}
     <div class="empty-state plain-state">

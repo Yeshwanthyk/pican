@@ -4,6 +4,7 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: "./tests",
+  grepInvert: process.env.PICAN_E2E_SCREENSHOTS ? undefined : /@screenshots/,
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,

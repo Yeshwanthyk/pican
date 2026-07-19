@@ -60,7 +60,10 @@ test.describe("share / export", () => {
 
   test("live session page exposes the Share action", async ({ page }) => {
     await page.goto("/");
-    await page.locator(".session-card", { hasText: "add deepseek-v4-pro" }).click();
+    await page
+      .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+      .locator(".session-ticker-link")
+      .click();
     await expect(page).toHaveURL(/\/session\?id=/);
 
     // Present in the live DOM (may live in a header menu depending on width);

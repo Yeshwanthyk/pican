@@ -6,7 +6,7 @@ This document explains how the live Svelte SPA, Go-embedded shell, shared styles
 
 | Layer / Directory | Purpose |
 |---|---|
-| `web/` | Client runtime source — Svelte + Vite modules compiled into `web/dist/` and served as `/static/assets/...` |
+| `web/` | TypeScript client runtime source — Svelte + Vite modules compiled into `web/dist/` and served as `/static/assets/...` |
 | `internal/ui/embedded/app.html` | One Go-embedded live SPA shell for browser routes |
 | `internal/ui/embedded/share-session.html` | Static export/share shell only; rendered with `IsLive: false` by `internal/ui/export.go` |
 | `internal/ui/embedded/styles/` | Shared CSS tokens and page styles used by the SPA shell, PWA CSS routes, and export |

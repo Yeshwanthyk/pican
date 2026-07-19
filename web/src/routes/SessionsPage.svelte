@@ -438,9 +438,12 @@
 
 <HomeMenu
   open={menuOpen}
+  {layout}
   onClose={closeMenu}
   onNewSession={openNewSessionModal}
   onManageProjects={openProjectsModal}
+  onLayoutChange={setLayout}
+  onSchedules={() => navigate('/schedules')}
 />
 
 <CommandPalette onNewSession={openNewSessionModal} navigate={(url: string) => navigate(url)} />

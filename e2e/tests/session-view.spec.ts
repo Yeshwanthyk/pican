@@ -2,7 +2,10 @@ import { test, expect, openTree } from "../lib/test";
 
 async function openDemoSession(page: import("@playwright/test").Page) {
   await page.goto("/");
-  await page.locator(".session-card", { hasText: "add deepseek-v4-pro" }).click();
+  await page
+    .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+    .locator(".session-ticker-link")
+    .click();
   await expect(page).toHaveURL(/\/session\?id=/);
 }
 

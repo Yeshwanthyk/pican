@@ -136,12 +136,14 @@
     const target = window;
     const runtime = getSessionRuntime();
     const model = isSessionRuntimeModel(runtime.model) ? runtime.model : null;
-    const entries: SessionEntry[] = Array.isArray(model?.entries)
-      ? model.entries.flatMap((entry) => {
-          const parsed = sessionEntryFromUnknown(entry);
-          return parsed ? [parsed] : [];
-        })
-      : [];
+    const liveEntries = (): SessionEntry[] =>
+      Array.isArray(model?.entries)
+        ? model.entries.flatMap((entry) => {
+            const parsed = sessionEntryFromUnknown(entry);
+            return parsed ? [parsed] : [];
+          })
+        : [];
+    const entries = liveEntries();
     getTestHook(globalThis)?.();
     const composerRuntime = runChatComposer({
       documentImpl: document,
@@ -155,7 +157,7 @@
       // Live getter: steer-queue uses this on every pi-session-reload to look
       // for a matching user entry and clear the corresponding steer chip once
       // pi has folded the steer into the conversation.
-      getLiveEntries: () => entries,
+      getLiveEntries: liveEntries,
       navigateTo: runtime.navigateTo ?? undefined,
       escapeHtml: (text: unknown) => escapeHtml(text, { documentImpl: document }),
       chatApi,

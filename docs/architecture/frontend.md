@@ -4,7 +4,7 @@ pican uses a single Vite-built Svelte SPA embedded into the Go binary, plus a se
 
 ## Vite App Frontend
 
-Built with **Vite + Svelte + JavaScript modules**, embedded into the Go binary.
+Built with **Vite + Svelte 5 + TypeScript**, embedded into the Go binary. Effect 4 owns typed browser I/O and failure handling at the frontend boundary; components stay thin and consume adapters or the Svelte runtime bridge instead of running Effects directly.
 
 ### Build Pipeline
 
@@ -12,7 +12,7 @@ Built with **Vite + Svelte + JavaScript modules**, embedded into the Go binary.
 web/src/main.ts
 web/src/App.svelte
 web/src/routes/*.svelte
-web/src/{components,routes,index,session,settings,shared}/**/*.{svelte,js}
+web/src/{components,routes,index,session,settings,shared}/**/*.{svelte,ts}
         │
         └──▶ vite build ──▶ web/dist/ ──▶ //go:embed
                               │
@@ -39,6 +39,19 @@ Browser routes served by the SPA shell:
 
 API, SSE, PWA, sound, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
 
+## Effect and TypeScript Boundary
+
+All frontend modules under `web/src/` are TypeScript. `web/src/lib/` is the Effect foundation:
+
+- `schema.ts` defines the runtime schemas and inferred TypeScript models for API payloads.
+- `errors.ts` defines the tagged failure taxonomy: `NetworkError`, `HttpError`, `DecodeError`, `AbortError`, `TimeoutError`, `StorageError`, `SseError`, and `WorkerDownError`.
+- `http.ts` performs schema-decoded JSON requests with typed HTTP, network, abort, timeout, and decode failures.
+- `storage.ts` wraps browser storage reads, writes, and parsing as typed Effects.
+- `sse.ts` exposes the shared status stream and schema-decodes structured SSE events.
+- `runtime.ts` owns the managed runtime plus `runPromise`, `runFork`, `runSync`, and `effectResource`. This is the Svelte bridge: components call these adapters and never call `Effect.run*` directly.
+
+Feature modules expose Effect-backed APIs while retaining promise-shaped adapter functions where imperative Svelte or legacy call sites need them. When writing new Effect code, consult the pinned `effect-smol` source matching `web/package.json`; the project uses an Effect 4 beta and does not assume Effect 3 APIs.
+
 ## Sessions Index (`/`)
 
 `SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the ticker-row session list, desktop right rail, mobile thumb bar, command palette, home menu, new-session modal, and project management modal. Timeline, Projects, Schedules, and Subagents are the global index views; Workflows and Tasks are session-scoped actions in `CommandMenu.svelte`. `web/src/index/` contains pure data/API helpers (`sessions.ts`) for normalization, Now/pinned/date/project grouping, filtering, and API calls.
@@ -57,12 +70,12 @@ Assistant edit tools use the shared, side-effect-free `words-diff.ts` parser and
 
 The old runners/renderers have been replaced by Svelte components plus focused helpers: `web/src/session/` holds the reactive model, pure helpers, live-only helpers, and a few shared utilities:
 
-- `data/` — payload decoding + the reactive `SessionDataModel` (`session-data.svelte.js`, the single source of truth: entries/lookups/tree/active-path/view-state, `reconcile()`)
+- `data/` — payload decoding + the reactive `SessionDataModel` (`session-data.svelte.ts`, the single source of truth: entries/lookups/tree/active-path/view-state, `reconcile()`)
 - `tree/`, `render/`, `navigation/` — **pure** tree/format/markdown/navigation helpers consumed by the Svelte components (and the export). The message renderer is now `<SessionEntry>`/`<ToolCall>`; `render/` keeps `session-format`, `markdown`, `entry-format`, `session-entry-actions` (download/share/copy)
-- `session-globals.js`, `session-content-runtime.js`, `lazy-highlight.js` — the relocated live glue (see above)
+- `session-globals.ts`, `session-content-runtime.ts`, `lazy-highlight.ts` — the relocated live glue (see above)
 - `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/sound/push util, also used by the settings page). Model discovery is session-scoped (`/api/models?id=<sessionId>`) so Pi and Codex selectors cannot mix providers. Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
-- `live/` — live-only helpers used by `<LiveReload>`: `live-connection.js` (SSE connection/reconnect lifecycle), `live-events.js` (SSE/reload primitives), `live-scroll.js` (low-level scroll primitives), `live-follow.js` (`createFollowScrollController` — follow-mode decision state + follow button), `live-stats.js` (header stats), and `chat-preview.js` (streaming-preview helper, also used by `<BtwPopup>`)
-- `ui/` — search/toggle/session-ui-runner helpers used by `setupSessionUi` and `RightSidebar`, plus `sidebar.js`'s mobile-breakpoint helpers (`isMobileLayout`) and the docked-sidebar drawer toggle (`setSidebarOpen`) still used by the static export (see below)
+- `live/` — live-only helpers used by `<LiveReload>`: `live-connection.ts` (SSE connection/reconnect lifecycle), `live-events.ts` (SSE/reload primitives), `live-scroll.ts` (low-level scroll primitives), `live-follow.ts` (`createFollowScrollController` — follow-mode decision state + follow button), `live-stats.ts` (header stats), and `chat-preview.ts` (streaming-preview helper, also used by `<BtwPopup>`)
+- `ui/` — search/toggle/session-ui-runner helpers used by `setupSessionUi` and `RightSidebar`, plus `sidebar.ts`'s mobile-breakpoint helpers (`isMobileLayout`) and the docked-sidebar drawer toggle (`setSidebarOpen`) still used by the static export (see below)
 - `artifacts/` — pure registries/filters + the fetch API wrappers; the panel itself is `ArtifactPanel.svelte`
 
 The index + settings Phase 4 migration is complete: those routes are Svelte-orchestrated too, with only pure/API helpers left outside components.
@@ -118,7 +131,7 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 - Oxlint allows `lucide` imports only in `web/src/shared/icons.ts`, rejects inline SVG in Svelte components, and rejects Unicode back/chevron glyphs used as span icons. `ContextUsage.svelte` has the sole inline-SVG exception because its ring is data visualization rather than an icon.
 - `web/src/export/export-boundary.test.ts` walks the export dependency graph and rejects live chat, SSE, browser networking, and the application Effect runtime bridge.
 - `web/src/shared/strings.test.ts` verifies the English string lookup and parameter interpolation used by Svelte, TypeScript runtime code, and static exports.
-- Knip, Prettier, the frontend build, Vitest, Go tests, installer tests, and `go vet` run through the same `make check` gate.
+- Oxlint, Oxfmt, Svelte formatting, TypeScript and `svelte-check`, Knip, the frontend build, Vitest, Go tests, installer tests, and `go vet` run through the same `make check` gate.
 
 ## Static Assets
 

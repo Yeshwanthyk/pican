@@ -1,6 +1,14 @@
 <script lang="ts">
   import { t } from '../../shared/strings.js';
-  import { icon, SquarePen, FolderGit2, Settings, Tag } from '../../shared/icons.js';
+  import {
+    icon,
+    SquarePen,
+    FolderGit2,
+    CalendarClock,
+    ListTree,
+    Settings,
+    Tag,
+  } from '../../shared/icons.js';
   import { openVersionModal } from '../../shared/version.js';
   import { handleNavClick } from '../../shared/navigation.js';
 
@@ -9,6 +17,9 @@
     onClose?: () => void;
     onNewSession?: () => void;
     onManageProjects?: () => void;
+    layout?: 'timeline' | 'projects';
+    onLayoutChange?: (layout: 'timeline' | 'projects') => void;
+    onSchedules?: () => void;
   }
 
   let {
@@ -16,6 +27,9 @@
     onClose = () => {},
     onNewSession = () => {},
     onManageProjects = () => {},
+    layout = 'timeline',
+    onLayoutChange = () => {},
+    onSchedules = () => {},
   }: Props = $props();
 
   function handleBackdropClick(e: MouseEvent | KeyboardEvent) {
@@ -76,6 +90,34 @@
       }}
       ><span class="menu-item-label"
         >{@html icon(FolderGit2, { size: 15 })}{t('index.manageProjects')}</span
+      ></button
+    >
+    <button
+      class="web-menu-item"
+      type="button"
+      data-layout-menu-btn
+      role="menuitem"
+      onclick={() => {
+        onClose();
+        onLayoutChange(layout === 'timeline' ? 'projects' : 'timeline');
+      }}
+      ><span class="menu-item-label"
+        >{@html icon(ListTree, { size: 15 })}{layout === 'timeline'
+          ? t('index.layoutProjects')
+          : t('index.layoutTimeline')}</span
+      ></button
+    >
+    <button
+      class="web-menu-item"
+      type="button"
+      data-schedules-menu-btn
+      role="menuitem"
+      onclick={() => {
+        onClose();
+        onSchedules();
+      }}
+      ><span class="menu-item-label"
+        >{@html icon(CalendarClock, { size: 15 })}{t('schedules.navTitle')}</span
       ></button
     >
   </div>

@@ -134,6 +134,13 @@ Every component (the index list cards, sidebar tree, chat bubbles, buttons, and 
 - Edit tools render unified rows with tabular old/new line numbers. Added and removed rows use a 7% semantic tint, while paired intra-line changes use a 28% highlight derived from the same diff token.
 - Transcript disclosures and actions use named 120ms transitions, 40px desktop targets, and 44px mobile targets. The streaming caret stops blinking under reduced-motion preferences.
 
+### Sessions Index
+
+- Sessions render as flat ticker rows separated by hairlines. The title leads, current activity or waiting state follows when present, and the footer balances project/model against token, cost, and recency metrics.
+- Live and waiting sessions move into a `Now` group and are excluded from pinned/date groups below it. Waiting uses `--attention`; live work uses `--accent` and a reduced-motion-safe status pulse.
+- Desktop uses a compact top action bar and a right rail for waiting questions, schedules, and machines. Mobile uses a bottom thumb bar with search, a 46px new-session action, and the overflow menu.
+- Counts, costs, tokens, elapsed durations, and timestamps use tabular numerals. All fourteen named themes define `--attention` independently from danger and success.
+
 ### Plain States
 
 - First-run and empty-search states use one centered muted line plus one dim hint line. They don't use cards, glyphs, or apology copy; the hint states the immediate fix.
