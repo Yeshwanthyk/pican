@@ -19,7 +19,7 @@ The live app no longer uses separate Go-rendered `index.html`, `settings.html`, 
 
 ```txt
 internal/ui/embedded/app.html
-└── web/src/main.js  (Vite entry)
+└── web/src/main.ts  (Vite entry)
     └── web/src/App.svelte
         ├── routes/SessionsPage.svelte  (/)
         ├── routes/SessionPage.svelte   (/session?id=…)
@@ -65,7 +65,7 @@ Export/share snapshots are still fully self-contained and must not depend on the
 |---|---|---|
 | Go renderer | `internal/ui/spa_page.go` | `internal/ui/export.go` |
 | HTML shell | `embedded/app.html` | `embedded/share-session.html` (`IsLive: false`) |
-| JS source | `web/src/main.js` | `web/src/export/export-entry.js` |
+| Source entry | `web/src/main.ts` | `web/src/export/export-entry.js` |
 | JS delivery | `/static/assets/app-*.js` | inline IIFE `internal/ui/embedded/export/export.js` |
 | Network required | Yes | No |
 | Chat/SSE | Yes | No |

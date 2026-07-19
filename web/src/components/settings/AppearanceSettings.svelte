@@ -1,10 +1,21 @@
-<script>
-  import { t } from '../../shared/strings.js';
-  import { applyTheme } from '../../shared/theme.js';
-  import { applyFonts } from '../../shared/fonts.js';
-  import { valueFor } from '../../settings/settings-support.js';
+<script lang="ts">
+  import { t } from '../../shared/strings';
+  import { applyTheme } from '../../shared/theme';
+  import { applyFonts } from '../../shared/fonts';
+  import { valueFor } from '../../settings/settings-support';
+  import type { Settings } from '../../settings/settings-support';
+  import { settle } from '../shared/ui-effect';
 
-  let { settings = {}, onSave = () => {}, onSaved = () => {} } = $props();
+  type FontKind = 'ui' | 'content' | 'code';
+  let {
+    settings = {},
+    onSave = () => {},
+    onSaved = () => {},
+  }: {
+    settings?: Settings;
+    onSave?: (key: string, value: string) => void;
+    onSaved?: () => void;
+  } = $props();
   // Swatch colors are each theme's own --body-bg/--text/--accent so a grid
   // tile renders in its real palette without needing data-theme applied to it.
   const COMMUNITY_THEMES = [
@@ -61,61 +72,82 @@
       accent: '#7e9cd8',
     },
   ];
-  const FONT_KEYS = {
+  const FONT_KEYS: Record<FontKind, string> = {
     ui: 'pican:v1:font-ui',
     content: 'pican:v1:font-content',
     code: 'pican:v1:font-code',
   };
-  const BUILTIN_FONTS = ['mono', 'system', 'sans', 'serif'];
+  const BUILTIN_FONTS: ReadonlyArray<string> = ['mono', 'system', 'sans', 'serif'];
   const uiSizeKey = 'pican:v1:font-ui-size';
   const contentSizeKey = 'pican:v1:font-content-size';
+  const fontItems: ReadonlyArray<{
+    readonly kind: FontKind;
+    readonly name: string;
+    readonly hint: string;
+  }> = [
+    { kind: 'ui', name: t('settings.interfaceFont'), hint: t('settings.interfaceFontHint') },
+    { kind: 'content', name: t('settings.contentFont'), hint: t('settings.contentFontHint') },
+    { kind: 'code', name: t('settings.codeFont'), hint: t('settings.codeFontHint') },
+  ];
   let theme = $derived(valueFor(settings, 'pican-theme', 'dark'));
   let uiSize = $derived(valueFor(settings, uiSizeKey, '14'));
   let contentSize = $derived(valueFor(settings, contentSizeKey, '15'));
-  let detectedFonts = $state([]);
+  let detectedFonts = $state<string[]>([]);
   // User explicitly picked "Custom…" for a kind, so the text field shows even
   // before a family is committed (auto-detected custom families don't need it).
-  let manualCustom = $state({ ui: false, content: false, code: false });
+  let manualCustom = $state<Record<FontKind, boolean>>({ ui: false, content: false, code: false });
   // In-progress edit to the custom-family text (null = not editing; fall back to
   // the stored value). Kept separate from settings so typing isn't clobbered.
-  let customDraft = $state({ ui: null, content: null, code: null });
+  let customDraft = $state<Record<FontKind, string | null>>({
+    ui: null,
+    content: null,
+    code: null,
+  });
 
-  function fontValue(kind) {
+  function fontValue(kind: FontKind) {
     return valueFor(settings, FONT_KEYS[kind], 'mono');
   }
-  function isCustomFont(kind) {
+  function isCustomFont(kind: FontKind) {
     const v = fontValue(kind);
     return !BUILTIN_FONTS.includes(v) && !detectedFonts.includes(v);
   }
   // All pure (reads only) — safe to call from the template. The previous version
   // wrote $state inside fontSelectValue(), which throws state_unsafe_mutation when
   // this component mounts during a reactive route swap rather than a fresh load.
-  function fontSelectValue(kind) {
+  function fontSelectValue(kind: FontKind) {
     return isCustomFont(kind) ? '__custom__' : fontValue(kind);
   }
-  function customShown(kind) {
+  function customShown(kind: FontKind) {
     return manualCustom[kind] || isCustomFont(kind);
   }
-  function customValue(kind) {
+  function customValue(kind: FontKind) {
     if (customDraft[kind] != null) return customDraft[kind];
     return isCustomFont(kind) ? fontValue(kind) : '';
   }
-  function setDraft(kind, value) {
+  function setDraft(kind: FontKind, value: string | null) {
     customDraft = { ...customDraft, [kind]: value };
   }
 
-  function commitTheme(value) {
-    applyTheme(window, document, value);
+  function commitTheme(value: string) {
+    applyTheme(
+      {
+        localStorage: window.localStorage,
+        navigator: { windowControlsOverlay: window.navigator.windowControlsOverlay },
+        getComputedStyle: () => window.getComputedStyle(document.documentElement),
+      },
+      document,
+      value,
+    );
     onSaved();
   }
 
-  function commitSize(kind, value) {
+  function commitSize(kind: 'ui' | 'content', value: string) {
     const key = kind === 'ui' ? uiSizeKey : contentSizeKey;
     onSave(key, value);
     applyFonts(document, kind === 'ui' ? { uiSize: value } : { contentSize: value });
   }
 
-  function commitFont(kind, value) {
+  function commitFont(kind: FontKind, value: string) {
     onSave(FONT_KEYS[kind], value);
     applyFonts(document, { [kind]: value });
   }
@@ -125,18 +157,18 @@
       window.alert?.(t('settings.fontDetectUnsupported'));
       return;
     }
-    try {
-      const fonts = await window.queryLocalFonts();
-      detectedFonts = Array.from(new Set(fonts.map((f) => f.family))).sort((a, b) =>
+    const result = await settle(() => window.queryLocalFonts?.() ?? Promise.resolve([]));
+    if (result.ok) {
+      detectedFonts = Array.from(new Set(result.value.map((font) => font.family))).sort((a, b) =>
         a.localeCompare(b),
       );
       onSaved();
-    } catch {
+    } else {
       window.alert?.(t('settings.fontDetectDenied'));
     }
   }
 
-  async function handleFontSelect(kind, value) {
+  async function handleFontSelect(kind: FontKind, value: string) {
     if (value === '__detect__') {
       await detectInstalledFonts();
       return;
@@ -151,7 +183,7 @@
     commitFont(kind, value);
   }
 
-  function commitCustom(kind) {
+  function commitCustom(kind: FontKind) {
     const fam = String(customValue(kind)).trim();
     if (fam) {
       commitFont(kind, fam);
@@ -206,7 +238,7 @@
     </div>
   </div>
 
-  {#each [{ kind: 'ui', name: t('settings.interfaceFont'), hint: t('settings.interfaceFontHint') }, { kind: 'content', name: t('settings.contentFont'), hint: t('settings.contentFontHint') }, { kind: 'code', name: t('settings.codeFont'), hint: t('settings.codeFontHint') }] as item (item.kind)}
+  {#each fontItems as item (item.kind)}
     <div class="settings-row">
       <div class="settings-row-label">
         <span class="name">{item.name}</span><span class="hint">{item.hint}</span>

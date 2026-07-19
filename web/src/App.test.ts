@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { flushSync, unmount } from "svelte";
-import { mountApp } from "./main.js";
+import { mountApp } from "./main";
 
-let mounted;
+let mounted: ReturnType<typeof mountApp> = null;
 
 beforeEach(() => {
   document.body.innerHTML = "";
@@ -11,6 +11,7 @@ beforeEach(() => {
 
 afterEach(() => {
   if (mounted) unmount(mounted);
+  vi.restoreAllMocks();
 });
 
 describe("App", () => {
@@ -148,43 +149,37 @@ describe("App", () => {
   // SessionPage fetches /api/session?id=<id> as it mounts, so a fetch for the new
   // id is a reliable "it remounted and loaded the new session" signal.
   it("remounts SessionPage on session→session navigation (?id change)", () => {
-    const fetchSpy = vi.fn(() => Promise.reject(new Error("stub")));
-    const origFetch = window.fetch;
-    window.fetch = fetchSpy;
-    try {
-      document.body.innerHTML = '<div id="app"></div>';
-      window.history.pushState({}, "", "/session?id=A");
-      mounted = mountApp({ props: { path: "/session", search: "?id=A" } });
-      flushSync();
-      expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("id=A"))).toBe(true);
+    const fetchSpy = vi.fn((_input: RequestInfo | URL) =>
+      Promise.resolve(new Response("{}", { status: 500 })),
+    );
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+    window.history.pushState({}, "", "/session?id=A");
+    mounted = mountApp({ props: { path: "/session", search: "?id=A" } });
+    flushSync();
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("id=A"))).toBe(true);
 
-      fetchSpy.mockClear();
-      window.history.pushState({}, "", "/session?id=B");
-      flushSync();
-      expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("id=B"))).toBe(true);
-    } finally {
-      window.fetch = origFetch;
-    }
+    fetchSpy.mockClear();
+    window.history.pushState({}, "", "/session?id=B");
+    flushSync();
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("id=B"))).toBe(true);
   });
 
   it("does not remount SessionPage when the id is unchanged", () => {
-    const fetchSpy = vi.fn(() => Promise.reject(new Error("stub")));
-    const origFetch = window.fetch;
-    window.fetch = fetchSpy;
-    try {
-      document.body.innerHTML = '<div id="app"></div>';
-      window.history.pushState({}, "", "/session?id=A");
-      mounted = mountApp({ props: { path: "/session", search: "?id=A" } });
-      flushSync();
+    const fetchSpy = vi.fn((_input: RequestInfo | URL) =>
+      Promise.resolve(new Response("{}", { status: 500 })),
+    );
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+    window.history.pushState({}, "", "/session?id=A");
+    mounted = mountApp({ props: { path: "/session", search: "?id=A" } });
+    flushSync();
 
-      // A within-session URL change (non-id query param) must not tear down and
-      // reload the live session view.
-      fetchSpy.mockClear();
-      window.history.pushState({}, "", "/session?id=A&panel=tree");
-      flushSync();
-      expect(fetchSpy).not.toHaveBeenCalled();
-    } finally {
-      window.fetch = origFetch;
-    }
+    // A within-session URL change (non-id query param) must not tear down and
+    // reload the live session view.
+    fetchSpy.mockClear();
+    window.history.pushState({}, "", "/session?id=A&panel=tree");
+    flushSync();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

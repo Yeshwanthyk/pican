@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount, untrack } from 'svelte';
   import SessionsPage from './routes/SessionsPage.svelte';
   import SessionPage from './routes/SessionPage.svelte';
@@ -10,10 +10,15 @@
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
 
+  interface AppProps {
+    readonly path?: string;
+    readonly search?: string;
+  }
+
   let {
     path: initialPath = typeof window !== 'undefined' ? window.location.pathname : '/',
     search: initialSearch = typeof window !== 'undefined' ? window.location.search : '',
-  } = $props();
+  }: AppProps = $props();
 
   // Reactive current route. Seeded from the props (so prop-driven tests stay
   // deterministic) and thereafter updated only by real navigation events, never
@@ -45,29 +50,28 @@
       search = window.location.search;
     };
     const { history } = window;
-    const wrap = (name) => {
-      const original = history[name];
-      if (typeof original !== 'function' || original.__piPatched) return original;
-      const patched = function (...args) {
-        const result = original.apply(this, args);
-        window.dispatchEvent(new window.CustomEvent('pican:locationchange'));
-        return result;
-      };
-      patched.__piPatched = true;
-      patched.__piOriginal = original;
-      history[name] = patched;
-      return original;
+    const originalPush = history.pushState;
+    const originalReplace = history.replaceState;
+    const emitLocationChange = () => {
+      window.dispatchEvent(new window.CustomEvent('pican:locationchange'));
     };
-    const originalPush = wrap('pushState');
-    const originalReplace = wrap('replaceState');
+    const patchedPush: History['pushState'] = (data, unused, url) => {
+      originalPush.call(history, data, unused, url);
+      emitLocationChange();
+    };
+    const patchedReplace: History['replaceState'] = (data, unused, url) => {
+      originalReplace.call(history, data, unused, url);
+      emitLocationChange();
+    };
+    history.pushState = patchedPush;
+    history.replaceState = patchedReplace;
     window.addEventListener('popstate', syncPath);
     window.addEventListener('pican:locationchange', syncPath);
     return () => {
       window.removeEventListener('popstate', syncPath);
       window.removeEventListener('pican:locationchange', syncPath);
-      if (history.pushState?.__piOriginal === originalPush) history.pushState = originalPush;
-      if (history.replaceState?.__piOriginal === originalReplace)
-        history.replaceState = originalReplace;
+      if (history.pushState === patchedPush) history.pushState = originalPush;
+      if (history.replaceState === patchedReplace) history.replaceState = originalReplace;
     };
   });
 </script>

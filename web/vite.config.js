@@ -14,7 +14,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       input: {
-        app: resolve(__dirname, "src/main.js"),
+        app: resolve(__dirname, "src/main.ts"),
       },
       output: {
         manualChunks(id) {

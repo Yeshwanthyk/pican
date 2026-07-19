@@ -9,7 +9,7 @@ pican is a local HTTP server that lets you browse and interact with Pi sessions 
 | Layer | Technology |
 |-------|------------|
 | Backend | Go 1.25+ |
-| Frontend (live app) | Svelte 5 SPA (`web/src/main.js` → `App.svelte`), built by Vite; the session viewer is fully component-driven over a reactive `SessionDataModel`. Go serves a single embedded shell (`internal/ui/embedded/app.html`) + injects bootstrap data |
+| Frontend (live app) | Svelte 5 SPA (`web/src/main.ts` → `App.svelte`), built by Vite; the session viewer is fully component-driven over a reactive `SessionDataModel`. Go serves a single embedded shell (`internal/ui/embedded/app.html`) + injects bootstrap data |
 | Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained Gist) |
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
@@ -26,7 +26,7 @@ pican is a local HTTP server that lets you browse and interact with Pi sessions 
 │                                                                           │
 │   ┌──────────────────────────────────────┐  ┌─────────────────────────┐  │
 │   │        Svelte 5 SPA (#spa-root)       │  │   EventSource Client    │  │
-│   │  main.js → App.svelte (path router)   │  │      /events?id=…       │  │
+│   │  main.ts → App.svelte (path router)   │  │      /events?id=…       │  │
 │   │                                       │  │                         │  │
 │   │  / → SessionsPage (Svelte index)      │  │  • reload (session)     │  │
 │   │  /session → SessionPage (Svelte       │  │  • new-session (index)  │  │

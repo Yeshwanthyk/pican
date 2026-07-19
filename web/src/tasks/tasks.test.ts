@@ -6,7 +6,7 @@ import {
   storesForSelection,
   taskCount,
   taskGroupsByStatus,
-} from "./tasks.js";
+} from "./tasks";
 
 describe("tasks helpers", () => {
   it("normalizes task fields and unknown statuses", () => {

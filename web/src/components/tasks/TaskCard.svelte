@@ -1,28 +1,36 @@
-<script>
-  import { marked } from 'marked';
-  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown.js';
-  import { escapeHtml } from '../../shared/escape.js';
-  import { formatRelativeTime } from '../../index/sessions.js';
-  import { t } from '../../shared/strings.js';
+<script lang="ts">
+  import { Marked } from 'marked';
+  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown';
+  import { escapeHtml } from '../../shared/escape';
+  import { formatRelativeTime } from '../../index/sessions';
+  import { t } from '../../shared/strings';
   import TaskExecutionChip from './TaskExecutionChip.svelte';
+  import type { NormalizedTask } from '../../tasks/tasks';
+  import { settle, stringifyJson } from '../shared/ui-effect';
+  import { describeError } from '../../lib/errors';
 
-  let { task, project, fetchOutput } = $props();
+  let {
+    task,
+    project,
+    fetchOutput,
+  }: {
+    task: NormalizedTask;
+    project: string;
+    fetchOutput: (project: string, taskId: string) => Promise<string>;
+  } = $props();
   let expanded = $state(false);
   let output = $state('');
   let outputError = $state('');
   let outputLoading = $state(false);
   let outputLoaded = $state(false);
 
-  configureSessionMarkdown({ marked, hljs: null, escapeHtml });
+  const markdown = new Marked();
+  configureSessionMarkdown({ marked: markdown, hljs: null, escapeHtml });
 
-  const md = (text) => safeMarkedParse(String(text || ''), { marked });
+  const md = (text: unknown) => safeMarkedParse(String(text || ''), { marked: markdown });
   const metadata = $derived.by(() => {
     if (task.metadata == null) return '';
-    try {
-      return JSON.stringify(task.metadata, null, 2);
-    } catch {
-      return String(task.metadata);
-    }
+    return stringifyJson(task.metadata) || String(task.metadata);
   });
   const canShowOutput = $derived(
     !!task.execution?.outputFile ||
@@ -33,14 +41,14 @@
     if (outputLoaded || outputLoading) return;
     outputLoading = true;
     outputError = '';
-    try {
-      output = await fetchOutput(project, task.id);
+    const result = await settle(() => fetchOutput(project, task.id));
+    if (result.ok) {
+      output = result.value;
       outputLoaded = true;
-    } catch (error) {
-      outputError = error.message || String(error);
-    } finally {
-      outputLoading = false;
+    } else {
+      outputError = describeError(result.error);
     }
+    outputLoading = false;
   }
 </script>
 

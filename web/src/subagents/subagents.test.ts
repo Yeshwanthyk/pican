@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSubagent, subagentActivityTime, subagentProject } from "./subagents.js";
+import { normalizeSubagent, subagentActivityTime, subagentProject } from "./subagents";
 
 describe("subagent helpers", () => {
   it("normalizes optional fields and unsupported statuses", () => {

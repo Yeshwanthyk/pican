@@ -1,13 +1,14 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/strings.js';
+  import { navigate } from '../shared/navigation';
+  import { t } from '../shared/strings';
   import FullScreenSheet from '../components/session/FullScreenSheet.svelte';
   import {
     groupModelsByProvider,
     modelDisplayLabel,
     THINKING_LEVELS,
-  } from '../session/chat/chat-selectors.js';
+  } from '../session/chat/chat-selectors';
+  import type { ModelOption } from '../session/chat/chat-selectors';
   import {
     icon,
     ArrowLeft,
@@ -20,7 +21,7 @@
     Play,
     Plus,
     Trash2,
-  } from '../shared/icons.js';
+  } from '../shared/icons';
   import {
     FREQUENCIES,
     buildCron,
@@ -35,13 +36,35 @@
     defaultDeleteSchedule,
     defaultFetchModels,
     defaultFetchRecent,
-  } from '../index/schedules.js';
+  } from '../index/schedules';
+  import type { Frequency } from '../index/schedules';
+  import type { ModelList, RecentLocations, Schedule, ScheduleRun } from '../lib/schema';
+  import { describeError } from '../lib/errors';
+  import { settle } from '../components/shared/ui-effect';
 
-  let schedules = $state([]);
+  type Model = ModelList['models'][number];
+  interface ScheduleForm {
+    name: string;
+    instructions: string;
+    modelProvider: string;
+    modelId: string;
+    modelLabel: string;
+    thinkingLevel: string;
+    projectPath: string;
+    frequency: Frequency;
+    minute: number;
+    hour: number;
+    weekday: number;
+    customCron: string;
+    timezone: string;
+    enabled: boolean;
+  }
+
+  let schedules = $state<ReadonlyArray<Schedule>>([]);
   let loading = $state(true);
   let loadError = $state('');
-  let models = $state([]);
-  let recent = $state([]);
+  let models = $state<ReadonlyArray<Model>>([]);
+  let recent = $state<RecentLocations['locations']>([]);
 
   let editorOpen = $state(false);
   let editingId = $state('');
@@ -53,10 +76,10 @@
   let projectPickerOpen = $state(false);
 
   let expandedId = $state('');
-  let runs = $state([]);
+  let runs = $state<ReadonlyArray<ScheduleRun>>([]);
   let runsLoading = $state(false);
 
-  const blankForm = () => ({
+  const blankForm = (): ScheduleForm => ({
     name: '',
     instructions: '',
     modelProvider: '',
@@ -82,9 +105,9 @@
   });
 
   const filteredRecent = $derived.by(() => {
-    const paths = [];
+    const paths: string[] = [];
     for (const loc of recent) {
-      const path = (loc && loc.path) || loc;
+      const path = typeof loc === 'string' ? loc : loc.path;
       if (typeof path === 'string' && path && !paths.includes(path)) {
         paths.push(path);
       }
@@ -102,28 +125,23 @@
   async function refresh() {
     loading = true;
     loadError = '';
-    try {
-      const data = await defaultFetchSchedules();
-      schedules = Array.isArray(data.schedules) ? data.schedules : [];
-    } catch (err) {
-      loadError = err.message || String(err);
-    } finally {
-      loading = false;
+    const result = await settle(defaultFetchSchedules);
+    if (result.ok) {
+      schedules = result.value.schedules;
+    } else {
+      loadError = describeError(result.error);
     }
+    loading = false;
   }
 
   onMount(() => {
     refresh();
-    defaultFetchModels()
-      .then((data) => {
-        models = Array.isArray(data.models) ? data.models : [];
-      })
-      .catch(() => {});
-    defaultFetchRecent()
-      .then((data) => {
-        recent = Array.isArray(data.locations) ? data.locations : [];
-      })
-      .catch(() => {});
+    void settle(defaultFetchModels).then((result) => {
+      if (result.ok) models = result.value.models;
+    });
+    void settle(defaultFetchRecent).then((result) => {
+      if (result.ok) recent = result.value.locations;
+    });
   });
 
   function openCreate() {
@@ -136,7 +154,7 @@
     editorOpen = true;
   }
 
-  function openEdit(schedule) {
+  function openEdit(schedule: Schedule) {
     editingId = schedule.id;
     const parsed = parseCron(schedule.cronExpr);
     form = {
@@ -169,16 +187,16 @@
     editingId = '';
   }
 
-  function onTimeInput(event) {
-    const value = event.target.value || '';
+  function onTimeInput(event: Event) {
+    const value = event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '';
     const [h, m] = value.split(':');
-    const hour = Number.parseInt(h, 10);
-    const minute = Number.parseInt(m, 10);
+    const hour = Number.parseInt(h ?? '', 10);
+    const minute = Number.parseInt(m ?? '', 10);
     if (Number.isFinite(hour)) form.hour = hour;
     if (Number.isFinite(minute)) form.minute = minute;
   }
 
-  function selectModel(provider, model) {
+  function selectModel(provider: string, model: ModelOption) {
     const id = model.id || model.modelId || '';
     form.modelProvider = provider;
     form.modelId = id;
@@ -193,7 +211,7 @@
     modelPickerOpen = false;
   }
 
-  function selectProject(path) {
+  function selectProject(path: string) {
     form.projectPath = path;
     projectPickerOpen = false;
   }
@@ -230,24 +248,21 @@
       enabled: form.enabled,
     };
     saving = true;
-    try {
-      if (editingId) {
-        await defaultUpdateSchedule(editingId, payload);
-      } else {
-        await defaultCreateSchedule(payload);
-      }
+    const result = await settle(() =>
+      editingId ? defaultUpdateSchedule(editingId, payload) : defaultCreateSchedule(payload),
+    );
+    if (result.ok) {
       closeEditor();
       await refresh();
-    } catch (err) {
-      formError = err.message || String(err);
-    } finally {
-      saving = false;
+    } else {
+      formError = describeError(result.error);
     }
+    saving = false;
   }
 
-  async function toggleEnabled(schedule) {
-    try {
-      await defaultUpdateSchedule(schedule.id, {
+  async function toggleEnabled(schedule: Schedule) {
+    const result = await settle(() =>
+      defaultUpdateSchedule(schedule.id, {
         name: schedule.name,
         instructions: schedule.instructions,
         modelProvider: schedule.modelProvider,
@@ -257,41 +272,43 @@
         cronExpr: schedule.cronExpr,
         timezone: schedule.timezone,
         enabled: !schedule.enabled,
-      });
+      }),
+    );
+    if (result.ok) {
       await refresh();
-    } catch (err) {
-      loadError = err.message || String(err);
+    } else {
+      loadError = describeError(result.error);
     }
   }
 
-  async function runNow(schedule) {
-    try {
-      const data = await defaultRunSchedule(schedule.id);
-      if (data && data.sessionId) {
-        navigate('/session?id=' + encodeURIComponent(data.sessionId));
+  async function runNow(schedule: Schedule) {
+    const result = await settle(() => defaultRunSchedule(schedule.id));
+    if (result.ok) {
+      if (result.value.sessionId) {
+        navigate('/session?id=' + encodeURIComponent(result.value.sessionId));
       }
-    } catch (err) {
-      loadError = err.message || String(err);
+    } else {
+      loadError = describeError(result.error);
     }
   }
 
-  async function remove(schedule) {
+  async function remove(schedule: Schedule) {
     if (
       typeof window !== 'undefined' &&
       !window.confirm(t('schedules.confirmDelete', { name: schedule.name }))
     ) {
       return;
     }
-    try {
-      await defaultDeleteSchedule(schedule.id);
+    const result = await settle(() => defaultDeleteSchedule(schedule.id));
+    if (result.ok) {
       if (expandedId === schedule.id) expandedId = '';
       await refresh();
-    } catch (err) {
-      loadError = err.message || String(err);
+    } else {
+      loadError = describeError(result.error);
     }
   }
 
-  async function toggleRuns(schedule) {
+  async function toggleRuns(schedule: Schedule) {
     if (expandedId === schedule.id) {
       expandedId = '';
       return;
@@ -299,24 +316,23 @@
     expandedId = schedule.id;
     runs = [];
     runsLoading = true;
-    try {
-      const data = await defaultFetchScheduleRuns(schedule.id);
-      runs = Array.isArray(data.runs) ? data.runs : [];
-    } catch (err) {
-      loadError = err.message || String(err);
-    } finally {
-      runsLoading = false;
+    const result = await settle(() => defaultFetchScheduleRuns(schedule.id));
+    if (result.ok) {
+      runs = result.value.runs;
+    } else {
+      loadError = describeError(result.error);
     }
+    runsLoading = false;
   }
 
-  function fmtTime(value) {
+  function fmtTime(value: string | null | undefined) {
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
     return d.toLocaleString();
   }
 
-  function freqLabel(schedule) {
+  function freqLabel(schedule: Schedule) {
     return describeFrequency(schedule, t);
   }
 </script>
@@ -481,7 +497,7 @@
                           class="sched-link"
                           data-testid="run-open"
                           onclick={() =>
-                            navigate('/session?id=' + encodeURIComponent(run.sessionId))}
+                            navigate('/session?id=' + encodeURIComponent(run.sessionId || ''))}
                         >
                           <span class="sched-ico" aria-hidden="true"
                             >{@html icon(ExternalLink, { size: 13 })}</span

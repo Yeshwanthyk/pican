@@ -6,7 +6,15 @@ function defaultTarget() {
   return document.getElementById("spa-root") || document.getElementById("app");
 }
 
-export function mountApp({ target = defaultTarget(), props = {} } = {}) {
+export interface AppProps {
+  readonly path?: string;
+  readonly search?: string;
+}
+
+export function mountApp({
+  target = defaultTarget(),
+  props = {},
+}: { readonly target?: Element | null; readonly props?: AppProps } = {}) {
   if (!target) return null;
   return mount(App, { target, props });
 }

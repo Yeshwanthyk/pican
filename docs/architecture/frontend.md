@@ -9,7 +9,7 @@ Built with **Vite + Svelte + JavaScript modules**, embedded into the Go binary.
 ### Build Pipeline
 
 ```txt
-web/src/main.js
+web/src/main.ts
 web/src/App.svelte
 web/src/routes/*.svelte
 web/src/{components,routes,index,session,settings,shared}/**/*.{svelte,js}
@@ -20,7 +20,7 @@ web/src/{components,routes,index,session,settings,shared}/**/*.{svelte,js}
                          .vite/manifest.json
 ```
 
-At startup, `internal/frontend/assets.go` + `web/assets_embed.go` reads `.vite/manifest.json`, validates the `src/main.js` SPA entrypoint, and registers its hashed asset route under `/static/...`. Other hashed chunks are served from the embedded `web/dist/assets/` filesystem.
+At startup, `internal/frontend/assets.go` + `web/assets_embed.go` reads `.vite/manifest.json`, validates the `src/main.ts` SPA entrypoint, and registers its hashed asset route under `/static/...`. Other hashed chunks are served from the embedded `web/dist/assets/` filesystem.
 
 ## SPA Shell and Routes
 

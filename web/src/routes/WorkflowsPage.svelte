@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { createStatusEvents } from '../shared/status-events.js';
-  import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/strings.js';
-  import { formatRelativeTime } from '../index/sessions.js';
-  import { icon, ChevronLeft, ListTree } from '../shared/icons.js';
+  import { createStatusEvents } from '../shared/status-events';
+  import { navigate } from '../shared/navigation';
+  import { t } from '../shared/strings';
+  import { formatRelativeTime } from '../index/sessions';
+  import { icon, ChevronLeft, ListTree } from '../shared/icons';
   import WorkflowDetail from '../components/workflows/WorkflowDetail.svelte';
   import WorkflowStatusChip from '../components/workflows/WorkflowStatusChip.svelte';
   import {
@@ -12,69 +12,71 @@
     defaultFetchWorkflows,
     normalizeWorkflowSummary,
     workflowPhaseProgress,
-  } from '../workflows/workflows.js';
+  } from '../workflows/workflows';
+  import type { WorkflowSummary } from '../workflows/workflows';
+  import type { WorkflowRunDetail } from '../lib/schema';
+  import { describeError } from '../lib/errors';
+  import { recoverSync, settle } from '../components/shared/ui-effect';
 
-  let { runId = '', session = '' } = $props();
+  let { runId = '', session = '' }: { runId?: string; session?: string } = $props();
 
-  let workflows = $state([]);
+  let workflows = $state<ReadonlyArray<WorkflowSummary>>([]);
   let loading = $state(true);
   let loadError = $state('');
-  let detail = $state(null);
+  let detail = $state<WorkflowRunDetail | null>(null);
   let detailLoading = $state(false);
   let detailError = $state('');
   let listGeneration = 0;
   let detailGeneration = 0;
-  let updateTimer = null;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function refreshList({ soft = false, sessionFilter = session } = {}) {
     const generation = ++listGeneration;
     if (!soft) loading = true;
     loadError = '';
-    try {
-      const response = await defaultFetchWorkflows(sessionFilter);
+    const result = await settle(() => defaultFetchWorkflows(sessionFilter));
+    if (result.ok) {
       if (generation !== listGeneration) return;
-      workflows = (response.workflows || []).map(normalizeWorkflowSummary);
-    } catch (error) {
-      if (generation === listGeneration) loadError = error.message || String(error);
-    } finally {
-      if (generation === listGeneration) loading = false;
+      workflows = result.value.workflows.map(normalizeWorkflowSummary);
+    } else if (generation === listGeneration) {
+      loadError = describeError(result.error);
     }
+    if (generation === listGeneration) loading = false;
   }
 
-  async function refreshDetail(selectedRunId, { soft = false } = {}) {
+  async function refreshDetail(selectedRunId: string, { soft = false }: { soft?: boolean } = {}) {
     const generation = ++detailGeneration;
     if (!soft) {
       detail = null;
       detailLoading = true;
     }
     detailError = '';
-    try {
-      const response = await defaultFetchWorkflowRun(selectedRunId);
-      if (generation === detailGeneration && runId === selectedRunId) detail = response;
-    } catch (error) {
+    const result = await settle(() => defaultFetchWorkflowRun(selectedRunId));
+    if (result.ok) {
+      if (generation === detailGeneration && runId === selectedRunId) detail = result.value;
+    } else {
       if (generation === detailGeneration && runId === selectedRunId) {
-        detailError = error.message || String(error);
+        detailError = describeError(result.error);
       }
-    } finally {
-      if (generation === detailGeneration) detailLoading = false;
     }
+    if (generation === detailGeneration) detailLoading = false;
   }
 
   function scheduleRefresh() {
     clearTimeout(updateTimer);
     updateTimer = setTimeout(() => {
-      updateTimer = null;
+      updateTimer = undefined;
       refreshList({ soft: true });
       if (runId) refreshDetail(runId, { soft: true });
     }, 150);
   }
 
-  function selectRun(selectedRunId) {
+  function selectRun(selectedRunId: string) {
     navigate(workflowsHref(selectedRunId));
   }
 
   function workflowsHref(selectedRunId = '') {
-    const params = [];
+    const params: string[] = [];
     if (session) params.push('session=' + encodeURIComponent(session));
     if (selectedRunId) params.push('runId=' + encodeURIComponent(selectedRunId));
     return '/workflows' + (params.length ? '?' + params.join('&') : '');
@@ -104,9 +106,7 @@
     const previousTitle = document.title;
     document.title = t('workflows.title');
     const statusEvents = createStatusEvents({ onWorkflowUpdate: scheduleRefresh });
-    try {
-      statusEvents.connect();
-    } catch {}
+    recoverSync(() => statusEvents.connect(), undefined);
     return () => {
       document.title = previousTitle;
       clearTimeout(updateTimer);

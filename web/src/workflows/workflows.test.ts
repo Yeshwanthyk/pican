@@ -3,7 +3,7 @@ import {
   normalizeWorkflowSummary,
   workflowPhaseProgress,
   workflowTranscriptGroups,
-} from "./workflows.js";
+} from "./workflows";
 
 describe("workflow helpers", () => {
   it("normalizes optional summary fields", () => {

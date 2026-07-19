@@ -1,18 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  consumeSessionPrefetch,
-  prefetchSession,
-  resetSessionPrefetch,
-} from "./session-prefetch.js";
+import { consumeSessionPrefetch, prefetchSession, resetSessionPrefetch } from "./session-prefetch";
 
 afterEach(() => resetSessionPrefetch());
 
 describe("session-prefetch", () => {
   it("starts an /api/session fetch and lets consume await the same promise", async () => {
-    const calls = [];
-    const fetchImpl = async (url) => {
-      calls.push(url);
-      return { ok: true, json: async () => ({ name: "Prefetched" }) };
+    const calls: string[] = [];
+    const fetchImpl = async (url: RequestInfo | URL) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ name: "Prefetched" }));
     };
 
     prefetchSession("s.jsonl", { fetchImpl });
@@ -26,7 +22,7 @@ describe("session-prefetch", () => {
     let calls = 0;
     const fetchImpl = async () => {
       calls++;
-      return { ok: true, json: async () => ({}) };
+      return new Response("{}");
     };
     prefetchSession("s.jsonl", { fetchImpl });
     prefetchSession("s.jsonl", { fetchImpl });
@@ -37,7 +33,7 @@ describe("session-prefetch", () => {
     let calls = 0;
     const fetchImpl = async () => {
       calls++;
-      return { ok: true, json: async () => ({}) };
+      return new Response("{}");
     };
     prefetchSession("s.jsonl", { fetchImpl });
     await consumeSessionPrefetch("s.jsonl");
@@ -50,7 +46,7 @@ describe("session-prefetch", () => {
   });
 
   it("drops a rejected prefetch so callers fall back to a fresh fetch", async () => {
-    const fetchImpl = async () => ({ ok: false, status: 500 });
+    const fetchImpl = async () => new Response("{}", { status: 500 });
     prefetchSession("s.jsonl", { fetchImpl });
     const promise = consumeSessionPrefetch("s.jsonl");
     expect(promise).not.toBe(null);

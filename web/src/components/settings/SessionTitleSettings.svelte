@@ -1,20 +1,25 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { t } from '../../shared/strings.js';
-  import { boolFor, fetchModelGroups, valueFor } from '../../settings/settings-support.js';
+  import { t } from '../../shared/strings';
+  import { boolFor, fetchModelGroups, valueFor } from '../../settings/settings-support';
+  import type { ModelGroup, Settings } from '../../settings/settings-support';
+  import { settle } from '../shared/ui-effect';
 
-  let { settings = {}, onSave = () => {} } = $props();
+  let {
+    settings = {},
+    onSave = () => {},
+  }: { settings?: Settings; onSave?: (key: string, value: string) => void } = $props();
   const enabledKey = 'pican:v1:auto-title:enabled';
   const modeKey = 'pican:v1:auto-title:mode';
   const modelKey = 'pican:v1:auto-title:model';
   let enabled = $derived(boolFor(settings, enabledKey, false));
   let mode = $derived(valueFor(settings, modeKey, 'once'));
   let model = $derived(valueFor(settings, modelKey, ''));
-  let modelGroups = $state([]);
+  let modelGroups = $state<ReadonlyArray<ModelGroup>>([]);
 
   onMount(() => {
-    fetchModelGroups({ fetchImpl: window.fetch.bind(window) }).then((groups) => {
-      modelGroups = groups;
+    void settle(fetchModelGroups).then((result) => {
+      if (result.ok) modelGroups = result.value;
     });
   });
 </script>

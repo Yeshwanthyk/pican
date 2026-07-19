@@ -13,6 +13,12 @@ function activeNav() {
   return document.querySelector(".settings-sidebar-item.active")?.getAttribute("data-settings-nav");
 }
 
+function nav(section: string): Element {
+  const element = document.querySelector(`[data-settings-nav="${section}"]`);
+  expect(element).not.toBeNull();
+  return element ?? document.body;
+}
+
 describe("SettingsPage tab persistence", () => {
   it("defaults to the appearance tab when no section is in the URL", async () => {
     render(SettingsPage);
@@ -39,7 +45,7 @@ describe("SettingsPage tab persistence", () => {
     render(SettingsPage);
     await tick();
 
-    await fireEvent.click(document.querySelector('[data-settings-nav="notifications"]'));
+    await fireEvent.click(nav("notifications"));
     await tick();
 
     expect(window.location.search).toBe("?section=notifications");
@@ -51,9 +57,9 @@ describe("SettingsPage tab persistence", () => {
     await tick();
     const lengthBefore = window.history.length;
 
-    await fireEvent.click(document.querySelector('[data-settings-nav="notifications"]'));
+    await fireEvent.click(nav("notifications"));
     await tick();
-    await fireEvent.click(document.querySelector('[data-settings-nav="machines"]'));
+    await fireEvent.click(nav("machines"));
     await tick();
 
     expect(window.history.length).toBe(lengthBefore);

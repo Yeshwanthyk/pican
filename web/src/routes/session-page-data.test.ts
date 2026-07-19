@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildSessionPageState,
@@ -5,13 +6,15 @@ import {
   loadSessionPageState,
   newestLeaf,
   normalizeSessionRuntime,
-} from "./session-page-data.js";
-import { prefetchSession, resetSessionPrefetch } from "./session-prefetch.js";
+} from "./session-page-data";
+import { prefetchSession, resetSessionPrefetch } from "./session-prefetch";
 
 afterEach(() => resetSessionPrefetch());
 
-const btoaImpl = (value) => Buffer.from(value, "binary").toString("base64");
-const decodePayload = (encoded) => JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+const btoaImpl = (value: string) => Buffer.from(value, "binary").toString("base64");
+const decodeJson = Schema.decodeUnknownSync(Schema.UnknownFromJsonString);
+const decodePayload = (encoded: string) =>
+  decodeJson(Buffer.from(encoded, "base64").toString("utf8"));
 
 describe("session-page-data", () => {
   it("finds the newest entry id", () => {
@@ -89,16 +92,15 @@ describe("session-page-data", () => {
   });
 
   it("only fetches the session on the network path; the scratchpad is the sidebar’s job", async () => {
-    const seen = [];
-    const fetchImpl = async (url) => {
-      seen.push(url);
-      if (url.startsWith("/api/session")) {
-        return {
-          ok: true,
-          json: async () => ({ name: "Loaded", header: { cwd: "/tmp/space path" }, entries: [] }),
-        };
+    const seen: string[] = [];
+    const fetchImpl = async (url: RequestInfo | URL) => {
+      seen.push(String(url));
+      if (String(url).startsWith("/api/session")) {
+        return new Response(
+          JSON.stringify({ name: "Loaded", header: { cwd: "/tmp/space path" }, entries: [] }),
+        );
       }
-      throw new Error(`unexpected url: ${url}`);
+      return new Response("{}", { status: 500 });
     };
 
     const state = await loadSessionPageState({
@@ -113,7 +115,7 @@ describe("session-page-data", () => {
   });
 
   it("uses the embedded bootstrap payload without fetching", async () => {
-    const b64utf8 = (value) => Buffer.from(value, "utf8").toString("base64");
+    const b64utf8 = (value: string) => Buffer.from(value, "utf8").toString("base64");
     const bootstrap = b64utf8(
       JSON.stringify({
         id: "s.jsonl",
@@ -129,13 +131,13 @@ describe("session-page-data", () => {
       }),
     );
     const documentImpl = {
-      getElementById: (id) =>
+      getElementById: (id: string) =>
         id === "pican-session-bootstrap" ? { textContent: bootstrap } : null,
     };
     let fetched = false;
     const fetchImpl = async () => {
       fetched = true;
-      throw new Error("should not fetch when bootstrap is present");
+      return new Response("{}", { status: 500 });
     };
 
     const state = await loadSessionPageState({
@@ -152,13 +154,12 @@ describe("session-page-data", () => {
   });
 
   it("reuses a prefetched /api/session payload instead of fetching again", async () => {
-    const calls = [];
-    const fetchImpl = async (url) => {
-      calls.push(url);
-      return {
-        ok: true,
-        json: async () => ({ name: "Prefetched", header: { cwd: "/p" }, entries: [] }),
-      };
+    const calls: string[] = [];
+    const fetchImpl = async (url: RequestInfo | URL) => {
+      calls.push(String(url));
+      return new Response(
+        JSON.stringify({ name: "Prefetched", header: { cwd: "/p" }, entries: [] }),
+      );
     };
 
     prefetchSession("s.jsonl", { fetchImpl });
@@ -177,11 +178,8 @@ describe("session-page-data", () => {
     let attempt = 0;
     const fetchImpl = async () => {
       attempt++;
-      if (attempt === 1) return { ok: false, status: 500 };
-      return {
-        ok: true,
-        json: async () => ({ name: "Recovered", header: {}, entries: [] }),
-      };
+      if (attempt === 1) return new Response("{}", { status: 500 });
+      return new Response(JSON.stringify({ name: "Recovered", header: {}, entries: [] }));
     };
 
     prefetchSession("s.jsonl", { fetchImpl });
@@ -196,21 +194,21 @@ describe("session-page-data", () => {
   });
 
   it("falls back to fetch when the bootstrap is for a different session", async () => {
-    const b64utf8 = (value) => Buffer.from(value, "utf8").toString("base64");
+    const b64utf8 = (value: string) => Buffer.from(value, "utf8").toString("base64");
     const bootstrap = b64utf8(
       JSON.stringify({ id: "other.jsonl", data: { name: "Other", entries: [] } }),
     );
     const documentImpl = {
-      getElementById: (id) =>
+      getElementById: (id: string) =>
         id === "pican-session-bootstrap" ? { textContent: bootstrap } : null,
     };
     let fetched = false;
-    const fetchImpl = async (url) => {
+    const fetchImpl = async (url: RequestInfo | URL) => {
       fetched = true;
-      if (url.startsWith("/api/session")) {
-        return { ok: true, json: async () => ({ name: "Fetched", header: {}, entries: [] }) };
+      if (String(url).startsWith("/api/session")) {
+        return new Response(JSON.stringify({ name: "Fetched", header: {}, entries: [] }));
       }
-      return { ok: true, json: async () => ({ content: "" }) };
+      return new Response(JSON.stringify({ content: "" }));
     };
 
     const state = await loadSessionPageState({

@@ -1,7 +1,7 @@
-<script>
-  import { t } from '../../shared/strings.js';
+<script lang="ts">
+  import { t } from '../../shared/strings';
 
-  let { status = '' } = $props();
+  let { status = '' }: { status?: string } = $props();
 
   const label = $derived.by(() => {
     const key = `workflows.status.${status}`;

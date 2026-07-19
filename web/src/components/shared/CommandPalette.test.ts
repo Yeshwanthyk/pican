@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/svelte";
-import CommandPalette, {
-  filterPaletteSessions,
-  normalizePaletteSession,
-} from "./CommandPalette.svelte";
+import CommandPalette from "./CommandPalette.svelte";
+import { filterPaletteSessions, normalizePaletteSession } from "./command-palette";
 import {
   getSessionPaletteApi,
   openSessionPalette,
   setSessionPaletteApi,
-} from "../../shared/command-palette-runtime.js";
+} from "../../shared/command-palette-runtime";
 
 afterEach(() => {
   cleanup();
@@ -26,14 +24,14 @@ describe("CommandPalette", () => {
   });
 
   it("opens through the window bridge and navigates a selected session", async () => {
-    const seen = [];
+    const seen: string[] = [];
     render(CommandPalette, {
       props: {
         loadSessions: async () => [{ id: "s1", name: "Session one", model: "m" }],
-        navigate: (url) => seen.push(url),
+        navigate: (url: string) => seen.push(url),
       },
     });
-    await window.__piOpenSessionPalette();
+    await window.__piOpenSessionPalette?.();
     await screen.findByText("Session one");
     await fireEvent.click(screen.getByText("Session one"));
     expect(seen).toEqual(["/session?id=s1"]);

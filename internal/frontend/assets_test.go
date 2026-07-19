@@ -8,7 +8,7 @@ import (
 func TestLoadFrontendScriptsSingleEntrypoint(t *testing.T) {
 	fsys := fstest.MapFS{
 		".vite/manifest.json": &fstest.MapFile{
-			Data: []byte(`{"src/main.js":{"file":"assets/app-abc123.js"}}`),
+			Data: []byte(`{"src/main.ts":{"file":"assets/app-abc123.js"}}`),
 		},
 		"assets/app-abc123.js": &fstest.MapFile{Data: []byte("console.log('hello')")},
 	}
@@ -30,7 +30,7 @@ func TestLoadFrontendScriptsSingleEntrypoint(t *testing.T) {
 func TestLoadFrontendScriptsLoadsMultipleEntrypoints(t *testing.T) {
 	fsys := fstest.MapFS{
 		".vite/manifest.json": &fstest.MapFile{
-			Data: []byte(`{"src/main.js":{"file":"assets/app-000111.js"},"src/other.js":{"file":"assets/other-222333.js"}}`),
+			Data: []byte(`{"src/main.ts":{"file":"assets/app-000111.js"},"src/other.js":{"file":"assets/other-222333.js"}}`),
 		},
 		"assets/app-000111.js":   &fstest.MapFile{Data: []byte("app")},
 		"assets/other-222333.js": &fstest.MapFile{Data: []byte("other")},
@@ -65,7 +65,7 @@ func TestLoadFrontendScriptsMissingManifest(t *testing.T) {
 func TestLoadFrontendScriptsEmptyFile(t *testing.T) {
 	fsys := fstest.MapFS{
 		".vite/manifest.json": &fstest.MapFile{
-			Data: []byte(`{"src/main.js":{"file":""}}`),
+			Data: []byte(`{"src/main.ts":{"file":""}}`),
 		},
 	}
 	if _, err := loadFrontendScripts(fsys, appEntry); err == nil {
@@ -76,7 +76,7 @@ func TestLoadFrontendScriptsEmptyFile(t *testing.T) {
 func TestLoadFrontendScriptsAbsolutePath(t *testing.T) {
 	fsys := fstest.MapFS{
 		".vite/manifest.json": &fstest.MapFile{
-			Data: []byte(`{"src/main.js":{"file":"/etc/passwd"}}`),
+			Data: []byte(`{"src/main.ts":{"file":"/etc/passwd"}}`),
 		},
 	}
 	if _, err := loadFrontendScripts(fsys, appEntry); err == nil {
@@ -87,7 +87,7 @@ func TestLoadFrontendScriptsAbsolutePath(t *testing.T) {
 func TestLoadFrontendScriptsPathTraversal(t *testing.T) {
 	fsys := fstest.MapFS{
 		".vite/manifest.json": &fstest.MapFile{
-			Data: []byte(`{"src/main.js":{"file":"../etc/passwd"}}`),
+			Data: []byte(`{"src/main.ts":{"file":"../etc/passwd"}}`),
 		},
 	}
 	if _, err := loadFrontendScripts(fsys, appEntry); err == nil {
