@@ -26,6 +26,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.3.1",
     "@testing-library/user-event": "^14.6.1",
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^26.1.1",
     "jsdom": "latest",
     "knip": "^6.16.0",
