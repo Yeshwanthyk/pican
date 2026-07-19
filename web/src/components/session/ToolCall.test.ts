@@ -68,7 +68,7 @@ describe("ToolCall", () => {
     });
 
     expect(container.querySelector<HTMLDetailsElement>(".tool-fold")?.open).toBe(true);
-    expect(container.querySelector(".tool-fold-summary")?.textContent).toContain("error");
+    expect(container.querySelector(".tool-fold-summary")?.textContent).toContain("failed");
     expect(container.querySelector(".tool-execution")?.id).toBe("entry-result-1");
     expect(container.querySelector(".tool-fold")?.id).toBe("");
   });
@@ -96,6 +96,57 @@ describe("ToolCall", () => {
     const call = { id: "b", name: "bash", arguments: { command: "ls -la" } };
     const { container } = render(ToolCall, { props: { call, model: model() } });
     expect(container.querySelector(".tool-command")?.textContent).toContain("ls -la");
+  });
+
+  it("renders a short edit as an expanded unified words diff", () => {
+    const call = { id: "edit-1", name: "edit", arguments: { path: "/repo/src/file.ts" } };
+    const result = {
+      id: "edit-result",
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolCallId: "edit-1",
+        content: [],
+        details: {
+          diff: "@@ -4,2 +4,2 @@\n-const answer = 41;\n+const answer = 42;\n keep();",
+        },
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    const sheet = container.querySelector<HTMLDetailsElement>(".tool-diff-sheet");
+    expect(sheet?.open).toBe(true);
+    expect(container.querySelector(".tool-diff-counts")?.textContent).toContain("+1 −1");
+    expect(container.querySelectorAll(".tool-diff-row")).toHaveLength(3);
+    expect(container.querySelectorAll(".diff-word-changed")).toHaveLength(2);
+    expect(container.querySelector(".diff-removed .diff-line-number")?.textContent).toBe("4");
+    expect(container.textContent).toContain("copy patch");
+  });
+
+  it("collapses edit diffs larger than eight changed lines", () => {
+    const call = { id: "edit-big", name: "edit", arguments: { path: "large.ts" } };
+    const lines = Array.from({ length: 5 }, (_, index) => `-old ${index}`).concat(
+      Array.from({ length: 5 }, (_, index) => `+new ${index}`),
+    );
+    const result = {
+      id: "edit-big-result",
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolCallId: "edit-big",
+        content: [],
+        details: { diff: `@@ -1,5 +1,5 @@\n${lines.join("\n")}` },
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    const sheet = container.querySelector<HTMLDetailsElement>(".tool-diff-sheet.large");
+    expect(sheet?.open).toBe(false);
+    expect(sheet?.querySelector("summary")?.textContent).toContain("large.ts +5 −5");
   });
 
   it("renders an ask_user_question card with clickable options", () => {

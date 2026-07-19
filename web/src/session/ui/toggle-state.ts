@@ -140,9 +140,14 @@ export function applyToggleStateToNode(
   node.querySelectorAll<HTMLElement>(".thinking-collapsed").forEach((el) => {
     el.style.display = state.thinkingExpanded ? "none" : "block";
   });
-  node.querySelectorAll<HTMLElement>(".tool-execution, .compaction").forEach((el) => {
-    el.style.display = state.toolsVisible ? "" : "none";
+  node.querySelectorAll<HTMLElement>(".activity-thinking").forEach((el) => {
+    el.style.display = state.thinkingExpanded ? "" : "none";
   });
+  node
+    .querySelectorAll<HTMLElement>(".tool-execution, .activity-tool, .compaction")
+    .forEach((el) => {
+      el.style.display = state.toolsVisible ? "" : "none";
+    });
   // Mirrors the .thinking-text / .thinking-collapsed pair: show a "Tool: <name>
   // ..." placeholder so a hidden tool call still has a visible marker (and an
   // assistant message whose only content is a tool call isn't a stranded
@@ -153,6 +158,9 @@ export function applyToggleStateToNode(
   });
   node.querySelectorAll(".tool-output.expandable").forEach((el) => {
     el.classList.toggle("expanded", state.toolOutputsExpanded);
+  });
+  node.querySelectorAll<HTMLDetailsElement>(".activity-tool > .tool-fold").forEach((el) => {
+    if (!el.closest(".activity-fold.pending")) el.open = state.toolOutputsExpanded;
   });
   node.querySelectorAll(".compaction").forEach((el) => {
     el.classList.toggle("expanded", state.toolOutputsExpanded);

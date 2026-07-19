@@ -7,9 +7,9 @@
   // imperative layer still owns. Shared by the live app + the static export.
   import { getSessionModel } from '../../session/session-context.js';
   import type { SessionEntry as SessionEntryData } from '../../session/data/session-types.js';
-  import { formatToolRunBreakdown, groupToolRuns } from '../../session/render/group-tool-runs.js';
+  import { groupToolRuns } from '../../session/render/group-tool-runs.js';
   import type { ToolRunRenderItem } from '../../session/render/group-tool-runs.js';
-  import { t } from '../../shared/strings.js';
+  import ActivityFold from './ActivityFold.svelte';
   import SessionEntry from './SessionEntry.svelte';
 
   interface ContentModel {
@@ -22,12 +22,16 @@
     model?: ContentModel;
     afterRender?: ((container: HTMLElement) => void) | null;
     live?: boolean;
+    modelLabel?: string;
+    sessionId?: string;
   }
 
   let {
     model = getSessionModel<ContentModel>(),
     afterRender = null,
     live = false,
+    modelLabel = '',
+    sessionId = '',
   }: Props = $props();
 
   let containerEl = $state<HTMLDivElement | null>(null);
@@ -50,37 +54,19 @@
 <div id="messages-list" class="messages-list" bind:this={containerEl}>
   {#each renderItems as item, itemIndex (renderItemKey(item, itemIndex))}
     {#if item.kind === 'group'}
-      {@const breakdown = formatToolRunBreakdown(
-        item.breakdown,
-        t('session.moreToolNames', { count: item.breakdown.remaining }),
-      )}
-      <details class="tool-run-group {item.status}" open={item.status === 'error' || undefined}>
-        <summary class="tool-run-group-summary">
-          <span
-            class="tool-run-group-status {item.status}"
-            title={t(
-              `session.${item.status === 'error' ? 'failed' : item.status === 'pending' ? 'running' : 'completed'}`,
-            )}
-            aria-hidden="true"
-          ></span>
-          <span class="sr-only">
-            {t(
-              `session.${item.status === 'error' ? 'failed' : item.status === 'pending' ? 'running' : 'completed'}`,
-            )}
-          </span>
-          <span class="tool-run-group-count">
-            {t('session.toolCalls', { count: item.toolCount })}
-          </span>
-          {#if breakdown}<span class="tool-run-group-breakdown">{breakdown}</span>{/if}
-        </summary>
-        <div class="tool-run-group-body">
-          {#each item.entries as entry (entry.id)}
-            <SessionEntry {entry} {model} {live} />
-          {/each}
-        </div>
-      </details>
+      <ActivityFold
+        entries={item.entries}
+        {model}
+        toolCount={item.toolCount}
+        durationSeconds={item.durationSeconds}
+        hasEdits={item.hasEdits}
+        status={item.status}
+        startedAt={item.startedAt}
+        {live}
+        {sessionId}
+      />
     {:else}
-      <SessionEntry entry={item.entry} {model} {live} />
+      <SessionEntry entry={item.entry} {model} {live} {modelLabel} {sessionId} />
     {/if}
   {/each}
 </div>

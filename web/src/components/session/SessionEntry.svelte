@@ -11,11 +11,12 @@
   import { formatTimestamp } from '../../session/render/entry-format.js';
   import {
     contentBlocksFromUnknown,
+    isUnknownRecord,
     type ContentBlock,
     type SessionEntry as SessionEntryData,
   } from '../../session/data/session-types.js';
-  import ToolCall from './ToolCall.svelte';
   import ToolOutput from './ToolOutput.svelte';
+  import ActivityFold from './ActivityFold.svelte';
 
   // `live` (passed from <SessionContent>) gates the fork/label buttons, which
   // need the chat composer; copy-link is always shown. The static export passes
@@ -35,10 +36,14 @@
     entry,
     model = null,
     live = false,
+    modelLabel = '',
+    sessionId = '',
   }: {
     entry: SessionEntryData;
     model?: EntryModel | null;
     live?: boolean;
+    modelLabel?: string;
+    sessionId?: string;
   } = $props();
 
   const ts = $derived(formatTimestamp(entry.timestamp));
@@ -76,12 +81,50 @@
           .join('\n');
   });
   const userImages = $derived(imageBlocks(msg?.content));
+  const assistantToolCalls = $derived(messageBlocks.filter((block) => block.type === 'toolCall'));
+  const assistantThinking = $derived(
+    messageBlocks.filter(
+      (block) => block.type === 'thinking' && blockThinking(block).trim().length > 0,
+    ),
+  );
+  const hasAssistantActivity = $derived(
+    assistantToolCalls.length > 0 || assistantThinking.length > 0,
+  );
+  const assistantHasText = $derived(
+    messageBlocks.some((block) => block.type === 'text' && blockText(block).trim()),
+  );
+  const activityResults = $derived(
+    assistantToolCalls.flatMap((call) => {
+      const id = typeof call.id === 'string' ? call.id : '';
+      return (
+        model?.entries?.filter(
+          (candidate) => candidate.type === 'message' && candidate.message?.toolCallId === id,
+        ) ?? []
+      );
+    }),
+  );
+  const embeddedActivityStatus = $derived(
+    activityResults.some((candidate) => candidate.message?.isError)
+      ? 'error'
+      : assistantToolCalls.length > activityResults.length
+        ? 'pending'
+        : 'success',
+  );
+  const embeddedActivityHasEdits = $derived(
+    activityResults.some((candidate) => {
+      const details = candidate.message?.details;
+      return isUnknownRecord(details) && typeof details.diff === 'string';
+    }),
+  );
+  const assistantName = $derived(
+    String(msg?.model || msg?.provider || modelLabel || '').trim() || t('session.assistant'),
+  );
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
 
 {#snippet actions(id: string)}
-  {#if live}<button class="fork-btn" data-entry-id={id} title="Fork session from this message"
+  {#if live}<button class="fork-btn" data-entry-id={id} title={t('session.forkFromMessage')}
       >{@html icon(GitFork, { size: 13 })}</button
     >{/if}
   {#if live}<button
@@ -90,7 +133,7 @@
       title={t('session.labelEntry')}
       aria-label={t('session.labelEntry')}>{@html icon(Tag, { size: 13 })}</button
     >{/if}
-  <button class="copy-link-btn" data-entry-id={id} title="Copy link to this message"
+  <button class="copy-link-btn" data-entry-id={id} title={t('session.copyMessageLink')}
     >{@html icon(Link2, { size: 14 })}</button
   >
 {/snippet}
@@ -99,6 +142,9 @@
 {#if msg && msg.role === 'user'}
   <div class="user-message" id={`entry-${entryId}`}>
     {@render actions(entryId)}{@render timestamp()}
+    <div class="message-who user-who">
+      {t('session.you')}{#if ts}<span aria-hidden="true"> · </span>{ts}{/if}
+    </div>
     {#if userImages.length > 0}<div class="message-images">
         {#each userImages as img, imgIndex (imgIndex)}<img
             src={`data:${img.mimeType};base64,${img.data}`}
@@ -111,22 +157,27 @@
 {:else if msg && msg.role === 'assistant'}
   <div class="assistant-message" id={`entry-${entryId}`}>
     {@render actions(entryId)}{@render timestamp()}
+    {#if assistantHasText}<div class="message-who assistant-who">{assistantName}</div>{/if}
+    {#if hasAssistantActivity}
+      <ActivityFold
+        entries={[entry]}
+        {model}
+        toolCount={assistantToolCalls.length}
+        durationSeconds={0}
+        hasEdits={embeddedActivityHasEdits}
+        status={embeddedActivityStatus}
+        startedAt={entry.timestamp ?? ''}
+        {live}
+        {sessionId}
+      />
+    {/if}
     {#each messageBlocks as block, blockIndex (blockIndex)}
       {#if block.type === 'text' && blockText(block).trim()}<div
           class="assistant-text markdown-content"
         >
           {@html md(blockText(block))}
-        </div>{:else if block.type === 'thinking' && blockThinking(block).trim()}<div
-          class="thinking-block"
-        >
-          <div class="thinking-text markdown-content">{@html md(blockThinking(block))}</div>
-          <div class="thinking-collapsed">Thinking ...</div>
         </div>{/if}
     {/each}
-    {#each messageBlocks as block, toolBlockIndex (toolBlockIndex)}{#if block.type === 'toolCall'}<ToolCall
-          call={block}
-          {model}
-        />{/if}{/each}
     {#if msg.stopReason === 'aborted'}<div class="error-text">
         Aborted
       </div>{:else if msg.stopReason === 'error'}<div class="error-text">

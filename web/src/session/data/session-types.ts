@@ -20,6 +20,7 @@ export interface SessionMessage extends UnknownRecord {
   exitCode?: number | null;
   cancelled?: boolean;
   isError?: boolean;
+  isRunning?: boolean;
   stopReason?: string;
   errorMessage?: string;
   toolName?: string;

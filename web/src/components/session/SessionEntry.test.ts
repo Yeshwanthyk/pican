@@ -17,6 +17,7 @@ describe("SessionEntry", () => {
     expect(node).not.toBeNull();
     expect(node).toHaveClass("user-message");
     expect(node?.textContent).toContain("hello");
+    expect(node?.querySelector(".user-who")?.textContent).toContain("YOU");
   });
 
   it("renders an assistant message", () => {
@@ -29,6 +30,7 @@ describe("SessionEntry", () => {
     const node = container.querySelector("#entry-a");
     expect(node).toHaveClass("assistant-message");
     expect(node?.textContent).toContain("hi");
+    expect(node?.querySelector(".assistant-who")?.textContent).toBe("ASSISTANT");
   });
 
   it("renders thinking through the safe Markdown pipeline", () => {
@@ -42,11 +44,13 @@ describe("SessionEntry", () => {
     };
     const { container } = render(SessionEntry, { props: { entry, model: model([entry]) } });
 
-    expect(container.querySelector(".thinking-text strong")?.textContent).toBe(
+    expect(container.querySelector(".activity-thinking-text strong")?.textContent).toBe(
       "Checking the package",
     );
-    expect(container.querySelector(".thinking-text li")?.textContent).toBe("inspect exports");
-    expect(container.querySelector(".thinking-text")?.textContent).not.toContain("**");
+    expect(container.querySelector(".activity-thinking-text li")?.textContent).toBe(
+      "inspect exports",
+    );
+    expect(container.querySelector(".activity-thinking-text")?.textContent).not.toContain("**");
   });
 
   it("renders nothing for tool-result entries", () => {

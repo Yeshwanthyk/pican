@@ -140,7 +140,7 @@ describe("toggle state helpers", () => {
   it("applies state to rendered nodes and buttons", () => {
     const dom = new JSDOM(`<div>
       <div class="thinking-text"></div><div class="thinking-collapsed"></div>
-      <div class="tool-call-collapsed"></div><div class="tool-execution"></div><div class="tool-output expandable"></div><div class="compaction"></div>
+      <div class="activity-thinking"></div><div class="tool-call-collapsed"></div><div class="tool-execution activity-tool"><details class="tool-fold"></details></div><div class="tool-output expandable"></div><div class="compaction"></div>
       <button data-action="toggle-thinking"></button><button data-action="toggle-tools"></button><button data-action="toggle-tool-output"></button>
     </div>`);
     const state = { thinkingExpanded: false, toolsVisible: false, toolOutputsExpanded: true };
@@ -149,6 +149,7 @@ describe("toggle state helpers", () => {
 
     expect(styleOf(dom.window.document, ".thinking-text")?.display).toBe("none");
     expect(styleOf(dom.window.document, ".thinking-collapsed")?.display).toBe("block");
+    expect(styleOf(dom.window.document, ".activity-thinking")?.display).toBe("none");
     expect(styleOf(dom.window.document, ".tool-execution")?.display).toBe("none");
     // Mirror placeholder appears when tools are hidden so a tool-only assistant
     // message keeps a visible marker instead of just a stranded timestamp.
@@ -230,10 +231,10 @@ describe("toggle state helpers", () => {
     expect(styleOf(dom.window.document, ".tool-execution")?.display).toBe("");
   });
 
-  it("applies tool visibility inside a group without hiding the group summary", () => {
-    const dom = new JSDOM(`<details class="tool-run-group">
-      <summary class="tool-run-group-summary">5 tool calls</summary>
-      <div><div class="tool-call-collapsed"></div><div class="tool-execution"></div></div>
+  it("maps visibility defaults inside an activity fold without hiding its summary", () => {
+    const dom = new JSDOM(`<details class="activity-fold">
+      <summary class="activity-summary">5 tool runs</summary>
+      <div><div class="activity-thinking"></div><div class="tool-call-collapsed"></div><div class="tool-execution activity-tool"><details class="tool-fold"></details></div></div>
     </details>`);
     applyToggleStateToNode(dom.window.document, {
       thinkingExpanded: true,
@@ -241,9 +242,22 @@ describe("toggle state helpers", () => {
       toolOutputsExpanded: false,
     });
 
-    expect(styleOf(dom.window.document, ".tool-run-group-summary")?.display).toBe("");
+    expect(styleOf(dom.window.document, ".activity-summary")?.display).toBe("");
+    expect(styleOf(dom.window.document, ".activity-thinking")?.display).toBe("");
     expect(styleOf(dom.window.document, ".tool-execution")?.display).toBe("none");
     expect(styleOf(dom.window.document, ".tool-call-collapsed")?.display).toBe("block");
+  });
+
+  it("maps the tool-output default onto nested activity tool disclosures", () => {
+    const dom = new JSDOM(
+      `<details class="activity-fold success"><div class="activity-tool"><details class="tool-fold"></details></div></details>`,
+    );
+    applyToggleStateToNode(dom.window.document, {
+      thinkingExpanded: true,
+      toolsVisible: true,
+      toolOutputsExpanded: true,
+    });
+    expect(dom.window.document.querySelector<HTMLDetailsElement>(".tool-fold")?.open).toBe(true);
   });
 
   it("controller reload picks up settings written after creation (cold-cache first paint)", () => {

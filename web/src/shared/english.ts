@@ -351,6 +351,23 @@ export default {
   "diff.collapseFile": "Collapse file",
   "diff.expandFile": "Expand file",
 
+  // ── Session transcript ──
+  "session.you": "YOU",
+  "session.assistant": "ASSISTANT",
+  "session.live": "LIVE",
+  "session.forkFromMessage": "Fork session from this message",
+  "session.copyMessageLink": "Copy link to this message",
+  "session.activitySummary": "{seconds}s thinking · {count} {runs}",
+  "session.activityRun": "tool run",
+  "session.activityRuns": "tool runs",
+  "session.activityEdits": " · edits",
+  "session.activityRunning": "running {command} · {elapsed}",
+  "session.activitySeconds": "{count}s",
+  "session.activityThinking": "thinking",
+  "session.activityTool": "tool",
+  "session.openFullDiff": "open full diff",
+  "session.copyPatch": "copy patch",
+
   // ── Right sidebar ──
   "sidebar.scratchpad": "Scratchpad",
   "sidebar.artifacts": "Artifacts",

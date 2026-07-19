@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import { runSync } from "../../lib/runtime.js";
 import { isUnknownRecord } from "../data/session-types.js";
+import { t } from "../../shared/strings.js";
 
 interface PreviewWindow {
   readonly localStorage?: Pick<Storage, "getItem">;
@@ -89,6 +90,8 @@ export function finishChatPreviewState(state: ChatPreviewState): boolean {
   state.chatPreviewEl.classList.add("done");
   const label = state.chatPreviewEl.querySelector(".preview-label");
   if (label && label.parentNode) label.parentNode.removeChild(label);
+  state.chatPreviewEl.querySelector(".streaming-live")?.remove();
+  state.chatPreviewEl.querySelector(".streaming-caret")?.remove();
   stopWorkingAnimation(state);
   return true;
 }
@@ -238,7 +241,18 @@ function createAssistantPreview(
   const el = documentImpl.createElement("div");
   el.id = "chat-preview-stream";
   el.className = "assistant-message chat-preview-stream" + (waiting ? " chat-preview-waiting" : "");
+  const who = documentImpl.createElement("div");
+  who.className = "message-who assistant-who streaming-who";
+  who.append(documentImpl.createTextNode(t("session.assistant")));
+  const liveLabel = documentImpl.createElement("span");
+  liveLabel.className = "streaming-live";
+  liveLabel.textContent = ` · ${t("session.live")}`;
+  const caret = documentImpl.createElement("span");
+  caret.className = "streaming-caret";
+  caret.setAttribute("aria-hidden", "true");
+  who.append(liveLabel, caret);
   el.append(
+    who,
     createMarkdownBlock(documentImpl, "message-content assistant-text markdown-content"),
     createPreviewLabel(documentImpl, config),
   );
@@ -269,9 +283,12 @@ export function renderPendingChatState(
   state.pendingUserEl = documentImpl.createElement("div");
   state.pendingUserEl.id = "chat-pending-user";
   state.pendingUserEl.className = "user-message chat-pending-user";
+  const userWho = documentImpl.createElement("div");
+  userWho.className = "message-who user-who";
+  userWho.textContent = t("session.you");
   const userContent = createMarkdownBlock(documentImpl, "markdown-content");
   setMarkdownContent(userContent, renderMarkdown(text));
-  state.pendingUserEl.appendChild(userContent);
+  state.pendingUserEl.append(userWho, userContent);
   container.appendChild(state.pendingUserEl);
 
   state.chatPreviewEl = createAssistantPreview(documentImpl, { waiting: true, windowImpl });

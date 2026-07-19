@@ -10,7 +10,7 @@ import { NetworkError, describeError } from "../lib/errors";
 import { runFork, runPromise } from "../lib/runtime";
 import { setIconElement, Loader } from "../shared/icons.js";
 import { t } from "../shared/strings.js";
-import { openLabel } from "./session-modals.svelte.js";
+import { openDiff, openLabel } from "./session-modals.svelte.js";
 import { navigate } from "../shared/navigation.js";
 import { sessionRuntime } from "./session-runtime.js";
 import { extractContent } from "./tree/session-filter.js";
@@ -176,6 +176,12 @@ export function wireSessionContentRuntime({
   const messagesEl = documentImpl.getElementById("messages");
   const onMessagesClick = (e: MouseEvent) => {
     if (!(e.target instanceof Element)) return;
+    const fullDiffBtn = e.target.closest<HTMLElement>(".open-full-diff-btn");
+    if (fullDiffBtn?.dataset.sessionId) {
+      e.stopPropagation();
+      openDiff({ sessionId: fullDiffBtn.dataset.sessionId });
+      return;
+    }
     const copyBtn = e.target.closest<HTMLElement>(".copy-link-btn");
     if (copyBtn?.dataset.entryId) {
       e.stopPropagation();

@@ -126,3 +126,10 @@ Every component (the index list cards, sidebar tree, chat bubbles, buttons, and 
 - **Inputs (`input[type="text"]`):**
   - Soft-shadow focus rings mapping `--accent`.
   - Complete padding alignment with adjacent buttons.
+
+### Session Transcript
+
+- User and assistant turns are prose-first: compact role labels establish authorship, user copy carries stronger weight, and assistant prose uses a 13.5px/1.65 reading rhythm capped at 72 characters.
+- Thinking and tool execution live in one Activity disclosure per turn. Its neutral left hairline indicates hierarchy rather than status; running state uses `--attention`, while failures use the existing error token.
+- Edit tools render unified rows with tabular old/new line numbers. Added and removed rows use a 7% semantic tint, while paired intra-line changes use a 28% highlight derived from the same diff token.
+- Transcript disclosures and actions use named 120ms transitions, 40px desktop targets, and 44px mobile targets. The streaming caret stops blinking under reduced-motion preferences.

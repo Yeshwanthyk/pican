@@ -58,23 +58,29 @@ describe("groupToolRuns", () => {
       assistantTools("a2", ["edit", "bash", "read"]),
     ];
 
-    const [group] = groupToolRuns(entries);
+    const groups = groupToolRuns(entries);
+    const group = groups[0];
     expect(group).toMatchObject({
       kind: "group",
-      entries,
-      toolCount: 6,
+      entries: entries.slice(0, 2),
+      toolCount: 3,
       breakdown: {
         tools: [
-          { name: "bash", count: 3 },
-          { name: "read", count: 2 },
-          { name: "edit", count: 1 },
+          { name: "bash", count: 2 },
+          { name: "read", count: 1 },
         ],
         remaining: 0,
       },
     });
     expect(formatToolRunBreakdown(group?.kind === "group" ? group.breakdown : undefined)).toBe(
-      "bash x3, read x2, edit x1",
+      "bash x2, read x1",
     );
+    expect(groups).toMatchObject([
+      { kind: "group" },
+      { kind: "entry", entry: entries[2] },
+      { kind: "entry", entry: entries[3] },
+      { kind: "group", entries: [entries[4]], toolCount: 3 },
+    ]);
   });
 
   it("does not merge tool runs across assistant prose", () => {
@@ -94,9 +100,11 @@ describe("groupToolRuns", () => {
     expect(groupToolRuns(entries)).toMatchObject([{ kind: "group", entries, toolCount: 2 }]);
   });
 
-  it("keeps a single tool call inline", () => {
+  it("folds a single tool call into the turn activity", () => {
     const entry = assistantTools("a1", ["bash"]);
-    expect(groupToolRuns([entry])).toEqual([{ kind: "entry", entry }]);
+    expect(groupToolRuns([entry])).toMatchObject([
+      { kind: "group", entries: [entry], toolCount: 1, durationSeconds: 0 },
+    ]);
   });
 
   it("always breaks runs at user messages", () => {
@@ -160,9 +168,30 @@ describe("groupToolRuns", () => {
     ];
 
     expect(groupToolRuns([...leading, prose, ...trailing])).toMatchObject([
-      { kind: "group", entries: leading, toolCount: 5 },
+      { kind: "entry", entry: leading[0] },
+      { kind: "group", entries: [leading[1]], toolCount: 5 },
       { kind: "entry", entry: prose },
       { kind: "group", entries: trailing, toolCount: 5 },
+    ]);
+  });
+
+  it("does not create an empty fold for a result after prose with embedded activity", () => {
+    const mixed = {
+      id: "mixed",
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "mixed-call", name: "edit" },
+          { type: "text", text: "Done" },
+        ],
+      },
+    };
+    const result = toolResultFor("mixed-call");
+
+    expect(groupToolRuns([mixed, result])).toMatchObject([
+      { kind: "entry", entry: mixed },
+      { kind: "entry", entry: result },
     ]);
   });
 

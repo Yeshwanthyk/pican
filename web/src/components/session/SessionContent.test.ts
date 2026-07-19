@@ -121,13 +121,13 @@ describe("SessionContent", () => {
     const model = new SessionDataModel({ entries: groupedEntries, header: {}, leafId: "tools" });
     const { container } = render(SessionContent, { props: { model: contentModel(model) } });
 
-    const group = container.querySelector<HTMLDetailsElement>(".tool-run-group");
+    const group = container.querySelector<HTMLDetailsElement>(".activity-fold");
     expect(group?.open).toBe(false);
-    expect(group?.querySelector("summary")?.textContent).toContain("5 tool calls");
-    expect(group?.querySelector("#entry-tools")).toBeInTheDocument();
+    expect(group?.querySelector("summary")?.textContent).toContain("5 tool runs");
+    expect(group?.id).toBe("entry-tools");
   });
 
-  it("opens a compact tool group when one of its calls fails", () => {
+  it("keeps completed and failed activity closed when it is not the live turn", () => {
     const failedEntries = [
       ...entries.slice(0, 1),
       {
@@ -164,7 +164,42 @@ describe("SessionContent", () => {
     });
     const { container } = render(SessionContent, { props: { model: contentModel(model) } });
 
-    expect(container.querySelector<HTMLDetailsElement>(".tool-run-group.error")?.open).toBe(true);
+    expect(container.querySelector<HTMLDetailsElement>(".activity-fold.error")?.open).toBe(false);
+  });
+
+  it("auto-opens only pending activity in the live viewer", () => {
+    const activeEntries = [
+      ...entries.slice(0, 1),
+      {
+        id: "active-tools",
+        parentId: "root",
+        timestamp: new Date().toISOString(),
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "live-call",
+              name: "bash",
+              arguments: { command: "make test" },
+            },
+          ],
+        },
+      },
+    ];
+    const model = new SessionDataModel({
+      entries: activeEntries,
+      header: {},
+      leafId: "active-tools",
+    });
+    const { container } = render(SessionContent, {
+      props: { model: contentModel(model), live: true },
+    });
+
+    const fold = container.querySelector<HTMLDetailsElement>(".activity-fold.pending");
+    expect(fold?.open).toBe(true);
+    expect(fold?.querySelector("summary")?.textContent).toContain("running bash make test");
   });
 
   it("runs afterRender(container) when the path changes", async () => {

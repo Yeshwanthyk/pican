@@ -14,6 +14,7 @@
     type UnknownRecord,
   } from '../../session/data/session-types.js';
   import { t } from '../../shared/strings.js';
+  import { parseWordsDiff } from '../../session/render/words-diff.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
   import AskQuestion from './AskQuestion.svelte';
@@ -37,7 +38,19 @@
     readonly resultHtmlExpanded?: string;
   }
 
-  let { call, model }: { call: ContentBlock; model?: ToolCallModel | null } = $props();
+  let {
+    call,
+    model,
+    activity = false,
+    live = false,
+    sessionId = '',
+  }: {
+    call: ContentBlock;
+    model?: ToolCallModel | null;
+    activity?: boolean;
+    live?: boolean;
+    sessionId?: string;
+  } = $props();
 
   const toolName = $derived(typeof call.name === 'string' ? call.name : 'tool');
   const callId = $derived(typeof call.id === 'string' ? call.id : '');
@@ -97,6 +110,8 @@
     formatToolFoldSummary(toolName, args, resultDetails ? { details: resultDetails } : null),
   );
   const diffText = $derived(typeof resultDetails?.diff === 'string' ? resultDetails.diff : '');
+  const parsedDiff = $derived(parseWordsDiff(diffText));
+  const isLargeDiff = $derived(parsedDiff.changedLines > 8);
   const offset = $derived(typeof args.offset === 'number' ? args.offset : 1);
   const limit = $derived(typeof args.limit === 'number' ? args.limit : null);
   const toolResult = $derived(resultDetails ? { details: resultDetails } : null);
@@ -120,6 +135,14 @@
     'subagent_cancel',
     'subagent_list',
   ]);
+  let patchCopied = $state(false);
+
+  async function copyPatch(): Promise<void> {
+    if (!diffText) return;
+    await navigator.clipboard.writeText(diffText);
+    patchCopied = true;
+    window.setTimeout(() => (patchCopied = false), 1200);
+  }
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
@@ -131,13 +154,21 @@
   tool call doesn't render as a stranded timestamp.
 -->
 <div class="tool-call-collapsed">Tool: {toolName} ...</div>
-<div class="tool-execution {statusClass}" id={resultEntry ? `entry-${resultEntry.id}` : undefined}>
+<div
+  class="tool-execution {statusClass}"
+  class:activity-tool={activity}
+  id={resultEntry ? `entry-${resultEntry.id}` : undefined}
+>
   <details class="tool-fold" open={result?.isError || undefined}>
     <summary class="tool-fold-summary">
       <span class="tool-fold-status {statusClass}" aria-hidden="true"></span>
       <span class="tool-fold-name">{toolName}</span>
       {#if toolSummary}<span class="tool-fold-description">{toolSummary}</span>{/if}
-      {#if result?.isError}<span class="tool-fold-error">{t('session.error')}</span>{/if}
+      <span class="tool-fold-result {statusClass}">
+        {t(
+          `session.${statusClass === 'error' ? 'failed' : statusClass === 'pending' ? 'running' : 'completed'}`,
+        )}
+      </span>
     </summary>
     <div class="tool-fold-body">
       {#if toolName === 'bash'}
@@ -196,25 +227,47 @@
             <div>{resultText.trim()}</div>
           </div>{/if}
       {:else if toolName === 'edit'}
-        <div class="tool-header">
-          <span class="tool-name">edit</span>
-          <span class="tool-path"
-            >{#if filePath === null}<span class="tool-error">[invalid arg]</span
-              >{:else}{shortenPath(filePath || '')}{/if}</span
-          >
-        </div>
         {#if diffText}
-          <div class="tool-diff">
-            {#each diffText.split('\n') as line, lineIndex (lineIndex)}<div
-                class={line.match(/^\+/)
-                  ? 'diff-added'
-                  : line.match(/^-/)
-                    ? 'diff-removed'
-                    : 'diff-context'}
-              >
-                {line.replace(/\t/g, '   ')}
-              </div>{/each}
-          </div>
+          <details
+            class="tool-diff-sheet"
+            class:large={isLargeDiff}
+            open={!isLargeDiff || undefined}
+          >
+            <summary class="tool-diff-chip">
+              <span class="tool-diff-file">{shortenPath(filePath || '')}</span>
+              <span class="tool-diff-counts">
+                +{parsedDiff.additions} −{parsedDiff.deletions}
+              </span>
+              {#if isLargeDiff}<span aria-hidden="true">▸</span>{/if}
+            </summary>
+            <div class="tool-diff">
+              <div class="tool-diff-rows">
+                {#each parsedDiff.rows as row, rowIndex (rowIndex)}
+                  <div class="tool-diff-row diff-{row.kind}">
+                    <span class="diff-line-number">{row.oldLine ?? ''}</span>
+                    <span class="diff-line-number">{row.newLine ?? ''}</span>
+                    <span class="diff-marker">{row.marker}</span>
+                    <code
+                      >{#each row.segments as segment, segmentIndex (segmentIndex)}<span
+                          class:diff-word-changed={segment.changed}
+                          >{segment.text.replace(/\t/g, '   ')}</span
+                        >{/each}</code
+                    >
+                  </div>
+                {/each}
+              </div>
+              <div class="tool-diff-actions">
+                {#if live && sessionId}<button
+                    type="button"
+                    class="open-full-diff-btn"
+                    data-session-id={sessionId}>{t('session.openFullDiff')}</button
+                  >{/if}
+                <button type="button" onclick={copyPatch}>
+                  {patchCopied ? t('common.copied') : t('session.copyPatch')}
+                </button>
+              </div>
+            </div>
+          </details>
         {:else if result && resultText.trim()}<div class="tool-output">
             <pre>{resultText.trim()}</pre>
           </div>{/if}

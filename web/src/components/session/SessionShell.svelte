@@ -94,7 +94,13 @@
       <div id="header-container"><SessionInfoHeader model={sessionModel} /></div>
       <LoadEarlier model={sessionModel} {sessionId} navigateTo={liveRuntime.navigateTo} />
       <div id="messages">
-        <SessionContent model={sessionModel} afterRender={contentRuntime.afterRender} live />
+        <SessionContent
+          model={sessionModel}
+          afterRender={contentRuntime.afterRender}
+          live
+          {modelLabel}
+          {sessionId}
+        />
       </div>
     </main>
     <ChatComposer {sessionId} {chatAvailable} {chatDisabledReason} {cwd} {modelLabel} />

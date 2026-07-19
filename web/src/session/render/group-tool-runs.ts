@@ -1,6 +1,9 @@
-import { contentBlocksFromUnknown, type SessionEntry } from "../data/session-types.js";
+import {
+  contentBlocksFromUnknown,
+  isUnknownRecord,
+  type SessionEntry,
+} from "../data/session-types.js";
 
-const TOOL_RUN_GROUP_THRESHOLD = 1;
 const MAX_BREAKDOWN_TOOLS = 4;
 const INTERACTIVE_TOOL_NAMES = new Set([
   "ask_user",
@@ -20,6 +23,10 @@ export type ToolRunRenderItem =
       readonly kind: "group";
       readonly entries: SessionEntry[];
       readonly toolCount: number;
+      readonly thinkingCount: number;
+      readonly hasEdits: boolean;
+      readonly durationSeconds: number;
+      readonly startedAt: string;
       readonly breakdown: ToolBreakdown;
       readonly status: ToolRunStatus;
     };
@@ -29,13 +36,14 @@ function analyzeToolRunEntry(
   completedCallIds: ReadonlySet<string>,
 ): string[] | null {
   if (entry?.type === "custom_message" && entry.customType === "subagent-result") {
-    return [];
+    return null;
   }
 
   if (entry?.type !== "message") return null;
 
   const message = entry.message;
-  if (message?.role === "toolResult" || message?.role === "bashExecution") return [];
+  if (message?.role === "toolResult") return [];
+  if (message?.role === "bashExecution") return null;
   if (message?.role !== "assistant" || !Array.isArray(message.content)) return null;
 
   const toolNames: string[] = [];
@@ -65,6 +73,10 @@ function analyzeToolRunEntry(
   }
 
   return hasToolActivity ? toolNames : null;
+}
+
+function canStartToolRun(entry: SessionEntry | undefined): boolean {
+  return entry?.type === "message" && entry.message?.role === "assistant";
 }
 
 function collectCompletedCallIds(activePath: ReadonlyArray<SessionEntry>): Set<string> {
@@ -104,6 +116,52 @@ function toolRunStatus(
   return toolCallIds.some((id) => !completedCallIds.has(id)) ? "pending" : "success";
 }
 
+function activityMetadata(
+  entries: ReadonlyArray<SessionEntry>,
+  toolCallIds: ReadonlyArray<string>,
+): {
+  readonly thinkingCount: number;
+  readonly hasEdits: boolean;
+  readonly durationSeconds: number;
+  readonly startedAt: string;
+} {
+  const resultByCallId = new Map(
+    entries.flatMap((entry) => {
+      const message = entry.type === "message" ? entry.message : null;
+      return message?.role === "toolResult" && message.toolCallId
+        ? [[message.toolCallId, message] as const]
+        : [];
+    }),
+  );
+  const thinkingCount = entries.reduce(
+    (count, entry) =>
+      count +
+      (entry.type === "message"
+        ? contentBlocksFromUnknown(entry.message?.content).filter(
+            (block) => block.type === "thinking" && String(block.thinking ?? "").trim(),
+          ).length
+        : 0),
+    0,
+  );
+  const timestamps = entries
+    .map((entry) => Date.parse(entry.timestamp ?? ""))
+    .filter(Number.isFinite);
+  const first = timestamps[0];
+  const last = timestamps.at(-1);
+  return {
+    thinkingCount,
+    hasEdits: toolCallIds.some((id) => {
+      const details = resultByCallId.get(id)?.details;
+      return isUnknownRecord(details) && typeof details.diff === "string";
+    }),
+    durationSeconds:
+      first === undefined || last === undefined
+        ? 0
+        : Math.max(0, Math.round((last - first) / 1000)),
+    startedAt: entries.find((entry) => typeof entry.timestamp === "string")?.timestamp ?? "",
+  };
+}
+
 function buildToolBreakdown(toolNames: ReadonlyArray<string>): ToolBreakdown {
   const counts = new Map<string, { name: string; count: number; firstIndex: number }>();
   toolNames.forEach((name, index) => {
@@ -138,7 +196,7 @@ export function groupToolRuns(activePath: ReadonlyArray<SessionEntry> = []): Too
   for (let index = 0; index < activePath.length;) {
     const current = activePath[index];
     if (!current) break;
-    if (analyzeToolRunEntry(current, completedCallIds) === null) {
+    if (analyzeToolRunEntry(current, completedCallIds) === null || !canStartToolRun(current)) {
       renderItems.push({ kind: "entry", entry: current });
       index += 1;
       continue;
@@ -163,11 +221,16 @@ export function groupToolRuns(activePath: ReadonlyArray<SessionEntry> = []): Too
       index += 1;
     }
 
-    if (toolNames.length > TOOL_RUN_GROUP_THRESHOLD) {
+    if (
+      toolNames.length > 0 ||
+      entries.some((entry) => analyzeToolRunEntry(entry, completedCallIds))
+    ) {
+      const metadata = activityMetadata(entries, toolCallIds);
       renderItems.push({
         kind: "group",
         entries,
         toolCount: toolNames.length,
+        ...metadata,
         breakdown: buildToolBreakdown(toolNames),
         status: toolRunStatus(entries, toolCallIds, completedCallIds),
       });
