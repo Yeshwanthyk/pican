@@ -13,6 +13,14 @@ afterEach(() => {
 });
 
 describe("SessionHeader runtime commands", () => {
+  it("uses the centered title as the pinned-session switcher trigger", () => {
+    const { container } = render(SessionHeader, { props: { title: "Pinned work" } });
+    const trigger = container.querySelector("#session-header-title");
+    expect(trigger?.tagName).toBe("BUTTON");
+    expect(trigger).toHaveAttribute("popovertarget", "pinned-session-switcher");
+    expect(trigger).toHaveAccessibleName("Switch pinned session");
+  });
+
   it("copies the legacy Pi resume command from the session UUID", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", {

@@ -11,6 +11,7 @@
     Plus,
     SquarePen,
     MoreHorizontal,
+    ChevronDown,
   } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { navigate, handleNavClick } from '../../shared/navigation.js';
@@ -170,7 +171,15 @@
       onclick={() => openTree()}>{@html icon(PanelLeft, { size: 14 })}</button
     >
   </div>
-  <span class="session-header-title" id="session-header-title">
+  <button
+    type="button"
+    class="session-header-title"
+    id="session-header-title"
+    popovertarget="pinned-session-switcher"
+    popovertargetaction="toggle"
+    aria-label={t('session.openPinnedSessions')}
+    title={t('session.openPinnedSessions')}
+  >
     <span class="session-header-title-text">{sessionTitle.name || title}</span>
     {#if runtime === 'codex'}
       <span
@@ -191,7 +200,10 @@
         >{t('session.viewOnly')}</span
       >
     {/if}
-  </span>
+    <span class="session-header-title-chevron" aria-hidden="true"
+      >{@html icon(ChevronDown, { size: 12 })}</span
+    >
+  </button>
   <div class="session-header-right">
     <button
       id="new-session-header-btn"

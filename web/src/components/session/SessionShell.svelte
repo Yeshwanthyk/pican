@@ -16,6 +16,7 @@
   import LoadEarlier from './LoadEarlier.svelte';
   import SessionTree from './SessionTree.svelte';
   import ShareDialog from './ShareDialog.svelte';
+  import PinnedSessionSwitcher from './PinnedSessionSwitcher.svelte';
   import {
     sessionModals,
     hasDiffUrlParam,
@@ -95,6 +96,7 @@
   {chatAvailable}
   {workerStatus}
 />
+<PinnedSessionSwitcher {sessionId} />
 
 <CommandMenu {sessionId} {cwd} />
 

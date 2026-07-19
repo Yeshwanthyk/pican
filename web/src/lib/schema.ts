@@ -41,6 +41,8 @@ export const SessionSchema = Schema.Struct({
   ChatDisabledReason: optionalNullableString,
   pinned: optionalNullableBoolean,
   Pinned: optionalNullableBoolean,
+  pinOrder: optionalNullableNumber,
+  PinOrder: optionalNullableNumber,
   btw: optionalNullableBoolean,
   Btw: optionalNullableBoolean,
   currentActivity: optionalNullableString,
@@ -67,6 +69,7 @@ export const SessionListSchema = Schema.Struct({
   total: Schema.optionalKey(Schema.Number),
 });
 export type SessionList = typeof SessionListSchema.Type;
+export const PinListSchema = Schema.Struct({ pins: Schema.Array(Schema.String) });
 
 export const ProjectSchema = Schema.Struct({
   path: Schema.String,

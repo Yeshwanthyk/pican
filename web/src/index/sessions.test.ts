@@ -29,6 +29,7 @@ describe("index sessions helpers", () => {
       nativeId: "",
       chatAvailable: true,
       pinned: false,
+      pinOrder: 0,
       btw: false,
       currentActivity: "",
       waitingQuestion: "",
@@ -150,14 +151,14 @@ describe("index sessions helpers", () => {
     expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["today-a", "today-b"]);
   });
 
-  it("splits pinned sessions out, sorted by activity, and leaves the rest untouched", () => {
+  it("splits pinned sessions out in fixed pin order and leaves the rest untouched", () => {
     const { pinned, rest } = splitPinnedSessions([
       { id: "a", pinned: false, lastActivity: "2024-01-03T00:00:00Z" },
-      { id: "b", pinned: true, lastActivity: "2024-01-01T00:00:00Z" },
-      { id: "c", pinned: true, lastActivity: "2024-01-02T00:00:00Z" },
+      { id: "b", pinned: true, pinOrder: 1, lastActivity: "2024-01-01T00:00:00Z" },
+      { id: "c", pinned: true, pinOrder: 2, lastActivity: "2024-01-02T00:00:00Z" },
       { id: "d", pinned: false, lastActivity: "2024-01-04T00:00:00Z" },
     ]);
-    expect(pinned.map((s) => s.id)).toEqual(["c", "b"]);
+    expect(pinned.map((s) => s.id)).toEqual(["b", "c"]);
     expect(rest.map((s) => s.id)).toEqual(["a", "d"]);
   });
 

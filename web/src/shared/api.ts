@@ -17,6 +17,7 @@ import {
   ProjectListSchema,
   ProjectMutationResponseSchema,
   PinMutationResponseSchema,
+  PinListSchema,
   QueueItemSchema,
   QueuePauseResponseSchema,
   QueueRemoveResponseSchema,
@@ -131,6 +132,7 @@ export const effects = {
       Http.post("/api/projects", { path, action }, ProjectMutationResponseSchema),
     updatePin: (sessionId: string, pinned: boolean) =>
       Http.post("/api/pins", { sessionId, pinned }, PinMutationResponseSchema),
+    pins: Http.get("/api/pins", PinListSchema),
   },
   schedules: {
     list: Http.get("/api/schedules", ScheduleListSchema),

@@ -21,6 +21,7 @@ export interface NormalizedSession {
   chatAvailable: boolean;
   chatDisabledReason: string;
   pinned: boolean;
+  pinOrder: number;
   btw: boolean;
   currentActivity: string;
   activityStartedAt: string;
@@ -91,6 +92,7 @@ export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession 
     chatAvailable: raw.chatAvailable ?? raw.ChatAvailable ?? true,
     chatDisabledReason: raw.chatDisabledReason || raw.ChatDisabledReason || "",
     pinned: raw.pinned ?? raw.Pinned ?? false,
+    pinOrder: raw.pinOrder ?? raw.PinOrder ?? 0,
     btw: raw.btw ?? raw.Btw ?? false,
     currentActivity: raw.currentActivity || raw.CurrentActivity || "",
     activityStartedAt: raw.activityStartedAt || raw.ActivityStartedAt || "",
@@ -131,16 +133,18 @@ export function splitHomeSessions<
 // splitPinnedSessions separates pinned sessions from the rest, sorting the
 // pinned group by activity (newest first) so it reads like its own mini
 // timeline above the regular groups.
-export function splitPinnedSessions<T extends SessionActivity & { readonly pinned?: boolean }>(
-  sessions: ReadonlyArray<T> = [],
-): { pinned: T[]; rest: T[] } {
+export function splitPinnedSessions<
+  T extends SessionActivity & { readonly pinned?: boolean; readonly pinOrder?: number },
+>(sessions: ReadonlyArray<T> = []): { pinned: T[]; rest: T[] } {
   const pinned: T[] = [];
   const rest: T[] = [];
   for (const session of sessions) {
     if (session?.pinned) pinned.push(session);
     else rest.push(session);
   }
-  pinned.sort((a, b) => activityMs(b) - activityMs(a));
+  pinned.sort(
+    (a, b) => (a.pinOrder || Number.MAX_SAFE_INTEGER) - (b.pinOrder || Number.MAX_SAFE_INTEGER),
+  );
   return { pinned, rest };
 }
 

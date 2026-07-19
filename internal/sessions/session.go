@@ -81,6 +81,7 @@ type SessionSummary struct {
 	// Pinned is set by the server from pican's SQLite session_pins table; it
 	// is never derived from the session file itself.
 	Pinned            bool     `json:"pinned,omitempty"`
+	PinOrder          int      `json:"pinOrder,omitempty"`
 	Btw               bool     `json:"btw,omitempty"`
 	CurrentActivity   string   `json:"currentActivity,omitempty"`
 	ActivityStartedAt string   `json:"activityStartedAt,omitempty"`
