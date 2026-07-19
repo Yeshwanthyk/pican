@@ -285,6 +285,53 @@ func TestRenameSessionKeepsRequestedNameInProjection(t *testing.T) {
 	}
 }
 
+func TestNewSessionPlaceholderRemainsAutoTitleEligible(t *testing.T) {
+	root := t.TempDir()
+	thread := testThread()
+	thread.Name = newSessionName
+	projection, err := Materialize(root, thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := sessions.ReadTitleInputs(projection.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !inputs.AutoTitled {
+		t.Fatalf("placeholder title became user-owned: %+v", inputs)
+	}
+}
+
+func TestRenameSessionOverridesPreservedAutoTitle(t *testing.T) {
+	root := t.TempDir()
+	projection, err := Materialize(root, testThread())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AutoTitleSession(projection.Path, "Automatic Title", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	projection, err = RenameSession(context.Background(), root, helperCommand("normal"), "thread-1", "Manual Title")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := sessions.ParseFile(projection.Path, "project", projection.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Name != "Manual Title" {
+		t.Fatalf("name = %q, want manual title", parsed.Name)
+	}
+	inputs, err := sessions.ReadTitleInputs(projection.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inputs.AutoTitled {
+		t.Fatalf("manual rename remained auto-titled: %+v", inputs)
+	}
+}
+
 func TestMapModels(t *testing.T) {
 	got := MapModels([]Model{{ID: "catalog-id", Model: "gpt", DisplayName: "GPT", SupportedReasoningEfforts: []ReasoningEffort{{ReasoningEffort: "low"}, {ReasoningEffort: "high"}}}})
 	if len(got) != 1 {

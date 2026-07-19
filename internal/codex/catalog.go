@@ -155,7 +155,17 @@ func RenameSession(ctx context.Context, sessionsDir string, command []string, na
 		return Projection{}, err
 	}
 	thread.Name = name
-	return Materialize(sessionsDir, thread)
+	projection, err := Materialize(sessionsDir, thread)
+	if err != nil {
+		return Projection{}, err
+	}
+	// Materialize preserves pican-local session_info entries. Append a manual
+	// marker after refreshing so an older auto-title cannot keep precedence over
+	// the native name, and future auto-title passes recognize user ownership.
+	if err := RenameProjection(projection.Path, name, nil); err != nil {
+		return Projection{}, fmt.Errorf("persist manual Codex session name: %w", err)
+	}
+	return projection, nil
 }
 
 func projectionForNativeID(sessionsDir, nativeID string) (string, error) {
