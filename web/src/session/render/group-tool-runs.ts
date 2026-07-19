@@ -1,3 +1,5 @@
+import { contentBlocksFromUnknown, type SessionEntry } from "../data/session-types.js";
+
 const TOOL_RUN_GROUP_THRESHOLD = 1;
 const MAX_BREAKDOWN_TOOLS = 4;
 const INTERACTIVE_TOOL_NAMES = new Set([
@@ -6,7 +8,26 @@ const INTERACTIVE_TOOL_NAMES = new Set([
   "pican_ask_user_question",
 ]);
 
-function analyzeToolRunEntry(entry, completedCallIds) {
+export interface ToolBreakdown {
+  readonly tools: ReadonlyArray<{ readonly name: string; readonly count: number }>;
+  readonly remaining: number;
+}
+
+export type ToolRunStatus = "error" | "pending" | "success";
+export type ToolRunRenderItem =
+  | { readonly kind: "entry"; readonly entry: SessionEntry }
+  | {
+      readonly kind: "group";
+      readonly entries: SessionEntry[];
+      readonly toolCount: number;
+      readonly breakdown: ToolBreakdown;
+      readonly status: ToolRunStatus;
+    };
+
+function analyzeToolRunEntry(
+  entry: SessionEntry | undefined,
+  completedCallIds: ReadonlySet<string>,
+): string[] | null {
   if (entry?.type === "custom_message" && entry.customType === "subagent-result") {
     return [];
   }
@@ -17,12 +38,18 @@ function analyzeToolRunEntry(entry, completedCallIds) {
   if (message?.role === "toolResult" || message?.role === "bashExecution") return [];
   if (message?.role !== "assistant" || !Array.isArray(message.content)) return null;
 
-  const toolNames = [];
+  const toolNames: string[] = [];
   let hasToolActivity = false;
 
-  for (const block of message.content) {
+  for (const block of contentBlocksFromUnknown(message.content)) {
     if (block?.type === "toolCall") {
-      if (INTERACTIVE_TOOL_NAMES.has(block.name) && !completedCallIds.has(block.id)) return null;
+      if (
+        typeof block.name === "string" &&
+        INTERACTIVE_TOOL_NAMES.has(block.name) &&
+        typeof block.id === "string" &&
+        !completedCallIds.has(block.id)
+      )
+        return null;
       hasToolActivity = true;
       toolNames.push(
         typeof block.name === "string" && block.name.trim() ? block.name.trim() : "tool",
@@ -40,16 +67,22 @@ function analyzeToolRunEntry(entry, completedCallIds) {
   return hasToolActivity ? toolNames : null;
 }
 
-function collectCompletedCallIds(activePath) {
+function collectCompletedCallIds(activePath: ReadonlyArray<SessionEntry>): Set<string> {
   return new Set(
     activePath
       .filter((entry) => entry?.type === "message" && entry.message?.role === "toolResult")
-      .map((entry) => entry.message.toolCallId)
-      .filter(Boolean),
+      .flatMap((entry) => {
+        const id = entry.message?.toolCallId;
+        return id ? [id] : [];
+      }),
   );
 }
 
-function toolRunStatus(entries, toolCallIds, completedCallIds) {
+function toolRunStatus(
+  entries: ReadonlyArray<SessionEntry>,
+  toolCallIds: ReadonlyArray<string>,
+  completedCallIds: ReadonlySet<string>,
+): ToolRunStatus {
   const failed = entries.some((entry) => {
     if (entry?.type === "custom_message" && entry.customType === "subagent-result") {
       return entry.details?.status === "error";
@@ -71,8 +104,8 @@ function toolRunStatus(entries, toolCallIds, completedCallIds) {
   return toolCallIds.some((id) => !completedCallIds.has(id)) ? "pending" : "success";
 }
 
-function buildToolBreakdown(toolNames) {
-  const counts = new Map();
+function buildToolBreakdown(toolNames: ReadonlyArray<string>): ToolBreakdown {
+  const counts = new Map<string, { name: string; count: number; firstIndex: number }>();
   toolNames.forEach((name, index) => {
     const current = counts.get(name);
     if (current) current.count += 1;
@@ -88,33 +121,42 @@ function buildToolBreakdown(toolNames) {
   };
 }
 
-export function formatToolRunBreakdown(breakdown, moreLabel = "") {
-  const parts = (breakdown?.tools || []).map(({ name, count }) => `${name} x${count}`);
-  if (breakdown?.remaining > 0 && moreLabel) parts.push(moreLabel);
+export function formatToolRunBreakdown(
+  breakdown: ToolBreakdown | null | undefined,
+  moreLabel = "",
+): string {
+  if (!breakdown) return "";
+  const parts = breakdown.tools.map(({ name, count }) => `${name} x${count}`);
+  if (breakdown.remaining > 0 && moreLabel) parts.push(moreLabel);
   return parts.join(", ");
 }
 
-export function groupToolRuns(activePath = []) {
-  const renderItems = [];
+export function groupToolRuns(activePath: ReadonlyArray<SessionEntry> = []): ToolRunRenderItem[] {
+  const renderItems: ToolRunRenderItem[] = [];
   const completedCallIds = collectCompletedCallIds(activePath);
 
   for (let index = 0; index < activePath.length;) {
-    if (analyzeToolRunEntry(activePath[index], completedCallIds) === null) {
-      renderItems.push({ kind: "entry", entry: activePath[index] });
+    const current = activePath[index];
+    if (!current) break;
+    if (analyzeToolRunEntry(current, completedCallIds) === null) {
+      renderItems.push({ kind: "entry", entry: current });
       index += 1;
       continue;
     }
 
-    const entries = [];
-    const toolNames = [];
-    const toolCallIds = [];
+    const entries: SessionEntry[] = [];
+    const toolNames: string[] = [];
+    const toolCallIds: string[] = [];
     while (index < activePath.length) {
       const entryToolNames = analyzeToolRunEntry(activePath[index], completedCallIds);
       if (entryToolNames === null) break;
-      entries.push(activePath[index]);
+      const entry = activePath[index];
+      if (!entry) break;
+      entries.push(entry);
       toolNames.push(...entryToolNames);
-      if (activePath[index]?.type === "message") {
-        for (const block of activePath[index].message?.content || []) {
+      const currentEntry = activePath[index];
+      if (currentEntry?.type === "message") {
+        for (const block of contentBlocksFromUnknown(currentEntry.message?.content)) {
           if (block?.type === "toolCall" && block.id) toolCallIds.push(block.id);
         }
       }
@@ -130,7 +172,7 @@ export function groupToolRuns(activePath = []) {
         status: toolRunStatus(entries, toolCallIds, completedCallIds),
       });
     } else {
-      renderItems.push(...entries.map((entry) => ({ kind: "entry", entry })));
+      renderItems.push(...entries.map((entry): ToolRunRenderItem => ({ kind: "entry", entry })));
     }
   }
 

@@ -3,14 +3,16 @@
 // migration so the header card can be a component while the math stays a
 // framework-free, unit-tested function. See docs/dev/svelte-migration-plan.md.
 
-export function formatTokens(count) {
+export function formatTokens(count: number): string {
   if (count < 1000) return count.toString();
   if (count < 10000) return (count / 1000).toFixed(1) + "k";
   if (count < 1000000) return Math.round(count / 1000) + "k";
   return (count / 1000000).toFixed(1) + "M";
 }
 
-export function computeSessionStats(entryList = []) {
+export function computeSessionStats(
+  entryList: ReadonlyArray<Partial<SessionEntry>> = [],
+): SessionStats {
   let userMessages = 0,
     assistantMessages = 0,
     toolResults = 0;
@@ -20,28 +22,31 @@ export function computeSessionStats(entryList = []) {
     toolCalls = 0;
   const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-  const models = new Set();
+  const models = new Set<string>();
 
   for (const entry of entryList) {
     if (entry.type === "message") {
       const msg = entry.message;
+      if (!msg) continue;
       if (msg.role === "user") userMessages++;
       if (msg.role === "assistant") {
         assistantMessages++;
         if (msg.model) models.add(msg.provider ? `${msg.provider}/${msg.model}` : msg.model);
         if (msg.usage) {
-          tokens.input += msg.usage.input || 0;
-          tokens.output += msg.usage.output || 0;
-          tokens.cacheRead += msg.usage.cacheRead || 0;
-          tokens.cacheWrite += msg.usage.cacheWrite || 0;
-          if (msg.usage.cost) {
-            cost.input += msg.usage.cost.input || 0;
-            cost.output += msg.usage.cost.output || 0;
-            cost.cacheRead += msg.usage.cost.cacheRead || 0;
-            cost.cacheWrite += msg.usage.cost.cacheWrite || 0;
+          tokens.input += numberField(msg.usage, "input");
+          tokens.output += numberField(msg.usage, "output");
+          tokens.cacheRead += numberField(msg.usage, "cacheRead");
+          tokens.cacheWrite += numberField(msg.usage, "cacheWrite");
+          if (isUnknownRecord(msg.usage.cost)) {
+            cost.input += numberField(msg.usage.cost, "input");
+            cost.output += numberField(msg.usage.cost, "output");
+            cost.cacheRead += numberField(msg.usage.cost, "cacheRead");
+            cost.cacheWrite += numberField(msg.usage.cost, "cacheWrite");
           }
         }
-        toolCalls += (msg.content || []).filter((c) => c.type === "toolCall").length;
+        toolCalls += contentBlocksFromUnknown(msg.content).filter(
+          (block) => block.type === "toolCall",
+        ).length;
       }
       if (msg.role === "toolResult") toolResults++;
     } else if (entry.type === "model_change") {
@@ -72,17 +77,17 @@ export function computeSessionStats(entryList = []) {
 
 // Pre-formatted summary strings used by the header card (kept here so they are
 // unit-testable and identical between live + export).
-export function summarizeSessionStats(stats) {
+export function summarizeSessionStats(stats: SessionStats) {
   const totalCost =
     stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite;
 
-  const tokenParts = [];
+  const tokenParts: string[] = [];
   if (stats.tokens.input) tokenParts.push(`↑${formatTokens(stats.tokens.input)}`);
   if (stats.tokens.output) tokenParts.push(`↓${formatTokens(stats.tokens.output)}`);
   if (stats.tokens.cacheRead) tokenParts.push(`R${formatTokens(stats.tokens.cacheRead)}`);
   if (stats.tokens.cacheWrite) tokenParts.push(`W${formatTokens(stats.tokens.cacheWrite)}`);
 
-  const msgParts = [];
+  const msgParts: string[] = [];
   if (stats.userMessages) msgParts.push(`${stats.userMessages} user`);
   if (stats.assistantMessages) msgParts.push(`${stats.assistantMessages} assistant`);
   if (stats.toolResults) msgParts.push(`${stats.toolResults} tool results`);
@@ -98,3 +103,31 @@ export function summarizeSessionStats(stats) {
     toolCalls: stats.toolCalls,
   };
 }
+import {
+  contentBlocksFromUnknown,
+  isUnknownRecord,
+  type SessionEntry,
+} from "../data/session-types.js";
+
+export interface NumericBreakdown {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+export interface SessionStats {
+  userMessages: number;
+  assistantMessages: number;
+  toolResults: number;
+  customMessages: number;
+  compactions: number;
+  branchSummaries: number;
+  toolCalls: number;
+  tokens: NumericBreakdown;
+  cost: NumericBreakdown;
+  models: string[];
+}
+
+const numberField = (record: Record<string, unknown>, key: string): number =>
+  typeof record[key] === "number" ? record[key] : 0;

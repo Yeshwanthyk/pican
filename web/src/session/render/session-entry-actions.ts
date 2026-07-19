@@ -6,6 +6,17 @@
 
 import { setIconElement, Check } from "../../shared/icons.js";
 import { copyToClipboard as writeClipboard } from "../../shared/clipboard.js";
+import type { SessionEntry, UnknownRecord } from "../data/session-types.js";
+
+interface DownloadDocument {
+  readonly body: Pick<HTMLElement, "appendChild" | "removeChild">;
+  createElement(tagName: "a"): HTMLAnchorElement;
+}
+
+interface UrlFactory {
+  createObjectURL(blob: Blob): string;
+  revokeObjectURL(url: string): void;
+}
 
 // Download the session as JSONL: header line + entry lines.
 export function downloadSessionJson({
@@ -14,8 +25,14 @@ export function downloadSessionJson({
   documentImpl = document,
   URLImpl = URL,
   BlobImpl = Blob,
-} = {}) {
-  const lines = [];
+}: {
+  readonly entries?: ReadonlyArray<SessionEntry>;
+  readonly header?: UnknownRecord | null;
+  readonly documentImpl?: DownloadDocument;
+  readonly URLImpl?: UrlFactory;
+  readonly BlobImpl?: typeof Blob;
+} = {}): void {
+  const lines: string[] = [];
   if (header) lines.push(JSON.stringify({ type: "header", ...header }));
   for (const entry of entries) lines.push(JSON.stringify(entry));
   const blob = new BlobImpl([lines.join("\n")], { type: "application/x-ndjson" });
@@ -31,11 +48,24 @@ export function downloadSessionJson({
 
 // Build a shareable URL for a message: base?gistId&leafId=<leaf>&targetId=<entry>.
 export function buildShareUrl(
-  entryId,
-  { documentImpl = document, windowImpl = window, getCurrentLeafId = () => "", URLImpl = URL } = {},
-) {
+  entryId: string,
+  {
+    documentImpl = document,
+    windowImpl = window,
+    getCurrentLeafId = () => "",
+    URLImpl = URL,
+  }: {
+    readonly documentImpl?: Pick<Document, "querySelector">;
+    readonly windowImpl?: Pick<Window, "location">;
+    readonly getCurrentLeafId?: () => string;
+    readonly URLImpl?: typeof URL;
+  } = {},
+): string {
   const baseUrlMeta = documentImpl.querySelector('meta[name="pican-share-base-url"]');
-  const baseUrl = baseUrlMeta ? baseUrlMeta.content : windowImpl.location.href.split("?")[0];
+  const baseUrl =
+    baseUrlMeta instanceof HTMLMetaElement
+      ? baseUrlMeta.content
+      : windowImpl.location.href.split("?")[0];
 
   const url = new URLImpl(windowImpl.location.href);
   // The gist id is the first query param without a value (e.g. ?abc123).
@@ -47,7 +77,7 @@ export function buildShareUrl(
   params.set("leafId", getCurrentLeafId());
   params.set("targetId", entryId);
 
-  if (baseUrlMeta) return `${baseUrl}&${params.toString()}`;
+  if (baseUrlMeta instanceof HTMLMetaElement) return `${baseUrl}&${params.toString()}`;
   url.search = gistId ? `?${gistId}&${params.toString()}` : `?${params.toString()}`;
   return url.toString();
 }
@@ -55,10 +85,13 @@ export function buildShareUrl(
 // Copy text to the clipboard (with an execCommand fallback for HTTP) and flash
 // the button with a check icon.
 export async function copyToClipboard(
-  text,
-  button,
-  { documentImpl = document, navigatorImpl = navigator } = {},
-) {
+  text: string,
+  button: HTMLElement | null,
+  {
+    documentImpl = document,
+    navigatorImpl = navigator,
+  }: { readonly documentImpl?: Document; readonly navigatorImpl?: Navigator } = {},
+): Promise<void> {
   const success = await writeClipboard(text, { documentImpl, navigatorImpl });
 
   if (success && button) {

@@ -1,7 +1,15 @@
 export const strictStrikethroughRegex =
   /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
 
-export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
+export function configureSessionMarkdown({
+  marked,
+  hljs,
+  escapeHtml,
+}: {
+  readonly marked: Marked;
+  readonly hljs: HLJSApi | null;
+  readonly escapeHtml: (text: unknown) => string;
+}): void {
   marked.use({
     breaks: true,
     gfm: true,
@@ -15,11 +23,13 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
       del(src) {
         const match = strictStrikethroughRegex.exec(src);
         if (!match) return undefined;
+        const text = match[2];
+        if (text === undefined) return undefined;
         return {
           type: "del",
           raw: match[0],
-          text: match[2],
-          tokens: this.lexer.inlineTokens(match[2]),
+          text,
+          tokens: this.lexer.inlineTokens(text),
         };
       },
     },
@@ -52,19 +62,21 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
         const code = token.text;
         const lang = token.lang;
         if (hljs) {
-          let highlighted;
+          let highlighted: string;
           if (lang && hljs.getLanguage(lang)) {
-            try {
-              highlighted = hljs.highlight(code, { language: lang }).value;
-            } catch {
-              highlighted = escapeHtml(code);
-            }
+            highlighted = runSync(
+              Effect.try({
+                try: () => hljs.highlight(code, { language: lang }).value,
+                catch: () => escapeHtml(code),
+              }).pipe(Effect.catch((fallback) => Effect.succeed(fallback))),
+            );
           } else {
-            try {
-              highlighted = hljs.highlightAuto(code).value;
-            } catch {
-              highlighted = escapeHtml(code);
-            }
+            highlighted = runSync(
+              Effect.try({
+                try: () => hljs.highlightAuto(code).value,
+                catch: () => escapeHtml(code),
+              }).pipe(Effect.catch((fallback) => Effect.succeed(fallback))),
+            );
           }
           return `<pre><code class="hljs">${highlighted}</code></pre>`;
         }
@@ -79,6 +91,10 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
   });
 }
 
-export function safeMarkedParse(text, { marked }) {
-  return marked.parse(text);
+export function safeMarkedParse(text: string, { marked }: { readonly marked: Marked }): string {
+  return marked.parse(text, { async: false });
 }
+import { Effect } from "effect";
+import type { HLJSApi } from "highlight.js";
+import type { Marked } from "marked";
+import { runSync } from "../../lib/runtime.js";

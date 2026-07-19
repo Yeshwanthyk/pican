@@ -1,10 +1,28 @@
 import { icon, ArrowDown } from "../../shared/icons.js";
 
-export function chatComposerHeight() {
+interface ScrollWindow {
+  readonly innerHeight: number;
+  readonly pageYOffset?: number;
+  readonly scrollY?: number;
+  scrollTo?(options: ScrollToOptions): void;
+  setTimeout?(handler: () => void, timeout?: number): unknown;
+}
+
+interface ScrollOptions {
+  readonly documentImpl?: Document;
+  readonly windowImpl?: ScrollWindow;
+  readonly threshold?: number;
+}
+
+export function chatComposerHeight(_options?: { readonly documentImpl?: Document }): number {
   return 0;
 }
 
-export function isAtBottom({ documentImpl = document, windowImpl = window, threshold = 80 } = {}) {
+export function isAtBottom({
+  documentImpl = document,
+  windowImpl = window,
+  threshold = 80,
+}: ScrollOptions = {}): boolean {
   const de = documentImpl.documentElement;
   const body = documentImpl.body;
   const content = documentImpl.getElementById("content");
@@ -33,22 +51,25 @@ export function isAtBottom({ documentImpl = document, windowImpl = window, thres
   return docHeight - scrolled - viewport < threshold;
 }
 
-export function scrollToBottom(smooth, { documentImpl = document, windowImpl = window } = {}) {
+export function scrollToBottom(
+  smooth: boolean,
+  { documentImpl = document, windowImpl = window }: ScrollOptions = {},
+): void {
   const content = documentImpl.getElementById("content");
   if (content && content.scrollHeight > content.clientHeight) {
     content.scrollTo({ top: content.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   }
-  windowImpl.scrollTo({
+  windowImpl.scrollTo?.({
     top: Math.max(documentImpl.documentElement.scrollHeight, documentImpl.body.scrollHeight),
     behavior: smooth ? "smooth" : "auto",
   });
 }
 
 export function scrollElementAboveComposer(
-  el,
-  smooth,
-  { documentImpl = document, windowImpl = window } = {},
-) {
+  el: Element | null | undefined,
+  smooth: boolean,
+  { documentImpl = document, windowImpl = window }: ScrollOptions = {},
+): void {
   if (!el) {
     scrollToBottom(smooth, { documentImpl, windowImpl });
     return;
@@ -66,8 +87,8 @@ export function scrollElementAboveComposer(
   const rect = el.getBoundingClientRect();
   const viewportDelta = rect.bottom - (windowImpl.innerHeight - gap);
   if (viewportDelta > 0) {
-    windowImpl.scrollTo({
-      top: (windowImpl.scrollY || windowImpl.pageYOffset) + viewportDelta,
+    windowImpl.scrollTo?.({
+      top: (windowImpl.scrollY || windowImpl.pageYOffset || 0) + viewportDelta,
       behavior: smooth ? "smooth" : "auto",
     });
   }
@@ -77,7 +98,11 @@ export function createFollowButton({
   documentImpl = document,
   requestAnimationFrameImpl = requestAnimationFrame,
   onClick,
-} = {}) {
+}: {
+  readonly documentImpl?: Document;
+  readonly requestAnimationFrameImpl?: (callback: FrameRequestCallback) => number | void;
+  readonly onClick?: () => void;
+} = {}): HTMLButtonElement {
   const button = documentImpl.createElement("button");
   button.className = "follow-button";
   button.setAttribute("aria-label", "Scroll to bottom");
@@ -90,14 +115,17 @@ export function createFollowButton({
   return button;
 }
 
-export function setFollowButtonText(button, _pendingCount) {
+export function setFollowButtonText(button: HTMLButtonElement | null, _pendingCount: number): void {
   if (button) button.innerHTML = icon(ArrowDown, { size: 18 });
 }
 
-export function removeFollowButton(button, { windowImpl = window } = {}) {
+export function removeFollowButton(
+  button: HTMLButtonElement | null,
+  { windowImpl = window }: { readonly windowImpl?: Pick<ScrollWindow, "setTimeout"> } = {},
+): void {
   if (!button) return;
   button.classList.remove("visible");
-  windowImpl.setTimeout(() => {
+  windowImpl.setTimeout?.(() => {
     if (button.parentNode) button.parentNode.removeChild(button);
   }, 200);
 }

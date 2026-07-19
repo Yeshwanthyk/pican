@@ -5,6 +5,8 @@ import {
   getSessionIdFromLocation,
   handleSessionReload,
   wireSessionEvents,
+  type EventSourceLike,
+  type SessionEvent,
 } from "./live-events.js";
 
 describe("live events", () => {
@@ -26,7 +28,7 @@ describe("live events", () => {
   });
 
   it("waits for reactive rendering before clearing the streaming preview", async () => {
-    const order = [];
+    const order: string[] = [];
     await handleSessionReload({
       sessionId: "s",
       fetchImpl: vi.fn(() =>
@@ -44,8 +46,8 @@ describe("live events", () => {
   });
 
   it("discards an older reload response that resolves after a newer generation", async () => {
-    let resolveOld;
-    let resolveNew;
+    let resolveOld: (value: Response) => void = () => undefined;
+    let resolveNew: (value: Response) => void = () => undefined;
     const oldResponse = new Promise((resolve) => {
       resolveOld = resolve;
     });
@@ -53,12 +55,12 @@ describe("live events", () => {
       resolveNew = resolve;
     });
     let latestGeneration = 1;
-    const applied = [];
-    const cleared = [];
+    const applied: unknown[] = [];
+    const cleared: boolean[] = [];
     const base = {
       sessionId: "s",
       entryState: { seen: new Set(), liveRendered: new Set() },
-      onReloaded: (data) => applied.push(data.name),
+      onReloaded: (data: Record<string, unknown>) => applied.push(data.name),
       clearChatPreview: () => cleared.push(true),
     };
     const oldReload = handleSessionReload({
@@ -310,47 +312,56 @@ describe("live events", () => {
   });
 
   it("wires event source messages", () => {
-    const eventSource = { addEventListener: vi.fn() };
+    const addEventListener =
+      vi.fn<(type: string, listener: (event: SessionEvent) => void) => void>();
+    const eventSource: EventSourceLike & { addEventListener: typeof addEventListener } = {
+      addEventListener,
+    };
     const onReload = vi.fn();
     const onChatPreview = vi.fn();
     const onError = vi.fn();
     wireSessionEvents({ eventSource, onReload, onChatPreview, onError });
-    eventSource.onmessage({ data: "noop" });
-    eventSource.onmessage({ data: "reload" });
+    eventSource.onmessage?.({ data: "noop" });
+    eventSource.onmessage?.({ data: "reload" });
     expect(onReload).toHaveBeenCalledTimes(1);
-    const previewHandler = eventSource.addEventListener.mock.calls[0][1];
-    previewHandler({ data: JSON.stringify({ content: "x" }) });
+    const previewHandler = eventSource.addEventListener.mock.calls[0]?.[1];
+    previewHandler?.({ data: JSON.stringify({ content: "x" }) });
     expect(onChatPreview).toHaveBeenCalledWith({ content: "x" });
-    previewHandler({ data: "{bad" });
+    previewHandler?.({ data: "{bad" });
     expect(onError).toHaveBeenCalled();
   });
 
   it("reconciles on a chat-preview done (covers a dropped first-write reload)", () => {
-    const eventSource = { addEventListener: vi.fn() };
+    const addEventListener =
+      vi.fn<(type: string, listener: (event: SessionEvent) => void) => void>();
+    const eventSource: EventSourceLike & { addEventListener: typeof addEventListener } = {
+      addEventListener,
+    };
     const onReload = vi.fn();
     const onChatPreview = vi.fn();
     wireSessionEvents({ eventSource, onReload, onChatPreview });
-    const previewHandler = eventSource.addEventListener.mock.calls[0][1];
+    const previewHandler = eventSource.addEventListener.mock.calls[0]?.[1];
 
-    previewHandler({ data: JSON.stringify({ content: "streaming", done: false }) });
+    previewHandler?.({ data: JSON.stringify({ content: "streaming", done: false }) });
     expect(onReload).not.toHaveBeenCalled();
 
-    previewHandler({ data: JSON.stringify({ content: "final", done: true }) });
+    previewHandler?.({ data: JSON.stringify({ content: "final", done: true }) });
     expect(onChatPreview).toHaveBeenLastCalledWith({ content: "final", done: true });
     expect(onReload).toHaveBeenCalledTimes(1);
   });
 
   it("dispatches pi-session-reload window event on reload", () => {
-    const eventSource = { addEventListener: vi.fn() };
-    const dispatched = [];
+    const eventSource: EventSourceLike = { addEventListener: vi.fn() };
+    const dispatched: FakeCustomEvent[] = [];
     const windowImpl = {
-      dispatchEvent: (e) => {
-        dispatched.push(e);
+      dispatchEvent: (event: unknown) => {
+        if (event instanceof FakeCustomEvent) dispatched.push(event);
         return true;
       },
     };
     class FakeCustomEvent {
-      constructor(type) {
+      readonly type: string;
+      constructor(type: string) {
         this.type = type;
       }
     }
@@ -361,42 +372,54 @@ describe("live events", () => {
       windowImpl,
       CustomEventImpl: FakeCustomEvent,
     });
-    eventSource.onmessage({ data: "reload" });
+    eventSource.onmessage?.({ data: "reload" });
     expect(dispatched.length).toBe(1);
-    expect(dispatched[0].type).toBe("pi-session-reload");
-    eventSource.onmessage({ data: "noop" });
+    expect(dispatched[0]?.type).toBe("pi-session-reload");
+    eventSource.onmessage?.({ data: "noop" });
     expect(dispatched.length).toBe(1);
   });
 
   it("dispatches extension UI events with parsed payloads", () => {
-    const handlers = new Map();
-    const eventSource = {
-      addEventListener: vi.fn((name, handler) => handlers.set(name, handler)),
+    const handlers = new Map<string, (event: SessionEvent) => void>();
+    const eventSource: EventSourceLike = {
+      addEventListener: vi.fn((name: string, handler: (event: SessionEvent) => void) => {
+        handlers.set(name, handler);
+      }),
     };
-    const dispatched = [];
+    const dispatched: FakeCustomEvent[] = [];
     class FakeCustomEvent {
-      constructor(type, options = {}) {
+      readonly type: string;
+      readonly detail: Record<string, unknown>;
+      constructor(type: string, options: { readonly detail?: unknown } = {}) {
         this.type = type;
-        this.detail = options.detail;
+        this.detail =
+          typeof options.detail === "object" && options.detail !== null
+            ? Object.fromEntries(Object.entries(options.detail))
+            : {};
       }
     }
     wireSessionEvents({
       eventSource,
       onReload: vi.fn(),
       onChatPreview: vi.fn(),
-      windowImpl: { dispatchEvent: (event) => dispatched.push(event) },
+      windowImpl: {
+        dispatchEvent: (event) => {
+          if (event instanceof FakeCustomEvent) dispatched.push(event);
+          return true;
+        },
+      },
       CustomEventImpl: FakeCustomEvent,
     });
 
-    handlers.get("extension-ui-request")({ data: '{"id":"ui-1","method":"confirm"}' });
-    handlers.get("extension-ui-resolved")({ data: '{"id":"ui-1"}' });
-    handlers.get("extension-notify")({ data: '{"message":"Done","type":"info"}' });
+    handlers.get("extension-ui-request")?.({ data: '{"id":"ui-1","method":"confirm"}' });
+    handlers.get("extension-ui-resolved")?.({ data: '{"id":"ui-1"}' });
+    handlers.get("extension-notify")?.({ data: '{"message":"Done","type":"info"}' });
 
     expect(dispatched.map((event) => event.type)).toEqual([
       "pi-extension-ui-request",
       "pi-extension-ui-resolved",
       "pi-extension-notify",
     ]);
-    expect(dispatched[0].detail.id).toBe("ui-1");
+    expect(dispatched[0]?.detail.id).toBe("ui-1");
   });
 });

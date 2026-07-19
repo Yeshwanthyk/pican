@@ -25,6 +25,14 @@
 
 import { SvelteMap } from "svelte/reactivity";
 import { buildSessionLookups } from "./session-data.js";
+import { sessionEntryFromUnknown } from "./session-types.js";
+import type {
+  SessionDataShape,
+  SessionEntry,
+  SessionPayload,
+  ToolCallInfo,
+  UnknownRecord,
+} from "./session-types.js";
 import {
   buildTree,
   buildTreeNodeMap,
@@ -35,36 +43,45 @@ import {
   stitchOrphanRoots,
 } from "../tree/session-tree.js";
 import { filterNodes } from "../tree/session-filter.js";
+import type { TreeEntry } from "../tree/session-tree.js";
 
-function refillMap(target, source) {
+type SessionFilterMode = "all" | "default" | "user-only" | "no-tools" | "labeled-only";
+
+const normalizeStitchedEntries = (entries: ReadonlyArray<TreeEntry>): SessionEntry[] =>
+  entries.flatMap((entry) => {
+    const normalized = sessionEntryFromUnknown(entry);
+    return normalized ? [normalized] : [];
+  });
+
+function refillMap<K, V>(target: Map<K, V>, source?: ReadonlyMap<K, V>): void {
   target.clear();
   if (source) source.forEach((value, key) => target.set(key, value));
 }
 
 export class SessionDataModel {
   // ── raw data (compatible fields for the plain model shape) ──────────────
-  entries = $state([]);
-  header = $state(null);
-  systemPrompt = $state(null);
-  tools = $state(null);
-  renderedTools = $state(null);
+  entries = $state<SessionEntry[]>([]);
+  header = $state<UnknownRecord>({});
+  systemPrompt = $state<unknown>(null);
+  tools = $state<unknown>(null);
+  renderedTools = $state<unknown>(null);
   leafId = $state("");
-  urlLeafId = $state(null);
-  urlTargetId = $state(null);
+  urlLeafId = $state<string | null>(null);
+  urlTargetId = $state<string | null>(null);
   total = $state(0);
   from = $state(0);
   truncated = $state(false);
 
   // Stable, in-place-mutated reactive lookup Maps (see header comment).
   // SvelteMap makes .set/.clear reactive while keeping a stable object identity.
-  byId = new SvelteMap();
-  toolCallMap = new SvelteMap();
-  labelMap = new SvelteMap();
+  byId = new SvelteMap<string, SessionEntry>();
+  toolCallMap = new SvelteMap<string, ToolCallInfo>();
+  labelMap = new SvelteMap<string, string>();
 
   // ── view state ──────────────────────────────────────────────────────────
   currentLeafId = $state("");
   currentTargetId = $state("");
-  filterMode = $state("default");
+  filterMode = $state<SessionFilterMode>("default");
   searchQuery = $state("");
 
   // ── derived tree (recompute on entries / labelMap / view changes) ────────
@@ -84,13 +101,13 @@ export class SessionDataModel {
     }),
   );
 
-  constructor(data) {
+  constructor(data?: SessionDataShape | null) {
     if (data) this.#hydrate(data);
   }
 
   // Build a reactive model straight from an embedded payload + URL params.
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read-only default param for URL parsing, not reactive state
-  static fromPayload(payload, params = new URLSearchParams()) {
+  static fromPayload(payload: SessionPayload | null, params = new URLSearchParams()) {
     // Lazy import avoidance: createSessionDataModel lives in session-data.js and
     // would create a cycle if imported at top level alongside buildSessionLookups
     // there; build the shape inline instead.
@@ -114,24 +131,32 @@ export class SessionDataModel {
 
   // Initial / full load: reset data + view state from a payload-shaped object
   // (as produced by createSessionDataModel or fromPayload's argument).
-  load(data) {
+  load(data: SessionDataShape): void {
     this.#hydrate(data);
   }
 
   // Replace data in place, preserving view state. Used by the static export and
   // standalone consumers; the live app's reload path uses reconcile() below.
-  applyLiveUpdate(data) {
+  applyLiveUpdate(data: SessionDataShape): void {
     this.#hydrate(data, { preserveView: true });
   }
 
-  #hydrate(data, { preserveView = false } = {}) {
-    this.entries = stitchOrphanRoots(Array.isArray(data.entries) ? data.entries : []);
-    this.header = data.header ?? null;
+  #hydrate(
+    data: SessionDataShape,
+    { preserveView = false }: { readonly preserveView?: boolean } = {},
+  ): void {
+    this.entries = normalizeStitchedEntries(
+      stitchOrphanRoots(Array.isArray(data.entries) ? data.entries : []),
+    );
+    this.header = data.header ?? {};
     this.systemPrompt = data.systemPrompt ?? null;
     this.tools = data.tools ?? null;
     this.renderedTools = data.renderedTools ?? null;
-    this.total = Number.isInteger(data.total) ? data.total : this.entries.length;
-    this.from = Number.isInteger(data.from) ? data.from : 0;
+    this.total =
+      typeof data.total === "number" && Number.isInteger(data.total)
+        ? data.total
+        : this.entries.length;
+    this.from = typeof data.from === "number" && Number.isInteger(data.from) ? data.from : 0;
     this.truncated = Boolean(data.truncated) || this.from > 0 || this.entries.length < this.total;
     this.urlLeafId = data.urlLeafId ?? null;
     this.urlTargetId = data.urlTargetId ?? null;
@@ -154,13 +179,13 @@ export class SessionDataModel {
   }
 
   // Move the active leaf/target (target defaults to the leaf).
-  navigateTo(leafId, targetId = leafId) {
+  navigateTo(leafId: string, targetId = leafId): void {
     this.currentLeafId = leafId;
     this.currentTargetId = targetId;
   }
 
   // Newest leaf under a node — used for click-to-navigate.
-  newestLeaf(nodeId) {
+  newestLeaf(nodeId: string): string {
     return findNewestLeaf(nodeId, this.nodeMap);
   }
 
@@ -186,13 +211,25 @@ export class SessionDataModel {
   //     components keyed on entry identity (not just id) skip re-rendering
   //     content that hasn't actually changed. Replaceable projections pass
   //     replaceExisting:true because stable IDs may carry newer content/status.
-  reconcile(entries, { isDelta = false, replaceExisting = false } = {}) {
+  reconcile(
+    entries: ReadonlyArray<UnknownRecord> | undefined,
+    {
+      isDelta = false,
+      replaceExisting = false,
+    }: { readonly isDelta?: boolean; readonly replaceExisting?: boolean } = {},
+  ): void {
     if (!Array.isArray(entries)) return;
+    const normalizedEntries = entries.flatMap((entry) => {
+      const normalized = sessionEntryFromUnknown(entry);
+      return normalized ? [normalized] : [];
+    });
     if (isDelta) {
-      const combined = stitchOrphanRoots([...this.entries, ...entries]);
+      const combined = normalizeStitchedEntries(
+        stitchOrphanRoots([...this.entries, ...normalizedEntries]),
+      );
       this.entries.push(...combined.slice(this.entries.length));
     } else {
-      const stitched = stitchOrphanRoots(entries);
+      const stitched = normalizeStitchedEntries(stitchOrphanRoots(normalizedEntries));
       // Pi entries are append-only, so retaining known objects avoids needless
       // rerenders. Codex projections replace in-progress tool entries under
       // stable IDs; those callers must accept the freshly fetched objects.

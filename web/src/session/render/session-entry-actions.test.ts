@@ -36,12 +36,16 @@ describe("session-entry-actions", () => {
     const { window } = dom("https://example.test/");
     window.document.body.innerHTML = "<button>copy</button>";
     const writeText = vi.fn(() => Promise.resolve());
-    const button = window.document.querySelector("button");
+    const button = window.document.querySelector<HTMLButtonElement>("button");
+    Object.defineProperty(window.navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
     await copyToClipboard("x", button, {
       documentImpl: window.document,
-      navigatorImpl: { clipboard: { writeText } },
+      navigatorImpl: window.navigator,
     });
     expect(writeText).toHaveBeenCalledWith("x");
-    expect(button.classList.contains("copied")).toBe(true);
+    expect(button?.classList.contains("copied")).toBe(true);
   });
 });

@@ -5,12 +5,13 @@ import {
   finishChatPreviewState as finishChatPreview,
   renderChatPreviewState as renderChatPreview,
   renderPendingChatState as renderPendingChat,
+  type ChatPreviewState,
 } from "./chat-preview.js";
 
 describe("chat preview", () => {
   it("renders, updates, follows, and clears preview", () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
-    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
     const forceFollowToBottom = vi.fn();
     const scrollAfterLayout = vi.fn();
 
@@ -25,11 +26,13 @@ describe("chat preview", () => {
     ).toBe(true);
 
     expect(dom.window.document.getElementById("chat-preview-stream")).toBeTruthy();
-    expect(state.chatPreviewEl.querySelector(".message-content").innerHTML).toBe("<p>hello</p>");
+    expect(state.chatPreviewEl?.querySelector(".message-content")?.innerHTML).toBe("<p>hello</p>");
     // Must include markdown-content so the streaming preview picks up the
     // same heading/hr/list/code styles as the settled assistant message.
     expect(
-      state.chatPreviewEl.querySelector(".message-content").classList.contains("markdown-content"),
+      state.chatPreviewEl
+        ?.querySelector(".message-content")
+        ?.classList.contains("markdown-content"),
     ).toBe(true);
     expect(forceFollowToBottom).toHaveBeenCalledWith(false);
 
@@ -38,8 +41,8 @@ describe("chat preview", () => {
       renderMarkdown: (text) => text,
       shouldFollow: () => false,
     });
-    expect(state.chatPreviewEl.classList.contains("done")).toBe(true);
-    expect(state.chatPreviewEl.textContent.toLowerCase()).not.toContain("working");
+    expect(state.chatPreviewEl?.classList.contains("done")).toBe(true);
+    expect(state.chatPreviewEl?.textContent?.toLowerCase()).not.toContain("working");
 
     clearChatPreview(state);
     expect(dom.window.document.getElementById("chat-preview-stream")).toBe(null);
@@ -48,7 +51,7 @@ describe("chat preview", () => {
 
   it("renders pending user message and working placeholder immediately", () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
-    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
     const forceFollowToBottom = vi.fn();
 
     expect(
@@ -61,12 +64,12 @@ describe("chat preview", () => {
     ).toBe(true);
 
     expect(dom.window.document.getElementById("chat-pending-user")).toBeTruthy();
-    expect(dom.window.document.getElementById("chat-pending-user").textContent).toContain(
+    expect(dom.window.document.getElementById("chat-pending-user")?.textContent).toContain(
       "hello **pi**",
     );
     expect(dom.window.document.getElementById("chat-preview-stream")).toBeTruthy();
     expect(
-      dom.window.document.getElementById("chat-preview-stream").textContent.toLowerCase(),
+      dom.window.document.getElementById("chat-preview-stream")?.textContent?.toLowerCase(),
     ).toContain("working");
     expect(forceFollowToBottom).toHaveBeenCalledWith(false);
 
@@ -77,7 +80,7 @@ describe("chat preview", () => {
 
   it("can finish a pending preview without removing assistant text", () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
-    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
 
     renderChatPreview({ content: "final answer", done: false }, state, {
       documentImpl: dom.window.document,
@@ -85,21 +88,21 @@ describe("chat preview", () => {
     });
 
     expect(finishChatPreview(state)).toBe(true);
-    expect(dom.window.document.getElementById("chat-preview-stream").textContent).toContain(
+    expect(dom.window.document.getElementById("chat-preview-stream")?.textContent).toContain(
       "final answer",
     );
     expect(
-      dom.window.document.getElementById("chat-preview-stream").textContent.toLowerCase(),
+      dom.window.document.getElementById("chat-preview-stream")?.textContent?.toLowerCase(),
     ).not.toContain("working");
-    expect(state.chatPreviewEl.classList.contains("done")).toBe(true);
+    expect(state.chatPreviewEl?.classList.contains("done")).toBe(true);
   });
 
   it("starts a fresh live preview when Codex moves to a new agent item", () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
-    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
     const options = {
       documentImpl: dom.window.document,
-      renderMarkdown: (text) => text,
+      renderMarkdown: (text: string) => text,
     };
 
     renderChatPreview(
@@ -108,7 +111,7 @@ describe("chat preview", () => {
       options,
     );
     const completedEl = state.chatPreviewEl;
-    expect(completedEl.classList.contains("done")).toBe(true);
+    expect(completedEl?.classList.contains("done")).toBe(true);
 
     renderChatPreview(
       { content: "Final answer starts", done: false, turnId: "turn-1", itemId: "final" },
@@ -118,9 +121,9 @@ describe("chat preview", () => {
 
     expect(state.chatPreviewEl).not.toBe(completedEl);
     expect(state.previewItemId).toBe("final");
-    expect(state.chatPreviewEl.classList.contains("done")).toBe(false);
-    expect(state.chatPreviewEl.querySelector(".preview-label")).toBeTruthy();
-    expect(state.chatPreviewEl.querySelector(".message-content").textContent).toBe(
+    expect(state.chatPreviewEl?.classList.contains("done")).toBe(false);
+    expect(state.chatPreviewEl?.querySelector(".preview-label")).toBeTruthy();
+    expect(state.chatPreviewEl?.querySelector(".message-content")?.textContent).toBe(
       "Final answer starts",
     );
     clearChatPreview(state);
@@ -128,7 +131,7 @@ describe("chat preview", () => {
 
   it("clears pending user but keeps assistant preview when keepAssistant option is true", () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
-    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
 
     renderPendingChat("hello pi", state, {
       documentImpl: dom.window.document,

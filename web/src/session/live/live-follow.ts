@@ -6,6 +6,25 @@ import {
   scrollToBottom,
   setFollowButtonText,
 } from "./live-scroll.js";
+import { Option, Schema } from "effect";
+
+interface FollowWindow {
+  scrollY: number;
+  readonly pageYOffset: number;
+  readonly innerHeight: number;
+  scrollTo(options: ScrollToOptions): void;
+  setTimeout(handler: () => void, timeout?: number): unknown;
+  requestAnimationFrame(callback: FrameRequestCallback): number;
+  addEventListener(type: string, handler: EventListener, options?: AddEventListenerOptions): void;
+  removeEventListener(
+    type: string,
+    handler: EventListener,
+    options?: AddEventListenerOptions,
+  ): void;
+}
+
+const KeyboardEventSchema = Schema.Struct({ key: Schema.String });
+const decodeKeyboardEvent = Schema.decodeUnknownOption(KeyboardEventSchema);
 
 // Owns the follow-scroll decision state for the live session viewer: whether we
 // auto-stick to the bottom as new entries stream in, the floating "scroll to
@@ -18,21 +37,31 @@ export function createFollowScrollController({
   windowImpl = window,
   requestAnimationFrameImpl = windowImpl.requestAnimationFrame.bind(windowImpl),
   setTimeoutImpl = windowImpl.setTimeout.bind(windowImpl),
+}: {
+  readonly documentImpl?: Document;
+  readonly windowImpl?: FollowWindow;
+  readonly requestAnimationFrameImpl?: (callback: FrameRequestCallback) => number | void;
+  readonly setTimeoutImpl?: (handler: () => void, timeout?: number) => unknown;
 } = {}) {
   const scrollImpls = { documentImpl, windowImpl };
   let following = true;
-  let followBtn = null;
+  let followBtn: HTMLButtonElement | null = null;
   let pendingCount = 0;
   let forcePreviewFollowUntil = 0;
   let lastScrollTop = 0;
   const contentEl = documentImpl.getElementById("content");
-  const cleanups = [];
-  const on = (host, type, handler, opts) => {
+  const cleanups: Array<() => void> = [];
+  const on = (
+    host: Pick<EventTarget, "addEventListener" | "removeEventListener">,
+    type: string,
+    handler: EventListener,
+    opts?: AddEventListenerOptions,
+  ): void => {
     host.addEventListener(type, handler, opts);
     cleanups.push(() => host.removeEventListener(type, handler, opts));
   };
 
-  function showFollowButton() {
+  function showFollowButton(): void {
     if (followBtn) return;
     followBtn = createFollowButton({
       documentImpl,
@@ -46,13 +75,13 @@ export function createFollowScrollController({
     });
     setFollowButtonText(followBtn, pendingCount);
   }
-  function hideFollowButton() {
+  function hideFollowButton(): void {
     if (!followBtn) return;
     removeFollowButton(followBtn, { windowImpl });
     followBtn = null;
   }
 
-  function getScrollPosition() {
+  function getScrollPosition(): number {
     let scrolled =
       windowImpl.scrollY ||
       windowImpl.pageYOffset ||
@@ -65,10 +94,11 @@ export function createFollowScrollController({
   }
   lastScrollTop = getScrollPosition();
 
-  function disableFollowOnUserInteraction(e) {
-    if (e.type === "keydown") {
+  function disableFollowOnUserInteraction(event: Event): void {
+    if (event.type === "keydown") {
       const scrollingKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "];
-      if (scrollingKeys.indexOf(e.key) === -1) return;
+      const key = Option.getOrElse(decodeKeyboardEvent(event), () => ({ key: "" })).key;
+      if (scrollingKeys.indexOf(key) === -1) return;
     }
     forcePreviewFollowUntil = 0;
     if (isAtBottom(scrollImpls)) {
@@ -80,7 +110,7 @@ export function createFollowScrollController({
     }
   }
 
-  function onScroll() {
+  function onScroll(): void {
     const currentScroll = getScrollPosition();
     const scrolledUp = currentScroll < lastScrollTop;
     lastScrollTop = currentScroll;
@@ -104,7 +134,7 @@ export function createFollowScrollController({
     }
   }
 
-  function scrollAfterLayout(smooth, target) {
+  function scrollAfterLayout(smooth: boolean, target?: Element | null): void {
     requestAnimationFrameImpl(() => {
       scrollElementAboveComposer(target, !!smooth, scrollImpls);
       setTimeoutImpl(() => {
@@ -112,7 +142,7 @@ export function createFollowScrollController({
       }, 40);
     });
   }
-  function forceFollowToBottom(smooth) {
+  function forceFollowToBottom(smooth: boolean): void {
     following = true;
     pendingCount = 0;
     hideFollowButton();
@@ -131,10 +161,10 @@ export function createFollowScrollController({
     isFollowing: () => following,
     isAtBottom: () => isAtBottom(scrollImpls),
     shouldFollow: () => following || Date.now() < forcePreviewFollowUntil,
-    extendPreviewFollow: (ms = 30000) => {
+    extendPreviewFollow: (ms = 30000): void => {
       forcePreviewFollowUntil = Date.now() + ms;
     },
-    incrementPending: (count) => {
+    incrementPending: (count: number): void => {
       pendingCount += count;
     },
     showFollowButton,

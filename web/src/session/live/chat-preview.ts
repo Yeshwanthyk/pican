@@ -1,13 +1,50 @@
-export function getSpinnerConfig(windowImpl = typeof window !== "undefined" ? window : null) {
+import { Effect } from "effect";
+import { runSync } from "../../lib/runtime.js";
+import { isUnknownRecord } from "../data/session-types.js";
+
+interface PreviewWindow {
+  readonly localStorage?: Pick<Storage, "getItem">;
+}
+
+type TimerHandle = number | ReturnType<typeof globalThis.setInterval>;
+
+export interface ChatPreviewState {
+  chatPreviewEl?: HTMLElement | null;
+  pendingUserEl?: HTMLElement | null;
+  previewTurnId?: string | null;
+  previewItemId?: string | null;
+  spinnerInterval?: TimerHandle | null;
+  activePreviewMessage?: string | null;
+}
+
+interface SpinnerConfig {
+  readonly frames: string[];
+  readonly fontFamily: string;
+  readonly interval: number;
+  readonly width: string;
+}
+
+interface PreviewRenderOptions {
+  readonly documentImpl?: Document;
+  readonly windowImpl?: PreviewWindow | null;
+  readonly renderMarkdown?: (text: string) => string;
+  readonly shouldFollow?: () => boolean;
+  readonly forceFollowToBottom?: (smooth: boolean) => void;
+  readonly scrollAfterLayout?: (smooth: boolean, target?: Element | null) => void;
+  readonly setIntervalImpl?: (handler: () => void, timeout: number) => TimerHandle;
+}
+
+export function getSpinnerConfig(
+  windowImpl: PreviewWindow | null = typeof window !== "undefined" ? window : null,
+): SpinnerConfig {
   let style = "runcat";
-  try {
-    if (windowImpl && windowImpl.localStorage) {
-      const saved = windowImpl.localStorage.getItem("pican:spinner-style");
-      if (saved === "braille") {
-        style = "braille";
-      }
-    }
-  } catch (_) {}
+  const saved = runSync(
+    Effect.try({
+      try: () => windowImpl?.localStorage?.getItem("pican:spinner-style") ?? null,
+      catch: () => null,
+    }),
+  );
+  if (saved === "braille") style = "braille";
 
   if (style === "braille") {
     return {
@@ -27,7 +64,10 @@ export function getSpinnerConfig(windowImpl = typeof window !== "undefined" ? wi
   }
 }
 
-export function clearChatPreviewState(state, { keepAssistant = false } = {}) {
+export function clearChatPreviewState(
+  state: ChatPreviewState,
+  { keepAssistant = false }: { readonly keepAssistant?: boolean } = {},
+): void {
   if (state.pendingUserEl && state.pendingUserEl.parentNode) {
     state.pendingUserEl.parentNode.removeChild(state.pendingUserEl);
     state.pendingUserEl = null;
@@ -43,7 +83,7 @@ export function clearChatPreviewState(state, { keepAssistant = false } = {}) {
   }
 }
 
-export function finishChatPreviewState(state) {
+export function finishChatPreviewState(state: ChatPreviewState): boolean {
   if (!state?.chatPreviewEl) return false;
   state.chatPreviewEl.classList.remove("chat-preview-waiting");
   state.chatPreviewEl.classList.add("done");
@@ -66,12 +106,15 @@ const CREATIVE_MESSAGES = [
 ];
 
 export function startWorkingAnimation(
-  state,
+  state: ChatPreviewState,
   {
     setIntervalImpl = setInterval,
     windowImpl = typeof window !== "undefined" ? window : null,
+  }: {
+    readonly setIntervalImpl?: (handler: () => void, timeout: number) => TimerHandle;
+    readonly windowImpl?: PreviewWindow | null;
   } = {},
-) {
+): void {
   stopWorkingAnimation(state);
 
   const config = getSpinnerConfig(windowImpl);
@@ -82,11 +125,11 @@ export function startWorkingAnimation(
 
   // Sync initial spinner properties if spinner element is already present
   if (state.chatPreviewEl) {
-    const spinnerEl = state.chatPreviewEl.querySelector(".preview-spinner");
+    const spinnerEl = state.chatPreviewEl.querySelector<HTMLElement>(".preview-spinner");
     if (spinnerEl) {
       spinnerEl.style.fontFamily = config.fontFamily;
       spinnerEl.style.width = config.width;
-      spinnerEl.textContent = config.frames[0];
+      spinnerEl.textContent = config.frames[0] ?? "";
     }
   }
 
@@ -96,28 +139,33 @@ export function startWorkingAnimation(
       return;
     }
 
-    const spinnerEl = state.chatPreviewEl.querySelector(".preview-spinner");
+    const spinnerEl = state.chatPreviewEl.querySelector<HTMLElement>(".preview-spinner");
     if (spinnerEl) {
       if (spinnerEl.style.fontFamily !== config.fontFamily) {
         spinnerEl.style.fontFamily = config.fontFamily;
         spinnerEl.style.width = config.width;
       }
       frameIdx = (frameIdx + 1) % config.frames.length;
-      spinnerEl.textContent = config.frames[frameIdx];
+      spinnerEl.textContent = config.frames[frameIdx] ?? "";
     }
 
     if (!state.activePreviewMessage && Date.now() - lastMsgChange >= 2000) {
       const textEl = state.chatPreviewEl.querySelector(".preview-text");
       if (textEl) {
         msgIdx = (msgIdx + 1) % CREATIVE_MESSAGES.length;
-        textEl.textContent = CREATIVE_MESSAGES[msgIdx];
+        textEl.textContent = CREATIVE_MESSAGES[msgIdx] ?? "Working...";
         lastMsgChange = Date.now();
       }
     }
   }, config.interval);
 }
 
-export function stopWorkingAnimation(state, { clearIntervalImpl = clearInterval } = {}) {
+export function stopWorkingAnimation(
+  state: ChatPreviewState | null | undefined,
+  {
+    clearIntervalImpl = (timer) => globalThis.clearInterval(timer),
+  }: { readonly clearIntervalImpl?: (timer: TimerHandle) => void } = {},
+): void {
   if (state && state.spinnerInterval) {
     clearIntervalImpl(state.spinnerInterval);
     state.spinnerInterval = null;
@@ -127,7 +175,7 @@ export function stopWorkingAnimation(state, { clearIntervalImpl = clearInterval 
   }
 }
 
-function getActiveMessage(content) {
+function getActiveMessage(content: string | null | undefined): string | null {
   if (!content) return null;
 
   // Check if there is an active/open thinking block
@@ -146,20 +194,20 @@ function getActiveMessage(content) {
   return "Generating response...";
 }
 
-function setMarkdownContent(el, html) {
+function setMarkdownContent(el: Element | null, html: string): void {
   // `renderMarkdown` returns sanitized markdown HTML (or escaped fallback). This
   // is content rendering, not structural view construction; the surrounding
   // preview DOM is built with elements so the helper stays narrowly scoped.
   if (el) el.innerHTML = html;
 }
 
-function createMarkdownBlock(documentImpl, className) {
+function createMarkdownBlock(documentImpl: Document, className: string): HTMLDivElement {
   const el = documentImpl.createElement("div");
   el.className = className;
   return el;
 }
 
-function createPreviewLabel(documentImpl, config) {
+function createPreviewLabel(documentImpl: Document, config: SpinnerConfig): HTMLDivElement {
   const label = documentImpl.createElement("div");
   label.className = "preview-label";
   const spinner = documentImpl.createElement("span");
@@ -170,7 +218,7 @@ function createPreviewLabel(documentImpl, config) {
   spinner.style.display = "inline-block";
   spinner.style.width = config.width;
   spinner.style.textAlign = "center";
-  spinner.textContent = config.frames[0];
+  spinner.textContent = config.frames[0] ?? "";
   const text = documentImpl.createElement("span");
   text.className = "preview-text";
   text.style.color = "var(--muted)";
@@ -179,7 +227,13 @@ function createPreviewLabel(documentImpl, config) {
   return label;
 }
 
-function createAssistantPreview(documentImpl, { waiting = false, windowImpl = null } = {}) {
+function createAssistantPreview(
+  documentImpl: Document,
+  {
+    waiting = false,
+    windowImpl = null,
+  }: { readonly waiting?: boolean; readonly windowImpl?: PreviewWindow | null } = {},
+): HTMLDivElement {
   const config = getSpinnerConfig(windowImpl);
   const el = documentImpl.createElement("div");
   el.id = "chat-preview-stream";
@@ -192,18 +246,18 @@ function createAssistantPreview(documentImpl, { waiting = false, windowImpl = nu
 }
 
 export function renderPendingChatState(
-  message,
-  state,
+  message: unknown,
+  state: ChatPreviewState,
   {
     documentImpl = document,
     windowImpl = typeof window !== "undefined" ? window : null,
-    renderMarkdown,
+    renderMarkdown = (content) => content,
     shouldFollow = () => false,
     forceFollowToBottom = () => {},
     scrollAfterLayout = () => {},
     setIntervalImpl = setInterval,
-  } = {},
-) {
+  }: PreviewRenderOptions = {},
+): boolean {
   const text = String(message || "").trim();
   if (!text) return false;
   const container =
@@ -233,19 +287,19 @@ export function renderPendingChatState(
 }
 
 export function renderChatPreviewState(
-  payload,
-  state,
+  payload: unknown,
+  state: ChatPreviewState,
   {
     documentImpl = document,
     windowImpl = typeof window !== "undefined" ? window : null,
-    renderMarkdown,
+    renderMarkdown = (content) => content,
     shouldFollow = () => false,
     forceFollowToBottom = () => {},
     scrollAfterLayout = () => {},
     setIntervalImpl = setInterval,
-  } = {},
-) {
-  if (!payload || typeof payload.content !== "string") return false;
+  }: PreviewRenderOptions = {},
+): boolean {
+  if (!isUnknownRecord(payload) || typeof payload.content !== "string") return false;
   const nextTurnId = typeof payload.turnId === "string" ? payload.turnId : null;
   const nextItemId = typeof payload.itemId === "string" ? payload.itemId : null;
   if (nextItemId && state.previewItemId && nextItemId !== state.previewItemId) {

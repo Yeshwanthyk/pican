@@ -2,14 +2,14 @@
 // session-entry-renderer.js during its decomposition into Svelte components
 // (docs/dev/svelte-migration-plan.md). No DOM, no side effects.
 
-export function formatTokens(count) {
+export function formatTokens(count: number): string {
   if (count < 1000) return count.toString();
   if (count < 10000) return (count / 1000).toFixed(1) + "k";
   if (count < 1000000) return Math.round(count / 1000) + "k";
   return (count / 1000000).toFixed(1) + "M";
 }
 
-export function formatTimestamp(ts) {
+export function formatTimestamp(ts: string | number | Date | null | undefined): string {
   if (!ts) return "";
   const date = new Date(ts);
   return date.toLocaleTimeString(undefined, {
@@ -19,21 +19,21 @@ export function formatTimestamp(ts) {
   });
 }
 
-export function replaceTabs(text) {
+export function replaceTabs(text: unknown): string {
   return String(text).replace(/\t/g, "   ");
 }
 
 // Coerce a value to a display string. Returns null for invalid (non-string,
 // non-nullish) types so callers can show an "[invalid arg]" marker.
-export function str(value) {
+export function str(value: unknown): string | null {
   if (typeof value === "string") return value;
   if (value == null) return "";
   return null;
 }
 
-export function getLanguageFromPath(filePath) {
+export function getLanguageFromPath(filePath: unknown): string | undefined {
   const ext = String(filePath).split(".").pop()?.toLowerCase();
-  const extToLang = {
+  const extToLang: Readonly<Record<string, string>> = {
     ts: "typescript",
     tsx: "typescript",
     js: "javascript",
@@ -63,11 +63,11 @@ export function getLanguageFromPath(filePath) {
     md: "markdown",
     dockerfile: "dockerfile",
   };
-  return extToLang[ext];
+  return ext ? extToLang[ext] : undefined;
 }
 
 // Split text into the first `maxLines` preview lines + the remaining count.
-export function splitOutputLines(text, maxLines) {
+export function splitOutputLines(text: unknown, maxLines: number) {
   const replaced = replaceTabs(text);
   const lines = replaced.split("\n");
   return { lines, preview: lines.slice(0, maxLines), remaining: lines.length - maxLines };

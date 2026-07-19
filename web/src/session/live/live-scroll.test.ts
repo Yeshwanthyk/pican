@@ -13,7 +13,7 @@ describe("live scroll helpers", () => {
     const dom = new JSDOM('<body><main id="content"></main></body>');
     const btn = createFollowButton({
       documentImpl: dom.window.document,
-      requestAnimationFrameImpl: (cb) => cb(),
+      requestAnimationFrameImpl: (cb) => cb(0),
     });
     setFollowButtonText(btn, 2);
     expect(btn.querySelector("svg")).not.toBeNull();
@@ -34,7 +34,10 @@ describe("live scroll helpers", () => {
       value: 1200,
       configurable: true,
     });
-    scrollToBottom(true, { documentImpl: dom.window.document, windowImpl: { scrollTo } });
+    scrollToBottom(true, {
+      documentImpl: dom.window.document,
+      windowImpl: { scrollTo, innerHeight: 0 },
+    });
     expect(scrollTo).toHaveBeenCalledWith({ top: 1200, behavior: "smooth" });
   });
 
@@ -84,13 +87,13 @@ describe("live scroll helpers", () => {
     };
 
     // Content scrolled to bottom
-    contentEl.scrollTop = 4200;
+    if (contentEl) contentEl.scrollTop = 4200;
     expect(isAtBottom({ documentImpl: docContent, windowImpl: winMobile, threshold: 80 })).toBe(
       true,
     );
 
     // Content scrolled up
-    contentEl.scrollTop = 1000;
+    if (contentEl) contentEl.scrollTop = 1000;
     expect(isAtBottom({ documentImpl: docContent, windowImpl: winMobile, threshold: 80 })).toBe(
       false,
     );

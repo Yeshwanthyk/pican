@@ -47,15 +47,19 @@ describe("live connection", () => {
 
   it("schedules manual reconnect only when EventSource is closed", () => {
     const dom = setupDom();
-    const timers = [];
-    const eventSource = { close: vi.fn(), readyState: 2 };
+    const timers: Array<{ cb: () => void; delay: number }> = [];
+    const eventSource: {
+      close: ReturnType<typeof vi.fn>;
+      readyState: number;
+      onError?: (error?: unknown) => void;
+    } = { close: vi.fn(), readyState: 2 };
     const replacement = { close: vi.fn(), readyState: 1 };
     const createEventSource = vi
       .fn()
       .mockReturnValueOnce(eventSource)
       .mockReturnValueOnce(replacement);
     const onReload = vi.fn();
-    const wireEvents = vi.fn(({ onError }) => {
+    const wireEvents = vi.fn(({ onError }: { readonly onError?: (error?: unknown) => void }) => {
       eventSource.onError = onError;
     });
 
@@ -74,11 +78,11 @@ describe("live connection", () => {
       randomImpl: () => 0,
     });
     connection.connect();
-    eventSource.onError(new Error("closed"));
+    eventSource.onError?.({ message: "closed" });
 
     expect(timers).toHaveLength(1);
-    expect(timers[0].delay).toBe(1000);
-    timers[0].cb();
+    expect(timers[0]?.delay).toBe(1000);
+    timers[0]?.cb();
 
     expect(createEventSource).toHaveBeenCalledTimes(2);
     expect(onReload).toHaveBeenCalledTimes(1);

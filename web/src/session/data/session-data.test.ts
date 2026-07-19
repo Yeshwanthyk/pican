@@ -6,7 +6,7 @@ import {
   getSessionSearchParams,
 } from "./session-data.js";
 
-function b64(value) {
+function b64(value: unknown): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 }
 

@@ -47,14 +47,14 @@ describe("SessionDataModel", () => {
 
   it("derives lookups (byId / toolCallMap / labelMap)", () => {
     const m = model();
-    expect(m.byId.get("mid").parentId).toBe("root");
+    expect(m.byId.get("mid")?.parentId).toBe("root");
     expect([...m.byId.keys()]).toEqual(["root", "old", "mid", "leaf"]);
   });
 
   it("derives the tree from entries", () => {
     const m = model();
     expect(m.tree.map((n) => n.entry.id)).toEqual(["root"]);
-    expect(m.tree[0].children.map((n) => n.entry.id)).toEqual(["old", "mid"]);
+    expect(m.tree[0]?.children.map((n) => n.entry.id)).toEqual(["old", "mid"]);
   });
 
   it("derives the active path from the current leaf", () => {
@@ -92,7 +92,7 @@ describe("SessionDataModel", () => {
     });
 
     expect(m.byId.has("leaf2")).toBe(true);
-    expect(m.nodeMap.get("leaf").children.map((n) => n.entry.id)).toEqual(["leaf2"]);
+    expect(m.nodeMap.get("leaf")?.children.map((n) => n.entry.id)).toEqual(["leaf2"]);
     // view state preserved across a live update (we were on 'leaf')
     expect(m.currentLeafId).toBe("leaf");
   });
@@ -199,9 +199,9 @@ describe("SessionDataModel", () => {
     // leaf2 is a genuinely new entry — no prior identity to preserve, just
     // check it landed with the right content (Svelte's $state deeply proxies
     // pushed objects, so it is never Object.is-equal to the plain literal).
-    expect(m.byId.get("leaf2").message.content).toBe("more");
+    expect(m.byId.get("leaf2")?.message?.content).toBe("more");
     expect(m.currentLeafId).toBe("leaf2");
-    expect(m.nodeMap.get("leaf").children.map((n) => n.entry.id)).toEqual(["leaf2"]);
+    expect(m.nodeMap.get("leaf")?.children.map((n) => n.entry.id)).toEqual(["leaf2"]);
   });
 
   it("reconcile(entries) (full resync) reuses existing object references for known ids even when the incoming objects are fresh duplicates", () => {
@@ -232,7 +232,7 @@ describe("SessionDataModel", () => {
     expect(m.entries).not.toContain(freshDuplicates[2]);
     // The genuinely new entry (no prior id) is used as-is (content-wise; see
     // the isDelta test above for why this isn't a toBe on the plain literal).
-    expect(m.byId.get("leaf2").message.content).toBe("more");
+    expect(m.byId.get("leaf2")?.message?.content).toBe("more");
   });
 
   it("replaces known objects when stable ids belong to a mutable projection", () => {
@@ -249,7 +249,7 @@ describe("SessionDataModel", () => {
     );
 
     expect(m.byId.get("leaf")).not.toBe(originalLeaf);
-    expect(m.byId.get("leaf").message.content).toBe("completed canonical output");
+    expect(m.byId.get("leaf")?.message?.content).toBe("completed canonical output");
   });
 
   it("derives the ordered active path (root→leaf)", () => {

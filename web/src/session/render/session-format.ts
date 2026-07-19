@@ -1,4 +1,20 @@
-export function shortenPath(p) {
+import {
+  isUnknownRecord,
+  type SessionEntry,
+  type ToolCallInfo,
+  type UnknownRecord,
+} from "../data/session-types.js";
+import { Match, Option } from "effect";
+
+interface ToolResultLike {
+  readonly details?: UnknownRecord;
+}
+
+interface HtmlDocument {
+  createElement(tagName: string): { textContent: string | null; innerHTML: string };
+}
+
+export function shortenPath(p: unknown): string {
   if (typeof p !== "string") return "";
   if (p.startsWith("/Users/")) {
     const parts = p.split("/");
@@ -11,12 +27,12 @@ export function shortenPath(p) {
   return p;
 }
 
-export function formatToolCall(name, args = {}) {
-  switch (name) {
-    case "read": {
+export function formatToolCall(name: string, args: UnknownRecord = {}): string {
+  const formatted = Match.value(name).pipe(
+    Match.when("read", () => {
       const path = shortenPath(String(args.path || args.file_path || ""));
-      const offset = args.offset;
-      const limit = args.limit;
+      const offset = typeof args.offset === "number" ? args.offset : undefined;
+      const limit = typeof args.limit === "number" ? args.limit : undefined;
       let display = path;
       if (offset !== undefined || limit !== undefined) {
         const start = offset ?? 1;
@@ -24,65 +40,67 @@ export function formatToolCall(name, args = {}) {
         display += `:${start}${end ? `-${end}` : ""}`;
       }
       return `[read: ${display}]`;
-    }
-    case "write":
-      return `[write: ${shortenPath(String(args.path || args.file_path || ""))}]`;
-    case "edit":
-      return `[edit: ${shortenPath(String(args.path || args.file_path || ""))}]`;
-    case "bash": {
+    }),
+    Match.when("write", () => `[write: ${shortenPath(String(args.path || args.file_path || ""))}]`),
+    Match.when("edit", () => `[edit: ${shortenPath(String(args.path || args.file_path || ""))}]`),
+    Match.when("bash", () => {
       const rawCmd = String(args.command || "");
       const cmd = rawCmd
         .replace(/[\n\t]/g, " ")
         .trim()
         .slice(0, 50);
       return `[bash: ${cmd}${rawCmd.length > 50 ? "..." : ""}]`;
-    }
-    case "grep":
-      return `[grep: /${args.pattern || ""}/ in ${shortenPath(String(args.path || "."))}]`;
-    case "find":
-      return `[find: ${args.pattern || ""} in ${shortenPath(String(args.path || "."))}]`;
-    case "ls":
-      return `[ls: ${shortenPath(String(args.path || "."))}]`;
-    case "TaskCreate":
-      return `[TaskCreate: ${String(args.subject || "")}]`;
-    case "TaskList":
-      return "[TaskList]";
-    case "TaskUpdate":
-    case "TaskGet":
-    case "TaskClaim":
-    case "TaskOutput":
-    case "TaskStop":
-      return `[${name}: ${String(args.taskId ?? args.task_id ?? "")}]`;
-    case "TaskExecute": {
+    }),
+    Match.when(
+      "grep",
+      () => `[grep: /${args.pattern || ""}/ in ${shortenPath(String(args.path || "."))}]`,
+    ),
+    Match.when(
+      "find",
+      () => `[find: ${args.pattern || ""} in ${shortenPath(String(args.path || "."))}]`,
+    ),
+    Match.when("ls", () => `[ls: ${shortenPath(String(args.path || "."))}]`),
+    Match.when("TaskCreate", () => `[TaskCreate: ${String(args.subject || "")}]`),
+    Match.when("TaskList", () => "[TaskList]"),
+    Match.whenOr(
+      "TaskUpdate",
+      "TaskGet",
+      "TaskClaim",
+      "TaskOutput",
+      "TaskStop",
+      (toolName) => `[${toolName}: ${String(args.taskId ?? args.task_id ?? "")}]`,
+    ),
+    Match.when("TaskExecute", () => {
       const ids = Array.isArray(args.task_ids) ? args.task_ids.join(", ") : args.task_ids || "";
       return `[TaskExecute: ${String(ids)}]`;
-    }
-    case "subagent_spawn":
-      return `[subagent_spawn: ${String(args.title || args.id || "")}]`;
-    case "subagent_wait":
-    case "subagent_cancel": {
+    }),
+    Match.when("subagent_spawn", () => `[subagent_spawn: ${String(args.title || args.id || "")}]`),
+    Match.whenOr("subagent_wait", "subagent_cancel", (toolName) => {
       const ids = Array.isArray(args.ids) ? args.ids.join(", ") : args.id || args.ids || "";
-      return `[${name}: ${String(ids)}]`;
-    }
-    case "subagent_check":
-      return `[subagent_check: ${String(args.id || "")}]`;
-    case "subagent_list":
-      return "[subagent_list]";
-    case "workflow": {
+      return `[${toolName}: ${String(ids)}]`;
+    }),
+    Match.when("subagent_check", () => `[subagent_check: ${String(args.id || "")}]`),
+    Match.when("subagent_list", () => "[subagent_list]"),
+    Match.when("workflow", () => {
       const label = args.name || args.runId || args.run_id || "";
       const status = args.status ? ` (${args.status})` : "";
       return `[workflow: ${String(label)}${status}]`;
-    }
-    default: {
-      const json = JSON.stringify(args);
-      const preview = json.slice(0, 40);
-      return `[${name}: ${preview}${json.length > 40 ? "..." : ""}]`;
-    }
-  }
+    }),
+    Match.option,
+  );
+  return Option.getOrElse(formatted, () => {
+    const json = JSON.stringify(args);
+    const preview = json.slice(0, 40);
+    return `[${name}: ${preview}${json.length > 40 ? "..." : ""}]`;
+  });
 }
 
-export function formatToolFoldSummary(name, args = {}, result = null) {
-  const truncateInline = (value, maxLength) => {
+export function formatToolFoldSummary(
+  name: string,
+  args: UnknownRecord = {},
+  result: ToolResultLike | null = null,
+): string {
+  const truncateInline = (value: unknown, maxLength: number): string => {
     const text = String(value ?? "")
       .replace(/[\n\t]/g, " ")
       .trim();
@@ -109,13 +127,16 @@ export function formatToolFoldSummary(name, args = {}, result = null) {
     return formatted.startsWith(prefix) ? formatted.slice(prefix.length) : "";
   }
 
-  return truncateInline(JSON.stringify(args), 60);
+  return truncateInline(JSON.stringify(args) ?? "", 60);
 }
 
-export function escapeHtml(text, { documentImpl = globalThis.document } = {}) {
+export function escapeHtml(
+  text: unknown,
+  { documentImpl = globalThis.document }: { readonly documentImpl?: HtmlDocument } = {},
+): string {
   if (documentImpl?.createElement) {
     const div = documentImpl.createElement("div");
-    div.textContent = text;
+    div.textContent = String(text ?? "");
     return div.innerHTML;
   }
   return String(text)
@@ -126,27 +147,35 @@ export function escapeHtml(text, { documentImpl = globalThis.document } = {}) {
     .replaceAll("'", "&#39;");
 }
 
-export function truncate(s, maxLen = 100) {
-  s = String(s ?? "");
-  if (s.length <= maxLen) return s;
-  return s.slice(0, maxLen) + "...";
+export function truncate(value: unknown, maxLen = 100): string {
+  const text = String(value ?? "");
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + "...";
+}
+
+interface TreeDisplayOptions {
+  readonly extractContent?: (content: unknown) => string;
+  readonly toolCallMap?: ReadonlyMap<string, ToolCallInfo>;
+  readonly escapeHtmlImpl?: (text: unknown) => string;
 }
 
 export function getTreeNodeDisplayHtml(
-  entry,
-  label,
-  { extractContent, toolCallMap = new Map(), escapeHtmlImpl = escapeHtml } = {},
-) {
-  const normalize = (s) =>
-    String(s ?? "")
+  entry: Partial<SessionEntry>,
+  label: string | null | undefined,
+  { extractContent, toolCallMap = new Map(), escapeHtmlImpl = escapeHtml }: TreeDisplayOptions = {},
+): string {
+  const normalize = (value: unknown): string =>
+    String(value ?? "")
       .replace(/[\n\t]/g, " ")
       .trim();
-  const getContent = extractContent || ((content) => (typeof content === "string" ? content : ""));
+  const getContent =
+    extractContent ?? ((content: unknown) => (typeof content === "string" ? content : ""));
   const labelHtml = label ? `<span class="tree-label">[${escapeHtmlImpl(label)}]</span> ` : "";
 
-  switch (entry.type) {
-    case "message": {
+  const display = Match.value(entry.type).pipe(
+    Match.when("message", () => {
       const msg = entry.message;
+      if (!msg) return labelHtml + '<span class="tree-muted">[message]</span>';
       if (msg.role === "user") {
         const content = truncate(normalize(getContent(msg.content)));
         return labelHtml + `<span class="tree-role-user">user:</span> ${escapeHtmlImpl(content)}`;
@@ -178,7 +207,7 @@ export function getTreeNodeDisplayHtml(
         if (toolCall)
           return (
             labelHtml +
-            `<span class="tree-role-tool">${escapeHtmlImpl(formatToolCall(toolCall.name, toolCall.arguments))}</span>`
+            `<span class="tree-role-tool">${escapeHtmlImpl(formatToolCall(typeof toolCall.name === "string" ? toolCall.name : "tool", isUnknownRecord(toolCall.arguments) ? toolCall.arguments : {}))}</span>`
           );
         return labelHtml + `<span class="tree-role-tool">[${msg.toolName || "tool"}]</span>`;
       }
@@ -187,31 +216,39 @@ export function getTreeNodeDisplayHtml(
         return labelHtml + `<span class="tree-role-tool">[bash]:</span> ${escapeHtmlImpl(cmd)}`;
       }
       return labelHtml + `<span class="tree-muted">[${msg.role}]</span>`;
-    }
-    case "compaction":
-      return (
+    }),
+    Match.when(
+      "compaction",
+      () =>
         labelHtml +
-        `<span class="tree-compaction">[compaction: ${Math.round(entry.tokensBefore / 1000)}k tokens]</span>`
-      );
-    case "branch_summary": {
+        `<span class="tree-compaction">[compaction: ${Math.round((entry.tokensBefore ?? 0) / 1000)}k tokens]</span>`,
+    ),
+    Match.when("branch_summary", () => {
       const summary = truncate(normalize(entry.summary || ""));
       return (
         labelHtml +
         `<span class="tree-branch-summary">[branch summary]:</span> ${escapeHtmlImpl(summary)}`
       );
-    }
-    case "custom_message": {
+    }),
+    Match.when("custom_message", () => {
       const content = typeof entry.content === "string" ? entry.content : getContent(entry.content);
       return (
         labelHtml +
         `<span class="tree-custom">[${escapeHtmlImpl(entry.customType)}]:</span> ${escapeHtmlImpl(truncate(normalize(content)))}`
       );
-    }
-    case "model_change":
-      return labelHtml + `<span class="tree-muted">[model: ${entry.modelId}]</span>`;
-    case "thinking_level_change":
-      return labelHtml + `<span class="tree-muted">[thinking: ${entry.thinkingLevel}]</span>`;
-    default:
-      return labelHtml + `<span class="tree-muted">[${entry.type}]</span>`;
-  }
+    }),
+    Match.when(
+      "model_change",
+      () => labelHtml + `<span class="tree-muted">[model: ${entry.modelId}]</span>`,
+    ),
+    Match.when(
+      "thinking_level_change",
+      () => labelHtml + `<span class="tree-muted">[thinking: ${entry.thinkingLevel}]</span>`,
+    ),
+    Match.option,
+  );
+  return Option.getOrElse(
+    display,
+    () => labelHtml + `<span class="tree-muted">[${entry.type}]</span>`,
+  );
 }

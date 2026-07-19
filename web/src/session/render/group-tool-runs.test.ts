@@ -1,17 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { formatToolRunBreakdown, groupToolRuns } from "./group-tool-runs.js";
 
-const user = (id) => ({
+const user = (id: string) => ({
   id,
   type: "message",
   message: { role: "user", content: "Keep going" },
 });
-const assistantText = (id, text = "Done") => ({
+const assistantText = (id: string, text = "Done") => ({
   id,
   type: "message",
   message: { role: "assistant", content: [{ type: "text", text }] },
 });
-const assistantTools = (id, names, { thinking = false } = {}) => ({
+const assistantTools = (
+  id: string,
+  names: ReadonlyArray<string>,
+  { thinking = false }: { readonly thinking?: boolean } = {},
+) => ({
   id,
   type: "message",
   message: {
@@ -22,22 +26,22 @@ const assistantTools = (id, names, { thinking = false } = {}) => ({
     ],
   },
 });
-const toolResult = (id) => ({
+const toolResult = (id: string) => ({
   id,
   type: "message",
   message: { role: "toolResult", toolCallId: `call-${id}`, content: [] },
 });
-const toolResultFor = (id, { isError = false } = {}) => ({
+const toolResultFor = (id: string, { isError = false }: { readonly isError?: boolean } = {}) => ({
   id: `result-${id}`,
   type: "message",
   message: { role: "toolResult", toolCallId: id, content: [], isError },
 });
-const bashExecution = (id) => ({
+const bashExecution = (id: string) => ({
   id,
   type: "message",
   message: { role: "bashExecution", command: "pwd", output: "", exitCode: 0 },
 });
-const subagentResult = (id) => ({
+const subagentResult = (id: string) => ({
   id,
   type: "custom_message",
   customType: "subagent-result",
@@ -68,7 +72,9 @@ describe("groupToolRuns", () => {
         remaining: 0,
       },
     });
-    expect(formatToolRunBreakdown(group.breakdown)).toBe("bash x3, read x2, edit x1");
+    expect(formatToolRunBreakdown(group?.kind === "group" ? group.breakdown : undefined)).toBe(
+      "bash x3, read x2, edit x1",
+    );
   });
 
   it("does not merge tool runs across assistant prose", () => {
@@ -162,9 +168,9 @@ describe("groupToolRuns", () => {
 
   it("limits the breakdown to four tool names", () => {
     const [group] = groupToolRuns([assistantTools("a1", ["bash", "read", "edit", "write", "ls"])]);
-    expect(group.breakdown.remaining).toBe(1);
-    expect(formatToolRunBreakdown(group.breakdown, "+1 more")).toBe(
-      "bash x1, read x1, edit x1, write x1, +1 more",
-    );
+    expect(group?.kind === "group" ? group.breakdown.remaining : 0).toBe(1);
+    expect(
+      formatToolRunBreakdown(group?.kind === "group" ? group.breakdown : undefined, "+1 more"),
+    ).toBe("bash x1, read x1, edit x1, write x1, +1 more");
   });
 });

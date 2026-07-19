@@ -36,12 +36,12 @@ describe("live stats", () => {
       <div class="info-item"><span class="info-label">Cost:</span><span class="info-value"></span></div>
     </div>`);
     expect(updateStatsDom(entries, { documentImpl: dom.window.document })).toBe(true);
-    expect(dom.window.document.querySelectorAll(".info-value")[0].textContent).toBe(
+    expect(dom.window.document.querySelectorAll(".info-value")[0]?.textContent).toBe(
       "1 user, 1 assistant",
     );
-    expect(dom.window.document.querySelectorAll(".info-value")[1].textContent).toBe("1");
-    expect(dom.window.document.querySelectorAll(".info-value")[2].textContent).toBe("p/m");
-    expect(dom.window.document.querySelectorAll(".info-value")[3].textContent).toBe("↑1.0k ↓2.0k");
-    expect(dom.window.document.querySelectorAll(".info-value")[4].textContent).toBe("$0.003");
+    expect(dom.window.document.querySelectorAll(".info-value")[1]?.textContent).toBe("1");
+    expect(dom.window.document.querySelectorAll(".info-value")[2]?.textContent).toBe("p/m");
+    expect(dom.window.document.querySelectorAll(".info-value")[3]?.textContent).toBe("↑1.0k ↓2.0k");
+    expect(dom.window.document.querySelectorAll(".info-value")[4]?.textContent).toBe("$0.003");
   });
 });

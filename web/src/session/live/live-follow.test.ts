@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import { createFollowScrollController } from "./live-follow.js";
 
-function setup({ scrollHeight = 2000, innerHeight = 1000 } = {}) {
+function setup({
+  scrollHeight = 2000,
+  innerHeight = 1000,
+}: { readonly scrollHeight?: number; readonly innerHeight?: number } = {}) {
   const dom = new JSDOM('<body><main id="content"></main></body>');
   const documentImpl = dom.window.document;
   Object.defineProperty(documentImpl.documentElement, "scrollHeight", {
@@ -14,34 +17,40 @@ function setup({ scrollHeight = 2000, innerHeight = 1000 } = {}) {
     configurable: true,
   });
 
-  const handlers = {};
+  const handlers: Record<string, EventListener[]> = {};
   const windowImpl = {
     scrollY: 0,
     pageYOffset: 0,
     innerHeight,
     scrollTo: vi.fn(),
-    setTimeout: (cb) => {
+    setTimeout: (cb: () => void) => {
       cb();
       return 0;
     },
-    requestAnimationFrame: (cb) => {
-      cb();
+    requestAnimationFrame: (cb: FrameRequestCallback) => {
+      cb(0);
       return 0;
     },
-    addEventListener: (type, handler) => {
+    addEventListener: (type: string, handler: EventListener) => {
       (handlers[type] ||= []).push(handler);
     },
-    removeEventListener: (type, handler) => {
+    removeEventListener: (type: string, handler: EventListener) => {
       handlers[type] = (handlers[type] || []).filter((h) => h !== handler);
     },
   };
-  const fire = (type, extra = {}) => (handlers[type] || []).forEach((h) => h({ type, ...extra }));
+  const fire = (type: string, extra: { readonly key?: string } = {}) => {
+    const event =
+      type === "keydown"
+        ? new dom.window.KeyboardEvent(type, { key: extra.key })
+        : new dom.window.Event(type);
+    (handlers[type] || []).forEach((handler) => handler(event));
+  };
 
   const controller = createFollowScrollController({
     documentImpl,
     windowImpl,
     requestAnimationFrameImpl: (cb) => {
-      cb();
+      cb(0);
       return 0;
     },
     setTimeoutImpl: (cb) => {
@@ -96,10 +105,10 @@ describe("createFollowScrollController", () => {
   it("clicking the follow button re-follows and removes the button", () => {
     const { documentImpl, windowImpl, fire, controller } = setup();
     fire("scroll");
-    const btn = documentImpl.querySelector(".follow-button");
+    const btn = documentImpl.querySelector<HTMLButtonElement>(".follow-button");
     expect(btn).not.toBeNull();
     windowImpl.scrollTo.mockClear();
-    btn.click();
+    btn?.click();
     expect(windowImpl.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
     expect(documentImpl.querySelector(".follow-button")).toBeNull();
     expect(controller.isFollowing()).toBe(true);
