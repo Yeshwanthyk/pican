@@ -14,8 +14,8 @@ export function getWorkerStatus(sessionId, { fetchImpl = fetch } = {}) {
   return fetchImpl(chatUrl('/api/worker-status', sessionId));
 }
 
-export function listModels({ fetchImpl = fetch } = {}) {
-  return fetchImpl('/api/models');
+export function listModels(sessionId = '', { fetchImpl = fetch } = {}) {
+  return fetchImpl(sessionId ? chatUrl('/api/models', sessionId) : '/api/models');
 }
 
 export function getCommands(sessionId, { load = false } = {}, { fetchImpl = fetch } = {}) {

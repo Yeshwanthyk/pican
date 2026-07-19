@@ -5,7 +5,7 @@
   // HTML; everything else is escaped Svelte template. The result element keeps
   // the `entry-<resultId>` anchor so scroll still works.
   import { formatToolFoldSummary, shortenPath } from '../../session/render/session-format.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
   import AskQuestion from './AskQuestion.svelte';
@@ -27,7 +27,9 @@
     return null;
   });
   const result = $derived(resultEntry?.message || null);
-  const statusClass = $derived(result ? (result.isError ? 'error' : 'success') : 'pending');
+  const statusClass = $derived(
+    result ? (result.isRunning ? 'pending' : result.isError ? 'error' : 'success') : 'pending',
+  );
   const args = $derived(call.arguments || {});
 
   const resultText = $derived(
@@ -171,7 +173,7 @@
           >
         </div>
         {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={20} />{/if}
-      {:else if call.name === 'ask_user_question' || call.name === 'pi_web_ask_user_question'}
+      {:else if call.name === 'ask_user_question' || call.name === 'pican_ask_user_question'}
         <AskQuestion {args} {result} />
       {:else if taskTools.has(call.name)}
         <TaskToolCard name={call.name} {args} {resultText} />

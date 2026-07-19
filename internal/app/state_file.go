@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"pi-web/internal/agentdir"
+	"pican/internal/agentdir"
 )
 
 // stateFile is held open for the lifetime of the process so the flock stays
@@ -14,18 +14,18 @@ import (
 var stateFile *os.File
 
 func writeStateFile(agentDir, host, port string, tailscale bool, tailscaleURL string) (string, error) {
-	webDir := agentdir.WebDir(agentDir)
-	if err := os.MkdirAll(webDir, 0755); err != nil {
+	picanDir := agentdir.PicanDir(agentDir)
+	if err := os.MkdirAll(picanDir, 0755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(webDir, "pi-web-state.json")
+	path := filepath.Join(picanDir, "pican-state.json")
 
-	// Migrate old state file from pre-pi-web directory layout.
+	// Migrate old state file from pre-pican directory layout.
 	// Only migrate when the new path does not already exist; otherwise
-	// os.Rename would unlink a destination inode that another pi-web
+	// os.Rename would unlink a destination inode that another pican
 	// process may already hold a flock on, defeating the single-instance
 	// lock.
-	oldPath := filepath.Join(agentDir, "pi-web-state.json")
+	oldPath := filepath.Join(agentDir, "pican-state.json")
 	if _, err := os.Stat(oldPath); err == nil {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			_ = os.Rename(oldPath, path)

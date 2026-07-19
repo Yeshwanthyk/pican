@@ -1,6 +1,6 @@
 <script>
   import { icon, MoreHorizontal, CalendarClock } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let {
     layout = 'timeline',

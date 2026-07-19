@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/chat"
+	"pican/internal/chat"
 )
 
 type State string
@@ -41,7 +41,10 @@ type ExtensionUIResponse struct {
 	Cancelled *bool
 }
 
-var ErrExtensionUIRequestNotFound = errors.New("extension UI request not found")
+var (
+	ErrExtensionUIRequestNotFound = errors.New("extension UI request not found")
+	ErrManagerClosed              = errors.New("worker manager closed")
+)
 
 // WorkerSnapshot is a point-in-time view of a single live worker for the
 // metrics dashboard. PID/UptimeS/IdleForS are only populated for workers that
@@ -90,6 +93,7 @@ type Manager struct {
 	// queue drainer dispatch queued items into a run that is still starting and
 	// making status polls fire a spurious idle transition.
 	pendingSends map[string]int
+	closed       bool
 
 	idleTTL    time.Duration
 	reaperStop chan struct{}
@@ -335,6 +339,17 @@ func (m *Manager) Close() error {
 	<-m.reaperDone
 
 	m.mu.Lock()
+	m.closed = true
+	creating := make([]<-chan struct{}, 0, len(m.creating))
+	for _, call := range m.creating {
+		creating = append(creating, call.done)
+	}
+	m.mu.Unlock()
+	for _, done := range creating {
+		<-done
+	}
+
+	m.mu.Lock()
 	workers := make([]ChatWorker, 0, len(m.workers))
 	for _, worker := range m.workers {
 		workers = append(workers, worker)
@@ -351,6 +366,10 @@ func (m *Manager) Close() error {
 func (m *Manager) workerFor(sessionID, sessionPath string) (ChatWorker, error) {
 	for {
 		m.mu.Lock()
+		if m.closed {
+			m.mu.Unlock()
+			return nil, ErrManagerClosed
+		}
 		if worker := m.workers[sessionID]; worker != nil {
 			if worker.Status().State != WorkerStateError {
 				m.mu.Unlock()
@@ -376,6 +395,17 @@ func (m *Manager) workerFor(sessionID, sessionPath string) (ChatWorker, error) {
 		worker, err := m.factory(sessionID, sessionPath)
 
 		m.mu.Lock()
+		if m.closed {
+			delete(m.creating, sessionID)
+			call.worker = nil
+			call.err = ErrManagerClosed
+			close(call.done)
+			m.mu.Unlock()
+			if worker != nil {
+				_ = worker.Close()
+			}
+			return nil, ErrManagerClosed
+		}
 		if err == nil {
 			if existing := m.workers[sessionID]; existing != nil && existing.Status().State != WorkerStateError {
 				_ = worker.Close()

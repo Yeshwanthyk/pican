@@ -1,12 +1,12 @@
 # Sequence Flows
 
-This directory documents the key runtime sequences in pi-web.
+This directory documents the key runtime sequences in pican.
 
 | Document | Description |
 |----------|-------------|
-| [server-startup.md](./server-startup.md) | From `main()` to listening on the network |
+| [server-startup.md](./server-startup.md) | Runtime selection, Codex catalog sync, and network startup |
 | [session-viewing.md](./session-viewing.md) | Loading and rendering a session page |
-| [chat.md](./chat.md) | Sending a chat message via the web UI |
+| [chat.md](./chat.md) | Sending, steering, queueing, and cancelling through Pi or Codex |
 | [live-reload.md](./live-reload.md) | How file changes propagate to the browser |
 | [artifacts.md](./artifacts.md) | Detecting (path-keyed/edit-aware), rendering, and sandbox-previewing artifacts |
 | [mention-autocomplete.md](./mention-autocomplete.md) | `@`-triggered file/folder path autocomplete in the chat composer |

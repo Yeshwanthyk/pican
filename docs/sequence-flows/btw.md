@@ -8,7 +8,7 @@ so it can be **hidden from the index** and **reaped when its parent disappears**
 
 Backend: `internal/server/btw.go`. Frontend: `web/src/session/` btw window (user
 strings under the `btw.*` / `settings.showBtw*` keys in
-`web/src/shared/locales/en.js`).
+`web/src/shared/english.js`).
 
 ## Data model
 
@@ -66,7 +66,7 @@ is an ordinary session as far as the worker is concerned.
 
 btw chats are **hidden from the sessions list by default**:
 
-- `showBtwInIndex()` reads the `pi-web:v1:show-btw-in-index` setting (default
+- `showBtwInIndex()` reads the `pican:v1:show-btw-in-index` setting (default
   `false`; toggled on the `/settings` page — `settings.showBtw`).
 - `filterBtwSummaries(...)` drops every id in `btwSessionIDs()` (all btws, active
   or orphaned) from the list unless showing is enabled. Applied server-side in the

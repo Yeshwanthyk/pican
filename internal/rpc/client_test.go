@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/chat"
+	"pican/internal/chat"
 )
 
 func readJSONLLines(r io.Reader) ([]string, error) {

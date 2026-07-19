@@ -27,7 +27,8 @@ function sessionWithArtifacts() {
           name: "write",
           arguments: {
             file_path: "src/widget.go",
-            content: 'package widget\n\nfunc New() string {\n\treturn "hi"\n}\n',
+            content:
+              'package widget\n\nfunc New() string {\n\treturn "hi"\n}\n',
           },
         },
       ],
@@ -52,7 +53,10 @@ function sessionWithMarkdown() {
           type: "toolCall",
           id: `mc-${Date.now()}`,
           name: "write",
-          arguments: { file_path: "notes.md", content: "# Heading\n\nSome **bold** text.\n" },
+          arguments: {
+            file_path: "notes.md",
+            content: "# Heading\n\nSome **bold** text.\n",
+          },
         },
       ],
       timestamp: Date.now(),
@@ -73,8 +77,18 @@ function sessionWithRename() {
     message: {
       role: "assistant",
       content: [
-        { type: "toolCall", id: `wc-${Date.now()}`, name: "write", arguments: { file_path: "daytrip.md", content: "# Trip\n" } },
-        { type: "toolCall", id: bashId, name: "bash", arguments: { command: "mv daytrip.md day-trip.md" } },
+        {
+          type: "toolCall",
+          id: `wc-${Date.now()}`,
+          name: "write",
+          arguments: { file_path: "daytrip.md", content: "# Trip\n" },
+        },
+        {
+          type: "toolCall",
+          id: bashId,
+          name: "bash",
+          arguments: { command: "mv daytrip.md day-trip.md" },
+        },
       ],
       timestamp: Date.now(),
     },
@@ -84,7 +98,12 @@ function sessionWithRename() {
     id: `tr-${Date.now()}`,
     parentId: writeId,
     timestamp: new Date().toISOString(),
-    message: { role: "toolResult", toolCallId: bashId, isError: false, content: [{ type: "text", text: "ok" }] },
+    message: {
+      role: "toolResult",
+      toolCallId: bashId,
+      isError: false,
+      content: [{ type: "text", text: "ok" }],
+    },
   });
   return entries;
 }
@@ -109,9 +128,27 @@ function sessionWithMixedArtifacts() {
       role: "assistant",
       content: [
         { type: "text", text: "Snippet:\n\n```html\n<b>hi</b>\n```" },
-        { type: "toolCall", id: `mc1-${Date.now()}`, name: "write", arguments: { file_path: "notes.md", content: "# Notes\n" } },
-        { type: "toolCall", id: `mc2-${Date.now()}`, name: "write", arguments: { file_path: "page.html", content: "<h1>Page</h1>\n" } },
-        { type: "toolCall", id: `mc3-${Date.now()}`, name: "write", arguments: { file_path: "src/widget.go", content: "package widget\n" } },
+        {
+          type: "toolCall",
+          id: `mc1-${Date.now()}`,
+          name: "write",
+          arguments: { file_path: "notes.md", content: "# Notes\n" },
+        },
+        {
+          type: "toolCall",
+          id: `mc2-${Date.now()}`,
+          name: "write",
+          arguments: { file_path: "page.html", content: "<h1>Page</h1>\n" },
+        },
+        {
+          type: "toolCall",
+          id: `mc3-${Date.now()}`,
+          name: "write",
+          arguments: {
+            file_path: "src/widget.go",
+            content: "package widget\n",
+          },
+        },
       ],
       timestamp: Date.now(),
     },
@@ -149,7 +186,9 @@ async function openArtifactsTab(page: import("@playwright/test").Page) {
   );
   if (collapsed) {
     await page.locator("#toggle-right-sidebar-btn").click();
-    await expect(page.locator("body")).not.toHaveClass(/right-sidebar-collapsed/);
+    await expect(page.locator("body")).not.toHaveClass(
+      /right-sidebar-collapsed/,
+    );
   }
   // click() auto-waits for actionability and scrolls the tab into view (the tab
   // row can overflow horizontally on narrow mobile viewports).
@@ -174,7 +213,9 @@ test.describe("artifacts panel", () => {
       page.locator(".artifact-list-item", { hasText: "widget.go" }),
     ).toBeVisible();
     // Exactly one previewable artifact (the html block) carries the badge.
-    await expect(page.locator(".artifact-list-item .artifact-badge")).toHaveCount(1);
+    await expect(
+      page.locator(".artifact-list-item .artifact-badge"),
+    ).toHaveCount(1);
   });
 
   test("selecting an artifact shows its source", async ({
@@ -189,10 +230,14 @@ test.describe("artifacts panel", () => {
 
     await page.locator(".artifact-list-item", { hasText: "widget.go" }).click();
     await expect(page.locator(".artifact-view-title")).toHaveText("widget.go");
-    await expect(page.locator(".artifact-source")).toContainText("package widget");
+    await expect(page.locator(".artifact-source")).toContainText(
+      "package widget",
+    );
 
     await page.locator(".artifact-list-item .artifact-badge").click();
-    await expect(page.locator(".artifact-source")).toContainText('class="hero"');
+    await expect(page.locator(".artifact-source")).toContainText(
+      'class="hero"',
+    );
   });
 
   test("runs a preview-kind artifact in a sandboxed iframe", async ({
@@ -207,7 +252,9 @@ test.describe("artifacts panel", () => {
 
     // The previewable artifact is the html block (it carries the badge).
     await page.locator(".artifact-list-item .artifact-badge").click();
-    const runBtn = page.locator('.artifact-action[data-action="toggle-preview"]');
+    const runBtn = page.locator(
+      '.artifact-action[data-action="toggle-preview"]',
+    );
     await expect(runBtn).toHaveText("Run preview");
     // Click-to-run: nothing executes until the user opts in.
     await expect(page.locator("iframe.artifact-preview")).toHaveCount(0);
@@ -226,7 +273,9 @@ test.describe("artifacts panel", () => {
     // Toggling back removes the frame and restores the source view.
     await runBtn.click();
     await expect(page.locator("iframe.artifact-preview")).toHaveCount(0);
-    await expect(page.locator(".artifact-source")).toContainText('class="hero"');
+    await expect(page.locator(".artifact-source")).toContainText(
+      'class="hero"',
+    );
   });
 
   test("previews a markdown artifact inline (not an iframe)", async ({
@@ -240,7 +289,9 @@ test.describe("artifacts panel", () => {
     await openArtifactsTab(page);
 
     await page.locator(".artifact-list-item", { hasText: "notes.md" }).click();
-    const previewBtn = page.locator('.artifact-action[data-action="toggle-preview"]');
+    const previewBtn = page.locator(
+      '.artifact-action[data-action="toggle-preview"]',
+    );
     await expect(previewBtn).toHaveText("Preview");
 
     await previewBtn.click();
@@ -262,7 +313,9 @@ test.describe("artifacts panel", () => {
     await openArtifactsTab(page);
 
     await expect(page.locator(".artifact-list-item")).toHaveCount(1);
-    await expect(page.locator(".artifact-list-item", { hasText: "day-trip.md" })).toBeVisible();
+    await expect(
+      page.locator(".artifact-list-item", { hasText: "day-trip.md" }),
+    ).toBeVisible();
   });
 
   test("explains artifacts and limitations via the help (?) button", async ({
@@ -313,16 +366,26 @@ test.describe("artifacts panel", () => {
     const name = uniqueSessionName(testInfo, "art");
     const id = writeSession(sessionsDir, name, sessionWithMixedArtifacts());
 
-    await seedArtifactSetting(page, "pi-web:v1:artifacts:include", "*.md, *.html");
+    await seedArtifactSetting(
+      page,
+      "pican:v1:artifacts:include",
+      "*.md, *.html",
+    );
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
     await openArtifactsTab(page);
 
     // notes.md + page.html survive; src/widget.go and the html snippet are hidden.
     await expect(page.locator("#artifact-tab-count")).toHaveText("2");
     await expect(page.locator(".artifact-list-item")).toHaveCount(2);
-    await expect(page.locator(".artifact-list-item", { hasText: "notes.md" })).toBeVisible();
-    await expect(page.locator(".artifact-list-item", { hasText: "page.html" })).toBeVisible();
-    await expect(page.locator(".artifact-list-item", { hasText: "widget.go" })).toHaveCount(0);
+    await expect(
+      page.locator(".artifact-list-item", { hasText: "notes.md" }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".artifact-list-item", { hasText: "page.html" }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".artifact-list-item", { hasText: "widget.go" }),
+    ).toHaveCount(0);
   });
 
   test("empty-state hint links to Settings when the filter hides everything", async ({
@@ -333,7 +396,7 @@ test.describe("artifacts panel", () => {
     const id = writeSession(sessionsDir, name, sessionWithMixedArtifacts());
 
     // A filter that matches none of the four artifacts.
-    await seedArtifactSetting(page, "pi-web:v1:artifacts:include", "*.rs");
+    await seedArtifactSetting(page, "pican:v1:artifacts:include", "*.rs");
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
     await openArtifactsTab(page);
 
@@ -350,7 +413,7 @@ test.describe("artifacts panel", () => {
     const name = uniqueSessionName(testInfo, "art");
     const id = writeSession(sessionsDir, name, sessionWithArtifacts());
 
-    await seedArtifactSetting(page, "pi-web:v1:artifacts:enabled", "false");
+    await seedArtifactSetting(page, "pican:v1:artifacts:enabled", "false");
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
     // Open the sidebar so its tabs are laid out (collapsed on mobile).
@@ -363,7 +426,6 @@ test.describe("artifacts panel", () => {
     // `hidden` property) while its siblings remain visible — guards against the
     // CSS `display` rule overriding the `[hidden]` attribute.
     await expect(page.locator("#right-tab-scratchpad")).toBeVisible();
-    await expect(page.locator("#right-tab-notes")).toBeVisible();
     await expect(page.locator("#right-tab-artifacts")).toBeHidden();
     // Scratchpad remains the active tab.
     await expect(page.locator("#right-tab-scratchpad")).toHaveClass(/active/);
@@ -389,7 +451,7 @@ test.describe("artifacts panel", () => {
     const other = await context.newPage();
     await other.goto("/");
     await other.evaluate(() =>
-      localStorage.setItem("pi-web:v1:artifacts:enabled", "false"),
+      localStorage.setItem("pican:v1:artifacts:enabled", "false"),
     );
 
     await expect(page.locator("#right-tab-artifacts")).toBeHidden();

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func TestRenderedExportPageReplacesKnownPlaceholders(t *testing.T) {

@@ -123,29 +123,31 @@ describe('updateContextUsage', () => {
     expect(positionPopover).toHaveBeenCalledTimes(1);
   });
 
-  it('loads dynamic limits in the controller', async () => {
+  it('loads dynamic limits from the session-scoped model list', async () => {
     renderDom();
+    const listModels = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            models: [{ id: 'DEEPSEEK-V4-PRO', provider: 'DEEPSEEK', contextWindow: 1234567 }],
+          }),
+      }),
+    );
     const controller = createContextUsageController({
       documentImpl: document,
       entries: [
         { type: 'message', message: { role: 'assistant', usage: { input: 1000, output: 500 } } },
       ],
+      sessionId: 'session.jsonl',
       getKnownModelLabel: () => 'DEEPSEEK-V4-PRO @ DEEPSEEK',
-      chatApi: {
-        listModels: () =>
-          Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                models: [{ id: 'DEEPSEEK-V4-PRO', provider: 'DEEPSEEK', contextWindow: 1234567 }],
-              }),
-          }),
-      },
+      chatApi: { listModels },
     });
 
     controller.update();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    expect(listModels).toHaveBeenCalledWith('session.jsonl');
     expect(document.querySelector('.pi-popover-limit').textContent).toBe('1.2M');
   });
 });

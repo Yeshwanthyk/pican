@@ -16,7 +16,7 @@ or export.
 | `GET /api/metrics` | JSON snapshot of process + per-worker resource usage |
 | `GET /api/debug/pprof/` | Go runtime profiler index (+ `cmdline`, `profile`, `symbol`, `trace`) |
 
-Both are behind the normal `auth` middleware, so they inherit `PI_WEB_TOKEN`
+Both are behind the normal `auth` middleware, so they inherit `PICAN_TOKEN`
 when set. The page's `fetch('/api/metrics')` authenticates automatically via the
 auth cookie.
 

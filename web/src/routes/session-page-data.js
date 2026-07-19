@@ -1,13 +1,13 @@
 import { decodeBase64JSON } from '../session/data/session-data.js';
-import { t } from '../shared/i18n.js';
+import { t } from '../shared/strings.js';
 import { consumeSessionPrefetch } from './session-prefetch.js';
 
 // The session route's HTML shell embeds the session payload (and scratchpad) in
-// a <script id="pi-session-bootstrap"> so the first paint needs no round-trip to
+// a <script id="pican-session-bootstrap"> so the first paint needs no round-trip to
 // /api/session or /api/scratchpad. Returns { id, data, scratchpad } or null.
 export function readSessionBootstrap({ documentImpl, atobImpl, TextDecoderImpl } = {}) {
   const doc = documentImpl || (typeof document !== 'undefined' ? document : null);
-  const el = doc?.getElementById?.('pi-session-bootstrap');
+  const el = doc?.getElementById?.('pican-session-bootstrap');
   const raw = el && el.textContent ? el.textContent.trim() : '';
   if (!raw) return null;
   try {
@@ -65,6 +65,15 @@ export async function loadScratchpad(projectPath, { fetchImpl = fetch } = {}) {
   }
 }
 
+export function normalizeSessionRuntime(data = {}, header = data?.header || {}) {
+  const runtime = String(data?.runtime || data?.Runtime || header?.runtime || 'pi').toLowerCase();
+  return {
+    runtime,
+    nativeId: data?.nativeId || data?.NativeID || header?.nativeId || '',
+    sessionUUID: data?.sessionUUID || data?.SessionUUID || header?.sessionUUID || header?.id || '',
+  };
+}
+
 export function buildSessionPageState({
   sessionId,
   data,
@@ -74,6 +83,9 @@ export function buildSessionPageState({
 } = {}) {
   const entries = Array.isArray(data?.entries) ? data.entries : [];
   const header = data?.header || {};
+  const { runtime, nativeId, sessionUUID } = normalizeSessionRuntime(data, header);
+  const normalizedHeader = { ...header, runtime };
+  if (nativeId) normalizedHeader.nativeId = nativeId;
   const cwd = header.cwd || '';
   const title = data?.name || sessionId;
   const leafId = newestLeaf(entries);
@@ -90,6 +102,9 @@ export function buildSessionPageState({
   return {
     sessionId,
     title,
+    runtime,
+    nativeId,
+    sessionUUID,
     entries,
     cwd,
     scratchpad,
@@ -98,7 +113,7 @@ export function buildSessionPageState({
     modelLabel: model && provider ? `${model} @ ${provider}` : model,
     payloadBase64: encodePayload(
       {
-        header,
+        header: normalizedHeader,
         entries,
         name: title,
         leafId,

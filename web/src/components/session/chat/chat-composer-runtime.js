@@ -31,6 +31,7 @@ export function runChatComposer({
   windowImpl = window,
   locationImpl = windowImpl.location,
   localEntries = [],
+  sessionId = '',
   leafId = '',
   urlTargetId = '',
   byId = new Map(),
@@ -72,6 +73,7 @@ export function runChatComposer({
   const contextUsage = createContextUsageController({
     documentImpl: document,
     entries,
+    sessionId,
     chatApi,
     getKnownModelLabel: () => toolbar.knownModelLabel,
     positionPopover: () => positionPopover(),

@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 
 	_ "modernc.org/sqlite"
 )

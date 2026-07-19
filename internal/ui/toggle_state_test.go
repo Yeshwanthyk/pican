@@ -27,7 +27,7 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 
 	srcChecks := map[string][]string{
 		toggleSrc: {
-			"const TOGGLE_STATE_STORAGE_KEY = 'pi.sessionDetail.toggleState';",
+			"const TOGGLE_STATE_STORAGE_KEY = 'pican:session-detail:toggle-state';",
 			"toolsVisible: true",
 			"toolOutputsExpanded: false",
 			"storage?.getItem(TOGGLE_STATE_STORAGE_KEY)",
@@ -128,7 +128,7 @@ func TestLiveReloadRendererUsesToggleableThinkingAndToolMarkup(t *testing.T) {
 	entrySrc := readSrc(t, "web/src/components/session/SessionEntry.svelte")
 	outputSrc := readSrc(t, "web/src/components/session/ToolOutput.svelte")
 	srcChecks := map[string][]string{
-		entrySrc: {`thinking-block`, `Thinking ...`},
+		entrySrc:  {`thinking-block`, `Thinking ...`},
 		outputSrc: {`tool-output expandable`, `output-preview`, `output-full`},
 	}
 	for src, checks := range srcChecks {

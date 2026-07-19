@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"pi-web/internal/chat"
+	"pican/internal/chat"
 )
 
 type response struct {

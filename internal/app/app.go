@@ -13,22 +13,23 @@ import (
 	"syscall"
 	"time"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/auth"
-	"pi-web/internal/frontend"
-	"pi-web/internal/rpc"
-	"pi-web/internal/server"
-	"pi-web/internal/sessions"
-	"pi-web/internal/ui"
-	"pi-web/internal/updater"
-	"pi-web/internal/workers"
-	"pi-web/web"
+	"pican/internal/agentdir"
+	"pican/internal/auth"
+	"pican/internal/codex"
+	"pican/internal/frontend"
+	"pican/internal/rpc"
+	"pican/internal/server"
+	"pican/internal/sessions"
+	"pican/internal/ui"
+	"pican/internal/updater"
+	"pican/internal/workers"
+	"pican/web"
 )
 
 const defaultPort = "31415"
-const tokenEnvVar = "PI_WEB_TOKEN"
+const tokenEnvVar = "PICAN_TOKEN"
 
-// Main runs the pi-web application. version is supplied by cmd/pi-web so
+// Main runs the pican application. version is supplied by cmd/pican so
 // release builds can set it with -ldflags "-X main.version=...".
 func Main(version string) {
 	port := flag.String("p", defaultPort, "port to listen on")
@@ -36,6 +37,8 @@ func Main(version string) {
 	open := flag.Bool("o", false, "auto-open browser")
 	insecure := flag.Bool("insecure", false, "allow non-loopback bind without "+tokenEnvVar+" (DANGEROUS)")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	runtimeFlag := flag.String("runtime", "pi", "agent runtime: pi, codex, or both")
+	codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
 	flag.Parse()
 
 	if *showVersion {
@@ -43,14 +46,44 @@ func Main(version string) {
 		os.Exit(0)
 	}
 
+	runtimeMode, err := parseRuntime(*runtimeFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	codexArgv := codexCommand(codexExecutable(*codexCommandFlag))
+
 	agentDir := agentdir.Path()
 	if err := seedSoundsDir(agentDir); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to seed sounds directory: %v\n", err)
 	}
 	sessionsDir := filepath.Join(agentDir, "sessions")
-	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "sessions directory not found: %s\n", sessionsDir)
-		os.Exit(1)
+	if _, statErr := os.Stat(sessionsDir); os.IsNotExist(statErr) {
+		if runtimeMode == runtimeCodex {
+			if mkdirErr := os.MkdirAll(sessionsDir, 0755); mkdirErr != nil {
+				fmt.Fprintf(os.Stderr, "create sessions directory: %v\n", mkdirErr)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "sessions directory not found: %s\n", sessionsDir)
+			os.Exit(1)
+		}
+	}
+
+	var catalog *catalogSyncer
+	if runtimeMode.enables("codex") {
+		catalog = newCatalogSyncer(func(ctx context.Context) error {
+			_, syncErr := codex.Sync(ctx, sessionsDir, codexArgv)
+			return syncErr
+		}, 15*time.Second, time.Minute)
+		if syncErr := catalog.sync(context.Background()); syncErr != nil {
+			if runtimeMode == runtimeCodex {
+				fmt.Fprintf(os.Stderr, "Codex runtime unavailable: %v\n", syncErr)
+				os.Exit(1)
+			}
+			fmt.Fprintf(os.Stderr, "Codex unavailable; continuing with Pi: %v\n", syncErr)
+		}
+		catalog.start()
 	}
 
 	bindHost := chooseBindHost(*hostOverride)
@@ -69,6 +102,59 @@ func Main(version string) {
 
 	var srv *server.Server
 	manager := workers.NewManager(func(sessionID, sessionPath string) (workers.ChatWorker, error) {
+		parsed, parseErr := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
+		if parseErr != nil {
+			return nil, fmt.Errorf("read session runtime: %w", parseErr)
+		}
+		if parsed.Runtime == "codex" {
+			if _, metadataErr := codex.ReadProjectionMetadata(sessionPath); metadataErr != nil {
+				return nil, metadataErr
+			}
+			if !runtimeMode.enables("codex") {
+				return nil, fmt.Errorf("Codex runtime is not enabled")
+			}
+			workerCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+			defer cancel()
+			return codex.NewWorker(workerCtx, sessionPath, codexArgv, codex.Callbacks{
+				Preview: func(preview codex.Preview) {
+					if srv != nil {
+						srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{Content: preview.Text, Done: preview.Done, TurnID: preview.TurnID, ItemID: preview.ItemID})
+					}
+				},
+				Status: func(workers.WorkerStatus) {
+					if srv != nil {
+						srv.NotifyWorkerUpdate(sessionID, false)
+					}
+				},
+				Projection: func(projection codex.Projection) {
+					if srv != nil {
+						target := projection.ID
+						if target == "" {
+							target = sessionID
+						}
+						srv.NotifyWorkerUpdate(target, true)
+					}
+				},
+				Lifecycle: func(action string, affectedID string) {
+					if srv != nil {
+						target := affectedID
+						if target == "" || target == parsed.NativeID {
+							target = sessionID
+						}
+						srv.NotifyCodexLifecycle(action, target)
+					}
+				},
+				Error: func(err error) {
+					fmt.Fprintf(os.Stderr, "Codex worker failed for %s: %v\n", sessionID, err)
+					if srv != nil {
+						srv.NotifyWorkerUpdate(sessionID, true)
+					}
+				},
+			})
+		}
+		if !runtimeMode.enables("pi") {
+			return nil, fmt.Errorf("Pi runtime is not enabled")
+		}
 		return rpc.NewPiWorkerWithEvents(
 			sessionPath,
 			func(preview rpc.StreamPreview) {
@@ -93,8 +179,33 @@ func Main(version string) {
 		RenderExportSession: ui.RenderExportSessionPage,
 		RenderAppShell:      ui.RenderAppShell,
 		Models: func(ctx context.Context) (json.RawMessage, error) {
-			return defaultModelsCache.get(ctx)
+			return runtimeModels(ctx, runtimeMode, codexArgv, sessionsDir, server.ModelQuery{})
 		},
+		ModelsFor: func(ctx context.Context, query server.ModelQuery) (json.RawMessage, error) {
+			return runtimeModels(ctx, runtimeMode, codexArgv, sessionsDir, query)
+		},
+		DefaultRuntime: func() string {
+			if runtimeMode == runtimeCodex {
+				return "codex"
+			}
+			return "pi"
+		}(),
+		EnabledRuntimes: runtimeMode.enabledRuntimes(),
+		RuntimeAvailable: func(runtime string) (bool, string) {
+			if runtime == "pi" {
+				return runtimeMode.enables("pi"), ""
+			}
+			if catalog == nil {
+				return false, "Codex runtime is not enabled"
+			}
+			return catalog.status()
+		},
+		Codex: func() server.CodexService {
+			if !runtimeMode.enables("codex") {
+				return nil
+			}
+			return codexService{sessionsDir: sessionsDir, command: codexArgv}
+		}(),
 		Updater:    versionChecker,
 		RunInstall: runInstall,
 		RunRestart: runRestart,
@@ -144,13 +255,13 @@ func Main(version string) {
 			}
 		}
 	}
-	fmt.Printf("Pi Sessions Viewer -> %s\n", url)
+	fmt.Printf("pican -> %s\n", url)
 	if tailscaleURL != "" {
 		fmt.Printf("Tailscale HTTPS -> %s\n", tailscaleURL)
 	}
 	fmt.Printf("Serving from: %s\n", sessionsDir)
 	if authMiddleware.Enabled() {
-		fmt.Println("Auth: enabled (set PI_WEB_TOKEN to require token)")
+		fmt.Println("Auth: enabled (set PICAN_TOKEN to require token)")
 	} else {
 		fmt.Printf("Auth: disabled — set %s to require a token for access.\n", tokenEnvVar)
 	}
@@ -174,7 +285,9 @@ func Main(version string) {
 		}()
 	}
 
-	warmModelsCache()
+	if runtimeMode.enables("pi") {
+		warmModelsCache()
+	}
 
 	httpServer := &http.Server{
 		Addr:              addr,
@@ -194,8 +307,11 @@ func Main(version string) {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
-		srv.Shutdown()
+		if catalog != nil {
+			catalog.close()
+		}
 		_ = manager.Close()
+		srv.Shutdown()
 	}()
 
 	serveErr := httpServer.ListenAndServe()

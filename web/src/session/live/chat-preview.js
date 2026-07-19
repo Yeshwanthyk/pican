@@ -2,7 +2,7 @@ export function getSpinnerConfig(windowImpl = typeof window !== 'undefined' ? wi
   let style = 'runcat';
   try {
     if (windowImpl && windowImpl.localStorage) {
-      const saved = windowImpl.localStorage.getItem('pi-sessions:spinner-style');
+      const saved = windowImpl.localStorage.getItem('pican:spinner-style');
       if (saved === 'braille') {
         style = 'braille';
       }
@@ -37,6 +37,8 @@ export function clearChatPreviewState(state, { keepAssistant = false } = {}) {
       state.chatPreviewEl.parentNode.removeChild(state.chatPreviewEl);
     }
     state.chatPreviewEl = null;
+    state.previewTurnId = null;
+    state.previewItemId = null;
     stopWorkingAnimation(state);
   }
 }
@@ -244,6 +246,11 @@ export function renderChatPreviewState(
   } = {},
 ) {
   if (!payload || typeof payload.content !== 'string') return false;
+  const nextTurnId = typeof payload.turnId === 'string' ? payload.turnId : null;
+  const nextItemId = typeof payload.itemId === 'string' ? payload.itemId : null;
+  if (nextItemId && state.previewItemId && nextItemId !== state.previewItemId) {
+    clearChatPreviewState(state);
+  }
   const container =
     documentImpl.getElementById('messages') ||
     documentImpl.getElementById('content') ||
@@ -253,6 +260,8 @@ export function renderChatPreviewState(
     container.appendChild(state.chatPreviewEl);
     startWorkingAnimation(state, { setIntervalImpl, windowImpl });
   }
+  if (nextTurnId) state.previewTurnId = nextTurnId;
+  if (nextItemId) state.previewItemId = nextItemId;
 
   const activeMsg = getActiveMessage(payload.content);
   if (activeMsg) {

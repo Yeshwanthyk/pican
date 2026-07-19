@@ -105,14 +105,14 @@ describe('readArtifactSettings', () => {
 
   it('reads stored values', () => {
     const s = fakeStorage({
-      'pi-web:v1:artifacts:enabled': 'false',
-      'pi-web:v1:artifacts:include': 'artifacts/**',
+      'pican:v1:artifacts:enabled': 'false',
+      'pican:v1:artifacts:include': 'artifacts/**',
     });
     expect(readArtifactSettings(s)).toEqual({ enabled: false, include: 'artifacts/**' });
   });
 
   it('treats only the literal string "true" as enabled', () => {
-    const s = fakeStorage({ 'pi-web:v1:artifacts:enabled': 'nope' });
+    const s = fakeStorage({ 'pican:v1:artifacts:enabled': 'nope' });
     expect(readArtifactSettings(s).enabled).toBe(false);
   });
 

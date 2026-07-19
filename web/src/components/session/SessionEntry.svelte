@@ -6,7 +6,7 @@
   // Shared by the live app and the static export (model passed as a prop).
   import { marked } from 'marked';
   import { icon, CircleCheck, CircleX, GitFork, Link2, Tag } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
   import { formatTimestamp } from '../../session/render/entry-format.js';
   import ToolCall from './ToolCall.svelte';

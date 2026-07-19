@@ -184,15 +184,21 @@ export class SessionDataModel {
   //     mutating existing ones — see AGENTS.md), so an existing entry's content
   //     never changes out from under its id, making reuse-by-id safe: it lets
   //     components keyed on entry identity (not just id) skip re-rendering
-  //     content that hasn't actually changed.
-  reconcile(entries, { isDelta = false } = {}) {
+  //     content that hasn't actually changed. Replaceable projections pass
+  //     replaceExisting:true because stable IDs may carry newer content/status.
+  reconcile(entries, { isDelta = false, replaceExisting = false } = {}) {
     if (!Array.isArray(entries)) return;
     if (isDelta) {
       const combined = stitchOrphanRoots([...this.entries, ...entries]);
       this.entries.push(...combined.slice(this.entries.length));
     } else {
       const stitched = stitchOrphanRoots(entries);
-      const merged = stitched.map((entry) => (entry?.id && this.byId.get(entry.id)) || entry);
+      // Pi entries are append-only, so retaining known objects avoids needless
+      // rerenders. Codex projections replace in-progress tool entries under
+      // stable IDs; those callers must accept the freshly fetched objects.
+      const merged = replaceExisting
+        ? stitched
+        : stitched.map((entry) => (entry?.id && this.byId.get(entry.id)) || entry);
       this.entries.splice(0, this.entries.length, ...merged);
     }
     const lk = buildSessionLookups(this.entries);

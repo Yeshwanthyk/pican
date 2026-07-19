@@ -3,7 +3,7 @@ const MAX_BREAKDOWN_TOOLS = 4;
 const INTERACTIVE_TOOL_NAMES = new Set([
   'ask_user',
   'ask_user_question',
-  'pi_web_ask_user_question',
+  'pican_ask_user_question',
 ]);
 
 function analyzeToolRunEntry(entry, completedCallIds) {

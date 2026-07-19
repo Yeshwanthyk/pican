@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// peer_hosts records other pi-web instances (reached over Tailscale) whose
+// peer_hosts records other pican instances (reached over Tailscale) whose
 // sessions should be aggregated into a read-only "Machines" view on the
 // homepage. Session ids are bare filenames and are not unique across
 // machines, so navigation to a peer session is always a deep link to the
@@ -231,7 +231,7 @@ func fetchPeerSessions(ctx context.Context, h peerHost) peerSessionsHost {
 	}
 	req.Header.Set("Accept", "application/json")
 	if h.Token != "" {
-		req.Header.Set("X-Pi-Token", h.Token)
+		req.Header.Set("X-Pican-Token", h.Token)
 	}
 
 	resp, err := peerHTTPClient.Do(req)

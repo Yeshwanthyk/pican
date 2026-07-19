@@ -31,6 +31,8 @@
     const project = session.Project || session.project || '';
     const model = session.Model || session.model || '';
     const provider = session.ModelProvider || session.modelProvider || '';
+    const runtime = session.Runtime || session.runtime || 'pi';
+    const nativeId = session.NativeID || session.nativeId || '';
     return {
       ...session,
       id,
@@ -38,7 +40,8 @@
       meta,
       href: sessionHref(session),
       searchText: String(
-        session.searchText || [title, id, meta, project, model, provider].filter(Boolean).join(' '),
+        session.searchText ||
+          [title, id, meta, project, model, provider, runtime, nativeId].filter(Boolean).join(' '),
       ).toLowerCase(),
     };
   }
@@ -110,7 +113,7 @@
     setSessionPaletteApi,
   } from '../../shared/command-palette-runtime.js';
   import { icon, X } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let {
     limit = 8,

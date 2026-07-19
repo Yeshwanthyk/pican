@@ -3,7 +3,7 @@
   import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown.js';
   import { escapeHtml } from '../../shared/escape.js';
   import { formatRelativeTime } from '../../index/sessions.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import TaskExecutionChip from './TaskExecutionChip.svelte';
 
   let { task, project, fetchOutput } = $props();

@@ -22,6 +22,28 @@ describe('ToolCall', () => {
     expect(container.querySelector('.tool-fold-status')?.classList).toContain('pending');
   });
 
+  it('keeps a live tool result pending while rendering its partial output', () => {
+    const call = { id: 'b', name: 'bash', arguments: { command: 'printf ok' } };
+    const result = {
+      id: 'result-live',
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'b',
+        isRunning: true,
+        isError: false,
+        content: [{ type: 'text', text: 'ok' }],
+      },
+    };
+    const { container } = render(ToolCall, {
+      props: { call, model: model({ entries: [result] }) },
+    });
+
+    expect(container.querySelector('.tool-fold-status')?.classList).toContain('pending');
+    expect(container.querySelector('.tool-fold-status')?.classList).not.toContain('success');
+    expect(container.textContent).toContain('ok');
+  });
+
   it('opens failed tool calls and keeps the result anchor on the outer wrapper', () => {
     const call = { id: 'b', name: 'bash', arguments: { command: 'false' } };
     const result = {
@@ -87,7 +109,7 @@ describe('ToolCall', () => {
   it('marks multi-select questions as needing submit', () => {
     const call = {
       id: 'q',
-      name: 'pi_web_ask_user_question',
+      name: 'pican_ask_user_question',
       arguments: {
         questions: [{ question: 'Pick many', multiSelect: true, options: [{ label: 'A' }] }],
       },

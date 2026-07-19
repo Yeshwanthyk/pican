@@ -8,20 +8,49 @@
     SquarePen,
     MoreHorizontal,
   } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { navigate, handleNavClick } from '../../shared/navigation.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
   import { openTree } from '../../session/session-modals.svelte.js';
-  let { title = 'Session', cwd = '', sessionId = '' } = $props();
+  import { sessionResumeCommand } from '../../session/session-resume.js';
+  let {
+    title = 'Session',
+    cwd = '',
+    sessionId = '',
+    runtime = 'pi',
+    nativeId = '',
+    sessionUUID = '',
+  } = $props();
+
+  function bodySessionUUID() {
+    const resumeSessionArg =
+      typeof document !== 'undefined' ? document.body.dataset.sessionUuid || '' : '';
+    return resumeSessionArg;
+  }
+
+  const resumeCommand = $derived(
+    sessionResumeCommand({
+      runtime,
+      nativeId,
+      sessionUUID: sessionUUID || bodySessionUUID(),
+    }),
+  );
 
   // The title prop seeds the shared store (and re-seeds it on session switch);
   // renames/auto-titling update the store, which this component renders and
   // mirrors into document.title.
   $effect(() => setSessionTitle(title));
   $effect(() => {
-    if (sessionTitle.name) document.title = sessionTitle.name;
+    if (!sessionTitle.name) return;
+    document.title =
+      runtime === 'codex'
+        ? t('session.runtimePageTitle', {
+            title: sessionTitle.name,
+            runtime: t('runtime.codex'),
+          })
+        : sessionTitle.name;
   });
 
   // Resume ("Terminal") + New Session behavior, absorbed from the former
@@ -45,14 +74,16 @@
     const newBtn = document.getElementById('new-btn');
 
     const onResume = () => {
-      const resumeSessionArg = document.body.dataset.sessionUuid;
-      const command = 'pi --session ' + resumeSessionArg;
-      copyText(command, () => showResumeCopiedNotice(command));
+      if (!resumeCommand) {
+        showToast(t('session.resumeUnavailable'));
+        return;
+      }
+      copyText(resumeCommand, () => showResumeCopiedNotice(resumeCommand));
     };
 
     const onNew = async () => {
       if (!cwd) {
-        newSessionToast('No working directory available for this session');
+        newSessionToast(t('session.noWorkingDirectory'));
         return;
       }
       const originalHTML = newBtn.innerHTML;
@@ -62,19 +93,19 @@
         const response = await fetch('/api/new-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: cwd, sourceSessionId: sessionId }),
+          body: JSON.stringify({ path: cwd, sourceSessionId: sessionId, runtime }),
         });
         const data = await response.json();
         if (data.error) {
-          newSessionToast(data.error || 'Failed to create session');
+          newSessionToast(data.error || t('index.failedCreateSession'));
         } else if (data.id) {
           navigate('/session?id=' + encodeURIComponent(data.id));
           return;
         } else {
-          newSessionToast('Failed to create session');
+          newSessionToast(t('index.failedCreateSession'));
         }
       } catch (err) {
-        newSessionToast(err.message || 'Network error');
+        newSessionToast(err.message || t('index.networkError'));
       }
       newBtn.innerHTML = originalHTML;
       newBtn.disabled = false;
@@ -96,7 +127,12 @@
   <button id="notify-toggle" title="Notify when response is ready" aria-pressed="false"
     >Notify</button
   >
-  <button id="resume-btn" title="Copy pi --session command to clipboard">Terminal</button>
+  <button
+    id="resume-btn"
+    title={resumeCommand
+      ? t('session.copyResumeCommand', { command: resumeCommand })
+      : t('session.resumeUnavailable')}>Terminal</button
+  >
   <button id="new-btn" title="New Session">Session</button>
   <button id="share-btn" title="Share session as GitHub Gist">Share</button>
 </div>
@@ -116,7 +152,19 @@
       onclick={() => openTree()}>{@html icon(PanelLeft, { size: 14 })}</button
     >
   </div>
-  <span class="session-header-title" id="session-header-title">{sessionTitle.name || title}</span>
+  <span class="session-header-title" id="session-header-title">
+    <span>{sessionTitle.name || title}</span>
+    {#if runtime === 'codex'}
+      <span
+        class="session-header-runtime"
+        title={nativeId ? t('session.nativeIdTitle', { id: nativeId }) : t('runtime.codex')}
+        aria-label={nativeId ? t('session.nativeIdTitle', { id: nativeId }) : t('runtime.codex')}
+      >
+        <img class="session-header-runtime-mark" src="/codex-icon.svg" alt="" aria-hidden="true" />
+        {t('runtime.codex')}
+      </span>
+    {/if}
+  </span>
   <div class="session-header-right">
     <button
       id="new-session-header-btn"

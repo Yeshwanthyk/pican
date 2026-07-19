@@ -14,8 +14,8 @@ Always use `make build`; `go build` alone can embed stale or missing frontend as
 
 ## Source Ownership
 
-- Root `README.md` and `user-docs/en/` are the documentation sources. Regenerate translations with `python3 scripts/build_readmes.py` and `python3 scripts/build_userdocs.py`; never hand-edit translated files.
-- User-facing strings use `t()` from `web/src/shared/i18n.js`. Edit only `web/src/shared/locales/en.js`; other locale files are machine-drafted. Session content is never translated.
+- Root `README.md` and `user-docs/en/` are the English documentation sources.
+- User-facing strings use `t()` from `web/src/shared/strings.js`; edit `web/src/shared/english.js`. Session content is never rewritten.
 
 ## Architecture
 

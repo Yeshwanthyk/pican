@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"pi-web/internal/ui"
+	"pican/internal/ui"
 )
 
-const TokenCookieName = "pi_token"
+const TokenCookieName = "pican_token"
 
 type Middleware struct {
 	token string
@@ -25,7 +25,7 @@ func (a *Middleware) Enabled() bool {
 // Wrap returns a handler that enforces the token check when auth is enabled.
 //
 // Token sources (checked in order): for browser POSTs, form body first;
-// otherwise query parameter, Authorization header, X-Pi-Token header, and
+// otherwise query parameter, Authorization header, X-Pican-Token header, and
 // cookie. When the token arrives via query or POST, a cookie is set and the
 // browser is redirected to the same URL without the token, so the secret never
 // appears in the address bar or browser history.
@@ -75,7 +75,7 @@ func (a *Middleware) Wrap(h http.HandlerFunc) http.HandlerFunc {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.WriteHeader(http.StatusUnauthorized)
 				themeCookie := ""
-				if c, err := r.Cookie("pi-web-theme"); err == nil {
+				if c, err := r.Cookie("pican-theme"); err == nil {
 					themeCookie = c.Value
 				}
 				ui.RenderAuthPrompt(w, themeCookie)
@@ -132,7 +132,7 @@ func ExtractToken(r *http.Request) (string, bool) {
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimPrefix(h, "Bearer "), false
 	}
-	if h := r.Header.Get("X-Pi-Token"); h != "" {
+	if h := r.Header.Get("X-Pican-Token"); h != "" {
 		return h, false
 	}
 	if c, err := r.Cookie(TokenCookieName); err == nil {

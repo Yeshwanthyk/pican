@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"pi-web/internal/chatqueue"
-	"pi-web/internal/sessions"
+	"pican/internal/chatqueue"
+	"pican/internal/sessions"
 )
 
 // /api/chat/queue: single endpoint that demuxes on method.

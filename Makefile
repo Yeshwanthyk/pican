@@ -1,6 +1,6 @@
 .PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-setup
 
-BINARY ?= pi-web
+BINARY ?= pican
 WEB_DIR := web
 E2E_DIR := e2e
 NODE_MODULES := $(WEB_DIR)/node_modules
@@ -9,7 +9,7 @@ ROOT_NODE_MODULES := node_modules
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 build: setup frontend-build
-	go build -ldflags="-s -w -X main.version=$(VERSION)" -o $(BINARY) ./cmd/pi-web
+	go build -ldflags="-s -w -X main.version=$(VERSION)" -o $(BINARY) ./cmd/pican
 
 setup: frontend-setup go-setup
 
@@ -64,7 +64,7 @@ vet: go-setup
 
 test: frontend-test extension-test memory-test go-test install-test
 
-check: frontend-lint frontend-format-check frontend-knip frontend-test extension-test memory-test frontend-build go-test install-test vet
+check: frontend-lint frontend-format-check frontend-knip frontend-test extension-test memory-test go-test install-test vet build
 
 dev: frontend-setup go-setup
 	@echo "Starting dev mode (frontend watcher + Go hot-reloader)..."

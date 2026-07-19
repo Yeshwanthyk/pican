@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/workers"
+	"pican/internal/workers"
 )
 
 func TestComputeRunningStatusFromStatusFile(t *testing.T) {

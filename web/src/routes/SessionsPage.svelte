@@ -16,7 +16,7 @@
     writeSetting,
   } from '../shared/settings-store.js';
   import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
   import {
     defaultCreateSession,
@@ -47,6 +47,7 @@
   let newSessionOpen = $state(false);
   let newSessionPath = $state('');
   let newSessionDropdownOpen = $state(false);
+  let newSessionRuntime = $state('pi');
   let recentLocations = $state([]);
   let creating = $state(false);
   let newSessionError = $state('');
@@ -195,6 +196,7 @@
     newSessionOpen = true;
     newSessionPath = '';
     newSessionDropdownOpen = false;
+    newSessionRuntime = 'pi';
     newSessionError = '';
     document.body?.classList.add('modal-sheet-open');
     try {
@@ -222,7 +224,7 @@
     creating = true;
     newSessionError = '';
     try {
-      const response = await defaultCreateSession(path);
+      const response = await defaultCreateSession(path, newSessionRuntime);
       if (response.ok && response.id) {
         navigate('/session?id=' + encodeURIComponent(response.id));
         return;
@@ -289,7 +291,7 @@
 
   onMount(() => {
     const previousTitle = document.title;
-    document.title = 'Pi Sessions';
+    document.title = t('common.productName');
     configureSettingsSync({ fetchImpl: window.fetch.bind(window) });
     setupKeyboardNav({ windowImpl: window, documentImpl: document });
 
@@ -410,6 +412,7 @@
   recent={recentLocations}
   bind:path={newSessionPath}
   bind:dropdownOpen={newSessionDropdownOpen}
+  bind:runtime={newSessionRuntime}
   {creating}
   error={newSessionError}
   onClose={closeNewSessionModal}

@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/sessions"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
 // queueDrainer is the autonomous worker that pulls items off the per-session
@@ -44,12 +44,12 @@ type queueDrainer struct {
 
 func newQueueDrainer(s *Server) *queueDrainer {
 	return &queueDrainer{
-		server:          s,
-		kickCh:          make(chan string, 64),
-		stopCh:          make(chan struct{}),
-		doneCh:          make(chan struct{}),
-		tickPeriod:      5 * time.Second,
-		nowFn:           time.Now,
+		server:     s,
+		kickCh:     make(chan string, 64),
+		stopCh:     make(chan struct{}),
+		doneCh:     make(chan struct{}),
+		tickPeriod: 5 * time.Second,
+		nowFn:      time.Now,
 		// Must exceed the RPC worker's cold-start timeout (120s) so a queued
 		// message survives a fresh worker spawn.
 		dispatchTimeout: 150 * time.Second,
@@ -138,6 +138,7 @@ func (d *queueDrainer) drainSession(sessionID string) {
 		fmt.Fprintf(os.Stderr, "queue drainer: resolve %s: %v\n", sessionID, err)
 		return
 	}
+	d.server.applyRuntimeAvailability(&resolved.Session.SessionSummary)
 	if !resolved.Session.ChatAvailable {
 		// Chat is disabled for this session (e.g., its working directory was
 		// removed). Leave the items in the queue; the user can clear them

@@ -252,18 +252,18 @@ func TestHandlePeersSessions_AggregationHappyPath(t *testing.T) {
 }
 
 // TestHandlePeersSessions_TokenHeaderSent verifies the configured token is
-// sent as X-Pi-Token, and that no header is sent when no token is configured.
+// sent as X-Pican-Token, and that no header is sent when no token is configured.
 func TestHandlePeersSessions_TokenHeaderSent(t *testing.T) {
 	s := newPeersServer(t)
 
 	var gotToken, gotTokenNoAuth string
 	withToken := newFakePeerServer(t, func(w http.ResponseWriter, r *http.Request) {
-		gotToken = r.Header.Get("X-Pi-Token")
+		gotToken = r.Header.Get("X-Pican-Token")
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"sessions":[]}`))
 	})
 	withoutToken := newFakePeerServer(t, func(w http.ResponseWriter, r *http.Request) {
-		gotTokenNoAuth = r.Header.Get("X-Pi-Token")
+		gotTokenNoAuth = r.Header.Get("X-Pican-Token")
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"sessions":[]}`))
 	})
@@ -278,10 +278,10 @@ func TestHandlePeersSessions_TokenHeaderSent(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 	if gotToken != "my-token" {
-		t.Fatalf("X-Pi-Token sent to secured peer = %q, want my-token", gotToken)
+		t.Fatalf("X-Pican-Token sent to secured peer = %q, want my-token", gotToken)
 	}
 	if gotTokenNoAuth != "" {
-		t.Fatalf("X-Pi-Token sent to peer with no configured token = %q, want empty", gotTokenNoAuth)
+		t.Fatalf("X-Pican-Token sent to peer with no configured token = %q, want empty", gotTokenNoAuth)
 	}
 }
 

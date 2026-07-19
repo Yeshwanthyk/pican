@@ -10,7 +10,7 @@
   // The old live-reload runner has been split between this component and focused
   // live-only helpers in session/live/: connection/reconnect lifecycle, reload
   // events, follow-scroll, stats, and chat-preview all have focused unit tests.
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { marked } from 'marked';
   import { escapeHtml } from '../../session/render/session-format.js';
   import { safeMarkedParse } from '../../session/render/markdown.js';
@@ -20,7 +20,11 @@
     renderChatPreviewState,
     renderPendingChatState,
   } from '../../session/live/chat-preview.js';
-  import { getSessionIdFromLocation, handleSessionReload } from '../../session/live/live-events.js';
+  import {
+    getReloadEntryCount,
+    getSessionIdFromLocation,
+    handleSessionReload,
+  } from '../../session/live/live-events.js';
   import { setupSessionLiveConnection } from '../../session/live/live-connection.js';
   import { createFollowScrollController } from '../../session/live/live-follow.js';
   import { updateStatsDom } from '../../session/live/live-stats.js';
@@ -159,9 +163,11 @@
     // tail-windowed/paginated (model.truncated) — model.entries.length isn't a
     // from-0 prefix count in that case, so the delta request is disabled and a
     // full reconcile is used instead.
-    const getEntryCount = () => (model.truncated ? null : model.entries.length);
+    const getEntryCount = () => getReloadEntryCount(model);
+    let reloadGeneration = 0;
 
     function triggerReload() {
+      const generation = ++reloadGeneration;
       return handleSessionReload({
         sessionId: sessId,
         fetchImpl,
@@ -176,8 +182,13 @@
         incrementPending,
         showFollowButton,
         getEntryCount,
-        onReloaded: (data) => {
-          reconcileEntries(data.entries, { isDelta: data.isDelta });
+        shouldApply: () => generation === reloadGeneration,
+        onReloaded: async (data) => {
+          reconcileEntries(data.entries, {
+            isDelta: data.isDelta,
+            replaceExisting: model.header?.runtime === 'codex',
+          });
+          await tick();
         },
         onNewEntries: highlightNewEntries,
       }).catch((err) => {

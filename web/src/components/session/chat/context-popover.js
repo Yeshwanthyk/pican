@@ -42,6 +42,12 @@ export function setupContextPopover({
     position();
   };
 
+  // Keep focus in the composer on compact layouts. Blurring an empty composer
+  // collapses its toolbar before the click can make the popover visible.
+  const onCapsulePointerDown = (event) => {
+    event.preventDefault();
+  };
+
   const onCapsuleClick = (event) => {
     if (event.target.closest('#pi-chat-context-popover')) {
       event.stopPropagation();
@@ -77,6 +83,7 @@ export function setupContextPopover({
     if (popover.style.display !== 'none') position();
   };
 
+  usageCapsule.addEventListener('pointerdown', onCapsulePointerDown);
   usageCapsule.addEventListener('click', onCapsuleClick);
   popover.addEventListener('click', onPopoverClick);
   documentImpl.addEventListener('click', onDocumentClick);
@@ -85,6 +92,7 @@ export function setupContextPopover({
   return {
     position,
     dispose: () => {
+      usageCapsule.removeEventListener('pointerdown', onCapsulePointerDown);
       usageCapsule.removeEventListener('click', onCapsuleClick);
       popover.removeEventListener('click', onPopoverClick);
       documentImpl.removeEventListener('click', onDocumentClick);

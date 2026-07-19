@@ -1,4 +1,4 @@
-// Lucide icons (https://lucide.dev — ISC license). pi-web renders icon data to
+// Lucide icons (https://lucide.dev — ISC license). pican renders icon data to
 // an SVG *string* for Svelte markup ({@html icon(...)}) and export snapshots.
 // Live utility modules that need to swap an icon imperatively can use
 // setIconElement(), which builds an SVG node and replaces children without

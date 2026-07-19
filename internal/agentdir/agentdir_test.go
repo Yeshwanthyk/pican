@@ -29,9 +29,9 @@ func TestPath_FallsBackToHome(t *testing.T) {
 	}
 }
 
-func TestWebDir(t *testing.T) {
-	got := WebDir("/custom/pi/agent")
-	want := filepath.Join("/custom/pi/agent", "pi-web")
+func TestPicanDir(t *testing.T) {
+	got := PicanDir("/custom/pi/agent")
+	want := filepath.Join("/custom/pi/agent", "pican")
 	if got != want {
 		t.Fatalf("want %s, got %s", want, got)
 	}

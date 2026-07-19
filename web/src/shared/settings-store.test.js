@@ -25,8 +25,8 @@ afterEach(() => {
 describe('writeSetting', () => {
   it('writes to localStorage without posting when sync is not configured', () => {
     const storage = fakeStorage();
-    writeSetting('pi-web-theme', 'nord', { storage });
-    expect(storage.getItem('pi-web-theme')).toBe('nord');
+    writeSetting('pican-theme', 'nord', { storage });
+    expect(storage.getItem('pican-theme')).toBe('nord');
   });
 
   it('posts a server-backed key through to /api/settings when sync is configured', () => {
@@ -34,14 +34,14 @@ describe('writeSetting', () => {
     const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     configureSettingsSync({ fetchImpl });
 
-    writeSetting('pi-web-theme', 'light', { storage });
+    writeSetting('pican-theme', 'light', { storage });
 
-    expect(storage.getItem('pi-web-theme')).toBe('light');
+    expect(storage.getItem('pican-theme')).toBe('light');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, opts] = fetchImpl.mock.calls[0];
     expect(url).toBe('/api/settings');
     expect(opts.method).toBe('POST');
-    expect(JSON.parse(opts.body)).toEqual({ settings: { 'pi-web-theme': 'light' } });
+    expect(JSON.parse(opts.body)).toEqual({ settings: { 'pican-theme': 'light' } });
   });
 
   it('does not post unknown (non-server-backed) keys', () => {
@@ -49,9 +49,9 @@ describe('writeSetting', () => {
     const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     configureSettingsSync({ fetchImpl });
 
-    writeSetting('pi-web:v1:right-sidebar-width', '320', { storage });
+    writeSetting('pican:v1:right-sidebar-width', '320', { storage });
 
-    expect(storage.getItem('pi-web:v1:right-sidebar-width')).toBe('320');
+    expect(storage.getItem('pican:v1:right-sidebar-width')).toBe('320');
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
@@ -62,14 +62,11 @@ describe('writeSettings', () => {
     const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     configureSettingsSync({ fetchImpl });
 
-    writeSettings(
-      { 'pi-web-theme': 'dracula', 'pi-sessions:spinner-style': 'braille' },
-      { storage },
-    );
+    writeSettings({ 'pican-theme': 'dracula', 'pican:spinner-style': 'braille' }, { storage });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
-      settings: { 'pi-web-theme': 'dracula', 'pi-sessions:spinner-style': 'braille' },
+      settings: { 'pican-theme': 'dracula', 'pican:spinner-style': 'braille' },
     });
   });
 });
@@ -79,16 +76,16 @@ describe('hydrateSettings', () => {
     const storage = fakeStorage();
     const settings = {};
     for (const k of SERVER_SETTING_KEYS) settings[k] = 'x';
-    settings['pi-web-theme'] = 'nord';
+    settings['pican-theme'] = 'nord';
     const fetchImpl = vi.fn(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ settings }) }),
     );
 
     const result = await hydrateSettings({ fetchImpl, storage });
 
-    expect(result['pi-web-theme']).toBe('nord');
-    expect(storage.getItem('pi-web-theme')).toBe('nord');
-    expect(storage.getItem('pi-sessions:spinner-style')).toBe('x');
+    expect(result['pican-theme']).toBe('nord');
+    expect(storage.getItem('pican-theme')).toBe('nord');
+    expect(storage.getItem('pican:spinner-style')).toBe('x');
   });
 
   it('returns null and leaves storage untouched on failure', async () => {

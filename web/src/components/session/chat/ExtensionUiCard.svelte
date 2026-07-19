@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../../../shared/i18n.js';
+  import { t } from '../../../shared/strings.js';
   import { extensionRequestExpiresAt } from './extension-ui-state.js';
 
   let { request, sessionId, onResolved = () => {}, fetchImpl = globalThis.fetch } = $props();

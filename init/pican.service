@@ -1,0 +1,17 @@
+[Unit]
+Description=pican — browser-based pi session viewer and chat
+Documentation=https://github.com/Yeshwanthyk/pican
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pican
+Restart=on-failure
+RestartSec=5
+
+# Pass PICAN_TOKEN from the environment if set
+EnvironmentFile=-%h/.config/pican/env
+
+[Install]
+WantedBy=default.target

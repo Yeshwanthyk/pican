@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func TestHandleRenameSessionAppendsSessionInfo(t *testing.T) {

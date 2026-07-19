@@ -1,8 +1,8 @@
-export const TOGGLE_STATE_STORAGE_KEY = 'pi.sessionDetail.toggleState';
+export const TOGGLE_STATE_STORAGE_KEY = 'pican:session-detail:toggle-state';
 export const TOGGLE_DEFAULT_SETTING_KEYS = {
-  thinkingExpanded: 'pi-web:v1:toggle:thinking',
-  toolsVisible: 'pi-web:v1:toggle:tools',
-  toolOutputsExpanded: 'pi-web:v1:toggle:tool-outputs',
+  thinkingExpanded: 'pican:v1:toggle:thinking',
+  toolsVisible: 'pican:v1:toggle:tools',
+  toolOutputsExpanded: 'pican:v1:toggle:tool-outputs',
 };
 export const toggleStateDefaults = {
   thinkingExpanded: true,

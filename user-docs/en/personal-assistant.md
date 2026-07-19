@@ -1,10 +1,10 @@
-# pi-web as Your Personal Assistant
+# pican as Your Personal Assistant
 
-pi-web isn't just for coding — you can turn it into a **personal AI assistant** that lives on your computer, like having your own OpenClaw or Hermes.
+pican isn't just for coding — you can turn it into a **personal AI assistant** that lives on your computer, like having your own OpenClaw or Hermes.
 
 ## How it works
 
-You create a dedicated folder on your machine — that's where your assistant lives. Inside, you drop in an `APPEND_SYSTEM.md` file that defines who your assistant is, what it knows, and how it behaves. pi-web gives you a beautiful chat interface to talk to it from any device.
+You create a dedicated folder on your machine — that's where your assistant lives. Inside, you drop in an `APPEND_SYSTEM.md` file that defines who your assistant is, what it knows, and how it behaves. pican gives you a beautiful chat interface to talk to it from any device.
 
 ## Step by step
 
@@ -49,11 +49,11 @@ pi automatically appends this to every conversation's system prompt, so your ass
 
 ### 3. Start a session in that folder
 
-In pi-web, create a new session pointed at `~/my-assistant/` (or whatever you named it). That's it — you're talking to your personal assistant.
+In pican, create a new session pointed at `~/my-assistant/` (or whatever you named it). That's it — you're talking to your personal assistant.
 
 ### 4. Use it from anywhere
 
-Install pi-web as a PWA on your phone, tablet, or laptop. Your assistant is always there — ask it anything, anytime.
+Install pican as a PWA on your phone, tablet, or laptop. Your assistant is always there — ask it anything, anytime.
 
 ## Ideas for your assistant
 

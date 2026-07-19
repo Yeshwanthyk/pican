@@ -302,6 +302,26 @@ func (c *Cache) FindPath(name string) (string, bool) {
 	return p, ok
 }
 
+// Invalidate drops parsed data and path resolution for a session. Runtime-backed
+// projections may be atomically replaced or moved between canonicalized project
+// directories, so the next read must rediscover the authoritative path rather
+// than relying on modtime precision or a stale filename index.
+func (c *Cache) Invalidate(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.pathIndex, id)
+	for path := range c.sessionCache {
+		if filepath.Base(path) == id {
+			delete(c.sessionCache, path)
+		}
+	}
+	for path := range c.entries {
+		if filepath.Base(path) == id {
+			delete(c.entries, path)
+		}
+	}
+}
+
 // Resolve resolves a session by filename ID. It tries the in-memory path index
 // first (O(1)) and falls back to a directory scan if the index is cold.
 // Parsed sessions are cached by modtime so repeated reads of unchanged files

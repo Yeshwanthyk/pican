@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { applyTheme } from '../../shared/theme.js';
   import { applyFonts } from '../../shared/fonts.js';
   import { valueFor } from '../../settings/settings-support.js';
@@ -62,14 +62,14 @@
     },
   ];
   const FONT_KEYS = {
-    ui: 'pi-web:v1:font-ui',
-    content: 'pi-web:v1:font-content',
-    code: 'pi-web:v1:font-code',
+    ui: 'pican:v1:font-ui',
+    content: 'pican:v1:font-content',
+    code: 'pican:v1:font-code',
   };
   const BUILTIN_FONTS = ['mono', 'system', 'sans', 'serif'];
-  const uiSizeKey = 'pi-web:v1:font-ui-size';
-  const contentSizeKey = 'pi-web:v1:font-content-size';
-  let theme = $derived(valueFor(settings, 'pi-web-theme', 'dark'));
+  const uiSizeKey = 'pican:v1:font-ui-size';
+  const contentSizeKey = 'pican:v1:font-content-size';
+  let theme = $derived(valueFor(settings, 'pican-theme', 'dark'));
   let uiSize = $derived(valueFor(settings, uiSizeKey, '14'));
   let contentSize = $derived(valueFor(settings, contentSizeKey, '15'));
   let detectedFonts = $state([]);
@@ -170,7 +170,7 @@
     </div>
     <div class="settings-control">
       <select
-        data-setting="pi-web-theme"
+        data-setting="pican-theme"
         data-setting-theme
         value={theme}
         onchange={(e) => commitTheme(e.currentTarget.value)}

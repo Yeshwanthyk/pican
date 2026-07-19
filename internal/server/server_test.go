@@ -11,21 +11,25 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/auth"
-	"pi-web/internal/sessions"
+	"pican/internal/auth"
+	"pican/internal/sessions"
 )
 
-func newTestServer(t *testing.T) *Server {
+func newTestServer(t *testing.T, nowFn ...func() time.Time) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	s, err := New(Deps{
+	deps := Deps{
 		AgentDir:            dir,
 		SessionsDir:         dir,
 		Auth:                auth.New(""),
 		Cache:               sessions.NewCache(),
 		RenderExportSession: func(s sessions.Session, theme string) string { return "" },
 		Models:              func(ctx context.Context) (json.RawMessage, error) { return nil, nil },
-	})
+	}
+	if len(nowFn) > 0 {
+		deps.Now = nowFn[0]
+	}
+	s, err := New(deps)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -37,12 +41,12 @@ func newTestServer(t *testing.T) *Server {
 
 func TestHandleCustomThemesServesConfiguredStylesheet(t *testing.T) {
 	s := newTestServer(t)
-	webDir := filepath.Join(s.agentDir, "pi-web")
-	if err := os.MkdirAll(webDir, 0755); err != nil {
+	picanDir := filepath.Join(s.agentDir, "pican")
+	if err := os.MkdirAll(picanDir, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	css := `[data-theme="custom"] { --body-bg: #010203; }`
-	if err := os.WriteFile(filepath.Join(webDir, "custom-themes.css"), []byte(css), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(picanDir, "custom-themes.css"), []byte(css), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 

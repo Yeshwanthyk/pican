@@ -51,8 +51,8 @@ func TestHandleGetSettingsDefaults(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	got := decodeSettings(t, w.Body.Bytes())
-	if got["pi-web-theme"] != "dark" {
-		t.Errorf("expected default theme 'dark', got %q", got["pi-web-theme"])
+	if got["pican-theme"] != "dark" {
+		t.Errorf("expected default theme 'dark', got %q", got["pican-theme"])
 	}
 	if len(got) != len(settingDefaults) {
 		t.Errorf("expected %d settings, got %d", len(settingDefaults), len(got))
@@ -62,7 +62,7 @@ func TestHandleGetSettingsDefaults(t *testing.T) {
 func TestHandleSaveSettingsRoundTrip(t *testing.T) {
 	s := &Server{db: newSettingsTestDB(t)}
 
-	body := bytes.NewBufferString(`{"settings":{"pi-web-theme":"nord","pi-sessions:spinner-style":"braille"}}`)
+	body := bytes.NewBufferString(`{"settings":{"pican-theme":"nord","pican:spinner-style":"braille"}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/settings", body)
 	w := httptest.NewRecorder()
 	s.handleSaveSettings(w, req)
@@ -70,7 +70,7 @@ func TestHandleSaveSettingsRoundTrip(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	if got := s.getSetting("pi-web-theme", "dark"); got != "nord" {
+	if got := s.getSetting("pican-theme", "dark"); got != "nord" {
 		t.Errorf("expected stored theme 'nord', got %q", got)
 	}
 	if got := s.ThemeSetting(); got != "nord" {
@@ -79,11 +79,11 @@ func TestHandleSaveSettingsRoundTrip(t *testing.T) {
 
 	// Other keys keep their defaults.
 	all := s.getSettings()
-	if all["pi-share:v1:done-sound"] != "cat.mp3" {
-		t.Errorf("expected default done-sound, got %q", all["pi-share:v1:done-sound"])
+	if all["pican:v1:done-sound"] != "cat.mp3" {
+		t.Errorf("expected default done-sound, got %q", all["pican:v1:done-sound"])
 	}
-	if all["pi-sessions:spinner-style"] != "braille" {
-		t.Errorf("expected stored spinner 'braille', got %q", all["pi-sessions:spinner-style"])
+	if all["pican:spinner-style"] != "braille" {
+		t.Errorf("expected stored spinner 'braille', got %q", all["pican:spinner-style"])
 	}
 }
 
@@ -91,17 +91,17 @@ func TestAutoTitleSettingsDefaultsAndRoundTrip(t *testing.T) {
 	s := &Server{db: newSettingsTestDB(t)}
 
 	all := s.getSettings()
-	if all["pi-web:v1:auto-title:enabled"] != "true" {
-		t.Errorf("expected auto-title enabled default 'true', got %q", all["pi-web:v1:auto-title:enabled"])
+	if all["pican:v1:auto-title:enabled"] != "true" {
+		t.Errorf("expected auto-title enabled default 'true', got %q", all["pican:v1:auto-title:enabled"])
 	}
-	if all["pi-web:v1:auto-title:mode"] != "each-turn" {
-		t.Errorf("expected auto-title mode default 'each-turn', got %q", all["pi-web:v1:auto-title:mode"])
+	if all["pican:v1:auto-title:mode"] != "each-turn" {
+		t.Errorf("expected auto-title mode default 'each-turn', got %q", all["pican:v1:auto-title:mode"])
 	}
-	if all["pi-web:v1:auto-title:model"] != "" {
-		t.Errorf("expected auto-title model default '', got %q", all["pi-web:v1:auto-title:model"])
+	if all["pican:v1:auto-title:model"] != "" {
+		t.Errorf("expected auto-title model default '', got %q", all["pican:v1:auto-title:model"])
 	}
 
-	body := bytes.NewBufferString(`{"settings":{"pi-web:v1:auto-title:enabled":"false","pi-web:v1:auto-title:mode":"each-turn","pi-web:v1:auto-title:model":"anthropic/sonnet"}}`)
+	body := bytes.NewBufferString(`{"settings":{"pican:v1:auto-title:enabled":"false","pican:v1:auto-title:mode":"each-turn","pican:v1:auto-title:model":"anthropic/sonnet"}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/settings", body)
 	w := httptest.NewRecorder()
 	s.handleSaveSettings(w, req)
@@ -124,17 +124,17 @@ func TestToggleDefaultSettingsRoundTrip(t *testing.T) {
 	s := &Server{db: newSettingsTestDB(t)}
 
 	all := s.getSettings()
-	if all["pi-web:v1:toggle:thinking"] != "true" {
-		t.Errorf("expected toggle:thinking default 'true', got %q", all["pi-web:v1:toggle:thinking"])
+	if all["pican:v1:toggle:thinking"] != "true" {
+		t.Errorf("expected toggle:thinking default 'true', got %q", all["pican:v1:toggle:thinking"])
 	}
-	if all["pi-web:v1:toggle:tools"] != "true" {
-		t.Errorf("expected toggle:tools default 'true', got %q", all["pi-web:v1:toggle:tools"])
+	if all["pican:v1:toggle:tools"] != "true" {
+		t.Errorf("expected toggle:tools default 'true', got %q", all["pican:v1:toggle:tools"])
 	}
-	if all["pi-web:v1:toggle:tool-outputs"] != "false" {
-		t.Errorf("expected toggle:tool-outputs default 'false', got %q", all["pi-web:v1:toggle:tool-outputs"])
+	if all["pican:v1:toggle:tool-outputs"] != "false" {
+		t.Errorf("expected toggle:tool-outputs default 'false', got %q", all["pican:v1:toggle:tool-outputs"])
 	}
 
-	body := bytes.NewBufferString(`{"settings":{"pi-web:v1:toggle:thinking":"false","pi-web:v1:toggle:tool-outputs":"true"}}`)
+	body := bytes.NewBufferString(`{"settings":{"pican:v1:toggle:thinking":"false","pican:v1:toggle:tool-outputs":"true"}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/settings", body)
 	w := httptest.NewRecorder()
 	s.handleSaveSettings(w, req)
@@ -142,14 +142,14 @@ func TestToggleDefaultSettingsRoundTrip(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	if got := s.getSetting("pi-web:v1:toggle:thinking", "true"); got != "false" {
+	if got := s.getSetting("pican:v1:toggle:thinking", "true"); got != "false" {
 		t.Errorf("expected stored toggle:thinking 'false', got %q", got)
 	}
-	if got := s.getSetting("pi-web:v1:toggle:tool-outputs", "false"); got != "true" {
+	if got := s.getSetting("pican:v1:toggle:tool-outputs", "false"); got != "true" {
 		t.Errorf("expected stored toggle:tool-outputs 'true', got %q", got)
 	}
 	// Untouched key keeps its default.
-	if got := s.getSetting("pi-web:v1:toggle:tools", "true"); got != "true" {
+	if got := s.getSetting("pican:v1:toggle:tools", "true"); got != "true" {
 		t.Errorf("expected toggle:tools to keep default 'true', got %q", got)
 	}
 }
@@ -157,7 +157,7 @@ func TestToggleDefaultSettingsRoundTrip(t *testing.T) {
 func TestHandleSaveSettingsIgnoresUnknownKeys(t *testing.T) {
 	s := &Server{db: newSettingsTestDB(t)}
 
-	body := bytes.NewBufferString(`{"settings":{"pi-web:v1:right-sidebar-width":"320","pi-web-theme":"light"}}`)
+	body := bytes.NewBufferString(`{"settings":{"pican:v1:right-sidebar-width":"320","pican-theme":"light"}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/settings", body)
 	w := httptest.NewRecorder()
 	s.handleSaveSettings(w, req)
@@ -166,11 +166,11 @@ func TestHandleSaveSettingsIgnoresUnknownKeys(t *testing.T) {
 	}
 
 	var stored string
-	err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", "pi-web:v1:right-sidebar-width").Scan(&stored)
+	err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", "pican:v1:right-sidebar-width").Scan(&stored)
 	if err != sql.ErrNoRows {
 		t.Errorf("unknown key should not be persisted, got value %q (err %v)", stored, err)
 	}
-	if s.getSetting("pi-web-theme", "dark") != "light" {
+	if s.getSetting("pican-theme", "dark") != "light" {
 		t.Errorf("known key in same request should still be saved")
 	}
 }
@@ -196,12 +196,12 @@ func TestSettingsNoDBDegradesGracefully(t *testing.T) {
 		t.Fatalf("expected 200 without db, got %d", w.Code)
 	}
 	got := decodeSettings(t, w.Body.Bytes())
-	if got["pi-web-theme"] != "dark" {
-		t.Errorf("expected default theme without db, got %q", got["pi-web-theme"])
+	if got["pican-theme"] != "dark" {
+		t.Errorf("expected default theme without db, got %q", got["pican-theme"])
 	}
 
 	// Writes are a no-op but report success.
-	body := bytes.NewBufferString(`{"settings":{"pi-web-theme":"nord"}}`)
+	body := bytes.NewBufferString(`{"settings":{"pican-theme":"nord"}}`)
 	req2 := httptest.NewRequest(http.MethodPost, "/api/settings", body)
 	w2 := httptest.NewRecorder()
 	s.handleSaveSettings(w2, req2)

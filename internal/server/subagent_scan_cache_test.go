@@ -126,8 +126,7 @@ func TestSubagentScanCacheHeaderTimeReusesAndInvalidates(t *testing.T) {
 // subagent's status changing (spawned -> done) once the parent session file
 // is appended to.
 func TestHandleApiSubagentsPicksUpAppendedResultAfterCacheInvalidation(t *testing.T) {
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	project := filepath.Join(t.TempDir(), "project")
 	spawnOnly := fmt.Sprintf(
 		"{\"type\":\"session\",\"timestamp\":\"2026-07-17T12:00:00Z\",\"cwd\":%q}\n"+

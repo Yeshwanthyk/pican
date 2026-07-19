@@ -11,7 +11,7 @@ import (
 
 func TestHandleApiSounds(t *testing.T) {
 	tmp := t.TempDir()
-	assetsDir := filepath.Join(tmp, "pi-web", "assets")
+	assetsDir := filepath.Join(tmp, "pican", "assets")
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestHandleApiSounds(t *testing.T) {
 
 func TestHandleSounds(t *testing.T) {
 	tmp := t.TempDir()
-	assetsDir := filepath.Join(tmp, "pi-web", "assets")
+	assetsDir := filepath.Join(tmp, "pican", "assets")
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		t.Fatal(err)
 	}

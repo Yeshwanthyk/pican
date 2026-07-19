@@ -25,7 +25,7 @@ test.beforeEach(({}, testInfo) => {
 
 /** A temp git repo with one committed file, an uncommitted edit, and an untracked file. */
 function gitRepoWithChanges(): string {
-  const dir = mkdtempSync(join(tmpdir(), "pi-web-e2e-gitdiff-"));
+  const dir = mkdtempSync(join(tmpdir(), "pican-e2e-gitdiff-"));
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: dir, stdio: "pipe" });
   git("init", "-q");

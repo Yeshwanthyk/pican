@@ -25,7 +25,7 @@ export function readSessionPayload({ documentImpl = document, atobImpl = globalT
 }
 
 export function getSessionSearchParams({ documentImpl = document, windowImpl = window } = {}) {
-  const injectedParams = documentImpl.querySelector('meta[name="pi-url-params"]');
+  const injectedParams = documentImpl.querySelector('meta[name="pican-url-params"]');
   const searchString = injectedParams
     ? injectedParams.content
     : (windowImpl.location?.search || '').replace(/^\?/, '');

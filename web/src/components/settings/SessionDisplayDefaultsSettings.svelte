@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { boolFor } from '../../settings/settings-support.js';
   import { TOGGLE_DEFAULT_SETTING_KEYS } from '../../session/ui/toggle-state.js';
 

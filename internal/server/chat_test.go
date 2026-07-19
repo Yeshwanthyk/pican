@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/sessions"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
 type fakeSender struct {

@@ -158,7 +158,7 @@ export function setupModelSelector({
   // Fire-and-forget: the popup opens immediately (Ctrl+L) and renders
   // available models as they load.
   chatApi
-    .listModels()
+    .listModels(sessionId)
     .then((res) => {
       if (!res.ok) throw new Error('api error');
       return res.json();

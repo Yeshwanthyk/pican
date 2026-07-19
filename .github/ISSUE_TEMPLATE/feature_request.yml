@@ -1,11 +1,11 @@
 name: Feature request
-description: Suggest an idea or improvement for pi-web
+description: Suggest an idea or improvement for pican
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        pi-web is early-stage. Per CONTRIBUTING.md, please open this issue to
+        pican is early-stage. Per CONTRIBUTING.md, please open this issue to
         discuss your idea first — the maintainer will triage it before inviting
         any pull request.
   - type: textarea

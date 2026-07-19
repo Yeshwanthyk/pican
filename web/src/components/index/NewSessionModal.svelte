@@ -1,6 +1,6 @@
 <script>
   import { icon, ArrowLeft } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import {
     defaultBrowsePath,
     filterProjectsByQuery,
@@ -9,7 +9,11 @@
     projectsToEntries,
     withParentEntry,
   } from '../../index/dir-browse.js';
-  import { defaultFetchProjects } from '../../index/sessions.js';
+  import {
+    defaultFetchProjects,
+    defaultFetchRuntimes,
+    normalizeRuntimesResponse,
+  } from '../../index/sessions.js';
 
   let {
     open = false,
@@ -18,6 +22,8 @@
     creating = false,
     error = '',
     dropdownOpen = $bindable(false),
+    runtime = $bindable('pi'),
+    fetchRuntimes = defaultFetchRuntimes,
     onClose = () => {},
     onCreate = () => {},
   } = $props();
@@ -31,6 +37,8 @@
   let highlightIndex = $state(-1);
   let browseGeneration = 0;
   let debounceTimer = null;
+  let runtimes = $state([]);
+  let runtimeGeneration = 0;
 
   const pathLike = $derived(isPathLikeQuery(path));
   const visibleEntries = $derived(
@@ -55,6 +63,32 @@
 
   $effect(() => {
     if (open) loadProjectsOnce();
+  });
+
+  $effect(() => {
+    if (!open) {
+      runtimeGeneration += 1;
+      return;
+    }
+    const generation = ++runtimeGeneration;
+    runtimes = [];
+    runtime = '';
+    fetchRuntimes()
+      .then((response) => {
+        if (generation !== runtimeGeneration) return;
+        const normalized = normalizeRuntimesResponse(response);
+        runtimes = normalized.runtimes;
+        runtime = normalized.selectedRuntime;
+      })
+      .catch(() => {
+        if (generation !== runtimeGeneration) return;
+        const normalized = normalizeRuntimesResponse();
+        runtimes = normalized.runtimes;
+        runtime = normalized.selectedRuntime;
+      });
+    return () => {
+      runtimeGeneration += 1;
+    };
   });
 
   function closeDropdownIfEmpty() {
@@ -123,6 +157,25 @@
     requestAnimationFrame(() => document.getElementById('sessionPath')?.focus());
   }
 
+  function handleRuntimeKeydown(e) {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+    const options = Array.from(
+      e.currentTarget.parentElement?.querySelectorAll('[role="radio"]:not(:disabled)') || [],
+    );
+    if (options.length === 0) return;
+    e.preventDefault();
+    const current = options.indexOf(e.currentTarget);
+    let next;
+    if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = options.length - 1;
+    else {
+      const direction = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+      next = (Math.max(0, current) + direction + options.length) % options.length;
+    }
+    options[next].click();
+    options[next].focus();
+  }
+
   function handleKeydown(e) {
     if (dropdownOpen && visibleEntries.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -185,6 +238,50 @@
         <button type="button" class="recent-chip" onclick={() => chooseRecent(loc)}>{loc}</button>
       {/each}
     </div>
+    {#if runtimes.length > 1 || runtimes.some((option) => !option.available)}
+      <fieldset class="runtime-selector">
+        <legend>{t('index.runtimeLabel')}</legend>
+        <div class="runtime-segments" role="radiogroup" aria-label={t('index.runtimeLabel')}>
+          {#each runtimes as option (option.id)}
+            <button
+              type="button"
+              class="runtime-segment"
+              class:runtime-segment--selected={runtime === option.id}
+              role="radio"
+              aria-checked={runtime === option.id}
+              tabindex={runtime === option.id ? 0 : -1}
+              disabled={!option.available}
+              title={!option.available ? option.reason || t('index.runtimeUnavailable') : undefined}
+              onclick={() => {
+                if (option.available) runtime = option.id;
+              }}
+              onkeydown={handleRuntimeKeydown}
+            >
+              <span class="runtime-segment-label">
+                {#if option.id === 'pi'}
+                  <img class="runtime-segment-mark" src="/pi-icon.svg" alt="" aria-hidden="true" />
+                {:else if option.id === 'codex'}
+                  <img
+                    class="runtime-segment-mark"
+                    src="/codex-icon.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                {/if}
+                <span>{t(`runtime.${option.id}`)}</span>
+              </span>
+              {#if !option.available}
+                <small
+                  >{option.reason
+                    ? t('index.runtimeUnavailableReason', { reason: option.reason })
+                    : t('index.runtimeUnavailable')}</small
+                >
+              {/if}
+            </button>
+          {/each}
+        </div>
+      </fieldset>
+    {/if}
     <div class="dir-input-wrap">
       <input
         type="text"
@@ -243,7 +340,7 @@
         class="btn-primary"
         id="createBtn"
         type="button"
-        disabled={creating}
+        disabled={creating || !runtime}
         onclick={onCreate}>{t('common.create')}</button
       >
     </div>

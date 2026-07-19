@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func drainBroadcast(t *testing.T, c *sseClient, timeout time.Duration) bool {
@@ -52,6 +54,29 @@ func TestFsnotifyWatcherBroadcastsOnAppend(t *testing.T) {
 
 	if !drainBroadcast(t, client, 2*time.Second) {
 		t.Fatalf("expected reload broadcast after file append")
+	}
+}
+
+func TestFsnotifyHandlesAtomicRenameReplacement(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "--tmp--project--")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sessionPath := filepath.Join(projectDir, "session.jsonl")
+	if err := os.WriteFile(sessionPath, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{sessionsDir: root, fileMod: map[string]time.Time{"session.jsonl": time.Unix(1, 0)}, lastKnown: make(map[string]struct{}), now: time.Now}
+	client := s.addClient("session.jsonl")
+	debum := newDebouncer(time.Millisecond)
+	done := make(chan struct{})
+	go func() { debum.run(s); close(done) }()
+	defer func() { debum.stop(); <-done; s.removeClient(client) }()
+
+	s.handleFsEvent(nil, fsnotify.Event{Name: sessionPath, Op: fsnotify.Rename}, debum)
+	if !drainBroadcast(t, client, time.Second) {
+		t.Fatal("expected reload broadcast after atomic rename replacement")
 	}
 }
 

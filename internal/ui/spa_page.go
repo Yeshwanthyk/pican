@@ -38,7 +38,7 @@ func RenderAppShell(w io.Writer, bootstrap string) error {
 	bootstrapTag := template.HTML("")
 	if bootstrap != "" {
 		// base64 only (A-Za-z0-9+/=), so it cannot break out of the script tag.
-		bootstrapTag = template.HTML(`<script id="pi-session-bootstrap" type="application/json">` + template.HTMLEscapeString(bootstrap) + `</script>`)
+		bootstrapTag = template.HTML(`<script id="pican-session-bootstrap" type="application/json">` + template.HTMLEscapeString(bootstrap) + `</script>`)
 	}
 	data := struct {
 		LiveDocumentStart template.HTML
@@ -49,7 +49,7 @@ func RenderAppShell(w io.Writer, bootstrap string) error {
 		LiveDocumentEnd   template.HTML
 	}{
 		LiveDocumentStart: template.HTML(renderLiveDocumentStart(liveDocumentData{
-			Title:   "pi-web",
+			Title:   "pican",
 			Preload: preload,
 			Styles:  appStylesheets(),
 		})),

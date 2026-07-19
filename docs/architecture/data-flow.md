@@ -1,12 +1,22 @@
 # Data Flow & Session File Format
 
+## Session Storage and Authority
+
+The session pipeline reads JSONL from `~/.pi/agent/sessions`, but the ownership model depends on `runtime`:
+
+- **Pi:** the JSONL file is the native, append-only transcript. Pi supplies conversation entries; pican only creates new files and appends supported local metadata.
+- **Codex:** `~/.codex` is authoritative. pican lists/reads threads through app-server and atomically materializes rebuildable `codex-<thread-id>.jsonl` projections under the matching encoded project directory. Projection refresh preserves local `session_info`, label, model-change, and thinking-level metadata.
+
+See [codex-runtime.md](./codex-runtime.md) for the protocol and lifecycle boundary.
+
 ## Session File Format
 
-Sessions are stored as **JSONL** files (one JSON object per line):
+The unified parser consumes **JSONL** files (one JSON object per line):
 
 ```
 ~/.pi/agent/sessions/--project-name--/
-└── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl
+├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl  # native Pi transcript
+└── codex-<thread-id>.jsonl                    # generated Codex projection
 ```
 
 ### Example JSONL Content
@@ -126,21 +136,17 @@ Browser POST /api/chat?id=<id>
            │         ├──▶ Extract text + image files
            │         └──▶ Validate (not empty, image size, mime type)
            │
-           ├──▶ workers.Manager.Send(ctx, sessionID, sessionPath, chatReq)
+           ├──▶ launch workers.Manager.Send in a background goroutine
            │         │
            │         ├──▶ Get or create ChatWorker for session
-           │         │         └──▶ rpc.NewPiWorkerWithStream(sessionPath, streamSink)
-           │         │               ├──▶ exec.Command("pi", "--mode", "rpc")
-           │         │               ├──▶ Start subprocess
-           │         │               ├──▶ switch_session RPC
-           │         │               └──▶ Background goroutines: consume stdout, wait
+           │         │         ├──▶ Pi: `pi --mode rpc` + `switch_session`
+           │         │         └──▶ Codex: `codex app-server --stdio` + `thread/resume`
            │         │
            │         └──▶ worker.Prompt(ctx, chatReq)
-           │               ├──▶ BuildPromptCommand (JSONL to stdin)
-           │               ├──▶ Await response on pending channel
-           │               └──▶ Update status → running
+           │               ├──▶ Pi: prompt RPC (`steer` while running)
+           │               └──▶ Codex: `turn/start` or `turn/steer`, with text/images
            │
-           └──▶ Return {"ok": true, "status": "accepted"}
+           └──▶ Return HTTP 202 {"ok": true, "status": "queued"}
 ```
 
 ## Data Flow: Rename Session
@@ -151,16 +157,14 @@ Browser POST /api/rename-session?id=<id>
            ▼
     server.handleRenameSession
            │
-           ├──▶ Decode JSON body → {"name":"New Name"}
-           ├──▶ Resolve session ID → filesystem path
-           ├──▶ sessions.RenameSession(path, name, now)
-           │         └──▶ Append JSONL line: {"type":"session_info","timestamp":"...","name":"New Name"}
-           ├──▶ record modtime + broadcast "reload" to session SSE clients
-           │
+           ├──▶ Resolve runtime from session metadata
+           ├──▶ Pi: append `session_info` metadata
+           ├──▶ Codex: `thread/name/set` → `thread/read` → atomic projection refresh
+           ├──▶ record modtime + broadcast `reload`
            └──▶ Return {"ok": true, "name": "New Name"}
 ```
 
-Rename is the only intentional pi-web write to an existing session JSONL file. It appends metadata history; it does not rewrite existing entries. Creating a new session is the other direct write path, but it only creates a fresh JSONL file.
+For Pi, rename preserves the append-only transcript rule. For Codex, the native thread name is authoritative; the rebuilt projection also preserves pican-local metadata.
 
 ## Data Flow: Live Reload
 
@@ -209,6 +213,24 @@ Browser POST /share?id=<id>
            └──▶ Return {gistUrl, gistId, previewUrl}
 ```
 
+## Data Flow: Codex Catalog Sync
+
+```text
+startup, then every minute
+           │
+           ▼
+short-lived `codex app-server --stdio`
+           ├── initialize / initialized
+           ├── thread/list (all pages; visible non-archived source kinds)
+           ├── thread/read(includeTurns=true) per thread
+           └── Materialize
+                 ├── map items to common session entries
+                 ├── preserve local metadata from existing projection
+                 └── temp write + fsync + rename + directory fsync
+```
+
+Per-thread failures are recorded without deleting older projections. In `both` mode a failed sync marks Codex unavailable but leaves Pi and cached Codex viewing intact.
+
 ## Data Flow: Create New Session
 
 ```
@@ -217,25 +239,13 @@ Browser POST /api/new-session
            ▼
     server.handleNewSession
            │
-           ├──▶ Decode JSON body → extract path and optional sourceSessionId
-           │
-           ├──▶ If sourceSessionId is present, read current worker model/thinking state
-           │
-           ├──▶ Validate path (absolute, exists or create)
-           │
-           ├──▶ Encode project name → create directory under sessionsDir
-           │
-           ├──▶ Generate UUID + timestamp → write fresh JSONL file
-           │         ├──▶ session header entry
-           │         └──▶ implicit model_change / thinking_level_change entries when copied
-           │              from the source session. These entries include normal entry `id`
-           │              and `parentId` fields so `pi --mode rpc switch_session` restores
-           │              the same initial model/thinking state.
-           │
-           ├──▶ Pre-initialize chat worker (EnsureWorker)
-           │         └──▶ So the session page can read default model/thinking level immediately
-           │
-           └──▶ Return {"ok": true, "id": <filename>}
+           ├──▶ Decode path, optional sourceSessionId, and runtime
+           ├──▶ Default runtime from server; a sibling inherits its source runtime
+           ├──▶ Validate runtime availability and working path
+           ├──▶ Pi: create a fresh native JSONL file with inherited settings
+           ├──▶ Codex: `thread/start` with model/effort → `thread/read` → materialize projection
+           ├──▶ Pre-initialize the runtime worker
+           └──▶ Return {"ok": true, "id": <session-or-projection filename>}
 ```
 
 ## Data Flow: Fork Session
@@ -259,6 +269,8 @@ Browser POST /api/fork-session?id=<sourceId>
            └──▶ Return {"ok": true, "id": <newFilename>}
 ```
 
+For Codex, the handler resolves the projected entry's `codexTurnId`, calls native `thread/fork(lastTurnId)`, reads the new thread, and materializes its projection. An entry without a native turn boundary returns a conflict instead of fabricating a branch.
+
 ## Data Flow: Clone Session
 
 ```
@@ -279,6 +291,8 @@ Browser POST /api/clone-session?id=<sourceId>
            │
            └──▶ Return {"ok": true, "id": <newFilename>}
 ```
+
+For Codex, clone is `thread/fork` without `lastTurnId`, so it clones the current native thread rather than copying projected JSONL entries.
 
 ## Data Flow: Scratchpad (Notes)
 

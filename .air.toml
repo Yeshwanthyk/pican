@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
   bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main ./cmd/pi-web"
+  cmd = "go build -o ./tmp/main ./cmd/pican"
   delay = 1000
   exclude_dir = ["tmp", "vendor", "web/node_modules", "web/src", ".git"]
   exclude_regex = ["_test.go"]

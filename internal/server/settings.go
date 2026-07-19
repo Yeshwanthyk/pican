@@ -53,27 +53,25 @@ func (s *Server) handleAppShell(w http.ResponseWriter, r *http.Request, bootstra
 // live-timer state (sidebar widths, focus countdown, tree toggles) is NOT
 // listed here — it stays in localStorage only.
 var settingDefaults = map[string]string{
-	"pi-web-theme":                "dark",
-	"pi-web:v1:locale":            "en",
-	"pi-web:v1:custom-languages":  "",
-	"pi-web:v1:font-ui":           "mono",
-	"pi-web:v1:font-content":      "mono",
-	"pi-web:v1:font-code":         "mono",
-	"pi-web:v1:font-ui-size":      "12",
-	"pi-web:v1:font-content-size": "13",
-	"pi-sessions:spinner-style":   "runcat",
-	"pi-share:v1:notify-on-done":  "false",
-	"pi-share:v1:done-sound":      "cat.mp3",
-	"pi-sessions:view-layout":     "timeline",
-	"pi-web:v1:show-btw-in-index": "false",
-	settingAutoTitleEnabled:       "true",
-	settingAutoTitleMode:          "each-turn",
-	settingAutoTitleModel:         "",
-	"pi-web:v1:artifacts:enabled": "true",
-	"pi-web:v1:artifacts:include": "*.md, *.html",
-	"pi-web:v1:toggle:thinking":      "true",
-	"pi-web:v1:toggle:tools":         "true",
-	"pi-web:v1:toggle:tool-outputs":  "false",
+	"pican-theme":                  "dark",
+	"pican:v1:font-ui":             "mono",
+	"pican:v1:font-content":        "mono",
+	"pican:v1:font-code":           "mono",
+	"pican:v1:font-ui-size":        "12",
+	"pican:v1:font-content-size":   "13",
+	"pican:spinner-style":          "runcat",
+	"pican:v1:notify-on-done":      "false",
+	"pican:v1:done-sound":          "cat.mp3",
+	"pican:view-layout":            "timeline",
+	"pican:v1:show-btw-in-index":   "false",
+	settingAutoTitleEnabled:        "true",
+	settingAutoTitleMode:           "each-turn",
+	settingAutoTitleModel:          "",
+	"pican:v1:artifacts:enabled":   "true",
+	"pican:v1:artifacts:include":   "*.md, *.html",
+	"pican:v1:toggle:thinking":     "true",
+	"pican:v1:toggle:tools":        "true",
+	"pican:v1:toggle:tool-outputs": "false",
 }
 
 // getSettings returns every server-backed setting: defaults overlaid with any
@@ -124,7 +122,7 @@ func (s *Server) getSetting(key, fallback string) string {
 // ThemeSetting returns the persisted theme, used for server-side injection so
 // the page paints the correct theme before any JS runs.
 func (s *Server) ThemeSetting() string {
-	return s.getSetting("pi-web-theme", "dark")
+	return s.getSetting("pican-theme", "dark")
 }
 
 // fontKeywords maps a curated font name to a full CSS font-family stack. The
@@ -186,11 +184,11 @@ func sanitizeFontSize(value, fallback string) string {
 // sizes for server-side injection so the page paints with the chosen
 // fonts/sizes before any JS runs.
 func (s *Server) FontStyles() (uiStack, contentStack, codeStack, uiSize, contentSize string) {
-	uiStack = resolveFontStack(s.getSetting("pi-web:v1:font-ui", "mono"))
-	contentStack = resolveFontStack(s.getSetting("pi-web:v1:font-content", "mono"))
-	codeStack = resolveFontStack(s.getSetting("pi-web:v1:font-code", "mono"))
-	uiSize = sanitizeFontSize(s.getSetting("pi-web:v1:font-ui-size", "12"), "12")
-	contentSize = sanitizeFontSize(s.getSetting("pi-web:v1:font-content-size", "13"), "13")
+	uiStack = resolveFontStack(s.getSetting("pican:v1:font-ui", "mono"))
+	contentStack = resolveFontStack(s.getSetting("pican:v1:font-content", "mono"))
+	codeStack = resolveFontStack(s.getSetting("pican:v1:font-code", "mono"))
+	uiSize = sanitizeFontSize(s.getSetting("pican:v1:font-ui-size", "12"), "12")
+	contentSize = sanitizeFontSize(s.getSetting("pican:v1:font-content-size", "13"), "13")
 	return
 }
 

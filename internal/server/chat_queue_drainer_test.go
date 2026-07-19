@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/chatqueue"
-	"pi-web/internal/workers"
+	"pican/internal/chatqueue"
+	"pican/internal/workers"
 )
 
 func newDrainerServer(t *testing.T, sender ChatSender) (*Server, *queueDrainer, string) {
@@ -78,8 +78,8 @@ func TestDrainerSkipsWhenPaused(t *testing.T) {
 
 func TestDrainerSkipsWhenWorkerBusy(t *testing.T) {
 	fake := &fakeSender{
-		status:  workers.WorkerStatus{State: workers.WorkerStateRunning},
-		sendCh:  make(chan struct{}, 1),
+		status: workers.WorkerStatus{State: workers.WorkerStateRunning},
+		sendCh: make(chan struct{}, 1),
 	}
 	s, d, id := newDrainerServer(t, fake)
 	s.chatQueue.Add(id, "wait your turn", "wait your turn")

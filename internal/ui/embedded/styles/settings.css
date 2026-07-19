@@ -348,34 +348,12 @@
   white-space: nowrap;
 }
 
-.settings-custom-languages {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 160px;
-  resize: vertical;
-  background: var(--input-bg, var(--surface-2));
-  color: var(--text);
-  border: 1px solid var(--dim);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.9em;
-  line-height: 1.5;
-}
-.settings-custom-languages-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.settings-custom-languages-status {
-  color: var(--muted);
-  font-size: 0.9em;
-}
-.settings-custom-languages-status.is-error {
+/* Machines (peer host registry) */
+.settings-machines-error {
   color: var(--danger, #e06c75);
+  font-size: 0.9em;
 }
 
-/* Machines (peer host registry) */
 .settings-machines-hint {
   color: var(--muted);
   font-size: 0.9em;

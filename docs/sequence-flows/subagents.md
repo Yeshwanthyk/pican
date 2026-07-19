@@ -1,6 +1,6 @@
 # Sequence Flow: Subagents Review
 
-The Subagents panel is a read-only review surface over records written by the external pi-subagents extension. pi-web doesn't create or modify subagent records.
+The Subagents panel is a read-only review surface over records written by the external pi-subagents extension. pican doesn't create or modify subagent records.
 
 ## Data sources and merge
 

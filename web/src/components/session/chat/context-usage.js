@@ -191,6 +191,7 @@ export function updateContextUsage({
 export function createContextUsageController({
   documentImpl = document,
   entries = [],
+  sessionId = '',
   chatApi,
   getKnownModelLabel = () => '',
   positionPopover = () => {},
@@ -208,7 +209,7 @@ export function createContextUsageController({
 
   if (chatApi && typeof chatApi.listModels === 'function') {
     chatApi
-      .listModels()
+      .listModels(sessionId)
       .then((res) => {
         if (res.ok) return res.json();
         throw new Error();

@@ -1,5 +1,5 @@
 // Minimal service worker — present so the page is installable as a PWA.
-// We intentionally don't cache: pi-web is a live view of local session files
+// We intentionally don't cache: pican is a live view of local session files
 // (SSE for status, streaming chat). Stale cached HTML/JSON would mislead
 // the user.
 //
@@ -41,7 +41,7 @@ self.addEventListener('push', (event) => {
     try {
       data = event.data ? event.data.json() : {};
     } catch (_) {
-      data = { title: 'pi session', body: 'Response ready' };
+      data = { title: 'pican session', body: 'Response ready' };
     }
 
     // Scheduled runs fire in the background regardless of whether the app is
@@ -59,12 +59,12 @@ self.addEventListener('push', (event) => {
       if (hasForegroundClient) return;
     }
 
-    const title = data.title || 'pi session';
+    const title = data.title || 'pican session';
     const options = {
       body: data.body || 'Response ready',
       icon: '/app-icon.png',
       badge: '/app-icon.png',
-      tag: isSchedule ? `pi-schedule-${data.sessionId || ''}` : 'pi-session-done',
+      tag: isSchedule ? `pican-schedule-${data.sessionId || ''}` : 'pican-session-done',
       renotify: true,
       data: { sessionId: data.sessionId || '' },
       // Phones play their default notification sound when this fires.

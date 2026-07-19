@@ -1,13 +1,13 @@
 # Sequence Flow: Multi-Machine Peers (Registry + Aggregation)
 
-This flow covers registering other pi-web instances ("peers") reached over Tailscale, and aggregating their sessions into a read-only "Machines" section on the homepage. This is phase 1: registry + aggregated view + deep-link navigation. There is **no proxying** — chatting with a remote session still happens on the peer's own origin.
+This flow covers registering other pican instances ("peers") reached over Tailscale, and aggregating their sessions into a read-only "Machines" section on the homepage. This is phase 1: registry + aggregated view + deep-link navigation. There is **no proxying** — chatting with a remote session still happens on the peer's own origin.
 
 ## Sequence Diagram
 
 ```
 ┌─────────┐   ┌──────────────┐   ┌──────────┐   ┌─────────────┐
-│ Browser │   │ Server (this │   │  SQLite  │   │  Peer pi-web │
-│         │   │  pi-web)     │   │          │   │  (Tailscale) │
+│ Browser │   │ Server (this │   │  SQLite  │   │  Peer pican │
+│         │   │  pican)     │   │          │   │  (Tailscale) │
 └────┬────┘   └──────┬───────┘   └────┬─────┘   └──────┬───────┘
      │               │                │                │
      │ POST /api/peers {name, baseUrl, token}
@@ -23,7 +23,7 @@ This flow covers registering other pi-web instances ("peers") reached over Tails
      │               │                │                │
      │               │  fan out concurrently, 3s/peer timeout
      │               │──────────────────────────────────▶│ GET /api/sessions?limit=50
-     │               │                                    │ X-Pi-Token: <token>
+     │               │                                    │ X-Pican-Token: <token>
      │               │◀──────────────────────────────────│ {sessions:[...]}
      │               │                │                │
      │               │  tag each session with host/hostUrl
@@ -50,7 +50,7 @@ This flow covers registering other pi-web instances ("peers") reached over Tails
 
 `GET /api/peers/sessions` (`handlePeersSessions`) loads every registered peer from SQLite and fans out concurrently (one goroutine per peer, `sync.WaitGroup`) to `GET <baseUrl>/api/sessions?limit=50` on each. Each peer request:
 
-- Sends `X-Pi-Token: <token>` only when a token is configured for that peer (matches how `internal/auth/auth.go` extracts tokens on the receiving end).
+- Sends `X-Pican-Token: <token>` only when a token is configured for that peer (matches how `internal/auth/auth.go` extracts tokens on the receiving end).
 - Is bounded by `peerFetchTimeout` (3s) via `context.WithTimeout`, using a single shared `*http.Client`/`http.Transport` so connections are reused across polls.
 - Decodes the peer's JSON response into `map[string]any` per session (not a typed struct) so whatever field casing the peer emits survives untouched, then adds `host` and `hostUrl` keys to each session map before returning it.
 
@@ -83,5 +83,5 @@ A follow-up phase could add a full reverse proxy at `/h/<host>/*` so a remote se
 - `web/src/index/peers.js` — fetch helpers + session/host normalization
 - `web/src/components/settings/MachinesSettings.svelte` — registry UI
 - `web/src/components/index/MachinesSection.svelte` / `PeerSessionRow.svelte` — homepage aggregation UI
-- `internal/auth/auth.go` — the `X-Pi-Token`/`Authorization: Bearer` extraction each peer already implements
-- `internal/app/tailscale.go` — how each pi-web instance publishes itself over Tailscale in the first place
+- `internal/auth/auth.go` — the `X-Pican-Token`/`Authorization: Bearer` extraction each peer already implements
+- `internal/app/tailscale.go` — how each pican instance publishes itself over Tailscale in the first place

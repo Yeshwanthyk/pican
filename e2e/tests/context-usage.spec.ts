@@ -33,6 +33,8 @@ test.describe("context usage popover", () => {
 
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
+    // Compact mobile layouts reveal the toolbar when the composer is focused.
+    await page.locator("#pi-chat-message").focus();
     const capsule = page.locator("#pi-chat-context-usage");
     await expect(capsule).toBeVisible();
 
@@ -45,15 +47,15 @@ test.describe("context usage popover", () => {
     await expect(popover.locator("#pi-popover-val-total")).toHaveText("7.7k");
     await expect(popover.locator(".pi-popover-used")).toHaveText("7.7k");
 
+    // Close and re-open by toggling the capsule while composer focus is held.
+    await capsule.click();
+    await expect(popover).toBeHidden();
+    await capsule.click();
+    await expect(popover).toBeVisible();
+
     // Close via the × button (the popover is a sibling of the capsule, so this
     // click does not reach the capsule's own toggle handler).
     await popover.locator(".pi-popover-close").click();
-    await expect(popover).toBeHidden();
-
-    // Re-open, then close by toggling the capsule again.
-    await capsule.click();
-    await expect(popover).toBeVisible();
-    await capsule.click();
     await expect(popover).toBeHidden();
   });
 });

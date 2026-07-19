@@ -23,7 +23,7 @@ describe('App', () => {
 
     mounted = mountApp({ props: { path: '/' } });
 
-    expect(document.querySelector('.header h1')?.textContent).toContain('Sessions');
+    expect(document.querySelector('.header h1')?.textContent).toContain('pican');
     expect(document.querySelector('[data-sessions-content]')).toBeTruthy();
   });
 
@@ -35,7 +35,7 @@ describe('App', () => {
     // delayed (no flash) so the class is the reliable "mounted" signal.
     flushSync();
 
-    expect(document.documentElement.classList.contains('pi-session-page')).toBe(true);
+    expect(document.documentElement.classList.contains('pican-session-page')).toBe(true);
   });
 
   it('routes /settings to the Svelte settings page', () => {
@@ -44,7 +44,7 @@ describe('App', () => {
     mounted = mountApp({ props: { path: '/settings' } });
 
     expect(document.querySelector('.session-header-title')?.textContent).toBe('Settings');
-    expect(document.querySelector('[data-setting="pi-web-theme"]')).toBeTruthy();
+    expect(document.querySelector('[data-setting="pican-theme"]')).toBeTruthy();
   });
 
   it('routes /workflows to the Svelte workflows page', () => {

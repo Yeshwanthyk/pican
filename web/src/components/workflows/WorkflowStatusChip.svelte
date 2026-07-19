@@ -1,14 +1,14 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let { status = '' } = $props();
 
   const label = $derived.by(() => {
     const key = `workflows.status.${status}`;
-    const translated = t(key);
-    return translated === key
+    const value = t(key);
+    return value === key
       ? String(status || t('workflows.status.unknown')).replaceAll('_', ' ')
-      : translated;
+      : value;
   });
 </script>
 

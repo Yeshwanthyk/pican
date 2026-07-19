@@ -35,10 +35,13 @@
     chatAvailable = true,
     chatDisabledReason = '',
     modelLabel = '',
+    runtime = 'pi',
+    nativeId = '',
+    sessionUUID = '',
     dataEl = $bindable(null),
   } = $props();
 
-  const runtime = getSessionRuntime();
+  const liveRuntime = getSessionRuntime();
 
   // Restore the diff sheet from `?diff=open` on first load. Must seed
   // sessionModals.diff before the sync $effect runs, or that effect would see
@@ -77,7 +80,7 @@
   });
 </script>
 
-<SessionHeader {title} {cwd} {sessionId} />
+<SessionHeader {title} {cwd} {sessionId} {runtime} {nativeId} {sessionUUID} />
 
 <CommandMenu {sessionId} {cwd} />
 
@@ -89,7 +92,7 @@
   <div id="content-container" class="content-container">
     <main id="content">
       <div id="header-container"><SessionInfoHeader model={sessionModel} /></div>
-      <LoadEarlier model={sessionModel} {sessionId} navigateTo={runtime.navigateTo} />
+      <LoadEarlier model={sessionModel} {sessionId} navigateTo={liveRuntime.navigateTo} />
       <div id="messages">
         <SessionContent model={sessionModel} afterRender={contentRuntime.afterRender} live />
       </div>
@@ -118,5 +121,11 @@
 
 <ShareDialog {sessionId} />
 <BtwPopup {cwd} parentId={sessionId} />
-<svelte:element this={"script"} id="session-data" type="application/json" bind:this={dataEl}
+<svelte:element
+  this={"script"}
+  id="session-data"
+  type="application/json"
+  data-runtime={runtime}
+  data-native-id={nativeId || undefined}
+  bind:this={dataEl}
 ></svelte:element>

@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 export const E2E_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO_ROOT = join(E2E_ROOT, "..");
 
-/** Path to the built pi-web binary. */
-export const BINARY = join(REPO_ROOT, "pi-web");
+/** Path to the built pican binary. */
+export const BINARY = join(REPO_ROOT, "pican");
 
 /** Committed, sanitized session fixtures copied into the temp dir at setup. */
 export const FIXTURES_SESSIONS = join(E2E_ROOT, "fixtures", "sessions");

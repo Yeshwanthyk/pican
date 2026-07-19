@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"pi-web/internal/workers"
+	"pican/internal/workers"
 )
 
 type extensionSenderStub struct {

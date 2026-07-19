@@ -3,7 +3,7 @@
   // tree label for an entry. Opened via the bindable `open` prop; `onSave({
   // entryId, label })` persists (the caller handles the API + tree refresh).
   import { tick } from 'svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let { open = $bindable(false), entryId = '', currentLabel = '', onSave = null } = $props();
 

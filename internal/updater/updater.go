@@ -1,4 +1,4 @@
-// Package updater checks whether a newer pi-web release is available. It
+// Package updater checks whether a newer pican release is available. It
 // compares the build-time version against the npm registry's published
 // version (the install channel) and fetches the matching changelog from the
 // GitHub Releases API. Results are cached in memory and refreshed by a
@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	defaultNPMURL    = "https://registry.npmjs.org/@ygncode/pi-web"
-	defaultGitHubAPI = "https://api.github.com/repos/ygncode/pi-web"
-	// npmChannel is the dist-tag pi-web installs from (see pi install command).
+	defaultNPMURL    = "https://registry.npmjs.org/@yeshwanthyk/pican"
+	defaultGitHubAPI = "https://api.github.com/repos/Yeshwanthyk/pican"
+	// npmChannel is the dist-tag pican installs from (see pi install command).
 	npmChannel = "beta"
 	// PollInterval is how often the background goroutine refreshes the cache.
 	PollInterval = 6 * time.Hour
@@ -181,7 +181,7 @@ func (c *Checker) fetchLatestVersion(ctx context.Context) (string, error) {
 	if v := doc.DistTags["latest"]; v != "" {
 		return v, nil
 	}
-	return "", fmt.Errorf("no published version found for @ygncode/pi-web")
+	return "", fmt.Errorf("no published version found for @yeshwanthyk/pican")
 }
 
 // fetchChangelog tries the version-specific GitHub release first, then the
@@ -221,7 +221,7 @@ func (c *Checker) get(ctx context.Context, url, bearer string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "pi-web-updater")
+	req.Header.Set("User-Agent", "pican-updater")
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}

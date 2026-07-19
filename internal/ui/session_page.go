@@ -8,11 +8,12 @@ import (
 	"os"
 	"strconv"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 // share-session.html renders the static export/share snapshot only; the live
 // session page is the Svelte SPA served via the app.html shell.
+//
 //go:embed embedded/share-session.html
 var exportSessionHtml string
 
@@ -39,8 +40,8 @@ var livePaletteCss string
 // (and future config plumbing) can trigger truncation with a small session
 // instead of rendering thousands of entries. Read once at startup.
 var (
-	LargeSessionThreshold   = envInt("PI_WEB_LARGE_SESSION_THRESHOLD", 1500)
-	LargeSessionTailEntries = envInt("PI_WEB_LARGE_SESSION_TAIL_ENTRIES", 1000)
+	LargeSessionThreshold   = envInt("PICAN_LARGE_SESSION_THRESHOLD", 1500)
+	LargeSessionTailEntries = envInt("PICAN_LARGE_SESSION_TAIL_ENTRIES", 1000)
 )
 
 func envInt(name string, def int) int {

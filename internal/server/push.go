@@ -12,20 +12,20 @@ import (
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 
-	"pi-web/internal/agentdir"
+	"pican/internal/agentdir"
 )
 
 // PushManager owns the VAPID key pair and the set of browser push
 // subscriptions. Subscriptions are persisted as JSON on disk so they
-// survive restarts; one file under ~/.pi/agent/web/.
+// survive restarts; one file under ~/.pi/agent/pican/.
 type PushManager struct {
-	mu        sync.Mutex
-	publicKey string
+	mu         sync.Mutex
+	publicKey  string
 	privateKey string
-	subject   string
-	storeDir  string
-	subs      map[string]pushSub
-	client    *http.Client
+	subject    string
+	storeDir   string
+	subs       map[string]pushSub
+	client     *http.Client
 }
 
 type pushSub struct {
@@ -42,14 +42,14 @@ type vapidFile struct {
 }
 
 // NewPushManager loads/creates VAPID keys and subscription store under
-// <agentDir>/pi-web/. Returns a manager ready to register HTTP handlers.
+// <agentDir>/pican/. Returns a manager ready to register HTTP handlers.
 func NewPushManager(agentDir string) (*PushManager, error) {
-	dir := agentdir.WebDir(agentDir)
+	dir := agentdir.PicanDir(agentDir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
 
-	// Migrate old push data from pre-pi-web directory layout.
+	// Migrate old push data from pre-pican directory layout.
 	oldDir := filepath.Join(agentDir, "web")
 	if info, err := os.Stat(oldDir); err == nil && info.IsDir() {
 		for _, name := range []string{"vapid.json", "push-subs.json"} {
@@ -67,7 +67,7 @@ func NewPushManager(agentDir string) (*PushManager, error) {
 	m := &PushManager{
 		storeDir: dir,
 		subs:     make(map[string]pushSub),
-		subject:  "mailto:pi-web@local",
+		subject:  "mailto:pican@local",
 		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 	if err := m.loadOrCreateKeys(); err != nil {
@@ -182,7 +182,7 @@ func (m *PushManager) NotifyDone(sessionID string) {
 	m.notify(map[string]string{
 		"type":      "session-done",
 		"sessionId": sessionID,
-		"title":     "pi session",
+		"title":     "pican session",
 		"body":      "Response ready",
 	})
 }

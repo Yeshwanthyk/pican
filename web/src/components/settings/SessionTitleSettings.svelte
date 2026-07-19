@@ -1,12 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { boolFor, fetchModelGroups, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();
-  const enabledKey = 'pi-web:v1:auto-title:enabled';
-  const modeKey = 'pi-web:v1:auto-title:mode';
-  const modelKey = 'pi-web:v1:auto-title:model';
+  const enabledKey = 'pican:v1:auto-title:enabled';
+  const modeKey = 'pican:v1:auto-title:mode';
+  const modelKey = 'pican:v1:auto-title:model';
   let enabled = $derived(boolFor(settings, enabledKey, false));
   let mode = $derived(valueFor(settings, modeKey, 'once'));
   let model = $derived(valueFor(settings, modelKey, ''));

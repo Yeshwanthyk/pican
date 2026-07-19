@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/rpc"
+	"pican/internal/rpc"
 )
 
 func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {
@@ -18,7 +18,7 @@ func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {
 	client := s.addClient("a.jsonl")
 	defer s.removeClient(client)
 
-	s.BroadcastChatPreview("a.jsonl", rpc.StreamPreview{Content: "hello\nworld", Done: false})
+	s.BroadcastChatPreview("a.jsonl", rpc.StreamPreview{Content: "hello\nworld", Done: false, TurnID: "turn-1", ItemID: "item-1"})
 
 	msg, ok := drainOnce(client, time.Second)
 	if !ok {
@@ -29,6 +29,9 @@ func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {
 	}
 	if !strings.Contains(msg, `"content":"hello\nworld"`) {
 		t.Fatalf("content was not JSON escaped in msg = %q", msg)
+	}
+	if !strings.Contains(msg, `"turnId":"turn-1"`) || !strings.Contains(msg, `"itemId":"item-1"`) {
+		t.Fatalf("preview identity was lost in msg = %q", msg)
 	}
 }
 

@@ -1,6 +1,6 @@
-# `pi-web` Design System Specification
+# `pican` Design System Specification
 
-This document details the core design system for `pi-web`. The design system is styled purely using standard **CSS Custom Properties** (Variables). This design system is responsive, highly performant, handles instant client-side transitions, and permits deep user customizability.
+This document details the core design system for `pican`. The design system is styled purely using standard **CSS Custom Properties** (Variables). This design system is responsive, highly performant, handles instant client-side transitions, and permits deep user customizability.
 
 ---
 
@@ -16,7 +16,7 @@ This document details the core design system for `pi-web`. The design system is 
 
 ## 2. Built-in Premium Themes
 
-`pi-web` packages four highly polished, built-in themes out of the box:
+`pican` packages four highly polished, built-in themes out of the box:
 
 ### A. Carbon/Obsidian Dark (`[data-theme="dark"]`)
 - **Theme Color:** `#0e0e13` / `#111116`
@@ -57,10 +57,10 @@ Ten additional themes ported from popular VS Code color themes, available from t
 
 ## 3. Dynamic Custom Themes
 
-You can inject **your own themes** into `pi-web`!
+You can inject **your own themes** into `pican`!
 
 ### How It Works Under the Hood
-1. The server checks for the file `~/.pi/agent/pi-web/custom-themes.css` on every page request.
+1. The server checks for the file `~/.pi/agent/pican/custom-themes.css` on every page request.
 2. If it exists, the Go server automatically appends a stylesheet link:
    ```html
    <link rel="stylesheet" href="/custom-themes.css">
@@ -68,7 +68,7 @@ You can inject **your own themes** into `pi-web`!
 3. You can define any theme block utilizing a `[data-theme="custom"]` (or any custom identifier) selector to override color schemes!
 
 ### Example: Setting Up a Custom Theme
-Create `~/.pi/agent/pi-web/custom-themes.css` and paste the following structure:
+Create `~/.pi/agent/pican/custom-themes.css` and paste the following structure:
 
 ```css
 [data-theme="custom"] {

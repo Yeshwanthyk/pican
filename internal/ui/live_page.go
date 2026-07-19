@@ -53,11 +53,11 @@ func SetFontProvider(fn func() (string, string, string, string, string)) {
 // /custom-themes.css — so a parser-blocking <script> guarantees those styles are
 // loaded and getComputedStyle can resolve the custom theme's --body-bg.
 // It does two things:
-//   1. Sets data-theme + an inline background-color on <html> matching the
-//      current theme and WCO state so the correct colour is present from the
-//      very first paint, eliminating the white/gray flash in the title-bar
-//      area. Every theme resolves through the palette variables loaded above.
-//   2. Toggles the `wco` class when Window Controls Overlay is active.
+//  1. Sets data-theme + an inline background-color on <html> matching the
+//     current theme and WCO state so the correct colour is present from the
+//     very first paint, eliminating the white/gray flash in the title-bar
+//     area. Every theme resolves through the palette variables loaded above.
+//  2. Toggles the `wco` class when Window Controls Overlay is active.
 const wcoBootScript = `<script>
 (function(){
   // Detect WCO via the display-mode media query — the reliable, synchronous
@@ -68,7 +68,7 @@ const wcoBootScript = `<script>
   var o = navigator.windowControlsOverlay;
   function isWCO(){ return mql.matches || !!(o && o.visible); }
   function serverTheme(){
-    var m = document.querySelector('meta[name="pi-web-theme"]');
+    var m = document.querySelector('meta[name="pican-theme"]');
     return m && m.content ? m.content : '';
   }
   function resolveTheme(){
@@ -78,7 +78,7 @@ const wcoBootScript = `<script>
     var t = document.documentElement.dataset.theme;
     if(t) return t;
     t = serverTheme();
-    if(!t){ try{ t = localStorage.getItem('pi-web-theme') || 'dark'; }catch(e){ t = 'dark'; } }
+    if(!t){ try{ t = localStorage.getItem('pican-theme') || 'dark'; }catch(e){ t = 'dark'; } }
     return t;
   }
   function applyBg(){
@@ -123,8 +123,8 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 	b.WriteString("<meta name=\"theme-color\" content=\"#0e0e13\">\n")
 	b.WriteString("<meta name=\"mobile-web-app-capable\" content=\"yes\">\n")
 	b.WriteString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n")
-	b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"Pi Sessions\">\n")
-	b.WriteString("<meta name=\"pi-web-theme\" content=\"")
+	b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"pican\">\n")
+	b.WriteString("<meta name=\"pican-theme\" content=\"")
 	b.WriteString(template.HTMLEscapeString(themeProvider()))
 	b.WriteString("\">\n")
 	if data.Styles != "" {
@@ -133,7 +133,7 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 	}
 	b.WriteString("<link rel=\"stylesheet\" href=\"/custom-themes.css\">\n")
 	fontUI, fontContent, fontCode, fontUISize, fontContentSize := fontProvider()
-	b.WriteString("<style id=\"pi-web-fonts\">:root{--font-sans:")
+	b.WriteString("<style id=\"pican-fonts\">:root{--font-sans:")
 	b.WriteString(fontUI)
 	b.WriteString(";--font-content:")
 	b.WriteString(fontContent)
@@ -175,7 +175,7 @@ func themeBootScript(defaultTheme string) template.HTML {
 	}
 	return template.HTML(fmt.Sprintf(`<script>
 (function(){
-  var STORAGE_KEY = 'pi-web-theme';
+  var STORAGE_KEY = 'pican-theme';
   var themes = ['dark', 'light', 'nord', 'dracula', 'custom', 'catppuccin-mocha', 'catppuccin-latte', 'gruvbox-dark', 'tokyo-night', 'rose-pine', 'github-dark', 'github-light', 'one-dark-pro', 'everforest-dark', 'kanagawa-wave'];
   function applyTheme(t){ document.documentElement.dataset.theme = t || 'dark'; }
   function currentTheme(){ return document.documentElement.dataset.theme || 'dark'; }
@@ -208,12 +208,12 @@ func themeBootScript(defaultTheme string) template.HTML {
     var next = idx === -1 ? themes[0] : themes[(idx + 1) %% themes.length];
     applyTheme(next);
     try{ localStorage.setItem(STORAGE_KEY, next); }catch(e){}
-    try{ document.cookie = 'pi-web-theme=' + next + ';path=/;SameSite=Lax;max-age=31536000'; }catch(e){}
+    try{ document.cookie = 'pican-theme=' + next + ';path=/;SameSite=Lax;max-age=31536000'; }catch(e){}
     updateBtn();
   }
   var defaultTheme = '%s';
   function serverTheme(){
-    var m = document.querySelector('meta[name="pi-web-theme"]');
+    var m = document.querySelector('meta[name="pican-theme"]');
     return m && m.content ? m.content : '';
   }
   // The server-injected meta tag is the source of truth (shared across

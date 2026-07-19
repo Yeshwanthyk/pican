@@ -1,6 +1,6 @@
 <script>
   import { icon, Maximize2 } from '../../../shared/icons.js';
-  import { t } from '../../../shared/i18n.js';
+  import { t } from '../../../shared/strings.js';
 
   let { chatAvailable = true } = $props();
 </script>

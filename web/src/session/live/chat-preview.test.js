@@ -94,6 +94,38 @@ describe('chat preview', () => {
     expect(state.chatPreviewEl.classList.contains('done')).toBe(true);
   });
 
+  it('starts a fresh live preview when Codex moves to a new agent item', () => {
+    const dom = new JSDOM('<body><div id="messages"></div></body>');
+    const state = { chatPreviewEl: null, pendingUserEl: null };
+    const options = {
+      documentImpl: dom.window.document,
+      renderMarkdown: (text) => text,
+    };
+
+    renderChatPreview(
+      { content: 'Commentary complete.', done: true, turnId: 'turn-1', itemId: 'commentary' },
+      state,
+      options,
+    );
+    const completedEl = state.chatPreviewEl;
+    expect(completedEl.classList.contains('done')).toBe(true);
+
+    renderChatPreview(
+      { content: 'Final answer starts', done: false, turnId: 'turn-1', itemId: 'final' },
+      state,
+      options,
+    );
+
+    expect(state.chatPreviewEl).not.toBe(completedEl);
+    expect(state.previewItemId).toBe('final');
+    expect(state.chatPreviewEl.classList.contains('done')).toBe(false);
+    expect(state.chatPreviewEl.querySelector('.preview-label')).toBeTruthy();
+    expect(state.chatPreviewEl.querySelector('.message-content').textContent).toBe(
+      'Final answer starts',
+    );
+    clearChatPreview(state);
+  });
+
   it('clears pending user but keeps assistant preview when keepAssistant option is true', () => {
     const dom = new JSDOM('<body><div id="messages"></div></body>');
     const state = { chatPreviewEl: null, pendingUserEl: null };

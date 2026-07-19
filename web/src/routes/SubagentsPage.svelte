@@ -5,7 +5,7 @@
   import { shortenPath } from '../session/render/session-format.js';
   import { createStatusEvents } from '../shared/status-events.js';
   import { icon, ChevronLeft, Layers } from '../shared/icons.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
   import {
     defaultFetchSubagents,
     normalizeSubagent,

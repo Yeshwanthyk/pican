@@ -21,8 +21,8 @@
  * artifact-registry.js.
  */
 
-const ENABLED_KEY = 'pi-web:v1:artifacts:enabled';
-const INCLUDE_KEY = 'pi-web:v1:artifacts:include';
+const ENABLED_KEY = 'pican:v1:artifacts:enabled';
+const INCLUDE_KEY = 'pican:v1:artifacts:include';
 
 // localStorage keys that should re-run the filter when changed in another tab.
 export const ARTIFACT_SETTING_KEYS = [ENABLED_KEY, INCLUDE_KEY];

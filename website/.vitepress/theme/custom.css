@@ -1,4 +1,4 @@
-/* pi-web docs theme — maps the app's four palettes (internal/ui/embedded/styles/
+/* pican docs theme — maps the app's four palettes (internal/ui/embedded/styles/
    theme.css) onto VitePress variables. Selected via html[data-theme="…"] by the
    nav ThemeSwitcher; dark-family themes also carry the .dark class so VitePress's
    own dark component styles apply. Default (dracula) is set pre-paint in config.js. */

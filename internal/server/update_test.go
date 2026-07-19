@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/updater"
+	"pican/internal/updater"
 )
 
 func TestHandleVersionReturnsCurrent(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 const titleWordLimit = 5
 
 // titleStopWords are dropped from heuristic titles. Ported from the former
-// pi-web pi extension so behavior is preserved now that titling is built in.
+// pican pi extension so behavior is preserved now that titling is built in.
 var titleStopWords = map[string]bool{
 	"a": true, "an": true, "and": true, "are": true, "can": true, "could": true,
 	"do": true, "does": true, "for": true, "from": true, "how": true, "i": true,
@@ -22,7 +22,7 @@ var titleStopWords = map[string]bool{
 }
 
 var titleAcronyms = map[string]string{
-	"pi": "Pi", "pi-web": "Pi-Web", "api": "API", "ui": "UI",
+	"pi": "Pi", "pican": "Pican", "api": "API", "ui": "UI",
 	"ux": "UX", "sse": "SSE", "rpc": "RPC", "tui": "TUI",
 }
 

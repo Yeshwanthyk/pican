@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/rpc"
+	"pican/internal/rpc"
 )
 
 // Spawning `pi --mode rpc` to enumerate models takes seconds, but the list

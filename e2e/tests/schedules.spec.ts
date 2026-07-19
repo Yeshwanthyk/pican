@@ -29,7 +29,7 @@ async function openCreateEditor(page: import("@playwright/test").Page) {
 test.describe("schedules (stubbed pi)", () => {
   test("nav button opens the schedules page", async ({ page }) => {
     await page.goto("/");
-    await page.locator("[data-schedules-btn]").click();
+    await page.locator(".schedules-nav-btn").click();
     await expect(page).toHaveURL(/\/schedules$/);
     // A create entry point is present (header button on desktop, floating + on
     // mobile).
@@ -111,7 +111,9 @@ test.describe("schedules (stubbed pi)", () => {
     await page
       .locator('[data-testid="schedule-instructions"]')
       .fill("Daily digest");
-    await page.locator('[data-testid="schedule-frequency"]').selectOption("daily");
+    await page
+      .locator('[data-testid="schedule-frequency"]')
+      .selectOption("daily");
     await page.locator('[data-testid="schedule-save"]').click();
 
     const card = page

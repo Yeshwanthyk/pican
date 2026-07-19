@@ -171,18 +171,18 @@ describe('chat composer runner', () => {
     expect(shell.classList.contains('expanded')).toBe(true);
     expect(btn.getAttribute('aria-pressed')).toBe('true');
     expect(btn.getAttribute('aria-label')).toBe('Collapse composer');
-    expect(storage.get('pi-chat:composer-expanded:abc')).toBe('1');
+    expect(storage.get('pican:chat:composer-expanded:abc')).toBe('1');
 
     btn.click();
     expect(shell.classList.contains('expanded')).toBe(false);
-    expect(storage.get('pi-chat:composer-expanded:abc')).toBe('0');
+    expect(storage.get('pican:chat:composer-expanded:abc')).toBe('0');
   });
 
   it('restores composer expanded state from localStorage', () => {
     const dom = new JSDOM(
       '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="abc"><div class="pi-chat-shell"><textarea id="pi-chat-message"></textarea><div id="pi-chat-attachments"></div><input id="pi-chat-images"><button id="pi-chat-attach"></button><button id="pi-chat-expand" aria-pressed="false"></button><button id="pi-chat-send"></button><span id="pi-chat-status"></span></div></form></body>',
     );
-    const storage = new Map([['pi-chat:composer-expanded:abc', '1']]);
+    const storage = new Map([['pican:chat:composer-expanded:abc', '1']]);
     Object.defineProperty(dom.window, 'localStorage', {
       configurable: true,
       value: {

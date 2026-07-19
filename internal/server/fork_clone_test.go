@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func writeTreeSessionFile(t *testing.T, root, project, name string) string {

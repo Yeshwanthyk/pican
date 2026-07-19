@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/auth"
-	"pi-web/internal/workers"
+	"pican/internal/auth"
+	"pican/internal/workers"
 )
 
 // snapshotSender extends fakeSender (which already satisfies ChatSender) with

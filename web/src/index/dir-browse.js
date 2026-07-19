@@ -44,7 +44,7 @@ export function projectsToEntries(projects) {
   }));
 }
 
-// Parent directory of an absolute path (posix semantics — pi-web only browses
+// Parent directory of an absolute path (posix semantics — pican only browses
 // the local filesystem the server runs on).
 export function parentDirOf(path) {
   if (!path || path === '/') return '/';

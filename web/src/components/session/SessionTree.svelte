@@ -3,7 +3,7 @@
   // (centered dialog on desktop, bottom sheet on mobile) — same pattern as
   // DiffModal. Replaces the old persistent docked `<aside id="sidebar">`.
   import FullScreenSheet from './FullScreenSheet.svelte';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { getSessionModel } from '../../session/session-context.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import { closeTree } from '../../session/session-modals.svelte.js';

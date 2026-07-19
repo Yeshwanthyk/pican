@@ -1,6 +1,6 @@
 <script>
   import { icon, ListChecks } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { parseTaskLines } from '../../session/render/task-tool.js';
 
   let { name, args = {}, resultText = '' } = $props();

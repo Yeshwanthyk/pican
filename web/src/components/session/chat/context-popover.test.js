@@ -54,6 +54,16 @@ describe('setupContextPopover', () => {
     expect(popover.style.display).toBe('none');
   });
 
+  it('keeps composer focus while opening on compact layouts', () => {
+    renderDom();
+    setupContextPopover({ documentImpl: document, windowImpl: window });
+    const pointerDown = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+
+    document.getElementById('pi-chat-context-usage').dispatchEvent(pointerDown);
+
+    expect(pointerDown.defaultPrevented).toBe(true);
+  });
+
   it('closes from the close button and outside clicks', () => {
     renderDom();
     setupContextPopover({ documentImpl: document, windowImpl: window });

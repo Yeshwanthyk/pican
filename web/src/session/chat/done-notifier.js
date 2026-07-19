@@ -1,7 +1,7 @@
 import { writeSetting } from '../../shared/settings-store.js';
 
-export const DONE_NOTIFY_STORAGE_KEY = 'pi-share:v1:notify-on-done';
-export const DONE_SOUND_STORAGE_KEY = 'pi-share:v1:done-sound';
+export const DONE_NOTIFY_STORAGE_KEY = 'pican:v1:notify-on-done';
+export const DONE_SOUND_STORAGE_KEY = 'pican:v1:done-sound';
 
 export function isDoneNotifyEnabled({ storage = globalThis.localStorage } = {}) {
   try {
@@ -48,14 +48,14 @@ export function playDoneSound({
 export function showDoneNotification({
   windowImpl = window,
   documentImpl = document,
-  title = 'pi session',
+  title = 'pican session',
   body = 'Response ready',
 } = {}) {
   try {
     const N = windowImpl.Notification;
     if (!N || N.permission !== 'granted') return;
     if (!documentImpl.hidden) return;
-    const n = new N(title, { body, icon: '/app-icon.png', tag: 'pi-session-done' });
+    const n = new N(title, { body, icon: '/app-icon.png', tag: 'pican-session-done' });
     n.onclick = () => {
       try {
         windowImpl.focus();

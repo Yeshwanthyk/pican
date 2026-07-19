@@ -16,6 +16,9 @@ var swJS string
 //go:embed embedded/assets/pi-icon.svg
 var piIconSVG string
 
+//go:embed embedded/assets/codex-icon.svg
+var codexIconSVG string
+
 //go:embed embedded/assets/icon-maskable.svg
 var iconMaskableSVG string
 
@@ -81,6 +84,11 @@ func RegisterPWAHandlers(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		_, _ = w.Write([]byte(piIconSVG))
+	})
+	mux.HandleFunc("/codex-icon.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write([]byte(codexIconSVG))
 	})
 	mux.HandleFunc("/icon-maskable.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")

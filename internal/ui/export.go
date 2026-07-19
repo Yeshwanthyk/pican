@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 //go:embed embedded/export/vendor/marked.min.js

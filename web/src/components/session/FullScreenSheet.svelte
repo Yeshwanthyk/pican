@@ -10,7 +10,7 @@
   // the open/close side effects. Body content is provided as the default snippet.
   import { onMount, tick } from 'svelte';
   import { icon, ArrowLeft, X } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
 
   let {
     open = $bindable(false),

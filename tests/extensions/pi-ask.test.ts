@@ -3,10 +3,10 @@ import {
   isRpcMode,
   buildAwaitingResult,
   extractToolNames,
-  findPiWebOverlaps,
+  findPicanOverlaps,
   buildSteeringNote,
   redirectTwin,
-  OWN_PI_WEB_TOOLS,
+  OWN_PICAN_TOOLS,
 } from '../../.pi/extensions/pi-ask.ts';
 
 describe('isRpcMode', () => {
@@ -82,46 +82,46 @@ describe('extractToolNames', () => {
   });
 });
 
-describe('findPiWebOverlaps', () => {
-  it('finds bare names whose pi_web_ twin is also active', () => {
-    const overlaps = findPiWebOverlaps([
+describe('findPicanOverlaps', () => {
+  it('finds bare names whose pican_ twin is also active', () => {
+    const overlaps = findPicanOverlaps([
       'ask_user_question',
-      'pi_web_ask_user_question',
+      'pican_ask_user_question',
       'bash',
     ]);
     expect(overlaps).toEqual(['ask_user_question']);
   });
 
   it('treats our own registered tools as twins even if not in the active list', () => {
-    // ghoseb's bare tool active, but pi_web twin only known via OWN_PI_WEB_TOOLS
-    expect(findPiWebOverlaps(['ask_user_question'])).toEqual([
+    // ghoseb's bare tool active, but the pican twin is only known via OWN_PICAN_TOOLS
+    expect(findPicanOverlaps(['ask_user_question'])).toEqual([
       'ask_user_question',
     ]);
-    expect(OWN_PI_WEB_TOOLS).toContain('pi_web_ask_user_question');
+    expect(OWN_PICAN_TOOLS).toContain('pican_ask_user_question');
   });
 
   it('returns [] when there is no overlap', () => {
-    expect(findPiWebOverlaps(['bash', 'read', 'pi_web_set_tab_title'])).toEqual([]);
+    expect(findPicanOverlaps(['bash', 'read', 'pican_set_tab_title'])).toEqual([]);
   });
 });
 
 describe('buildSteeringNote', () => {
   it('names the affected tools and directs to the prefixed twin', () => {
     const note = buildSteeringNote(['ask_user_question']);
-    expect(note).toContain('"ask_user_question" -> "pi_web_ask_user_question"');
+    expect(note).toContain('"ask_user_question" -> "pican_ask_user_question"');
     expect(note).toContain('not supported');
   });
 });
 
 describe('redirectTwin', () => {
-  const tools = new Set(['pi_web_ask_user_question']);
+  const tools = new Set(['pican_ask_user_question']);
 
   it('redirects a bare call whose twin is registered', () => {
-    expect(redirectTwin('ask_user_question', tools)).toBe('pi_web_ask_user_question');
+    expect(redirectTwin('ask_user_question', tools)).toBe('pican_ask_user_question');
   });
 
   it('does not redirect the prefixed tool itself', () => {
-    expect(redirectTwin('pi_web_ask_user_question', tools)).toBeNull();
+    expect(redirectTwin('pican_ask_user_question', tools)).toBeNull();
   });
 
   it('does not redirect tools without a registered twin', () => {

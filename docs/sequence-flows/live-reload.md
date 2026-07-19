@@ -1,13 +1,14 @@
 # Sequence Flow: Live Reload
 
-pi-web pushes real-time updates to the browser via **Server-Sent Events (SSE)**. This document covers both the file-watching → SSE path and the status-tracking → SSE path.
+pican pushes real-time updates to the browser via **Server-Sent Events (SSE)**. This document covers both the file-watching → SSE path and the status-tracking → SSE path.
 
 ## Overview
 
-There are two independent live-update mechanisms:
+There are three cooperating live-update mechanisms:
 
-1. **File Change Reload** — when a session JSONL file is modified, the session page fetches `/api/session`, reconciles canonical entries, and refreshes the visible/browser session title from the returned `name`
-2. **Running Status Updates** — when a session starts/stops running, the index page updates card badges in real-time
+1. **File Change Reload** — when a Pi transcript is appended or a Codex projection is atomically replaced, the session page fetches `/api/session`, reconciles canonical entries, and refreshes its title
+2. **Worker-driven reload** — Codex worker callbacks can emit reload immediately after projection materialization
+3. **Running Status Updates** — when a session starts/stops running, the index page updates card badges in real time
 
 ## 1. File Change Reload
 
@@ -66,8 +67,10 @@ On `Create` events:
 - If it's a new directory → add to watcher
 - If it's a `.jsonl` file → broadcast `new-session` to `__all__`
 
-On `Write` events for `.jsonl` files:
+On `Write`, `Create`, or `Rename` events for `.jsonl` files:
 - Schedule debounce (50ms)
+
+`Create`/`Rename` matter because Codex projections are replaced atomically rather than appended. New files also broadcast `new-session`.
 
 ### Debouncer
 
@@ -140,9 +143,9 @@ Polling scans all `.jsonl` files and compares modtimes against `fileMod` map.
 
 `computeRunningStatus(sessionID)` returns true if **any** of these are true:
 
-1. **session-status file** exists and has `state: "running"` and `updatedAt` within 10s TTL
-2. **Chat worker** status is `running` (in-process)
-3. **Recent file activity**: JSONL file modtime within 3 seconds
+1. **session-status file** exists and is fresh/running (Pi only; ignored for Codex projections)
+2. **Runtime worker** status is `running` (Pi or Codex)
+3. **Recent transcript/projection activity** is within the short grace window
 
 ### Status Sweeper
 
@@ -172,7 +175,7 @@ This catches cases where a signal goes stale (e.g., terminal process crashes wit
 | `new-session` | `__all__` | `"new-session"` | New `.jsonl` file created |
 | `status-snapshot` | `__all__` | `{"running": ["id1", "id2"]}` | Client connects to `/events?id=__all__` |
 | `status-delta` | `__all__` | `{"id": "abc", "running": true}` | Running status changes |
-| `chat-preview` | `sessID` | `{"content": "...", "done": false}` | Best-effort browser chat preview |
+| `chat-preview` | `sessID` | `{"content": "...", "done": false}` | Best-effort Pi stream or Codex item-delta preview |
 
 ### Browser Handling
 

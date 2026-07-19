@@ -1,6 +1,6 @@
 <script>
   import { icon, ChevronDown } from '../../shared/icons.js';
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import PeerSessionRow from './PeerSessionRow.svelte';
 
   let { hosts = [], now = Date.now() } = $props();

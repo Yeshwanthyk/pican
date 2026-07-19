@@ -45,8 +45,7 @@ func fetchSubagentsURL(t *testing.T, s *Server, url string) []subagentSummary {
 }
 
 func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	parentProject := filepath.Join(t.TempDir(), "parent")
 	childProject := filepath.Join(t.TempDir(), "child")
 	parent := fmt.Sprintf(
@@ -85,8 +84,7 @@ func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
 }
 
 func TestHandleApiSubagentsFiltersBySession(t *testing.T) {
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	projectA := filepath.Join(t.TempDir(), "project-a")
 	projectB := filepath.Join(t.TempDir(), "project-b")
 	parentA := fmt.Sprintf(
@@ -122,8 +120,7 @@ func TestHandleApiSubagentsMergesChildWrittenBeforeSpawnResult(t *testing.T) {
 	// The child session header is written a beat before the parent records the
 	// subagent_spawn result. The merge must still pair them (regression: an
 	// earlier one-directional window split every pi subagent into two rows).
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	project := filepath.Join(t.TempDir(), "proj")
 	parent := fmt.Sprintf(
 		"{\"type\":\"session\",\"id\":\"parent-id\",\"timestamp\":\"2026-07-17T11:59:00Z\",\"cwd\":%q}\n"+
@@ -149,8 +146,7 @@ func TestHandleApiSubagentsMergesChildWrittenBeforeSpawnResult(t *testing.T) {
 }
 
 func TestHandleApiSubagentsMapsRunningErrorAndUnknownStatuses(t *testing.T) {
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	project := filepath.Join(t.TempDir(), "project")
 	parent := fmt.Sprintf(
 		"{\"type\":\"session\",\"timestamp\":\"2026-07-17T12:00:00Z\",\"cwd\":%q}\n"+
@@ -186,8 +182,7 @@ func TestHandleApiSubagentsMapsRunningErrorAndUnknownStatuses(t *testing.T) {
 }
 
 func TestHandleApiSubagentsSortsNewestFirstAndCapsResults(t *testing.T) {
-	s := newTestServer(t)
-	s.now = func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) }
+	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	project := filepath.Join(t.TempDir(), "many")
 	for i := 0; i < 205; i++ {
 		timestamp := time.Date(2026, 7, 1, 0, i, 0, 0, time.UTC).Format(time.RFC3339)

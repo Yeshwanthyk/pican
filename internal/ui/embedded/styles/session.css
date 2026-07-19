@@ -1204,6 +1204,30 @@ button.session-header-back {
   max-width: 40vw;
 }
 
+.session-header-runtime {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1;
+  vertical-align: middle;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--dim));
+  border-radius: 999px;
+}
+
+.session-header-runtime-mark {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 3px;
+}
+
 .session-header-right {
   display: flex;
   align-items: center;
@@ -2598,8 +2622,8 @@ button.session-header-back {
 }
 
 @media (min-width: 901px) {
-  html.pi-session-page,
-  body.pi-session-page {
+  html.pican-session-page,
+  body.pican-session-page {
     height: 100vh;
     overflow: hidden;
   }
@@ -2612,8 +2636,8 @@ button.session-header-back {
 }
 
 @media (max-width: 900px) {
-  html.pi-session-page,
-  body.pi-session-page {
+  html.pican-session-page,
+  body.pican-session-page {
     height: 100%;
   }
 
@@ -2623,7 +2647,7 @@ button.session-header-back {
          can't be shifted, and its height tracks the visible viewport
          (--viewport-height, kept in sync from visualViewport in setupSessionGlobals), so
          the composer always sits just above the keyboard. */
-  body.pi-session-page {
+  body.pican-session-page {
     position: fixed;
     top: 0;
     left: 0;

@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/sessions"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
 type ChatSender interface {
@@ -35,6 +35,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	s.applyRuntimeAvailability(&resolved.Session.SessionSummary)
 	if !resolved.Session.ChatAvailable {
 		writeJSONError(w, http.StatusConflict, resolved.Session.ChatDisabledReason)
 		return
@@ -84,6 +85,9 @@ type sessionStatusFile struct {
 
 func (s *Server) readSessionStatus(sessionID string) *workers.WorkerStatus {
 	if sessionID == "" {
+		return nil
+	}
+	if resolved, err := sessions.ResolveByID(s.sessionsDir, sessionID); err == nil && resolved.Session.Runtime == "codex" {
 		return nil
 	}
 	path := filepath.Join(s.sessionStatusDir(), sessionID)
@@ -145,10 +149,7 @@ func (s *Server) handleWorkerStatus(w http.ResponseWriter, r *http.Request) {
 		stateCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 		if state, err := s.chatSender.GetState(stateCtx, sessionID); err == nil {
-			status.Model = state.Model
-			status.ModelName = state.ModelName
-			status.ModelProvider = state.ModelProvider
-			status.ThinkingLevel = state.ThinkingLevel
+			status = state
 		}
 	}
 	writeJSON(w, 0, status)
@@ -174,6 +175,10 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sessionID := resolved.Session.ID
+	if available, _ := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSON(w, 0, map[string]any{"commands": []workers.SlashCommand{}, "workerReady": false})
+		return
+	}
 	if r.URL.Query().Get("load") == "1" {
 		if err := s.chatSender.EnsureWorker(r.Context(), sessionID, resolved.Path); err != nil {
 			fmt.Fprintf(os.Stderr, "commands: ensure worker failed for %s: %v\n", sessionID, err)
@@ -225,6 +230,14 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "provider and modelId required")
 		return
 	}
+	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	if s.chatSender == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
+		return
+	}
 	if err := s.chatSender.SetModel(r.Context(), resolved.Session.ID, resolved.Path, body.Provider, body.ModelID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -250,6 +263,14 @@ func (s *Server) handleSetThinkingLevel(w http.ResponseWriter, r *http.Request) 
 	}
 	if body.Level == "" {
 		writeJSONError(w, http.StatusBadRequest, "level required")
+		return
+	}
+	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	if s.chatSender == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
 	}
 	if err := s.chatSender.SetThinkingLevel(r.Context(), resolved.Session.ID, resolved.Path, body.Level); err != nil {

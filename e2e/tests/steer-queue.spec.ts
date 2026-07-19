@@ -10,7 +10,7 @@ import {
 // The stub pi (e2e/lib/stub-pi/pi) honors a "[[slow:NNNN]]" marker to hold a run
 // open, and folds any prompt that lands mid-run into the active turn (a steer).
 
-// The e2e suite runs many projects in parallel against one pi-web backend that
+// The e2e suite runs many projects in parallel against one pican backend that
 // serializes SQLite writes; under that load a single POST /api/chat/queue
 // round-trip can exceed Playwright's default 5s expect window, and the
 // autonomous queue drainer racing with parallel test sessions amplifies the
@@ -45,6 +45,8 @@ test.describe("steer / queue (stubbed pi)", () => {
     await textarea.fill(`task A [[slow:${slowMs}]]`);
     await page.locator("#pi-chat-send").click();
 
+    // Compact mobile layouts reveal the toolbar when the composer is focused.
+    await textarea.focus();
     // While running, the Steer (send) and Queue buttons are available.
     await expect(page.locator("#pi-chat-queue")).toBeVisible();
     await expect(page.locator("#pi-chat-send")).toHaveText("Steer");
@@ -80,7 +82,8 @@ test.describe("steer / queue (stubbed pi)", () => {
       window.dispatchEvent = function (event: Event) {
         if (
           w.__piSuspendChipCleanup &&
-          (event.type === "pi-session-reload" || event.type === "pi-worker-done")
+          (event.type === "pi-session-reload" ||
+            event.type === "pi-worker-done")
         ) {
           return true;
         }
@@ -105,9 +108,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     // idle (pi-worker-done) between openRunningSession and our click,
     // dropping activeRun=false so the next send becomes a fresh turn instead
     // of a steer.
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "steer", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "steer",
+      {
+        slowMs: 30000,
+      },
+    );
 
     const steerMsg = `steer-${testInfo.workerIndex}-${Date.now()}`;
     const release = await suspendChipCleanup(page);
@@ -122,9 +131,12 @@ test.describe("steer / queue (stubbed pi)", () => {
     await release();
 
     // The steered message is delivered and answered.
-    await expect(page.locator("#messages")).toContainText(`Stub reply: ${steerMsg}`, {
-      timeout: 20000,
-    });
+    await expect(page.locator("#messages")).toContainText(
+      `Stub reply: ${steerMsg}`,
+      {
+        timeout: 20000,
+      },
+    );
 
     // Once the run completes (and the user message lands), the steer row clears.
     await expect(steerRow).toHaveCount(0, { timeout: 20000 });
@@ -137,9 +149,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     // 30s slow-hold so the original run is still in flight when the steer
     // lands. The chip must clear well before agent_end fires (we'd be done
     // long before this test's 30s timeout if we waited for the run instead).
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "steer-fast", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "steer-fast",
+      {
+        slowMs: 30000,
+      },
+    );
 
     const steerMsg = `fast-steer-${testInfo.workerIndex}-${Date.now()}`;
     const release = await suspendChipCleanup(page);
@@ -157,7 +175,9 @@ test.describe("steer / queue (stubbed pi)", () => {
     // watcher → SSE 'reload' → /api/session refetch → reconcile pipeline puts
     // the entry into the model. The steer chip must disappear within a few
     // seconds of that — well before the 30s slow run ends.
-    await expect(page.locator("#messages")).toContainText(steerMsg, { timeout: 10000 });
+    await expect(page.locator("#messages")).toContainText(steerMsg, {
+      timeout: 10000,
+    });
     await expect(steerRow).toHaveCount(0, { timeout: 5000 });
   });
 
@@ -168,9 +188,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     // Long slow-hold so activeRun stays true through the click — see the
     // matching note on "steering shows a panel row". Plus a refetch stall so
     // the auto-clear doesn't beat us to the X button.
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "steer-cancel", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "steer-cancel",
+      {
+        slowMs: 30000,
+      },
+    );
 
     const steerMsg = `dismiss-${testInfo.workerIndex}-${Date.now()}`;
     const release = await suspendChipCleanup(page);
@@ -192,7 +218,12 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "queue");
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "queue",
+    );
 
     const keep = `keep-${testInfo.workerIndex}-${Date.now()}`;
     const drop = `drop-${testInfo.workerIndex}-${Date.now()}`;
@@ -203,21 +234,31 @@ test.describe("steer / queue (stubbed pi)", () => {
     await page.locator("#pi-chat-queue").click();
 
     // Queue rows are the non-steer rows in the panel.
-    const queuedRows = page.locator(".pi-queue-item:not(.pi-queue-item--steer)");
+    const queuedRows = page.locator(
+      ".pi-queue-item:not(.pi-queue-item--steer)",
+    );
     await expect(queuedRows).toHaveCount(2);
 
     // Delete the second queued message before it is ever sent.
-    await queuedRows.filter({ hasText: drop }).locator(".pi-queue-item-remove").click();
+    await queuedRows
+      .filter({ hasText: drop })
+      .locator(".pi-queue-item-remove")
+      .click();
     await expect(queuedRows).toHaveCount(1);
     await expect(queuedRows.filter({ hasText: keep })).toHaveCount(1);
 
     // After the running response completes, the kept message auto-sends.
-    await expect(page.locator("#messages")).toContainText(`Stub reply: ${keep}`, {
-      timeout: 20000,
-    });
+    await expect(page.locator("#messages")).toContainText(
+      `Stub reply: ${keep}`,
+      {
+        timeout: 20000,
+      },
+    );
     await expect(queuedRows).toHaveCount(0);
     // The deleted message was never sent.
-    await expect(page.locator("#messages")).not.toContainText(`Stub reply: ${drop}`);
+    await expect(page.locator("#messages")).not.toContainText(
+      `Stub reply: ${drop}`,
+    );
   });
 
   // Keyboard shortcut tests live below. The panel's document-level keydown
@@ -236,16 +277,20 @@ test.describe("steer / queue (stubbed pi)", () => {
     // (and the panel updates) before the next item is added. Without this
     // wait the three POSTs race and items may arrive out of input order.
     // Use a generous timeout: the e2e suite runs many tests in parallel
-    // against one pi-web backend that serializes SQLite writes, so a single
+    // against one pican backend that serializes SQLite writes, so a single
     // POST round-trip can take longer than the default 5s expect window.
     for (let i = 0; i < items.length; i++) {
       await textarea.fill(items[i]);
       await page.locator("#pi-chat-queue").click();
-      await expect(page.locator(".pi-queue-item")).toHaveCount(i + 1, { timeout: 15000 });
+      await expect(page.locator(".pi-queue-item")).toHaveCount(i + 1, {
+        timeout: 15000,
+      });
     }
     // Textarea is cleared by each Queue press; the panel auto-focuses the first
     // row (focusIndex = 0), so the shortcut listener targets that row.
-    await expect(page.locator(".pi-queue-item--focused")).toHaveCount(1, { timeout: 5000 });
+    await expect(page.locator(".pi-queue-item--focused")).toHaveCount(1, {
+      timeout: 5000,
+    });
     return items;
   }
 
@@ -255,9 +300,15 @@ test.describe("steer / queue (stubbed pi)", () => {
   }, testInfo) => {
     // 30s slow-hold so the backend drainer never gets to dispatch items
     // mid-test (which would yank rows out from under the keyboard cursor).
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-nav", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-nav",
+      {
+        slowMs: 30000,
+      },
+    );
     const items = await queueThree(page, textarea, testInfo, "nav");
 
     const rows = page.locator(".pi-queue-item");
@@ -287,9 +338,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-del", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-del",
+      {
+        slowMs: 30000,
+      },
+    );
     const items = await queueThree(page, textarea, testInfo, "del");
 
     // Focus moves to index 1, then delete; row containing items[1] should go.
@@ -298,18 +355,30 @@ test.describe("steer / queue (stubbed pi)", () => {
 
     const rows = page.locator(".pi-queue-item");
     await expect(rows).toHaveCount(2);
-    await expect(page.locator(".pi-queue-item-text", { hasText: items[1] })).toHaveCount(0);
-    await expect(page.locator(".pi-queue-item-text", { hasText: items[0] })).toHaveCount(1);
-    await expect(page.locator(".pi-queue-item-text", { hasText: items[2] })).toHaveCount(1);
+    await expect(
+      page.locator(".pi-queue-item-text", { hasText: items[1] }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator(".pi-queue-item-text", { hasText: items[0] }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator(".pi-queue-item-text", { hasText: items[2] }),
+    ).toHaveCount(1);
   });
 
   test("Enter sends the focused queued row immediately (skip-ahead)", async ({
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-enter", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-enter",
+      {
+        slowMs: 30000,
+      },
+    );
     const items = await queueThree(page, textarea, testInfo, "enter");
 
     // The stub echoes the steered message into the JSONL immediately, and the
@@ -325,27 +394,42 @@ test.describe("steer / queue (stubbed pi)", () => {
 
     // items[2] becomes an in-flight steer (we're still mid-run), so it leaves
     // the queued list and shows up as a steer row instead.
-    await expect(page.locator(".pi-queue-item:not(.pi-queue-item--steer)")).toHaveCount(2);
-    await expect(page.locator(".pi-queue-item-text", { hasText: items[2] })).toHaveCount(1);
+    await expect(
+      page.locator(".pi-queue-item:not(.pi-queue-item--steer)"),
+    ).toHaveCount(2);
+    await expect(
+      page.locator(".pi-queue-item-text", { hasText: items[2] }),
+    ).toHaveCount(1);
     // The first two are still queued (in order).
-    const queuedTexts = await page.locator(".pi-queue-item:not(.pi-queue-item--steer) .pi-queue-item-text").allTextContents();
+    const queuedTexts = await page
+      .locator(".pi-queue-item:not(.pi-queue-item--steer) .pi-queue-item-text")
+      .allTextContents();
     expect(queuedTexts).toEqual([items[0], items[1]]);
 
     await release();
 
     // The sent message also reaches the conversation as a "Stub reply".
-    await expect(page.locator("#messages")).toContainText(`Stub reply: ${items[2]}`, {
-      timeout: 20000,
-    });
+    await expect(page.locator("#messages")).toContainText(
+      `Stub reply: ${items[2]}`,
+      {
+        timeout: 20000,
+      },
+    );
   });
 
   test("E pops the focused row back into the textarea for editing", async ({
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-edit", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-edit",
+      {
+        slowMs: 30000,
+      },
+    );
     const items = await queueThree(page, textarea, testInfo, "edit");
 
     await page.keyboard.press("ArrowDown"); // focus items[1]
@@ -353,16 +437,24 @@ test.describe("steer / queue (stubbed pi)", () => {
 
     await expect(textarea).toHaveValue(items[1]);
     await expect(page.locator(".pi-queue-item")).toHaveCount(2);
-    await expect(page.locator(".pi-queue-item-text", { hasText: items[1] })).toHaveCount(0);
+    await expect(
+      page.locator(".pi-queue-item-text", { hasText: items[1] }),
+    ).toHaveCount(0);
   });
 
   test("Esc unfocuses the panel and refocuses the textarea", async ({
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-esc", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-esc",
+      {
+        slowMs: 30000,
+      },
+    );
     await queueThree(page, textarea, testInfo, "esc");
 
     await page.keyboard.press("Escape");
@@ -375,9 +467,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "kb-suppress", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "kb-suppress",
+      {
+        slowMs: 30000,
+      },
+    );
     await queueThree(page, textarea, testInfo, "sup");
 
     // Start typing into the textarea; the panel listener must not hijack keys.
@@ -394,9 +492,13 @@ test.describe("steer / queue (stubbed pi)", () => {
     await expect(page.locator(".pi-queue-item")).toHaveCount(3);
 
     // Arrow keys also don't move panel focus while text is in the textarea.
-    const focusedTextBefore = await page.locator(".pi-queue-item--focused .pi-queue-item-text").textContent();
+    const focusedTextBefore = await page
+      .locator(".pi-queue-item--focused .pi-queue-item-text")
+      .textContent();
     await page.keyboard.press("ArrowDown");
-    const focusedTextAfter = await page.locator(".pi-queue-item--focused .pi-queue-item-text").textContent();
+    const focusedTextAfter = await page
+      .locator(".pi-queue-item--focused .pi-queue-item-text")
+      .textContent();
     expect(focusedTextAfter).toBe(focusedTextBefore);
   });
 
@@ -404,9 +506,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "above-shell", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "above-shell",
+      {
+        slowMs: 30000,
+      },
+    );
     await textarea.fill("anywhere");
     await page.locator("#pi-chat-queue").click();
 
@@ -436,25 +544,38 @@ test.describe("steer / queue (stubbed pi)", () => {
   }, testInfo) => {
     // 30s slow-hold so the autonomous drainer never gets a window to dispatch
     // the queued item before we manage to pause the panel.
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "persist", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "persist",
+      {
+        slowMs: 30000,
+      },
+    );
 
     const keep = `persist-${testInfo.workerIndex}-${Date.now()}`;
     await textarea.fill(keep);
     await page.locator("#pi-chat-queue").click();
     // Wait for the POST round-trip to land the item before reaching for the
     // Pause button (which lives inside the now-visible panel header).
-    await expect(page.locator(".pi-queue-item")).toHaveCount(1, { timeout: 15000 });
+    await expect(page.locator(".pi-queue-item")).toHaveCount(1, {
+      timeout: 15000,
+    });
     await expect(page.locator(".pi-queue-status-saved")).toBeVisible();
     await page.getByRole("button", { name: /^Pause$/ }).click();
     await expect(page.locator(".pi-queue-panel--paused")).toBeVisible();
 
     // Reload and confirm the queued row + paused flag came back from the server.
     await page.reload();
-    await expect(page.locator("#pi-chat-composer")).toHaveAttribute("data-chat-available", "true");
+    await expect(page.locator("#pi-chat-composer")).toHaveAttribute(
+      "data-chat-available",
+      "true",
+    );
 
-    await expect(page.locator(".pi-queue-item")).toHaveCount(1, { timeout: 10000 });
+    await expect(page.locator(".pi-queue-item")).toHaveCount(1, {
+      timeout: 10000,
+    });
     await expect(page.locator(".pi-queue-item")).toContainText(keep);
     await expect(page.locator(".pi-queue-panel--paused")).toBeVisible();
   });
@@ -473,7 +594,10 @@ test.describe("steer / queue (stubbed pi)", () => {
     const id = writeSession(sessionsDir, name, entries);
 
     await page1.goto(`/session?id=${encodeURIComponent(id)}`);
-    await expect(page1.locator("#pi-chat-composer")).toHaveAttribute("data-chat-available", "true");
+    await expect(page1.locator("#pi-chat-composer")).toHaveAttribute(
+      "data-chat-available",
+      "true",
+    );
 
     // Pause first so the autonomous drainer doesn't snap the message into pi
     // before we get a chance to see it from the second context.
@@ -483,6 +607,8 @@ test.describe("steer / queue (stubbed pi)", () => {
     // queue to outlive a full browser close, so pause as soon as it's there.
     await page1.locator("#pi-chat-message").fill("task A [[slow:30000]]");
     await page1.locator("#pi-chat-send").click();
+    // Compact mobile layouts reveal the toolbar when the composer is focused.
+    await page1.locator("#pi-chat-message").focus();
     await expect(page1.locator("#pi-chat-queue")).toBeVisible();
     await page1.locator("#pi-chat-message").fill(msg);
     await page1.locator("#pi-chat-queue").click();
@@ -496,8 +622,13 @@ test.describe("steer / queue (stubbed pi)", () => {
     const page2 = await context2.newPage();
     await collapseScratchpad(page2);
     await page2.goto(`/session?id=${encodeURIComponent(id)}`);
-    await expect(page2.locator("#pi-chat-composer")).toHaveAttribute("data-chat-available", "true");
-    await expect(page2.locator(".pi-queue-item")).toHaveCount(1, { timeout: 10000 });
+    await expect(page2.locator("#pi-chat-composer")).toHaveAttribute(
+      "data-chat-available",
+      "true",
+    );
+    await expect(page2.locator(".pi-queue-item")).toHaveCount(1, {
+      timeout: 10000,
+    });
     await expect(page2.locator(".pi-queue-item")).toContainText(msg);
     await expect(page2.locator(".pi-queue-panel--paused")).toBeVisible();
     await context2.close();
@@ -507,9 +638,15 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "saved-hint", {
-      slowMs: 30000,
-    });
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "saved-hint",
+      {
+        slowMs: 30000,
+      },
+    );
     await textarea.fill("hello");
     await page.locator("#pi-chat-queue").click();
     const hint = page.locator(".pi-queue-status-saved");
@@ -520,7 +657,12 @@ test.describe("steer / queue (stubbed pi)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    const { textarea } = await openRunningSession(page, sessionsDir, testInfo, "queue-pause");
+    const { textarea } = await openRunningSession(
+      page,
+      sessionsDir,
+      testInfo,
+      "queue-pause",
+    );
 
     const msg = `paused-${testInfo.workerIndex}-${Date.now()}`;
     await textarea.fill(msg);
@@ -531,13 +673,18 @@ test.describe("steer / queue (stubbed pi)", () => {
     await expect(page.locator(".pi-queue-panel--paused")).toBeVisible();
 
     // Even after the run completes, the message stays in the queue.
-    await expect(page.locator(".pi-queue-item")).toHaveCount(1, { timeout: 20000 });
+    await expect(page.locator(".pi-queue-item")).toHaveCount(1, {
+      timeout: 20000,
+    });
 
     // Resume kicks the message out.
     await page.getByRole("button", { name: /^Resume$/ }).click();
-    await expect(page.locator("#messages")).toContainText(`Stub reply: ${msg}`, {
-      timeout: 20000,
-    });
+    await expect(page.locator("#messages")).toContainText(
+      `Stub reply: ${msg}`,
+      {
+        timeout: 20000,
+      },
+    );
     await expect(page.locator(".pi-queue-item")).toHaveCount(0);
   });
 });

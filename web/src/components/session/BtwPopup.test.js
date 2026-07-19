@@ -266,7 +266,7 @@ describe('BtwPopup', () => {
   });
 
   it('does not auto-reopen on mobile even if it was open before', async () => {
-    localStorage.setItem('pi-btw:window', JSON.stringify({ open: true }));
+    localStorage.setItem('pican:btw:window', JSON.stringify({ open: true }));
     setupEnv({ mobile: true });
     render(BtwPopup);
     await settle();

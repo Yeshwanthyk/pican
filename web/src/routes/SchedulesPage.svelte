@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
   import FullScreenSheet from '../components/session/FullScreenSheet.svelte';
   import {
     groupModelsByProvider,

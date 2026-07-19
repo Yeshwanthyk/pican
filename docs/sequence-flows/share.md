@@ -1,6 +1,6 @@
 # Sequence Flow: Share to GitHub Gist
 
-This flow covers a user clicking the **Share** button on a session page, which creates a private GitHub Gist containing a standalone HTML export of the session.
+This flow covers a user clicking **Share** on a Pi or Codex session page, creating a private GitHub Gist containing a standalone HTML snapshot.
 
 ## Sequence Diagram
 
@@ -34,7 +34,7 @@ This flow covers a user clicking the **Share** button on a session page, which c
      │             │              │                  │               │              │
      │             │              │◀───────────────── HTML string (no buttons)        │
      │             │              │                  │               │              │
-     │             │              │─── os.MkdirTemp("pi-share-*")                    │
+     │             │              │─── os.MkdirTemp("pican-share-*")                    │
      │             │              │─── os.WriteFile(temp/share-session.html)                │
      │             │              │                  │               │              │
      │             │              │─── gh gist create --public=false temp/share-session.html
@@ -88,18 +88,18 @@ If not logged in → `400` error: `"GitHub CLI not logged in. Run 'gh auth login
 
 ### 4. Find and Render Session
 
-The handler resolves the session by ID and then calls:
+The handler resolves the session by ID through the common parser. For Codex this reads the latest local projection; sharing does not contact app-server. It then calls:
 
 ```go
 renderExportSessionPage(session, theme)
 ```
 
-The `theme` parameter is extracted from the user's `pi-web-theme` cookie (falling back to `"dark"`) so the exported snapshot opens with the same theme the user had active. The export renderer omits live-only chrome (no back link, no share button, no chat composer) — the exported HTML is meant to be a clean, self-contained document.
+The `theme` parameter is extracted from the user's `pican-theme` cookie (falling back to `"dark"`) so the exported snapshot opens with the same theme the user had active. The export renderer omits live-only chrome (no back link, no share button, no chat composer) — the exported HTML is meant to be a clean, self-contained document.
 
 ### 5. Create Temporary File
 
 ```go
-tmpDir, _ := os.MkdirTemp(os.TempDir(), "pi-share-*")
+tmpDir, _ := os.MkdirTemp(os.TempDir(), "pican-share-*")
 tmpFile := filepath.Join(tmpDir, "share-session.html")
 os.WriteFile(tmpFile, []byte(html), 0644)
 defer os.RemoveAll(tmpDir)
@@ -119,7 +119,7 @@ The gist is created as **private** (`--public=false`).
 
 ```json
 {
-  "gistUrl": "https://gist.github.com/setkyar/abc123",
+  "gistUrl": "https://gist.github.com/yeshwanthyk/abc123",
   "gistId": "abc123",
   "previewUrl": "https://pi.dev/session/#abc123"
 }
@@ -147,3 +147,4 @@ The shared HTML is completely **self-contained**:
 - Markdown rendering via inline `marked.min.js`
 - Syntax highlighting via inline `highlight.min.js`
 - No server dependencies — it works if saved and opened locally
+- Snapshot-only runtime metadata; no Pi RPC, Codex app-server, chat, or SSE behavior

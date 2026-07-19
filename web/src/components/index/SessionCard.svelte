@@ -1,5 +1,5 @@
 <script>
-  import { t } from '../../shared/i18n.js';
+  import { t } from '../../shared/strings.js';
   import { handleNavClick } from '../../shared/navigation.js';
   import { prefetchSession } from '../../routes/session-prefetch.js';
   import { icon, Pin, PinOff } from '../../shared/icons.js';
@@ -21,6 +21,7 @@
   const runningModel = $derived(running ? formatRunningModel(runningStatus) : '');
   const search = $derived(sessionSearchText(session));
   const metrics = $derived(formatSessionMetrics(session));
+  const runtime = $derived(session.runtime || 'pi');
   const pinLabel = $derived(session.pinned ? t('index.unpinSession') : t('index.pinSession'));
 
   let pinBusy = $state(false);
@@ -71,6 +72,12 @@
   <div class="session-title-row">
     <div class="session-title">{title}</div>
     <div class="session-card-flags">
+      {#if runtime === 'codex'}
+        <span class="session-card-badge session-card-runtime" title={t('index.runtimeBadgeTitle')}>
+          <img class="session-card-runtime-mark" src="/codex-icon.svg" alt="" aria-hidden="true" />
+          {t('runtime.codex')}
+        </span>
+      {/if}
       {#if !session.chatAvailable}
         <span
           class="session-card-badge"
@@ -95,7 +102,9 @@
   <div class="session-project">{session.project}</div>
   {#if modelLabel}
     <div class="session-model-row">
-      <img class="session-card-mark" src="/pi-icon.svg" alt="" aria-hidden="true" />
+      {#if runtime === 'pi'}
+        <img class="session-card-mark" src="/pi-icon.svg" alt="" aria-hidden="true" />
+      {/if}
       <div class="session-model" data-session-model>{modelLabel}</div>
     </div>
   {/if}

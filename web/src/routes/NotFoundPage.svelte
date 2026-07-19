@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
 
   onMount(() => {
     const previousTitle = document.title;
-    document.title = `${t('notFound.heading')} — Pi Sessions`;
+    document.title = `${t('notFound.heading')} — ${t('common.productName')}`;
     return () => {
       document.title = previousTitle;
     };

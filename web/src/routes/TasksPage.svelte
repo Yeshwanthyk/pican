@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { createStatusEvents } from '../shared/status-events.js';
   import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/i18n.js';
+  import { t } from '../shared/strings.js';
   import { icon, ChevronLeft, ListChecks } from '../shared/icons.js';
   import { defaultFetchProjects } from '../index/sessions.js';
   import TaskCard from '../components/tasks/TaskCard.svelte';

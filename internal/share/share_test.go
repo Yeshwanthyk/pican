@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 // fakeRunner is a configurable Runner stub: it records the html path it was
@@ -51,7 +51,7 @@ func TestHandlePreviewReturnsHTML(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/share?id=abc&preview=1", nil)
-	req.AddCookie(&http.Cookie{Name: "pi-web-theme", Value: "nord"})
+	req.AddCookie(&http.Cookie{Name: "pican-theme", Value: "nord"})
 	rec := httptest.NewRecorder()
 
 	Handle(rec, req, deps)

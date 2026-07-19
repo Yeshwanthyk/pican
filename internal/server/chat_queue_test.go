@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/chatqueue"
+	"pican/internal/chatqueue"
 
 	_ "modernc.org/sqlite"
 )
@@ -246,4 +246,3 @@ func TestChatQueueRejectsMissingPositionOnDelete(t *testing.T) {
 		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
-

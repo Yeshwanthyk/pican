@@ -18,7 +18,7 @@ var authTmpl = template.Must(template.New("auth").Parse(authTmplStr))
 // runtime "custom" theme resolves too: auth.html pulls /custom-themes.css,
 // which is served publicly for this pre-auth case.
 //
-// cookieTheme is the request's pi-web-theme cookie (the live theme toggle's
+// cookieTheme is the request's pican-theme cookie (the live theme toggle's
 // carrier); when empty it falls back to the server-persisted theme so the login
 // screen matches the user's choice even before any client storage exists.
 func RenderAuthPrompt(w io.Writer, cookieTheme string) error {

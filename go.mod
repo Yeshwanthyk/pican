@@ -1,4 +1,4 @@
-module pi-web
+module pican
 
 go 1.25.5
 

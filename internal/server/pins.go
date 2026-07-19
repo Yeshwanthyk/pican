@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 // session_pins records which sessions are pinned to the top of the homepage.

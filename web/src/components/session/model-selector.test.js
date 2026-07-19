@@ -20,14 +20,17 @@ function cleanupDom(el) {
 }
 
 describe('setupModelSelector', () => {
-  it('returns { open, close } API', () => {
+  it('requests models for the current session and returns { open, close } API', async () => {
     const el = createDom();
     const chatApi = {
-      listModels: () => Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
+      listModels: vi.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
+      ),
     };
     const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
     expect(api).toHaveProperty('open');
     expect(api).toHaveProperty('close');
+    await vi.waitFor(() => expect(chatApi.listModels).toHaveBeenCalledWith('s'));
     cleanupDom(el);
   });
 

@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 
-	"pi-web/internal/workers"
+	"pican/internal/workers"
 )
 
 // computeRunningStatus is the single source of truth for "is this session

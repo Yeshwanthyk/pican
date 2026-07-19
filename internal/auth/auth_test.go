@@ -125,7 +125,7 @@ func TestAuthAcceptsXPiTokenHeader(t *testing.T) {
 	a := New("secret")
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Pi-Token", "secret")
+	req.Header.Set("X-Pican-Token", "secret")
 	a.Wrap(okHandler)(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
@@ -161,8 +161,8 @@ func TestAuthRejectsBrowserWithHTMLPrompt(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want text/html", ct)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "pi-web") {
-		t.Fatal("expected HTML token prompt in response body")
+	if !strings.Contains(body, "pican") {
+		t.Fatal("expected branded HTML token prompt in response body")
 	}
 	if !strings.HasPrefix(strings.ToLower(body), "<!doctype html>") {
 		t.Fatal("expected HTML response")

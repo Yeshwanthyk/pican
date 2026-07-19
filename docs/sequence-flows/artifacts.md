@@ -63,7 +63,7 @@ The result:
   modal ("changes made through other shell commands … may show an older version
   … check the file on disk").
 
-This is intentional: pi-web is a read-only transcript viewer and does **not**
+This is intentional: pican is a read-only transcript viewer and does **not**
 read the working directory (the files may differ or not exist when viewing an old
 or exported session), so the transcript's structured calls are the only ground
 truth.
@@ -113,7 +113,7 @@ Previewable artifacts carry a `previewType`. The toggle defaults to **Source**
 The HTML/SVG iframe is the load-bearing security boundary:
 
 - `sandbox="allow-scripts"` **without** `allow-same-origin` → unique opaque
-  origin: no access to the parent DOM, cookies, `localStorage`, or `PI_WEB_TOKEN`.
+  origin: no access to the parent DOM, cookies, `localStorage`, or `PICAN_TOKEN`.
 - Content is set via the `srcdoc` **property** (never concatenated into parent
   HTML), so it can't execute in the parent document.
 - An injected CSP meta blocks all network: `default-src 'none'; img-src data:;
@@ -128,8 +128,8 @@ defaults in `internal/server/settings.go`) control what the panel shows:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `pi-web:v1:artifacts:enabled` | `true` | When `false`, the whole **Artifacts tab is hidden** (and if it was active, the sidebar falls back to Scratchpad). |
-| `pi-web:v1:artifacts:include` | `*.md, *.html` | Comma/space-separated glob list. Empty = show everything. |
+| `pican:v1:artifacts:enabled` | `true` | When `false`, the whole **Artifacts tab is hidden** (and if it was active, the sidebar falls back to Scratchpad). |
+| `pican:v1:artifacts:include` | `*.md, *.html` | Comma/space-separated glob list. Empty = show everything. |
 
 `filterArtifacts(artifacts, { enabled, include })` (pure) applies them:
 

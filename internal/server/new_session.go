@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
-func (s *Server) initialSettingsFromSource(ctx context.Context, sourceSessionID string) sessions.InitialSettings {
+func (s *Server) initialSettingsFromSource(ctx context.Context, sourceSessionID, targetRuntime string) sessions.InitialSettings {
 	if s.chatSender == nil || sourceSessionID == "" {
 		return sessions.InitialSettings{}
 	}
-	if _, err := sessions.ResolveByID(s.sessionsDir, sourceSessionID); err != nil {
+	resolved, err := sessions.ResolveByID(s.sessionsDir, sourceSessionID)
+	if err != nil || resolved.Session.Runtime != targetRuntime {
 		return sessions.InitialSettings{}
 	}
 	state, err := s.chatSender.GetState(ctx, sourceSessionID)
