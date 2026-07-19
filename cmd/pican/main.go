@@ -1,6 +1,6 @@
 package main
 
-import "pi-web/internal/app"
+import "pican/internal/app"
 
 // version is set at build time via -ldflags "-X main.version=...".
 var version = "dev"

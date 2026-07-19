@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import AboutSettings from '../components/settings/AboutSettings.svelte';
   import AppearanceSettings from '../components/settings/AppearanceSettings.svelte';
   import ArtifactSettings from '../components/settings/ArtifactSettings.svelte';
   import MachinesSettings from '../components/settings/MachinesSettings.svelte';
@@ -25,7 +24,6 @@
     { id: 'artifacts', labelKey: 'settings.artifacts' },
     { id: 'notifications', labelKey: 'settings.notifications' },
     { id: 'machines', labelKey: 'settings.machines' },
-    { id: 'about', labelKey: 'settings.about' },
   ];
   const sectionIds = new Set(sections.map((s) => s.id));
 
@@ -190,8 +188,6 @@
       <NotificationSettings {settings} onSave={saveSetting} onSaved={flashSaved} />
     {:else if activeSection === 'machines'}
       <MachinesSettings />
-    {:else if activeSection === 'about'}
-      <AboutSettings />
     {/if}
   </div>
 

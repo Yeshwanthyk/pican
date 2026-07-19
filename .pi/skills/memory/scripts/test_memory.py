@@ -46,19 +46,19 @@ class TestMemoryAutoInit(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.db_path = str(Path(self.tmpdir.name) / "new.sqlite")
-        os.environ["PI_MEMORY_DB"] = self.db_path
+        os.environ["PICAN_MEMORY_DB"] = self.db_path
 
     def tearDown(self):
         self.tmpdir.cleanup()
-        os.environ.pop("PI_MEMORY_DB", None)
+        os.environ.pop("PICAN_MEMORY_DB", None)
 
     def test_add_memory_auto_initializes_new_database(self):
         args = argparse.Namespace(
             content="First use memory",
             category="general",
             context=None,
-            cwd="/test/pi-web",
-            project="pi-web",
+            cwd="/test/pican",
+            project="pican",
             session_id=None,
             session_name=None,
             importance=3,
@@ -69,7 +69,7 @@ class TestMemoryAutoInit(unittest.TestCase):
         with patch("sys.stdout", io.StringIO()):
             memory.add_memory(args)
 
-        search_args = argparse.Namespace(query="First", project="pi-web", limit=20)
+        search_args = argparse.Namespace(query="First", project="pican", limit=20)
         buf = io.StringIO()
         with patch("sys.stdout", buf):
             memory.search(search_args)
@@ -82,7 +82,7 @@ class TestMemoryDB(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.db_path = str(Path(self.tmpdir.name) / "test.sqlite")
-        os.environ["PI_MEMORY_DB"] = self.db_path
+        os.environ["PICAN_MEMORY_DB"] = self.db_path
         # Suppress CLI output noise during setup/teardown
         self._stdout_patcher = patch("sys.stdout", io.StringIO())
         self._stdout_patcher.start()
@@ -91,7 +91,7 @@ class TestMemoryDB(unittest.TestCase):
     def tearDown(self):
         self._stdout_patcher.stop()
         self.tmpdir.cleanup()
-        os.environ.pop("PI_MEMORY_DB", None)
+        os.environ.pop("PICAN_MEMORY_DB", None)
 
     # --- helpers ---
 
@@ -132,24 +132,24 @@ class TestMemoryDB(unittest.TestCase):
         self.assertEqual(output.strip(), "")
 
     def test_search_by_project(self):
-        self._add("pi-web feature", project="pi-web", cwd="/Users/test/pi-web")
+        self._add("pican feature", project="pican", cwd="/Users/test/pican")
         self._add("other project idea", project="other-project", cwd="/other")
 
-        output = self._search("", project="pi-web")
-        self.assertIn("pi-web feature", output)
+        output = self._search("", project="pican")
+        self.assertIn("pican feature", output)
         self.assertNotIn("other project idea", output)
 
     def test_search_fallback_with_project_filter(self):
         """Regression: search with --project when FTS returns empty results."""
-        self._add("A feature idea", category="idea", project="pi-web", cwd="/Users/test/pi-web")
-        output = self._search("", project="pi-web")
+        self._add("A feature idea", category="idea", project="pican", cwd="/Users/test/pican")
+        output = self._search("", project="pican")
         self.assertIn("A feature idea", output)
 
     def test_search_no_alias_bug_regression(self):
         """Exact scenario that was broken before fixing the m alias in fallback query."""
-        self._add("pi-web roadmap item", category="plan", project="pi-web", cwd="/test/pi-web")
-        output = self._search("", project="pi-web")
-        self.assertIn("pi-web roadmap item", output)
+        self._add("pican roadmap item", category="plan", project="pican", cwd="/test/pican")
+        output = self._search("", project="pican")
+        self.assertIn("pican roadmap item", output)
 
     def test_project_filter_ignores_legacy_plain_text_context(self):
         """Regression: --project should not crash on pre-JSON context values."""
@@ -158,9 +158,9 @@ class TestMemoryDB(unittest.TestCase):
                 "INSERT INTO memories (content, category, context) VALUES (?, ?, ?)",
                 ("legacy plain context", "general", "not-json"),
             )
-        self._add("legacy json context", project="pi-web", cwd="/test/pi-web")
+        self._add("legacy json context", project="pican", cwd="/test/pican")
 
-        output = self._search("legacy", project="pi-web")
+        output = self._search("legacy", project="pican")
         self.assertIn("legacy json context", output)
         self.assertNotIn("legacy plain context", output)
 
@@ -174,10 +174,10 @@ class TestMemoryDB(unittest.TestCase):
             "Session-linked memory",
             session_id="abc12345",
             session_name="Refactor auth",
-            project="pi-web",
-            cwd="/test/pi-web",
+            project="pican",
+            cwd="/test/pican",
         )
-        output = self._search("", project="pi-web")
+        output = self._search("", project="pican")
         self.assertIn("Session-linked memory", output)
 
     def test_search_partial_word(self):

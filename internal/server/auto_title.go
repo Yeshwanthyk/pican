@@ -7,17 +7,17 @@ import (
 	"strings"
 	"time"
 
-	"pi-web/internal/rpc"
-	"pi-web/internal/sessions"
+	"pican/internal/rpc"
+	"pican/internal/sessions"
 )
 
 const (
 	autoTitleSystemPrompt = "You write short session titles. Reply with ONLY a 2-5 word Title Case title summarizing the user's task. No punctuation, no quotes, no extra words."
 	autoTitleTimeout      = 25 * time.Second
 
-	settingAutoTitleEnabled = "pi-web:v1:auto-title:enabled"
-	settingAutoTitleMode    = "pi-web:v1:auto-title:mode"
-	settingAutoTitleModel   = "pi-web:v1:auto-title:model"
+	settingAutoTitleEnabled = "pican:v1:auto-title:enabled"
+	settingAutoTitleMode    = "pican:v1:auto-title:mode"
+	settingAutoTitleModel   = "pican:v1:auto-title:model"
 )
 
 // autoTitleGenerate is the model call, injectable for tests.
@@ -72,7 +72,7 @@ func (s *Server) maybeAutoTitle(sessID string) {
 	}
 
 	s.autoTitle.mu.Lock()
-	// An explicit name pi-web didn't write (a manual rename or a header name)
+	// An explicit name pican didn't write (a manual rename or a header name)
 	// means the user owns the title — back off for good.
 	if inputs.HasExplicitName && !inputs.AutoTitled {
 		s.autoTitle.userOwned[sessID] = true

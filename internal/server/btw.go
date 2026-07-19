@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 // settingBtwSessionID is the legacy app_settings key that held the id of the
@@ -17,7 +17,7 @@ const settingBtwSessionID = "btw_session_id"
 
 // settingShowBtwInIndex toggles whether btw scratch-chats appear in the session
 // list. Off by default; surfaced on the /settings page.
-const settingShowBtwInIndex = "pi-web:v1:show-btw-in-index"
+const settingShowBtwInIndex = "pican:v1:show-btw-in-index"
 
 // btwGlobalParent is the sentinel parent_id used when a btw chat is opened with
 // no parent session (a future index-level btw). The legacy single global btw

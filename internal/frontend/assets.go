@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"pi-web/internal/render"
+	"pican/internal/render"
 )
 
 const (

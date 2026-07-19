@@ -34,14 +34,16 @@ describe('basename', () => {
 
 describe('filterProjectsByQuery', () => {
   const projects = [
-    { path: '/Users/x/pi-web' },
+    { path: '/Users/x/pican' },
     { path: '/Users/x/other-repo' },
-    { path: '/Users/x/nested/pican' },
+    { path: '/Users/x/nested/project' },
   ];
 
   it('matches by basename or full path, case-insensitively', () => {
-    expect(filterProjectsByQuery(projects, 'PI-WEB')).toEqual([{ path: '/Users/x/pi-web' }]);
-    expect(filterProjectsByQuery(projects, 'nested')).toEqual([{ path: '/Users/x/nested/pican' }]);
+    expect(filterProjectsByQuery(projects, 'PICAN')).toEqual([{ path: '/Users/x/pican' }]);
+    expect(filterProjectsByQuery(projects, 'nested')).toEqual([
+      { path: '/Users/x/nested/project' },
+    ]);
   });
 
   it('returns nothing for an empty or whitespace query', () => {
@@ -56,8 +58,8 @@ describe('filterProjectsByQuery', () => {
 
 describe('projectsToEntries', () => {
   it('normalizes project rows into { name, fullPath }', () => {
-    expect(projectsToEntries([{ path: '/Users/x/pi-web', enabled: true }])).toEqual([
-      { name: 'pi-web', fullPath: '/Users/x/pi-web' },
+    expect(projectsToEntries([{ path: '/Users/x/pican', enabled: true }])).toEqual([
+      { name: 'pican', fullPath: '/Users/x/pican' },
     ]);
   });
 });

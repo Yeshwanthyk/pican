@@ -1,6 +1,6 @@
 ---
 name: memory
-description: Manages project-local long-term memory in SQLite for pi-web users. Use when storing, searching, correcting, or listing memories.
+description: Manages project-local long-term memory in SQLite for pican users. Use when storing, searching, correcting, or listing memories.
 ---
 
 # Memory
@@ -8,7 +8,7 @@ description: Manages project-local long-term memory in SQLite for pi-web users. 
 Use this skill for project memory tasks. Every memory is scoped to a specific project (working directory) so facts stay relevant to the right context.
 
 ## Core files
-- `$PI_CODING_AGENT_DIR/pi-web-memory.sqlite` (default `~/.pi/agent/`) — primary memory database, auto-initialized on first use
+- `$PI_CODING_AGENT_DIR/pican-memory.sqlite` (default `~/.pi/agent/`) — primary memory database, auto-initialized on first use
 - `.pi/skills/memory/data/schema.sql` — schema definition (shipped with the skill)
 - `.pi/skills/memory/scripts/memory.py` — CLI implementation
 
@@ -18,8 +18,8 @@ Memories are associated with a project via `--cwd` and `--project`. This allows 
 
 | Context field | Source | Example |
 |---|---|---|
-| `--cwd` | `pwd` / pi session header `cwd` | `/Users/setkyar/pi-web` |
-| `--project` | basename of cwd | `pi-web` |
+| `--cwd` | `pwd` / pi session header `cwd` | `/Users/yeshwanthyk/pican` |
+| `--project` | basename of cwd | `pican` |
 | `--session-id` | pi session header `id` (8-char UUID) | `a1b2c3d4` |
 | `--session-name` | `/name` or `session_info` entry | `Refactor auth module` |
 
@@ -38,15 +38,15 @@ python3 .pi/skills/memory/scripts/memory.py init
 
 # Remember a project fact
 python3 .pi/skills/memory/scripts/memory.py add-memory "Prefers tabs over spaces" \
-  --category preference --importance 4 --cwd /Users/setkyar/pi-web --project pi-web
+  --category preference --importance 4 --cwd /Users/yeshwanthyk/pican --project pican
 
 # Remember with session context
 python3 .pi/skills/memory/scripts/memory.py add-memory "Decided to use Go 1.25 for the backend" \
-  --category decision --importance 5 --cwd /Users/setkyar/pi-web --project pi-web \
-  --session-id a1b2c3d4 --session-name "pi-web backend refactor"
+  --category decision --importance 5 --cwd /Users/yeshwanthyk/pican --project pican \
+  --session-id a1b2c3d4 --session-name "pican backend refactor"
 
 # Search across all projects or filter by project
-python3 .pi/skills/memory/scripts/memory.py search "tabs" --project pi-web
+python3 .pi/skills/memory/scripts/memory.py search "tabs" --project pican
 ```
 
 ## Rules

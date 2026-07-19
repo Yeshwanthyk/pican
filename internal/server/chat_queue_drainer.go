@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/sessions"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
 // queueDrainer is the autonomous worker that pulls items off the per-session

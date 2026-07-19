@@ -4,9 +4,9 @@
   import { boolFor, fetchModelGroups, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();
-  const enabledKey = 'pi-web:v1:auto-title:enabled';
-  const modeKey = 'pi-web:v1:auto-title:mode';
-  const modelKey = 'pi-web:v1:auto-title:model';
+  const enabledKey = 'pican:v1:auto-title:enabled';
+  const modeKey = 'pican:v1:auto-title:mode';
+  const modelKey = 'pican:v1:auto-title:model';
   let enabled = $derived(boolFor(settings, enabledKey, false));
   let mode = $derived(valueFor(settings, modeKey, 'once'));
   let model = $derived(valueFor(settings, modelKey, ''));

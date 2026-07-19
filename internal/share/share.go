@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"pi-web/internal/render"
-	"pi-web/internal/sessions"
+	"pican/internal/render"
+	"pican/internal/sessions"
 )
 
 type Runner interface {
@@ -53,10 +53,10 @@ func FindGh() string {
 }
 
 type Dependencies struct {
-	Runner  Runner
-	Resolve func(id string) (sessions.Session, error)
+	Runner       Runner
+	Resolve      func(id string) (sessions.Session, error)
 	RenderExport func(sessions.Session, string) string
-	FindGh  func() string
+	FindGh       func() string
 }
 
 func Handle(w http.ResponseWriter, r *http.Request, deps Dependencies) {
@@ -118,7 +118,7 @@ func Handle(w http.ResponseWriter, r *http.Request, deps Dependencies) {
 		return
 	}
 
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "pi-share-*")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "pican-share-*")
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to create temp dir: "+err.Error())
 		return
@@ -158,7 +158,7 @@ func renderExportHTML(w http.ResponseWriter, r *http.Request, deps Dependencies,
 		return "", false
 	}
 	theme := "dark"
-	if cookie, err := r.Cookie("pi-web-theme"); err == nil {
+	if cookie, err := r.Cookie("pican-theme"); err == nil {
 		theme = cookie.Value
 	}
 	html := deps.RenderExport(resolved, theme)

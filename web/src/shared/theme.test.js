@@ -29,8 +29,8 @@ describe('theme helpers', () => {
     applyTheme(windowImpl, documentImpl, 'custom');
 
     expect(documentImpl.documentElement.dataset.theme).toBe('custom');
-    expect(storage.getItem('pi-web-theme')).toBe('custom');
-    expect(documentImpl.cookie).toContain('pi-web-theme=custom');
+    expect(storage.getItem('pican-theme')).toBe('custom');
+    expect(documentImpl.cookie).toContain('pican-theme=custom');
   });
 
   it('uses the custom theme --body-bg for the page surround', () => {
@@ -88,7 +88,7 @@ describe('theme helpers', () => {
     toggleTheme(windowImpl, documentImpl);
 
     expect(documentImpl.documentElement.dataset.theme).toBe('custom');
-    expect(storage.getItem('pi-web-theme')).toBe('custom');
+    expect(storage.getItem('pican-theme')).toBe('custom');
   });
 
   it('cycles through the full theme registry and wraps to dark', () => {

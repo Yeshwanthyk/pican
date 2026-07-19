@@ -1,7 +1,7 @@
 /**
  * Write-through cache for server-backed user settings.
  *
- * The server (pi-web.sqlite `settings` table) is the source of truth. These
+ * The server (pican.sqlite `settings` table) is the source of truth. These
  * keys are mirrored into localStorage so the UI can read them synchronously and
  * paint without waiting on the network, but every change is written through to
  * the server so it survives a restart and is shared across browsers hitting the
@@ -15,23 +15,23 @@
 // The localStorage keys that are server-backed. Mirrors settingDefaults in
 // internal/server/settings.go.
 export const SERVER_SETTING_KEYS = [
-  'pi-web-theme',
-  'pi-web:v1:font-ui',
-  'pi-web:v1:font-content',
-  'pi-web:v1:font-ui-size',
-  'pi-web:v1:font-content-size',
-  'pi-sessions:spinner-style',
-  'pi-share:v1:notify-on-done',
-  'pi-share:v1:done-sound',
-  'pi-sessions:view-layout',
-  'pi-web:v1:auto-title:enabled',
-  'pi-web:v1:auto-title:mode',
-  'pi-web:v1:auto-title:model',
-  'pi-web:v1:artifacts:enabled',
-  'pi-web:v1:artifacts:include',
-  'pi-web:v1:toggle:thinking',
-  'pi-web:v1:toggle:tools',
-  'pi-web:v1:toggle:tool-outputs',
+  'pican-theme',
+  'pican:v1:font-ui',
+  'pican:v1:font-content',
+  'pican:v1:font-ui-size',
+  'pican:v1:font-content-size',
+  'pican:spinner-style',
+  'pican:v1:notify-on-done',
+  'pican:v1:done-sound',
+  'pican:view-layout',
+  'pican:v1:auto-title:enabled',
+  'pican:v1:auto-title:mode',
+  'pican:v1:auto-title:model',
+  'pican:v1:artifacts:enabled',
+  'pican:v1:artifacts:include',
+  'pican:v1:toggle:thinking',
+  'pican:v1:toggle:tools',
+  'pican:v1:toggle:tool-outputs',
 ];
 
 // Network sync is disabled until a page entrypoint configures it. This keeps

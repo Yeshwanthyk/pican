@@ -3,8 +3,8 @@
   import { boolFor, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();
-  const enabledKey = 'pi-web:v1:artifacts:enabled';
-  const includeKey = 'pi-web:v1:artifacts:include';
+  const enabledKey = 'pican:v1:artifacts:enabled';
+  const includeKey = 'pican:v1:artifacts:include';
   let enabled = $derived(boolFor(settings, enabledKey, true));
   let include = $derived(valueFor(settings, includeKey, ''));
 </script>

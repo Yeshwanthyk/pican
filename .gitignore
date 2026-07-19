@@ -1,9 +1,8 @@
-pi-sessions-viewer
 *.exe
 .DS_Store
 .superpowers/
 .worktrees/
-/pi-web
+/pican
 web/node_modules/
 web/dist/
 web/dist-export/

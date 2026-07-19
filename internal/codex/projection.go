@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 var projectionLocks sync.Map

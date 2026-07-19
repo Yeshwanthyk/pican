@@ -8,12 +8,12 @@ import (
 
 func TestWriteStateFile_SkipsMigrationWhenNewExists(t *testing.T) {
 	tmp := t.TempDir()
-	webDir := filepath.Join(tmp, "pi-web")
-	oldPath := filepath.Join(tmp, "pi-web-state.json")
-	newPath := filepath.Join(webDir, "pi-web-state.json")
+	picanDir := filepath.Join(tmp, "pican")
+	oldPath := filepath.Join(tmp, "pican-state.json")
+	newPath := filepath.Join(picanDir, "pican-state.json")
 
 	// Simulate another instance already holding the new path
-	if err := os.MkdirAll(webDir, 0755); err != nil {
+	if err := os.MkdirAll(picanDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(oldPath, []byte(`{"pid":123}`), 0644); err != nil {
@@ -45,8 +45,8 @@ func TestWriteStateFile_SkipsMigrationWhenNewExists(t *testing.T) {
 
 func TestWriteStateFile_MigratesOldStateFile(t *testing.T) {
 	tmp := t.TempDir()
-	oldPath := filepath.Join(tmp, "pi-web-state.json")
-	newPath := filepath.Join(tmp, "pi-web", "pi-web-state.json")
+	oldPath := filepath.Join(tmp, "pican-state.json")
+	newPath := filepath.Join(tmp, "pican", "pican-state.json")
 
 	// Create old state file
 	if err := os.WriteFile(oldPath, []byte(`{"pid":123}`), 0644); err != nil {

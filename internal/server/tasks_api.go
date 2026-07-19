@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"pi-web/internal/agentdir"
+	"pican/internal/agentdir"
 )
 
 var taskIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"pi-web/internal/rpc"
-	"pi-web/internal/sessions"
+	"pican/internal/rpc"
+	"pican/internal/sessions"
 )
 
 func TestSanitizeTitle(t *testing.T) {
@@ -39,7 +39,7 @@ func TestDeriveTitleFromInput(t *testing.T) {
 		{"add a new feature for the dashboard", "Add New Feature Dashboard"},
 		{"fix ```js\nconst x = 1;\n``` bug", "Fix Bug"},
 		{"check https://example.com/foo for updates", "Check Updates"},
-		{"pi-web api ui", "Pi-Web API UI"},
+		{"pican api ui", "Pican API UI"},
 	}
 	for _, c := range cases {
 		if got := deriveTitleFromInput(c.in); got != c.want {
@@ -125,7 +125,7 @@ func sessionNameNow(t *testing.T, s *Server, id string) string {
 }
 
 func TestMaybeAutoTitleHeuristicOnce(t *testing.T) {
-	s := newAutoTitleServer(t, map[string]string{"pi-web:v1:auto-title:mode": "once"}) // model="" → heuristic
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:mode": "once"}) // model="" → heuristic
 	id := writeAutoTitleSession(t, s.sessionsDir, "fix the flaky login test", "")
 
 	s.maybeAutoTitle(id)
@@ -141,7 +141,7 @@ func TestMaybeAutoTitleHeuristicOnce(t *testing.T) {
 }
 
 func TestMaybeAutoTitleUsesModel(t *testing.T) {
-	s := newAutoTitleServer(t, map[string]string{"pi-web:v1:auto-title:model": "anthropic/sonnet"})
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
 	id := writeAutoTitleSession(t, s.sessionsDir, "fix the flaky login test", "")
 
 	calls := 0
@@ -166,7 +166,7 @@ func TestMaybeAutoTitleUsesModel(t *testing.T) {
 }
 
 func TestMaybeAutoTitleModelErrorFallsBack(t *testing.T) {
-	s := newAutoTitleServer(t, map[string]string{"pi-web:v1:auto-title:model": "anthropic/sonnet"})
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
 	id := writeAutoTitleSession(t, s.sessionsDir, "fix the flaky login test", "")
 
 	restore := autoTitleGenerate
@@ -182,7 +182,7 @@ func TestMaybeAutoTitleModelErrorFallsBack(t *testing.T) {
 }
 
 func TestMaybeAutoTitleDisabled(t *testing.T) {
-	s := newAutoTitleServer(t, map[string]string{"pi-web:v1:auto-title:enabled": "false"})
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:enabled": "false"})
 	id := writeAutoTitleSession(t, s.sessionsDir, "fix the flaky login test", "")
 
 	s.maybeAutoTitle(id)
@@ -203,8 +203,8 @@ func TestMaybeAutoTitleSkipsUserNamed(t *testing.T) {
 
 func TestMaybeAutoTitleEachTurnUsesLatestMessage(t *testing.T) {
 	s := newAutoTitleServer(t, map[string]string{
-		"pi-web:v1:auto-title:mode":  "each-turn",
-		"pi-web:v1:auto-title:model": "anthropic/sonnet",
+		"pican:v1:auto-title:mode":  "each-turn",
+		"pican:v1:auto-title:model": "anthropic/sonnet",
 	})
 	// Two user messages: each-turn should title from the latest one.
 	project := filepath.Join(s.sessionsDir, "proj")
@@ -240,7 +240,7 @@ func TestMaybeAutoTitleReTitlesOwnAutoTitleAcrossRestart(t *testing.T) {
 	// A fresh server (empty in-memory maps) seeing a session it previously
 	// auto-titled must NOT treat it as user-owned, and should re-title in
 	// each-turn mode when a new message has arrived.
-	s := newAutoTitleServer(t, map[string]string{"pi-web:v1:auto-title:mode": "each-turn"})
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:mode": "each-turn"})
 	project := filepath.Join(s.sessionsDir, "proj")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)

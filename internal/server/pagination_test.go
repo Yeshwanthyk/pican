@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 // writeSessionWithNMessages scaffolds a session JSONL with `n` message

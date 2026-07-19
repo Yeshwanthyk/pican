@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/workers"
+	"pican/internal/workers"
 )
 
 type nopWriteCloser struct{ w io.Writer }

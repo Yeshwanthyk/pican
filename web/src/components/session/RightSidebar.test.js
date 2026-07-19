@@ -40,7 +40,7 @@ describe('RightSidebar tabs', () => {
     render(RightSidebar);
     document.querySelector('[data-pane="artifacts"]').click();
     await tick();
-    expect(localStorage.getItem('pi-web:v1:right-sidebar-tab')).toBe('artifacts');
+    expect(localStorage.getItem('pican:v1:right-sidebar-tab')).toBe('artifacts');
     cleanup();
 
     render(RightSidebar);

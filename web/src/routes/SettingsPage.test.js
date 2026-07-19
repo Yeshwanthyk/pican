@@ -22,10 +22,10 @@ describe('SettingsPage tab persistence', () => {
   });
 
   it('restores the active tab from the ?section= query param on mount', async () => {
-    window.history.replaceState({}, '', '/settings?section=about');
+    window.history.replaceState({}, '', '/settings?section=machines');
     render(SettingsPage);
     await tick();
-    expect(activeNav()).toBe('about');
+    expect(activeNav()).toBe('machines');
   });
 
   it('falls back to the default tab for an unknown section param', async () => {
@@ -53,10 +53,10 @@ describe('SettingsPage tab persistence', () => {
 
     await fireEvent.click(document.querySelector('[data-settings-nav="notifications"]'));
     await tick();
-    await fireEvent.click(document.querySelector('[data-settings-nav="about"]'));
+    await fireEvent.click(document.querySelector('[data-settings-nav="machines"]'));
     await tick();
 
     expect(window.history.length).toBe(lengthBefore);
-    expect(window.location.search).toBe('?section=about');
+    expect(window.location.search).toBe('?section=machines');
   });
 });

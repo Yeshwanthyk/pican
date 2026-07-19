@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verifies install.sh's in-place self-update path: when PI_WEB_INPLACE_UPDATE is
+# Verifies install.sh's in-place self-update path: when PICAN_INPLACE_UPDATE is
 # set, it must NOT stop/restart the service (doing so kills the npm process that
 # spawned it — see internal/app/update.go), and must still swap the binary.
 # Without the flag, the normal path must still stop the running instance.
@@ -63,24 +63,24 @@ SHIM
   : > "$calllog"
 
   # A stale binary so the "stop running instance" path is reachable in normal mode.
-  printf '#!/bin/sh\necho v0.0.0\n' > "$bindir/pi-web"
-  chmod +x "$bindir/pi-web"
+  printf '#!/bin/sh\necho v0.0.0\n' > "$bindir/pican"
+  chmod +x "$bindir/pican"
 
   local env_vars=(
     "HOME=$workdir"
-    "PI_WEB_INSTALL_DIR=$bindir"
+    "PICAN_INSTALL_DIR=$bindir"
     "PATH=$shimdir:/usr/bin:/bin"
   )
-  [[ "$mode" == "inplace" ]] && env_vars+=("PI_WEB_INPLACE_UPDATE=1")
+  [[ "$mode" == "inplace" ]] && env_vars+=("PICAN_INPLACE_UPDATE=1")
   if [[ -n "$package_version" ]]; then
-    env_vars+=("npm_package_name=@ygncode/pi-web" "npm_package_version=$package_version")
+    env_vars+=("npm_package_name=@yeshwanthyk/pican" "npm_package_version=$package_version")
   fi
 
   env -i "${env_vars[@]}" bash "$INSTALL_SH" </dev/null > "$workdir/out.log" 2>&1 \
     || fail "[$mode] install.sh exited non-zero:"$'\n'"$(cat "$workdir/out.log")"
 
-  [[ -x "$bindir/pi-web" ]] || fail "[$mode] binary missing after install"
-  grep -q "$expected_tag" "$bindir/pi-web" \
+  [[ -x "$bindir/pican" ]] || fail "[$mode] binary missing after install"
+  grep -q "$expected_tag" "$bindir/pican" \
     || fail "[$mode] binary not replaced with expected version $expected_tag"
 
   if [[ "$mode" == "inplace" ]]; then

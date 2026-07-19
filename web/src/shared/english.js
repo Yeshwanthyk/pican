@@ -484,17 +484,6 @@ export default {
   'settings.doneSound': 'Done sound',
   'settings.doneSoundHint': 'Sound played when a response is ready.',
 
-  'settings.about': 'About',
-  'settings.docs': 'Documentation',
-  'settings.docsHint': 'Guides and architecture docs for pican.',
-  'settings.openDocs': 'Open docs',
-  'settings.github': 'GitHub',
-  'settings.githubHint': 'If pican is useful to you, please give the repo a ⭐.',
-  'settings.starGithub': 'Star on GitHub',
-  'settings.sponsor': 'Sponsor',
-  'settings.sponsorHint': 'Support continued development of pican by sponsoring the creator.',
-  'settings.becomeSponsor': 'Become a sponsor',
-
   'settings.machines': 'Machines',
   'settings.machinesHint':
     'Other pican instances reached over Tailscale. Their sessions appear read-only on the homepage with a link back to that machine — nothing is proxied through this one.',

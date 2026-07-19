@@ -1,8 +1,8 @@
 import { getJSON, postJSON } from '../shared/api.js';
 import { t } from '../shared/strings.js';
 
-export const layoutStorageKey = 'pi-sessions:view-layout';
-export const collapsedProjectsStorageKey = 'pi-sessions:collapsed-projects';
+export const layoutStorageKey = 'pican:view-layout';
+export const collapsedProjectsStorageKey = 'pican:collapsed-projects';
 
 export const sessionsCountLabel = (n) =>
   n === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: n });

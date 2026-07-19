@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"pi-web/internal/schedules"
+	"pican/internal/schedules"
 )
 
 // scheduleInput is the editable payload for create/update. Server-managed fields

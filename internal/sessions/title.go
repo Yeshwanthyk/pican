@@ -23,7 +23,7 @@ type TitleInputs struct {
 	// A session whose name is only derived from the first message / filename has
 	// no explicit name.
 	HasExplicitName bool
-	// AutoTitled reports whether the current name was written by pi-web's
+	// AutoTitled reports whether the current name was written by pican's
 	// auto-titler (marked session_info), as opposed to a user rename or header
 	// name. Lets titling survive restarts without clobbering user-set names.
 	AutoTitled bool

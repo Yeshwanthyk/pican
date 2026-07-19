@@ -13,7 +13,7 @@ func TestSeedSoundsDir_SeedsDefaultsWhenEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	soundsDir := filepath.Join(agentDir, "pi-web", "assets")
+	soundsDir := filepath.Join(agentDir, "pican", "assets")
 	for _, name := range []string{"cat.mp3", "done.mp3"} {
 		info, err := os.Stat(filepath.Join(soundsDir, name))
 		if err != nil {
@@ -27,7 +27,7 @@ func TestSeedSoundsDir_SeedsDefaultsWhenEmpty(t *testing.T) {
 
 func TestSeedSoundsDir_SkipsWhenMP3AlreadyPresent(t *testing.T) {
 	agentDir := t.TempDir()
-	soundsDir := filepath.Join(agentDir, "pi-web", "assets")
+	soundsDir := filepath.Join(agentDir, "pican", "assets")
 	if err := os.MkdirAll(soundsDir, 0755); err != nil {
 		t.Fatal(err)
 	}

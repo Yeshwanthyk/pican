@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/auth"
-	"pi-web/internal/sessions"
+	"pican/internal/auth"
+	"pican/internal/sessions"
 )
 
 func generateLargeSessionContent(n int, cwd string) string {

@@ -1,5 +1,5 @@
 {
-  "name": "pi-web-extension",
+  "name": "pican-extension",
   "private": true,
   "dependencies": {
     "qrcode": "^1.5.4",

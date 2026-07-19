@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func item(id, kind string, fields map[string]any) ThreadItem {

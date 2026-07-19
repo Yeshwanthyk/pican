@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/chatqueue"
+	"pican/internal/chatqueue"
 
 	_ "modernc.org/sqlite"
 )

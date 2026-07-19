@@ -3,9 +3,9 @@
   import { boolFor, valueFor } from '../../settings/settings-support.js';
 
   let { settings = {}, onSave = () => {} } = $props();
-  const spinnerKey = 'pi-sessions:spinner-style';
-  const layoutKey = 'pi-sessions:view-layout';
-  const btwKey = 'pi-web:v1:show-btw-in-index';
+  const spinnerKey = 'pican:spinner-style';
+  const layoutKey = 'pican:view-layout';
+  const btwKey = 'pican:v1:show-btw-in-index';
   let spinner = $derived(valueFor(settings, spinnerKey, 'runcat'));
   let layout = $derived(valueFor(settings, layoutKey, 'timeline'));
   let showBtw = $derived(boolFor(settings, btwKey, false));

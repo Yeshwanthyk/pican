@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func (s *Server) runtimeEnabled(runtime string) bool {

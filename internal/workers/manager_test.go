@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/chat"
+	"pican/internal/chat"
 )
 
 type fakeChatWorker struct {

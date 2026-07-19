@@ -61,7 +61,7 @@ describe('session data helpers', () => {
   it('reads injected iframe params before window location params', () => {
     const doc = document.implementation.createHTMLDocument('test');
     const meta = doc.createElement('meta');
-    meta.setAttribute('name', 'pi-url-params');
+    meta.setAttribute('name', 'pican-url-params');
     meta.setAttribute('content', 'leafId=injected');
     doc.head.appendChild(meta);
     const params = getSessionSearchParams({

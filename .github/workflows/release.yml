@@ -72,9 +72,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'web/package-lock.json'
 
-      - name: Build frontend
-        run: make frontend-build
-
       - name: Build binary
         env:
           GOOS: ${{ matrix.goos }}
@@ -82,17 +79,17 @@ jobs:
           CGO_ENABLED: 0
           VERSION: ${{ github.ref_name }}
         run: |
-          output="pi-web-${{ matrix.goos }}-${{ matrix.goarch }}"
+          output="pican-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then
             output="${output}.exe"
           fi
-          go build -ldflags="-s -w -X main.version=${VERSION}" -o "${output}" ./cmd/pi-web
+          make build BINARY="${output}" VERSION="${VERSION}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pi-web-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: pi-web-${{ matrix.goos }}-${{ matrix.goarch }}*
+          name: pican-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: pican-${{ matrix.goos }}-${{ matrix.goarch }}*
 
   release:
     name: Create GitHub Release
@@ -103,7 +100,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-          pattern: pi-web-*
+          pattern: pican-*
           merge-multiple: true
 
       - name: Create Release
@@ -144,9 +141,9 @@ jobs:
           tag_version="${GITHUB_REF_NAME#v}"
           if [[ "${GITHUB_REF_NAME}" == *"-"* ]]; then
             npm publish --access public --tag beta --provenance
-            # pi-web is currently beta-only. Keep unqualified installs
-            # (`pi install npm:@ygncode/pi-web`) on the newest beta too.
-            npm dist-tag add "@ygncode/pi-web@${tag_version}" latest
+            # pican is currently beta-only. Keep unqualified installs
+            # (`pi install npm:@yeshwanthyk/pican`) on the newest beta too.
+            npm dist-tag add "@yeshwanthyk/pican@${tag_version}" latest
           else
             npm publish --access public --tag latest --provenance
           fi

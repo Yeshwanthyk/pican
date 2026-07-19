@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"pi-web/internal/auth"
+	"pican/internal/auth"
 )
 
 // TestHandleAppShellGzipsWhenAcceptEncodingAllows is a regression test for

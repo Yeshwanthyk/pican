@@ -12,7 +12,7 @@ func TestNewPushManager_CreatesDirUnderAgentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(tmp, "pi-web")
+	want := filepath.Join(tmp, "pican")
 	if pm.storeDir != want {
 		t.Fatalf("storeDir = %s, want %s", pm.storeDir, want)
 	}
@@ -45,7 +45,7 @@ func TestNewPushManager_PersistsVapidKeys(t *testing.T) {
 func TestNewPushManager_MigratesOldWebDir(t *testing.T) {
 	tmp := t.TempDir()
 	oldDir := filepath.Join(tmp, "web")
-	newDir := filepath.Join(tmp, "pi-web")
+	newDir := filepath.Join(tmp, "pican")
 
 	if err := os.MkdirAll(oldDir, 0700); err != nil {
 		t.Fatal(err)

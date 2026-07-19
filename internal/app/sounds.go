@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/ui"
+	"pican/internal/agentdir"
+	"pican/internal/ui"
 )
 
-// seedSoundsDir ensures that ~/.pi/agent/pi-web/assets exists and seeds it with default sounds if empty.
+// seedSoundsDir ensures that ~/.pi/agent/pican/assets exists and seeds it with default sounds if empty.
 func seedSoundsDir(agentDir string) error {
-	soundsDir := filepath.Join(agentdir.WebDir(agentDir), "assets")
+	soundsDir := filepath.Join(agentdir.PicanDir(agentDir), "assets")
 	if err := os.MkdirAll(soundsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create sounds directory: %w", err)
 	}

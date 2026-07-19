@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/codex"
-	"pi-web/internal/sessions"
+	"pican/internal/codex"
+	"pican/internal/sessions"
 )
 
 type fakeCodexService struct {

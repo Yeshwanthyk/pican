@@ -30,9 +30,9 @@ function readThemeColor(windowImpl, documentImpl, property) {
 export function applyTheme(windowImpl, documentImpl, next) {
   next = next || 'dark';
   documentImpl.documentElement.dataset.theme = next;
-  writeSetting('pi-web-theme', next, { storage: windowImpl.localStorage });
+  writeSetting('pican-theme', next, { storage: windowImpl.localStorage });
   try {
-    documentImpl.cookie = 'pi-web-theme=' + next + ';path=/;SameSite=Lax;max-age=31536000';
+    documentImpl.cookie = 'pican-theme=' + next + ';path=/;SameSite=Lax;max-age=31536000';
   } catch (e) {}
 
   const wco = !!(

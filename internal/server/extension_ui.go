@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"pi-web/internal/sessions"
-	"pi-web/internal/workers"
+	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
 type extensionUIChatSender interface {

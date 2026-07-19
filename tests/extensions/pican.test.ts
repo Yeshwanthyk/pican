@@ -16,25 +16,25 @@ vi.mock('node:fs', async (importOriginal) => {
       return undefined;
     }),
     writeFileSync: vi.fn((path: string, content: string, options?: unknown) => {
-      const tokenEnvPath = `${homedir()}/.config/pi-web/env`;
+      const tokenEnvPath = `${homedir()}/.config/pican/env`;
       if (typeof path === 'string' && path === tokenEnvPath) {
-        (globalThis as any).__MOCK_PI_WEB_ENV_CONTENT__ = content;
+        (globalThis as any).__MOCK_PICAN_ENV_CONTENT__ = content;
         return undefined;
       }
       return (actual as any).writeFileSync(path, content, options);
     }),
     readFileSync: vi.fn((path: string, encoding: BufferEncoding) => {
       // Delegate to actual unless it's the token env file
-      const tokenEnvPath = `${homedir()}/.config/pi-web/env`;
+      const tokenEnvPath = `${homedir()}/.config/pican/env`;
       if (typeof path === 'string' && path === tokenEnvPath) {
-        const content = (globalThis as any).__MOCK_PI_WEB_ENV_CONTENT__;
+        const content = (globalThis as any).__MOCK_PICAN_ENV_CONTENT__;
         if (content !== undefined) return content;
-        const token = (globalThis as any).__MOCK_PI_WEB_TOKEN__;
+        const token = (globalThis as any).__MOCK_PICAN_TOKEN__;
         if (token === undefined) {
           throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
         }
         if (token === null) return '';
-        return `PI_WEB_TOKEN=${token}\n`;
+        return `PICAN_TOKEN=${token}\n`;
       }
       return (actual as any).readFileSync(path, encoding);
     }),
@@ -46,14 +46,14 @@ import {
   isSSH,
   normalizeCommandArgs,
   withToken,
-  readPiWebToken,
-  writePiWebToken,
-  cleanupPiWebNpmTemps,
-} from '../../.pi/extensions/pi-web.ts';
+  readPicanToken,
+  writePicanToken,
+  cleanupPicanNpmTemps,
+} from '../../.pi/extensions/pican.ts';
 
 declare global {
-  var __MOCK_PI_WEB_TOKEN__: string | null | undefined;
-  var __MOCK_PI_WEB_ENV_CONTENT__: string | undefined;
+  var __MOCK_PICAN_TOKEN__: string | null | undefined;
+  var __MOCK_PICAN_ENV_CONTENT__: string | undefined;
 }
 
 // ── isSSH ───────────────────────────────────────────────────────────
@@ -153,18 +153,18 @@ describe('normalizeCommandArgs', () => {
 });
 
 // ── npm cleanup ────────────────────────────────────────────────────
-describe('cleanupPiWebNpmTemps', () => {
-  it('removes stale pi-web npm temp dirs only', () => {
+describe('cleanupPicanNpmTemps', () => {
+  it('removes stale pican npm temp dirs only', () => {
     const root = `${process.cwd()}/.tmp-test-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const scope = `${root}/npm/node_modules/@ygncode`;
-    const stale = `${scope}/.pi-web-F7YwHA7A`;
-    const keep = `${scope}/pi-web`;
+    const scope = `${root}/npm/node_modules/@yeshwanthyk`;
+    const stale = `${scope}/.pican-F7YwHA7A`;
+    const keep = `${scope}/pican`;
     mkdirSync(`${stale}/nested`, { recursive: true });
     mkdirSync(keep, { recursive: true });
     writeFileSync(`${stale}/nested/file`, 'x');
 
     try {
-      expect(cleanupPiWebNpmTemps(root)).toBe(1);
+      expect(cleanupPicanNpmTemps(root)).toBe(1);
       expect(existsSync(stale)).toBe(false);
       expect(existsSync(keep)).toBe(true);
     } finally {
@@ -173,16 +173,16 @@ describe('cleanupPiWebNpmTemps', () => {
   });
 });
 
-// ── withToken / readPiWebToken ──────────────────────────────────────
+// ── withToken / readPicanToken ──────────────────────────────────────
 describe('token helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (globalThis as any).__MOCK_PI_WEB_TOKEN__;
-    delete (globalThis as any).__MOCK_PI_WEB_ENV_CONTENT__;
+    delete (globalThis as any).__MOCK_PICAN_TOKEN__;
+    delete (globalThis as any).__MOCK_PICAN_ENV_CONTENT__;
   });
 
   it('withToken appends token when available', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = 'my-token';
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = 'my-token';
 
     expect(withToken('http://127.0.0.1:31415/session?id=abc')).toBe(
       'http://127.0.0.1:31415/session?id=abc&token=my-token',
@@ -190,7 +190,7 @@ describe('token helpers', () => {
   });
 
   it('withToken adds token with ? when no existing query', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = 'my-token';
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = 'my-token';
 
     expect(withToken('http://127.0.0.1:31415')).toBe(
       'http://127.0.0.1:31415?token=my-token',
@@ -199,7 +199,7 @@ describe('token helpers', () => {
 
   it('withToken returns URL unchanged when no token file', () => {
     // No mock set → ENOENT → no token
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = undefined;
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = undefined;
 
     expect(withToken('http://127.0.0.1:31415/session?id=abc')).toBe(
       'http://127.0.0.1:31415/session?id=abc',
@@ -207,7 +207,7 @@ describe('token helpers', () => {
   });
 
   it('withToken returns URL unchanged when env file has no token', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = null; // file exists but no token line
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = null; // file exists but no token line
 
     expect(withToken('http://127.0.0.1:31415/session?id=abc')).toBe(
       'http://127.0.0.1:31415/session?id=abc',
@@ -215,51 +215,51 @@ describe('token helpers', () => {
   });
 
   it('withToken URL-encodes the token value', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = 'tok en=val&ue';
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = 'tok en=val&ue';
 
     expect(withToken('http://127.0.0.1:31415')).toBe(
       'http://127.0.0.1:31415?token=tok%20en%3Dval%26ue',
     );
   });
 
-  it('readPiWebToken reads token from env file', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = 'secret-123';
+  it('readPicanToken reads token from env file', () => {
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = 'secret-123';
 
-    expect(readPiWebToken()).toBe('secret-123');
+    expect(readPicanToken()).toBe('secret-123');
   });
 
-  it('readPiWebToken returns null when file does not exist', () => {
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = undefined;
+  it('readPicanToken returns null when file does not exist', () => {
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = undefined;
 
-    expect(readPiWebToken()).toBeNull();
+    expect(readPicanToken()).toBeNull();
   });
 
-  it('readPiWebToken prefers process.env over env file', () => {
-    process.env['PI_WEB_TOKEN'] = 'from-env';
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = 'from-file';
+  it('readPicanToken prefers process.env over env file', () => {
+    process.env['PICAN_TOKEN'] = 'from-env';
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = 'from-file';
 
-    expect(readPiWebToken()).toBe('from-env');
+    expect(readPicanToken()).toBe('from-env');
 
-    delete process.env['PI_WEB_TOKEN'];
+    delete process.env['PICAN_TOKEN'];
   });
 
-  it('readPiWebToken returns token from env var even when no file exists', () => {
-    process.env['PI_WEB_TOKEN'] = 'env-only';
-    (globalThis as any).__MOCK_PI_WEB_TOKEN__ = undefined;
+  it('readPicanToken returns token from env var even when no file exists', () => {
+    process.env['PICAN_TOKEN'] = 'env-only';
+    (globalThis as any).__MOCK_PICAN_TOKEN__ = undefined;
 
-    expect(readPiWebToken()).toBe('env-only');
+    expect(readPicanToken()).toBe('env-only');
 
-    delete process.env['PI_WEB_TOKEN'];
+    delete process.env['PICAN_TOKEN'];
   });
 
-  it('writePiWebToken creates a private env file and directory', () => {
-    const path = `${homedir()}/.config/pi-web/env`;
+  it('writePicanToken creates a private env file and directory', () => {
+    const path = `${homedir()}/.config/pican/env`;
 
-    writePiWebToken('secret-123');
+    writePicanToken('secret-123');
 
     expect(mkdirSync).toHaveBeenCalledWith(dirname(path), { recursive: true });
     expect(chmodSync).toHaveBeenCalledWith(dirname(path), 0o700);
-    expect(writeFileSync).toHaveBeenCalledWith(path, 'PI_WEB_TOKEN=secret-123\n', {
+    expect(writeFileSync).toHaveBeenCalledWith(path, 'PICAN_TOKEN=secret-123\n', {
       mode: 0o600,
     });
     expect(chmodSync).toHaveBeenCalledWith(path, 0o600);

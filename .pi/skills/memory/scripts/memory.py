@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small CLI for the pi-web memory database."""
+"""Small CLI for the pican memory database."""
 
 import argparse
 import json
@@ -18,11 +18,11 @@ def _agent_dir():
         return Path(env_dir).expanduser()
     return Path.home() / ".pi" / "agent"
 
-DB = _agent_dir() / "pi-web-memory.sqlite"
+DB = _agent_dir() / "pican-memory.sqlite"
 
 
 def get_db_path():
-    env = os.environ.get("PI_MEMORY_DB")
+    env = os.environ.get("PICAN_MEMORY_DB")
     return Path(env) if env else DB
 
 

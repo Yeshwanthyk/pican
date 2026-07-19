@@ -125,7 +125,7 @@ func TestAuthAcceptsXPiTokenHeader(t *testing.T) {
 	a := New("secret")
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Pi-Token", "secret")
+	req.Header.Set("X-Pican-Token", "secret")
 	a.Wrap(okHandler)(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)

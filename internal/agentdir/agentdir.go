@@ -1,5 +1,5 @@
 // Package agentdir resolves the Pi agent configuration directory and the
-// paths pi-web stores under it. Centralizing this keeps the app and server
+// paths pican stores under it. Centralizing this keeps the app and server
 // packages from drifting on where "~/.pi/agent" lives.
 package agentdir
 
@@ -13,11 +13,11 @@ import (
 //
 // This mirrors pi's own getAgentDir() and intentionally models ONLY the
 // agent-dir override. pi resolves its sessions directory with higher-priority
-// knobs that pi-web does not honor: the --session-dir flag and the
+// knobs that pican does not honor: the --session-dir flag and the
 // PI_CODING_AGENT_SESSION_DIR env var both relocate just the sessions subdir
 // (pi precedence: --session-dir > PI_CODING_AGENT_SESSION_DIR > <agentDir>/sessions).
-// pi-web only derives sessions from <agentDir>/sessions, so a user who
-// relocates only the sessions dir would have pi-web look in the wrong place.
+// pican only derives sessions from <agentDir>/sessions, so a user who
+// relocates only the sessions dir would have pican look in the wrong place.
 // That is a known, accepted gap, not an oversight.
 //
 // Note also that pi derives this var name dynamically as
@@ -34,9 +34,9 @@ func Path() string {
 	return filepath.Join(home, ".pi", "agent")
 }
 
-// WebDir returns the pi-web data directory inside the given agent dir. Callers
+// PicanDir returns the pican data directory inside the given agent dir. Callers
 // that already hold an agent dir (e.g. the server, or a test temp dir) should
 // pass it; callers resolving from the environment can pass Path().
-func WebDir(agentDir string) string {
-	return filepath.Join(agentDir, "pi-web")
+func PicanDir(agentDir string) string {
+	return filepath.Join(agentDir, "pican")
 }

@@ -54,8 +54,10 @@ func TestAppIconIsServedAndInstalled(t *testing.T) {
 	}
 
 	var manifest struct {
-		Name  string `json:"name"`
-		Icons []struct {
+		Name      string `json:"name"`
+		ShortName string `json:"short_name"`
+		ID        string `json:"id"`
+		Icons     []struct {
 			Src  string `json:"src"`
 			Type string `json:"type"`
 		} `json:"icons"`
@@ -63,8 +65,11 @@ func TestAppIconIsServedAndInstalled(t *testing.T) {
 	if err := json.Unmarshal([]byte(manifestJSON), &manifest); err != nil {
 		t.Fatalf("decode manifest: %v", err)
 	}
-	if manifest.Name != "pican" {
-		t.Fatalf("manifest name = %q, want pican", manifest.Name)
+	if manifest.Name != "pican" || manifest.ShortName != "pican" {
+		t.Fatalf("manifest names = %q/%q, want pican/pican", manifest.Name, manifest.ShortName)
+	}
+	if manifest.ID != "/pican" {
+		t.Fatalf("manifest id = %q, want /pican", manifest.ID)
 	}
 	for _, icon := range manifest.Icons {
 		if icon.Src == "/app-icon.png" && icon.Type == "image/png" {

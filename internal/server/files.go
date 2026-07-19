@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/files"
+	"pican/internal/files"
 )
 
 // fileWalkTTL is how long a bounded directory walk is reused before the next

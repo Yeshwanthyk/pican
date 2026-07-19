@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/workers"
 )
 
 type piRPCWorker struct {

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 const (

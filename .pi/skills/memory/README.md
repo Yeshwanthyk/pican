@@ -1,11 +1,11 @@
 # Memory Skill
 
-Project-local memory workflow for pi-web users.
+Project-local memory workflow for pican users.
 
 ## Files
 - `SKILL.md` — skill instructions
 - `scripts/memory.py` — CLI implementation
-- `$PI_CODING_AGENT_DIR/pi-web-memory.sqlite` (default `~/.pi/agent/`) — database, auto-initialized on first use
+- `$PI_CODING_AGENT_DIR/pican-memory.sqlite` (default `~/.pi/agent/`) — database, auto-initialized on first use
 - `data/schema.sql` — schema (shipped with the skill)
 
 ## Use from repo root

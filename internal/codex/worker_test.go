@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/workers"
 )
 
 func TestWorkerResumePromptSteerInterruptSettingsStatusAndPreview(t *testing.T) {

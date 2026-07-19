@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 
 	_ "modernc.org/sqlite"
 )

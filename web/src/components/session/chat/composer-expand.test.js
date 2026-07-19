@@ -21,7 +21,7 @@ function createStorage(entries = []) {
 describe('setupComposerExpansion', () => {
   it('restores expanded state from session-scoped storage', () => {
     const parts = createParts();
-    const storage = createStorage([['pi-chat:composer-expanded:abc', '1']]);
+    const storage = createStorage([['pican:chat:composer-expanded:abc', '1']]);
 
     setupComposerExpansion({ sessionId: 'abc', ...parts, storage });
 
@@ -39,12 +39,12 @@ describe('setupComposerExpansion', () => {
     parts.expandButton.click();
 
     expect(parts.shell.classList.contains('expanded')).toBe(true);
-    expect(storage.values.get('pi-chat:composer-expanded:abc')).toBe('1');
+    expect(storage.values.get('pican:chat:composer-expanded:abc')).toBe('1');
     expect(parts.textarea.focus).toHaveBeenCalled();
     expect(onHeightChange).toHaveBeenCalled();
 
     parts.expandButton.click();
     expect(parts.shell.classList.contains('expanded')).toBe(false);
-    expect(storage.values.get('pi-chat:composer-expanded:abc')).toBe('0');
+    expect(storage.values.get('pican:chat:composer-expanded:abc')).toBe('0');
   });
 });

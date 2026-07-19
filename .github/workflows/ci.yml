@@ -123,7 +123,7 @@ jobs:
         working-directory: e2e
         run: npx playwright install-deps chromium firefox webkit
 
-      - name: Build pi-web
+      - name: Build pican
         run: make build
 
       - name: Run Playwright tests

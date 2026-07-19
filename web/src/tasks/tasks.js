@@ -1,6 +1,6 @@
 import { getJSON } from '../shared/api.js';
 
-export const tasksSelectionStorageKey = 'pi-tasks:selected-project';
+export const tasksSelectionStorageKey = 'pican:tasks:selected-project';
 
 export function normalizeTask(task = {}) {
   const execution = task.execution && typeof task.execution === 'object' ? task.execution : null;

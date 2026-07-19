@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/rpc"
+	"pican/internal/rpc"
 )
 
 func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {

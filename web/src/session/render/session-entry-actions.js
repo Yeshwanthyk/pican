@@ -34,7 +34,7 @@ export function buildShareUrl(
   entryId,
   { documentImpl = document, windowImpl = window, getCurrentLeafId = () => '', URLImpl = URL } = {},
 ) {
-  const baseUrlMeta = documentImpl.querySelector('meta[name="pi-share-base-url"]');
+  const baseUrlMeta = documentImpl.querySelector('meta[name="pican-share-base-url"]');
   const baseUrl = baseUrlMeta ? baseUrlMeta.content : windowImpl.location.href.split('?')[0];
 
   const url = new URLImpl(windowImpl.location.href);

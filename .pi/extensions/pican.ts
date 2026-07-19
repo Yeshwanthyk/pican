@@ -25,7 +25,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 
-interface PiWebState {
+interface PicanState {
   pid: number;
   port: string;
   host: string;
@@ -50,13 +50,13 @@ async function detectHostPort(
 } | null> {
   // 1. Try pidfile (new path first, then old for migration compat)
   const candidates = [
-    `${agentDir()}/pi-web/pi-web-state.json`,
-    `${agentDir()}/pi-web-state.json`,
+    `${agentDir()}/pican/pican-state.json`,
+    `${agentDir()}/pican-state.json`,
   ];
   for (const path of candidates) {
     try {
       const raw = readFileSync(path, "utf-8");
-      const state: PiWebState = JSON.parse(raw);
+      const state: PicanState = JSON.parse(raw);
 
       // Validate PID is still alive
       try {
@@ -79,7 +79,7 @@ async function detectHostPort(
   // 2. Process fallback (macOS / Linux)
   if (process.platform !== "win32") {
     try {
-      const result = await pi.exec("pgrep", ["-a", "pi-web"]);
+      const result = await pi.exec("pgrep", ["-a", "pican"]);
       const line = result.stdout.trim().split("\n")[0];
       if (line) {
         const parts = line.split(/\s+/);
@@ -205,7 +205,7 @@ async function healthCheck(host: string, port: string): Promise<boolean> {
     const res = await fetch(`http://${host}:${port}`, {
       signal: AbortSignal.timeout(1000),
     });
-    // 401/403 means pi-web is running with auth enabled.
+    // 401/403 means pican is running with auth enabled.
     return res.ok || res.status === 401 || res.status === 403;
   } catch {
     return false;
@@ -213,17 +213,17 @@ async function healthCheck(host: string, port: string): Promise<boolean> {
 }
 
 // windowsLauncher is the hidden startup launcher written by install.ps1; it
-// loads ~/.config/pi-web/env and starts pi-web without a console window.
+// loads ~/.config/pican/env and starts pican without a console window.
 function windowsLauncher(): string {
-  return join(homedir(), ".config", "pi-web", "pi-web-start.vbs");
+  return join(homedir(), ".config", "pican", "pican-start.vbs");
 }
 
-async function startPiWeb(pi: ExtensionAPI): Promise<void> {
+async function startPican(pi: ExtensionAPI): Promise<void> {
   if (process.platform === "win32") {
     const launcher = windowsLauncher();
     if (!existsSync(launcher)) {
       throw new Error(
-        "pi-web launcher not found; reinstall with: pi install npm:@ygncode/pi-web@beta",
+        "pican launcher not found; reinstall with: pi install npm:@yeshwanthyk/pican@beta",
       );
     }
     await pi.exec("wscript.exe", [launcher]);
@@ -233,13 +233,13 @@ async function startPiWeb(pi: ExtensionAPI): Promise<void> {
   if (process.platform === "darwin") {
     await pi.exec("sh", [
       "-lc",
-      `plist="$HOME/Library/LaunchAgents/com.pi-web.plist"; if [ ! -f "$plist" ]; then exit 127; fi; launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null || launchctl load "$plist" 2>/dev/null || true; launchctl kickstart -k "gui/$(id -u)/com.pi-web" 2>/dev/null || launchctl start com.pi-web`,
+      `plist="$HOME/Library/LaunchAgents/com.pican.plist"; if [ ! -f "$plist" ]; then exit 127; fi; launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null || launchctl load "$plist" 2>/dev/null || true; launchctl kickstart -k "gui/$(id -u)/com.pican" 2>/dev/null || launchctl start com.pican`,
     ]);
     return;
   }
 
   if (process.platform === "linux") {
-    await pi.exec("systemctl", ["--user", "start", "pi-web.service"]);
+    await pi.exec("systemctl", ["--user", "start", "pican.service"]);
     return;
   }
 
@@ -248,24 +248,24 @@ async function startPiWeb(pi: ExtensionAPI): Promise<void> {
   );
 }
 
-async function stopPiWeb(pi: ExtensionAPI): Promise<void> {
+async function stopPican(pi: ExtensionAPI): Promise<void> {
   if (process.platform === "win32") {
-    // No service manager on Windows; the Run-key launcher only starts pi-web,
+    // No service manager on Windows; the Run-key launcher only starts pican,
     // so stopping means killing the process directly (the pkill counterpart).
-    await pi.exec("taskkill", ["/IM", "pi-web.exe", "/F"]).catch(() => {});
+    await pi.exec("taskkill", ["/IM", "pican.exe", "/F"]).catch(() => {});
     return;
   }
 
   if (process.platform === "darwin") {
     await pi.exec("sh", [
       "-lc",
-      `launchctl bootout "gui/$(id -u)/com.pi-web" 2>/dev/null || launchctl stop com.pi-web 2>/dev/null || true`,
+      `launchctl bootout "gui/$(id -u)/com.pican" 2>/dev/null || launchctl stop com.pican 2>/dev/null || true`,
     ]);
     return;
   }
 
   if (process.platform === "linux") {
-    await pi.exec("systemctl", ["--user", "stop", "pi-web.service"]);
+    await pi.exec("systemctl", ["--user", "stop", "pican.service"]);
     return;
   }
 
@@ -274,35 +274,35 @@ async function stopPiWeb(pi: ExtensionAPI): Promise<void> {
   );
 }
 
-async function restartPiWeb(pi: ExtensionAPI): Promise<void> {
+async function restartPican(pi: ExtensionAPI): Promise<void> {
   if (process.platform === "win32") {
-    await stopPiWeb(pi);
-    await startPiWeb(pi);
+    await stopPican(pi);
+    await startPican(pi);
     return;
   }
 
   if (process.platform === "darwin") {
     await pi.exec("sh", [
       "-lc",
-      `plist="$HOME/Library/LaunchAgents/com.pi-web.plist"
+      `plist="$HOME/Library/LaunchAgents/com.pican.plist"
 if [ ! -f "$plist" ]; then exit 127; fi
-env_file="$HOME/.config/pi-web/env"
-token="$(awk -F= '$1 == "PI_WEB_TOKEN" { sub(/^[^=]*=/, ""); print; exit }' "$env_file" 2>/dev/null || true)"
+env_file="$HOME/.config/pican/env"
+token="$(awk -F= '$1 == "PICAN_TOKEN" { sub(/^[^=]*=/, ""); print; exit }' "$env_file" 2>/dev/null || true)"
 if [ -n "$token" ]; then
   /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables dict" "$plist" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PI_WEB_TOKEN $token" "$plist" 2>/dev/null || \
-    /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:PI_WEB_TOKEN string $token" "$plist"
-  launchctl setenv PI_WEB_TOKEN "$token" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :EnvironmentVariables:PICAN_TOKEN $token" "$plist" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:PICAN_TOKEN string $token" "$plist"
+  launchctl setenv PICAN_TOKEN "$token" 2>/dev/null || true
 fi
 launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || launchctl unload "$plist" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null || launchctl load "$plist"
-launchctl kickstart -k "gui/$(id -u)/com.pi-web" 2>/dev/null || launchctl start com.pi-web`,
+launchctl kickstart -k "gui/$(id -u)/com.pican" 2>/dev/null || launchctl start com.pican`,
     ]);
     return;
   }
 
   if (process.platform === "linux") {
-    await pi.exec("systemctl", ["--user", "restart", "pi-web.service"]);
+    await pi.exec("systemctl", ["--user", "restart", "pican.service"]);
     return;
   }
 
@@ -311,7 +311,7 @@ launchctl kickstart -k "gui/$(id -u)/com.pi-web" 2>/dev/null || launchctl start 
   );
 }
 
-async function ensurePiWebRunning(
+async function ensurePicanRunning(
   pi: ExtensionAPI,
   host: string,
   port: string,
@@ -319,7 +319,7 @@ async function ensurePiWebRunning(
   if (await healthCheck(host, port)) return true;
 
   try {
-    await startPiWeb(pi);
+    await startPican(pi);
   } catch {
     return false;
   }
@@ -332,26 +332,26 @@ async function ensurePiWebRunning(
   return false;
 }
 
-function piWebEnvPath(): string {
-  return `${homedir()}/.config/pi-web/env`;
+function picanEnvPath(): string {
+  return `${homedir()}/.config/pican/env`;
 }
 
-export function readPiWebToken(): string | null {
-  // Check process.env first — allows PI_WEB_TOKEN=... pi-web ... usage
-  const fromEnv = process.env["PI_WEB_TOKEN"];
+export function readPicanToken(): string | null {
+  // Check process.env first — allows PICAN_TOKEN=... pican ... usage
+  const fromEnv = process.env["PICAN_TOKEN"];
   if (fromEnv) return fromEnv;
 
   try {
-    const raw = readFileSync(piWebEnvPath(), "utf-8");
-    const match = raw.match(/^PI_WEB_TOKEN=(.*)$/m);
+    const raw = readFileSync(picanEnvPath(), "utf-8");
+    const match = raw.match(/^PICAN_TOKEN=(.*)$/m);
     return match?.[1]?.trim() || null;
   } catch {
     return null;
   }
 }
 
-export function writePiWebToken(token: string): void {
-  const path = piWebEnvPath();
+export function writePicanToken(token: string): void {
+  const path = picanEnvPath();
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true });
   chmodSync(dir, 0o700);
@@ -363,11 +363,11 @@ export function writePiWebToken(token: string): void {
     // file doesn't exist yet
   }
 
-  if (/^PI_WEB_TOKEN=/m.test(content)) {
-    content = content.replace(/^PI_WEB_TOKEN=.*$/m, `PI_WEB_TOKEN=${token}`);
+  if (/^PICAN_TOKEN=/m.test(content)) {
+    content = content.replace(/^PICAN_TOKEN=.*$/m, `PICAN_TOKEN=${token}`);
   } else {
     const trimmed = content.trimEnd();
-    content = `${trimmed ? `${trimmed}\n` : ""}PI_WEB_TOKEN=${token}\n`;
+    content = `${trimmed ? `${trimmed}\n` : ""}PICAN_TOKEN=${token}\n`;
   }
 
   writeFileSync(path, content, { mode: 0o600 });
@@ -375,18 +375,18 @@ export function writePiWebToken(token: string): void {
 }
 
 export function withToken(url: string): string {
-  const token = readPiWebToken();
+  const token = readPicanToken();
   if (!token) return url;
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
-export function cleanupPiWebNpmTemps(agentRoot = agentDir()): number {
-  const scopeDir = join(agentRoot, "npm", "node_modules", "@ygncode");
+export function cleanupPicanNpmTemps(agentRoot = agentDir()): number {
+  const scopeDir = join(agentRoot, "npm", "node_modules", "@yeshwanthyk");
   let removed = 0;
   try {
     for (const name of readdirSync(scopeDir)) {
-      if (!name.startsWith(".pi-web-")) continue;
+      if (!name.startsWith(".pican-")) continue;
       rmSync(join(scopeDir, name), { recursive: true, force: true });
       removed++;
     }
@@ -403,17 +403,17 @@ export function normalizeCommandArgs(args: unknown): string[] {
   return [];
 }
 
-async function findPiWebBinary(pi: ExtensionAPI): Promise<string | null> {
-  // 1. Local dev build (e.g. when working inside the pi-web repo).
+async function findPicanBinary(pi: ExtensionAPI): Promise<string | null> {
+  // 1. Local dev build (e.g. when working inside the pican repo).
   try {
-    accessSync("./pi-web", fsConstants.X_OK);
-    return "./pi-web";
+    accessSync("./pican", fsConstants.X_OK);
+    return "./pican";
   } catch {
     // not in cwd
   }
 
   // 2. Pi-managed install (may not be in PATH).
-  const piBin = `${agentDir()}/bin/pi-web`;
+  const piBin = `${agentDir()}/bin/pican`;
   try {
     accessSync(piBin, fsConstants.X_OK);
     return piBin;
@@ -423,7 +423,7 @@ async function findPiWebBinary(pi: ExtensionAPI): Promise<string | null> {
 
   // 3. Fall back to PATH lookup.
   try {
-    const result = await pi.exec("which", ["pi-web"]);
+    const result = await pi.exec("which", ["pican"]);
     const bin = result.stdout.trim();
     if (bin) return bin;
   } catch {
@@ -432,7 +432,7 @@ async function findPiWebBinary(pi: ExtensionAPI): Promise<string | null> {
   return null;
 }
 
-async function getPiWebVersion(pi: ExtensionAPI, bin: string): Promise<string> {
+async function getPicanVersion(pi: ExtensionAPI, bin: string): Promise<string> {
   for (const flag of ["-version", "--version"]) {
     try {
       const result = await pi.exec(bin, [flag]);
@@ -459,7 +459,7 @@ async function ensureQrCode(
 
   // Find the extension directory with a package.json that depends on qrcode
   const candidates = [
-    `${homedir()}/.pi/agent/extensions/pi-web/`,
+    `${homedir()}/.pi/agent/extensions/pican/`,
     `${homedir()}/.pi/agent/extensions/`,
     `${ctx.sessionManager.getCwd()}/.pi/extensions/`,
   ];
@@ -674,16 +674,16 @@ async function showRemoteAccess(
   const detected = await detectHostPort(pi);
   if (!detected) {
     ctx.ui.notify(
-      "Could not detect pi-web server. Start it with: pi-web -o",
+      "Could not detect pican server. Start it with: pican -o",
       "error",
     );
     return;
   }
 
   const { host, port, tailscale, tailscaleUrl } = detected;
-  if (!(await ensurePiWebRunning(pi, host, port))) {
+  if (!(await ensurePicanRunning(pi, host, port))) {
     ctx.ui.notify(
-      `pi-web not responding on ${host}:${port}. Start it with: pi-web -o`,
+      `pican not responding on ${host}:${port}. Start it with: pican -o`,
       "error",
     );
     return;
@@ -693,7 +693,7 @@ async function showRemoteAccess(
     tailscaleUrl || (await detectTailscaleHttpsUrl(pi, port));
   if (!tailscale && !detectedTailscaleUrl) {
     ctx.ui.notify(
-      "Tailscale HTTPS is not available. Install/sign in to Tailscale and restart pi-web so it can run `tailscale serve`.",
+      "Tailscale HTTPS is not available. Install/sign in to Tailscale and restart pican so it can run `tailscale serve`.",
       "error",
     );
     return;
@@ -750,28 +750,28 @@ async function showRemoteAccess(
 }
 
 export default function (pi: ExtensionAPI) {
-  // Session auto-titling now lives in pi-web itself (see internal/server/
+  // Session auto-titling now lives in pican itself (see internal/server/
   // auto_title.go), gated by the /settings page, so the extension no longer
   // registers a title tool or input handler.
 
-  // Start pi-web opportunistically when the extension loads so /remote works on a
-  // fresh shell after `pi install npm:@ygncode/pi-web@beta`.
+  // Start pican opportunistically when the extension loads so /remote works on a
+  // fresh shell after `pi install npm:@yeshwanthyk/pican@beta`.
   void detectHostPort(pi)
     .then((detected) => {
       if (!detected) return;
-      return ensurePiWebRunning(pi, detected.host, detected.port);
+      return ensurePicanRunning(pi, detected.host, detected.port);
     })
     .catch(() => {
       // Keep startup quiet; /remote and /refresh show actionable errors if needed.
     });
 
-  // ── /pi-web ───────────────────────────────────────────────────────
-  pi.registerCommand("pi-web", {
-    description: "Manage pi-web: status, token, start, stop, restart, remote, update",
+  // ── /pican ───────────────────────────────────────────────────────
+  pi.registerCommand("pican", {
+    description: "Manage pican: status, token, start, stop, restart, remote, update",
 
     handler: async (args, ctx: ExtensionCommandContext) => {
       const [subcommand = "status"] = normalizeCommandArgs(args);
-      const bin = await findPiWebBinary(pi);
+      const bin = await findPicanBinary(pi);
       const detected = await detectHostPort(pi);
       const host = detected?.host || "127.0.0.1";
       const port = detected?.port || "31415";
@@ -786,7 +786,7 @@ export default function (pi: ExtensionAPI) {
         subcommand === "-h"
       ) {
         ctx.ui.notify(
-          "Usage: /pi-web [status|version|path|token|set-token|start|stop|restart|remote|update|help]",
+          "Usage: /pican [status|version|path|token|set-token|start|stop|restart|remote|update|help]",
           "info",
         );
         return;
@@ -795,8 +795,8 @@ export default function (pi: ExtensionAPI) {
       if (subcommand === "path") {
         ctx.ui.notify(
           bin
-            ? `pi-web binary: ${bin}`
-            : "pi-web binary not found in PATH",
+            ? `pican binary: ${bin}`
+            : "pican binary not found in PATH",
           bin ? "info" : "warning",
         );
         return;
@@ -805,13 +805,13 @@ export default function (pi: ExtensionAPI) {
       if (subcommand === "version") {
         if (!bin) {
           ctx.ui.notify(
-            "pi-web binary not found in ~/.pi/agent/bin or /usr/local/bin",
+            "pican binary not found in ~/.pi/agent/bin or /usr/local/bin",
             "warning",
           );
           return;
         }
         ctx.ui.notify(
-          `pi-web version: ${await getPiWebVersion(pi, bin)}`,
+          `pican version: ${await getPicanVersion(pi, bin)}`,
           "info",
         );
         return;
@@ -819,13 +819,13 @@ export default function (pi: ExtensionAPI) {
 
       if (subcommand === "start") {
         if (running) {
-          const lines = [`pi-web already running at ${withToken(`http://${host}:${port}`)}`];
+          const lines = [`pican already running at ${withToken(`http://${host}:${port}`)}`];
           if (tailscaleUrl) lines.push(`remote: ${withToken(tailscaleUrl)}`);
           ctx.ui.notify(lines.join("\n"), "info");
           return;
         }
         try {
-          await startPiWeb(pi);
+          await startPican(pi);
           let started = false;
           for (let i = 0; i < 10; i++) {
             await new Promise((resolve) => setTimeout(resolve, 300));
@@ -837,30 +837,30 @@ export default function (pi: ExtensionAPI) {
           const remoteURL = await detectTailscaleHttpsUrl(pi, port);
           const lines = [
             started
-              ? `Started pi-web at ${withToken(`http://${host}:${port}`)}`
-              : "Started pi-web; still waiting for health check.",
+              ? `Started pican at ${withToken(`http://${host}:${port}`)}`
+              : "Started pican; still waiting for health check.",
           ];
           if (remoteURL) lines.push(`remote: ${withToken(remoteURL)}`);
           ctx.ui.notify(lines.join("\n"), started ? "success" : "warning");
         } catch (err) {
-          ctx.ui.notify(`Failed to start pi-web: ${err}`, "error");
+          ctx.ui.notify(`Failed to start pican: ${err}`, "error");
         }
         return;
       }
 
       if (subcommand === "stop") {
         try {
-          await stopPiWeb(pi);
-          ctx.ui.notify("Stopped pi-web.", "success");
+          await stopPican(pi);
+          ctx.ui.notify("Stopped pican.", "success");
         } catch (err) {
-          ctx.ui.notify(`Failed to stop pi-web: ${err}`, "error");
+          ctx.ui.notify(`Failed to stop pican: ${err}`, "error");
         }
         return;
       }
 
       if (subcommand === "restart") {
         try {
-          await restartPiWeb(pi);
+          await restartPican(pi);
           let restarted = false;
           for (let i = 0; i < 10; i++) {
             await new Promise((resolve) => setTimeout(resolve, 300));
@@ -872,24 +872,24 @@ export default function (pi: ExtensionAPI) {
           const remoteURL = await detectTailscaleHttpsUrl(pi, port);
           const lines = [
             restarted
-              ? `Restarted pi-web at ${withToken(`http://${host}:${port}`)}`
-              : "Restarted pi-web; still waiting for health check.",
+              ? `Restarted pican at ${withToken(`http://${host}:${port}`)}`
+              : "Restarted pican; still waiting for health check.",
           ];
           if (remoteURL) lines.push(`remote: ${withToken(remoteURL)}`);
           ctx.ui.notify(lines.join("\n"), restarted ? "success" : "warning");
         } catch (err) {
-          ctx.ui.notify(`Failed to restart pi-web: ${err}`, "error");
+          ctx.ui.notify(`Failed to restart pican: ${err}`, "error");
         }
         return;
       }
 
       if (subcommand === "token") {
-        const token = readPiWebToken();
+        const token = readPicanToken();
         if (token) {
           ctx.ui.notify(`Current token: ${token}`, "info");
         } else {
           ctx.ui.notify(
-            "No token set. Use /pi-web set-token <token> to create one.",
+            "No token set. Use /pican set-token <token> to create one.",
             "warning",
           );
         }
@@ -900,14 +900,14 @@ export default function (pi: ExtensionAPI) {
         const [, newToken] = normalizeCommandArgs(args);
         if (!newToken) {
           ctx.ui.notify(
-            "Usage: /pi-web set-token <token>",
+            "Usage: /pican set-token <token>",
             "warning",
           );
           return;
         }
-        writePiWebToken(newToken);
+        writePicanToken(newToken);
         ctx.ui.notify(
-          `Token updated. Restart pi-web for the change to take effect: /pi-web restart`,
+          `Token updated. Restart pican for the change to take effect: /pican restart`,
           "success",
         );
         return;
@@ -920,28 +920,28 @@ export default function (pi: ExtensionAPI) {
 
       if (subcommand === "update") {
         try {
-          const cleaned = cleanupPiWebNpmTemps();
+          const cleaned = cleanupPicanNpmTemps();
           ctx.ui.notify(
             cleaned > 0
-              ? `Cleaned ${cleaned} stale npm temp dir(s). Updating pi-web package...`
-              : "Updating pi-web package...",
+              ? `Cleaned ${cleaned} stale npm temp dir(s). Updating pican package...`
+              : "Updating pican package...",
             "info",
           );
-          await pi.exec("pi", ["install", "npm:@ygncode/pi-web@beta"]);
+          await pi.exec("pi", ["install", "npm:@yeshwanthyk/pican@beta"]);
           try {
-            await restartPiWeb(pi);
+            await restartPican(pi);
           } catch {
             // Package update may still have succeeded even if the service is not installed/running.
           }
           ctx.ui.notify(
-            "pi-web updated. Reloading pi extensions...",
+            "pican updated. Reloading pi extensions...",
             "success",
           );
           await ctx.reload();
           return;
         } catch (err) {
           ctx.ui.notify(
-            `Failed to update pi-web: ${err}\nTry: rm -rf ~/.pi/agent/npm/node_modules/@ygncode/.pi-web-* && pi install npm:@ygncode/pi-web@beta`,
+            `Failed to update pican: ${err}\nTry: rm -rf ~/.pi/agent/npm/node_modules/@yeshwanthyk/.pican-* && pi install npm:@yeshwanthyk/pican@beta`,
             "error",
           );
         }
@@ -950,14 +950,14 @@ export default function (pi: ExtensionAPI) {
 
       if (subcommand !== "status") {
         ctx.ui.notify(
-          `Unknown /pi-web command: ${subcommand}. Usage: /pi-web [status|version|path|token|set-token|start|stop|restart|remote|update|help]`,
+          `Unknown /pican command: ${subcommand}. Usage: /pican [status|version|path|token|set-token|start|stop|restart|remote|update|help]`,
           "warning",
         );
         return;
       }
 
       const lines = [
-        `binary: ${bin || "not found (~/.pi/agent/bin/pi-web, /usr/local/bin/pi-web)"}`,
+        `binary: ${bin || "not found (~/.pi/agent/bin/pican, /usr/local/bin/pican)"}`,
         `status: ${running ? "running" : "not responding"}`,
         `local: ${withToken(`http://${host}:${port}`)}`,
       ];
@@ -981,16 +981,16 @@ export default function (pi: ExtensionAPI) {
       const detected = await detectHostPort(pi);
       if (!detected) {
         ctx.ui.notify(
-          "Could not detect pi-web server. Start it with: pi-web -o",
+          "Could not detect pican server. Start it with: pican -o",
           "error",
         );
         return;
       }
 
       let { host, port, tailscaleUrl } = detected;
-      if (!(await ensurePiWebRunning(pi, host, port))) {
+      if (!(await ensurePicanRunning(pi, host, port))) {
         ctx.ui.notify(
-          `pi-web not responding on ${host}:${port}. Start it with: pi-web -o`,
+          `pican not responding on ${host}:${port}. Start it with: pican -o`,
           "error",
         );
         return;
@@ -1049,7 +1049,7 @@ export default function (pi: ExtensionAPI) {
 
   // ── /refresh ──────────────────────────────────────────────────────
   pi.registerCommand("refresh", {
-    description: "Sync pi-web-written messages back into this session",
+    description: "Sync pican-written messages back into this session",
     handler: async (_args, ctx: ExtensionCommandContext) => {
       const sessionFile = ctx.sessionManager.getSessionFile();
       if (!sessionFile) {

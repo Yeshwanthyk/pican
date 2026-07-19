@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"pi-web/internal/auth"
-	"pi-web/internal/sessions"
+	"pican/internal/auth"
+	"pican/internal/sessions"
 )
 
 type fakeShareRunner struct {
@@ -121,7 +121,7 @@ func TestHandleShareRejectsUnknownSession(t *testing.T) {
 
 func TestHandleShareSucceeds(t *testing.T) {
 	runner := &fakeShareRunner{
-		createOut: "https://gist.github.com/setkyar/abc123\n",
+		createOut: "https://gist.github.com/yeshwanthyk/abc123\n",
 	}
 	s, _ := newShareTestServer(t, runner)
 	req := httptest.NewRequest(http.MethodPost, "/share?id=session.jsonl", nil)
@@ -178,7 +178,7 @@ func TestShareEndpointEnforcesAuth(t *testing.T) {
 
 	// With token → 200
 	req2 := httptest.NewRequest(http.MethodPost, "/share?id=session.jsonl", nil)
-	req2.Header.Set("X-Pi-Token", "secret")
+	req2.Header.Set("X-Pican-Token", "secret")
 	rec2 := httptest.NewRecorder()
 	handler(rec2, req2)
 	if rec2.Code != http.StatusOK {

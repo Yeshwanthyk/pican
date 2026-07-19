@@ -8,9 +8,9 @@ describe('English UI strings', () => {
   });
 
   it('ignores stale language preferences', () => {
-    localStorage.setItem('pi-web:v1:locale', 'es');
+    localStorage.setItem('pican:v1:locale', 'es');
     expect(t('composer.send')).toBe('Send');
-    localStorage.removeItem('pi-web:v1:locale');
+    localStorage.removeItem('pican:v1:locale');
   });
 
   it('interpolates parameters', () => {

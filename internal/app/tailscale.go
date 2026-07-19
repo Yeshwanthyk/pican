@@ -82,7 +82,7 @@ const (
 )
 
 // configureTailscaleServe publishes the local HTTP server through Tailscale Serve.
-// Tailscale owns HTTPS/certs; pi-web keeps listening only on localhost.
+// Tailscale owns HTTPS/certs; pican keeps listening only on localhost.
 func configureTailscaleServe(ctx context.Context, port string) (string, bool, error) {
 	hostname, err := tailscaleSelfDNS(ctx)
 	if err != nil {

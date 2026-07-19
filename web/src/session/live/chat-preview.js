@@ -2,7 +2,7 @@ export function getSpinnerConfig(windowImpl = typeof window !== 'undefined' ? wi
   let style = 'runcat';
   try {
     if (windowImpl && windowImpl.localStorage) {
-      const saved = windowImpl.localStorage.getItem('pi-sessions:spinner-style');
+      const saved = windowImpl.localStorage.getItem('pican:spinner-style');
       if (saved === 'braille') {
         style = 'braille';
       }

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/workers"
+	"pican/internal/chat"
+	"pican/internal/workers"
 )
 
 type Preview struct {

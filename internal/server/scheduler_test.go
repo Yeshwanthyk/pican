@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/schedules"
+	"pican/internal/schedules"
 
 	_ "modernc.org/sqlite"
 )

@@ -50,7 +50,7 @@
       if (typeof original !== 'function' || original.__piPatched) return original;
       const patched = function (...args) {
         const result = original.apply(this, args);
-        window.dispatchEvent(new window.CustomEvent('pi:locationchange'));
+        window.dispatchEvent(new window.CustomEvent('pican:locationchange'));
         return result;
       };
       patched.__piPatched = true;
@@ -61,10 +61,10 @@
     const originalPush = wrap('pushState');
     const originalReplace = wrap('replaceState');
     window.addEventListener('popstate', syncPath);
-    window.addEventListener('pi:locationchange', syncPath);
+    window.addEventListener('pican:locationchange', syncPath);
     return () => {
       window.removeEventListener('popstate', syncPath);
-      window.removeEventListener('pi:locationchange', syncPath);
+      window.removeEventListener('pican:locationchange', syncPath);
       if (history.pushState?.__piOriginal === originalPush) history.pushState = originalPush;
       if (history.replaceState?.__piOriginal === originalReplace)
         history.replaceState = originalReplace;

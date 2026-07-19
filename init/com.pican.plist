@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.pi-web</string>
+    <string>com.pican</string>
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/pi-web</string>
+        <string>/usr/local/bin/pican</string>
         <string>-p</string>
         <string>31415</string>
     </array>
@@ -19,10 +19,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/tmp/pi-web.log</string>
+    <string>/tmp/pican.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/tmp/pi-web.error.log</string>
+    <string>/tmp/pican.error.log</string>
 
     <key>WorkingDirectory</key>
     <string>/tmp</string>

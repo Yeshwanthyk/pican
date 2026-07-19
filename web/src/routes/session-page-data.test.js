@@ -129,7 +129,8 @@ describe('session-page-data', () => {
       }),
     );
     const documentImpl = {
-      getElementById: (id) => (id === 'pi-session-bootstrap' ? { textContent: bootstrap } : null),
+      getElementById: (id) =>
+        id === 'pican-session-bootstrap' ? { textContent: bootstrap } : null,
     };
     let fetched = false;
     const fetchImpl = async () => {
@@ -200,7 +201,8 @@ describe('session-page-data', () => {
       JSON.stringify({ id: 'other.jsonl', data: { name: 'Other', entries: [] } }),
     );
     const documentImpl = {
-      getElementById: (id) => (id === 'pi-session-bootstrap' ? { textContent: bootstrap } : null),
+      getElementById: (id) =>
+        id === 'pican-session-bootstrap' ? { textContent: bootstrap } : null,
     };
     let fetched = false;
     const fetchImpl = async (url) => {

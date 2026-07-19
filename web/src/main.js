@@ -12,7 +12,7 @@ export function mountApp({ target = defaultTarget(), props = {} } = {}) {
 }
 
 const appTarget = typeof document !== 'undefined' ? defaultTarget() : null;
-if (appTarget && !appTarget.dataset.piWebSvelteMounted) {
-  appTarget.dataset.piWebSvelteMounted = 'true';
+if (appTarget && !appTarget.dataset.picanSvelteMounted) {
+  appTarget.dataset.picanSvelteMounted = 'true';
   mountApp({ target: appTarget });
 }

@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	"pi-web/internal/sessions"
-	"pi-web/internal/share"
+	"pican/internal/sessions"
+	"pican/internal/share"
 )
 
 // shareCmdRunner is overridable in tests so the share handler doesn't shell out.

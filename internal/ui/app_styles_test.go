@@ -71,7 +71,7 @@ func TestAppStylesBundleContainsPerRouteStylesheets(t *testing.T) {
 			t.Fatalf("appStylesBundle missing %s", name)
 		}
 	}
-	if strings.Contains(appStylesBundle, "--pi-web-theme-boot-marker--") {
+	if strings.Contains(appStylesBundle, "--pican-theme-boot-marker--") {
 		t.Fatalf("sanity check sentinel unexpectedly present")
 	}
 }

@@ -72,7 +72,7 @@ type SessionSummary struct {
 	NativeID           string `json:"nativeId,omitempty"`
 	ChatAvailable      bool
 	ChatDisabledReason string
-	// Pinned is set by the server from pi-web's SQLite session_pins table; it
+	// Pinned is set by the server from pican's SQLite session_pins table; it
 	// is never derived from the session file itself.
 	Pinned bool `json:"pinned,omitempty"`
 }
@@ -399,7 +399,7 @@ func RenameSession(path, name string, now func() time.Time) error {
 }
 
 // AutoTitleSession is like RenameSession but marks the entry as written by
-// pi-web's auto-titler (autoTitle:true), so a later read can tell its own titles
+// pican's auto-titler (autoTitle:true), so a later read can tell its own titles
 // apart from a user's manual rename and re-title safely across restarts.
 func AutoTitleSession(path, name string, now func() time.Time) error {
 	return appendSessionName(path, name, true, now)

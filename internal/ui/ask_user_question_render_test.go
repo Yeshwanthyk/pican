@@ -19,7 +19,7 @@ func TestAskUserQuestionToolHasDedicatedRenderer(t *testing.T) {
 	src := readAskQuestionSrc(t)
 	jsChecks := []string{
 		"'ask_user_question'",
-		"'pi_web_ask_user_question'",
+		"'pican_ask_user_question'",
 		"<AskQuestion",
 	}
 	for _, check := range jsChecks {

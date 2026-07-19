@@ -10,7 +10,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/process"
 
-	"pi-web/internal/workers"
+	"pican/internal/workers"
 )
 
 // processSample is a point-in-time resource reading for one OS process.

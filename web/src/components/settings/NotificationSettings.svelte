@@ -13,8 +13,8 @@
   } from '../../session/chat/done-notifier.js';
 
   let { settings = {}, onSave = () => {}, onSaved = () => {} } = $props();
-  const notifyKey = 'pi-share:v1:notify-on-done';
-  const soundKey = 'pi-share:v1:done-sound';
+  const notifyKey = 'pican:v1:notify-on-done';
+  const soundKey = 'pican:v1:done-sound';
   let notify = $derived(boolFor(settings, notifyKey, false));
   let sound = $derived(
     valueFor(settings, soundKey, getSelectedSound({ storage: globalThis.localStorage })),

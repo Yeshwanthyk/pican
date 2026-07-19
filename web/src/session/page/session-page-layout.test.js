@@ -11,17 +11,17 @@ describe('session page layout helpers', () => {
 
   it('adds and removes the session page body classes', () => {
     const dispose = applySessionPageBodyClasses({ documentImpl: document });
-    expect(document.documentElement.classList.contains('pi-session-page')).toBe(true);
-    expect(document.body.classList.contains('pi-session-page')).toBe(true);
+    expect(document.documentElement.classList.contains('pican-session-page')).toBe(true);
+    expect(document.body.classList.contains('pican-session-page')).toBe(true);
 
     dispose();
 
-    expect(document.documentElement.classList.contains('pi-session-page')).toBe(false);
-    expect(document.body.classList.contains('pi-session-page')).toBe(false);
+    expect(document.documentElement.classList.contains('pican-session-page')).toBe(false);
+    expect(document.body.classList.contains('pican-session-page')).toBe(false);
   });
 
   it('applies stored right-sidebar state', () => {
-    const storage = new Map([['pi-web:v1:right-sidebar-width', '456']]);
+    const storage = new Map([['pican:v1:right-sidebar-width', '456']]);
     const windowImpl = {
       matchMedia: vi.fn(() => ({ matches: true })),
     };

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 var (

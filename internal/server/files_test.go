@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/files"
-	"pi-web/internal/sessions"
+	"pican/internal/files"
+	"pican/internal/sessions"
 )
 
 // newFilesTestServer writes a session whose cwd is seeded with files and

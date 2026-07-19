@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"pi-web/internal/git"
+	"pican/internal/git"
 )
 
 // handleGitDiff returns the uncommitted working-tree diff (tracked changes plus

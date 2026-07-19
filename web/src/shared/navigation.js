@@ -1,5 +1,5 @@
 // Client-side SPA navigation. App.svelte (the root router) wraps
-// history.pushState to emit a 'pi:locationchange' event and swaps the active
+// history.pushState to emit a 'pican:locationchange' event and swaps the active
 // page whenever window.location.pathname changes, so pushing a URL here
 // navigates between SPA routes (e.g. the sessions index → a session view)
 // without a full page reload.

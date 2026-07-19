@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# pi-web installer — downloads the binary and sets up auto-start
+# pican installer — downloads the binary and sets up auto-start
 #
 # Standalone (no pi required):
-#   curl -fsSL https://raw.githubusercontent.com/ygncode/pi-web/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash
 #
 # Via pi package (also registers /remote, /refresh commands):
-#   pi install npm:@ygncode/pi-web@beta
+#   pi install npm:@yeshwanthyk/pican@beta
 #
 # Updates are handled by re-running the same command.
 
-REPO="ygncode/pi-web"
-if [[ -n "${PI_WEB_INSTALL_DIR:-}" ]]; then
-  INSTALL_DIR="$PI_WEB_INSTALL_DIR"
+REPO="Yeshwanthyk/pican"
+if [[ -n "${PICAN_INSTALL_DIR:-}" ]]; then
+  INSTALL_DIR="$PICAN_INSTALL_DIR"
 elif [[ -n "${npm_package_name:-}" ]]; then
   # pi installs npm packages non-interactively; avoid requiring sudo during npm postinstall.
   INSTALL_DIR="${HOME}/.pi/agent/bin"
 else
   INSTALL_DIR="/usr/local/bin"
 fi
-BINARY="$INSTALL_DIR/pi-web"
+BINARY="$INSTALL_DIR/pican"
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION_FILE="${HOME}/.pi/agent/pi-web-version"
+VERSION_FILE="${HOME}/.pi/agent/pican-version"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -62,9 +62,9 @@ detect_platform() {
 package_tag() {
   # When install.sh runs as an npm lifecycle script, install the binary that
   # matches the npm package version. This keeps pinned installs such as
-  # `pi install npm:@ygncode/pi-web@0.0.1-beta.25` pinned for both the extension
-  # package and the downloaded pi-web binary.
-  if [[ "${npm_package_name:-}" == "@ygncode/pi-web" && -n "${npm_package_version:-}" ]]; then
+  # `pi install npm:@yeshwanthyk/pican@0.0.1-beta.25` pinned for both the extension
+  # package and the downloaded pican binary.
+  if [[ "${npm_package_name:-}" == "@yeshwanthyk/pican" && -n "${npm_package_version:-}" ]]; then
     echo "v${npm_package_version#v}"
   fi
 }
@@ -137,26 +137,26 @@ needs_update() {
 download_binary() {
   local platform="$1"
   local tag="$2"
-  local asset="pi-web-${platform}"
+  local asset="pican-${platform}"
   local url="https://github.com/${REPO}/releases/download/${tag}/${asset}"
 
-  info "Downloading pi-web ${tag} (${platform})..."
+  info "Downloading pican ${tag} (${platform})..."
   info "  ${url}"
 
   local tmp
   tmp="$(mktemp -d)"
 
   if command -v curl &>/dev/null; then
-    curl -fsSL --progress-bar -o "${tmp}/pi-web" "$url"
+    curl -fsSL --progress-bar -o "${tmp}/pican" "$url"
   elif command -v wget &>/dev/null; then
-    wget -q --show-progress -O "${tmp}/pi-web" "$url"
+    wget -q --show-progress -O "${tmp}/pican" "$url"
   else
     err "Neither curl nor wget found. Install one and try again."
     exit 1
   fi
 
-  chmod +x "${tmp}/pi-web"
-  echo "${tmp}/pi-web"
+  chmod +x "${tmp}/pican"
+  echo "${tmp}/pican"
 }
 
 # ── Install binary ──────────────────────────────────────────────────
@@ -164,11 +164,11 @@ install_binary() {
   local src="$1"
   local tag="$2"
   local is_update="${3:-false}"
-  local inplace="${PI_WEB_INPLACE_UPDATE:-}"
+  local inplace="${PICAN_INPLACE_UPDATE:-}"
 
   if [[ -f "$BINARY" ]] && [[ "$is_update" != "true" ]]; then
     # Interactive: ask before overwriting
-    warn "pi-web already installed at ${BINARY}"
+    warn "pican already installed at ${BINARY}"
     read -rp "  Overwrite? [y/N] " answer
     if [[ ! "$answer" =~ ^[Yy]$ ]]; then
       info "Skipping binary install."
@@ -177,14 +177,14 @@ install_binary() {
   fi
 
   # Stop running instance before replacing. Skipped for in-place self-updates:
-  # pi-web spawned this script (via `pi install`), so stopping the service here
-  # would kill the very npm process running it. pi-web triggers its own detached
+  # pican spawned this script (via `pi install`), so stopping the service here
+  # would kill the very npm process running it. pican triggers its own detached
   # restart afterward (see internal/app/update.go).
   if [[ -f "$BINARY" && -z "$inplace" ]]; then
     if [[ "$(uname -s)" == "Linux" ]]; then
-      systemctl --user stop pi-web.service 2>/dev/null || true
+      systemctl --user stop pican.service 2>/dev/null || true
     elif [[ "$(uname -s)" == "Darwin" ]]; then
-      launchctl unload "${HOME}/Library/LaunchAgents/com.pi-web.plist" 2>/dev/null || true
+      launchctl unload "${HOME}/Library/LaunchAgents/com.pican.plist" 2>/dev/null || true
     fi
     # Also try pkill for manually-started instances
     pkill -f "${BINARY}" 2>/dev/null || true
@@ -212,7 +212,7 @@ install_binary() {
   mkdir -p "$(dirname "$VERSION_FILE")"
   echo "$tag" > "$VERSION_FILE"
 
-  info "pi-web ${tag} installed to ${BINARY}"
+  info "pican ${tag} installed to ${BINARY}"
   return 0
 }
 
@@ -231,7 +231,7 @@ fetch_config() {
 
 # ── macOS auto-start ─────────────────────────────────────────────────
 setup_macos() {
-  local plist_dst="${HOME}/Library/LaunchAgents/com.pi-web.plist"
+  local plist_dst="${HOME}/Library/LaunchAgents/com.pican.plist"
   local needs_reload=true
 
   mkdir -p "${HOME}/Library/LaunchAgents"
@@ -239,29 +239,29 @@ setup_macos() {
   # Generate plist from local file or fetch from repo
   local generated
   generated="$(mktemp)"
-  local plist_src="${SRC_DIR}/init/com.pi-web.plist"
+  local plist_src="${SRC_DIR}/init/com.pican.plist"
   if [[ -f "$plist_src" ]]; then
-    sed "s|/usr/local/bin/pi-web|${BINARY}|g" "$plist_src" > "$generated"
+    sed "s|/usr/local/bin/pican|${BINARY}|g" "$plist_src" > "$generated"
   else
     info "Fetching launchd config from repo..."
     local raw
     raw="$(mktemp)"
-    fetch_config "init/com.pi-web.plist" "$raw"
-    sed "s|/usr/local/bin/pi-web|${BINARY}|g" "$raw" > "$generated"
+    fetch_config "init/com.pican.plist" "$raw"
+    sed "s|/usr/local/bin/pican|${BINARY}|g" "$raw" > "$generated"
     rm -f "$raw"
   fi
 
-  info "pi-web will listen on localhost; if Tailscale is running, it will publish HTTPS with Tailscale Serve."
+  info "pican will listen on localhost; if Tailscale is running, it will publish HTTPS with Tailscale Serve."
 
-  # Pass the generated environment to launchd. This includes PI_WEB_TOKEN and
-  # PATH so pi-web can find `pi` when serving browser chat requests.
-  local env_file="${HOME}/.config/pi-web/env"
+  # Pass the generated environment to launchd. This includes PICAN_TOKEN and
+  # PATH so pican can find `pi` when serving browser chat requests.
+  local env_file="${HOME}/.config/pican/env"
   if [[ -f "$env_file" ]]; then
     local env_xml=""
     while IFS='=' read -r key value; do
       [[ -z "$key" || "$key" == \#* ]] && continue
       case "$key" in
-        PI_WEB_TOKEN|PI_CODING_AGENT_DIR|PATH) ;;
+        PICAN_TOKEN|PI_CODING_AGENT_DIR|PATH) ;;
         *) continue ;;
       esac
       value="$(printf '%s' "$value" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
@@ -291,32 +291,32 @@ setup_macos() {
   rm -f "$generated"
 
   # Restart if already running
-  launchctl kickstart -k "gui/$(id -u)/com.pi-web" 2>/dev/null || {
-    launchctl stop com.pi-web 2>/dev/null || true
-    launchctl start com.pi-web 2>/dev/null || true
+  launchctl kickstart -k "gui/$(id -u)/com.pican" 2>/dev/null || {
+    launchctl stop com.pican 2>/dev/null || true
+    launchctl start com.pican 2>/dev/null || true
   }
 }
 
 # ── Linux auto-start (systemd user service) ──────────────────────────
 setup_linux() {
   local service_dir="${HOME}/.config/systemd/user"
-  local service_dst="${service_dir}/pi-web.service"
+  local service_dst="${service_dir}/pican.service"
   local needs_reload=true
 
   mkdir -p "$service_dir"
 
   # Get service file from local clone or fetch from repo
-  local service_src="${SRC_DIR}/init/pi-web.service"
+  local service_src="${SRC_DIR}/init/pican.service"
   if [[ ! -f "$service_src" ]]; then
     info "Fetching systemd service file from repo..."
     service_src="$(mktemp)"
-    fetch_config "init/pi-web.service" "$service_src"
+    fetch_config "init/pican.service" "$service_src"
   fi
 
   local generated_service
   generated_service="$(mktemp)"
-  sed "s|/usr/local/bin/pi-web|${BINARY}|g" "$service_src" > "$generated_service"
-  info "pi-web will listen on localhost; if Tailscale is running, it will publish HTTPS with Tailscale Serve."
+  sed "s|/usr/local/bin/pican|${BINARY}|g" "$service_src" > "$generated_service"
+  info "pican will listen on localhost; if Tailscale is running, it will publish HTTPS with Tailscale Serve."
 
   # Check if service file changed
   if [[ -f "$service_dst" ]]; then
@@ -336,10 +336,10 @@ setup_linux() {
   fi
 
   # Enable and restart when user systemd is available.
-  systemctl --user enable pi-web.service 2>/dev/null || true
-  systemctl --user restart pi-web.service 2>/dev/null || {
+  systemctl --user enable pican.service 2>/dev/null || true
+  systemctl --user restart pican.service 2>/dev/null || {
     # Service may not be running yet (first install)
-    systemctl --user start pi-web.service 2>/dev/null || true
+    systemctl --user start pican.service 2>/dev/null || true
   }
 }
 
@@ -360,7 +360,7 @@ set_env_var() {
 }
 
 setup_env() {
-  local env_dir="${HOME}/.config/pi-web"
+  local env_dir="${HOME}/.config/pican"
   local env_file="${env_dir}/env"
 
   mkdir -p "$env_dir"
@@ -368,7 +368,7 @@ setup_env() {
   touch "$env_file"
   chmod 600 "$env_file" 2>/dev/null || true
 
-  if [[ -z "${PI_WEB_TOKEN:-}" ]] && ! grep -q '^PI_WEB_TOKEN=' "$env_file"; then
+  if [[ -z "${PICAN_TOKEN:-}" ]] && ! grep -q '^PICAN_TOKEN=' "$env_file"; then
     local token
     if command -v openssl &>/dev/null; then
       token="$(openssl rand -hex 16)"
@@ -376,25 +376,25 @@ setup_env() {
       token="$(date +%s%N)-$RANDOM-$RANDOM"
     fi
 
-    set_env_var "$env_file" "PI_WEB_TOKEN" "$token"
-    info "Generated PI_WEB_TOKEN in ${env_file}"
-    warn "Use this token when opening pi-web from another device: ${token}"
+    set_env_var "$env_file" "PICAN_TOKEN" "$token"
+    info "Generated PICAN_TOKEN in ${env_file}"
+    warn "Use this token when opening pican from another device: ${token}"
   fi
 
-  # Persist PI_CODING_AGENT_DIR so auto-started pi-web finds the right sessions.
+  # Persist PI_CODING_AGENT_DIR so auto-started pican finds the right sessions.
   if [[ -n "${PI_CODING_AGENT_DIR:-}" ]]; then
     set_env_var "$env_file" "PI_CODING_AGENT_DIR" "${PI_CODING_AGENT_DIR}"
   fi
 
   # Services launched by systemd/launchd often have a minimal PATH. Preserve the
-  # install-time PATH so pi-web can find `pi` for browser chat (`pi --mode rpc`).
+  # install-time PATH so pican can find `pi` for browser chat (`pi --mode rpc`).
   set_env_var "$env_file" "PATH" "${PATH}"
 }
 
 # ── Main ────────────────────────────────────────────────────────────
 main() {
   echo ""
-  info "pi-web installer"
+  info "pican installer"
   echo ""
 
   local platform
@@ -403,7 +403,7 @@ main() {
   local tag
   tag="$(package_tag)"
   if [[ -n "$tag" ]]; then
-    info "Using pi-web package version ${tag}."
+    info "Using pican package version ${tag}."
   else
     tag="$(latest_tag)"
   fi
@@ -428,11 +428,11 @@ main() {
     exit 0
   fi
 
-  # In-place self-update: pi-web triggered this and restarts itself afterward
+  # In-place self-update: pican triggered this and restarts itself afterward
   # via its own /api/restart. Skip env/service setup so we don't restart (and
   # kill) the npm process running this script, or clobber the service's PATH.
-  if [[ -n "${PI_WEB_INPLACE_UPDATE:-}" ]]; then
-    info "Binary updated to ${tag}; pi-web will restart to apply it."
+  if [[ -n "${PICAN_INPLACE_UPDATE:-}" ]]; then
+    info "Binary updated to ${tag}; pican will restart to apply it."
     echo ""
     exit 0
   fi
@@ -444,7 +444,7 @@ main() {
     Linux)  setup_linux ;;
   esac
 
-  info "Done! pi-web ${tag} is ready."
+  info "Done! pican ${tag} is ready."
   echo ""
 }
 

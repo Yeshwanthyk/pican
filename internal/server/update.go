@@ -56,7 +56,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 0, map[string]any{"status": "updated", "needsRestart": true})
 }
 
-// handleRestart spawns a detached restart of the pi-web service and then lets
+// handleRestart spawns a detached restart of the pican service and then lets
 // the process exit. The response is flushed before the restart fires so the
 // browser receives it; the browser then polls until the new process is up.
 // POST only.

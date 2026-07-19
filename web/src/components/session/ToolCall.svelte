@@ -173,7 +173,7 @@
           >
         </div>
         {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={20} />{/if}
-      {:else if call.name === 'ask_user_question' || call.name === 'pi_web_ask_user_question'}
+      {:else if call.name === 'ask_user_question' || call.name === 'pican_ask_user_question'}
         <AskQuestion {args} {result} />
       {:else if taskTools.has(call.name)}
         <TaskToolCard name={call.name} {args} {resultText} />

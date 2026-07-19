@@ -1,4 +1,4 @@
-export const BTW_GEOM_KEY = 'pi-btw:window';
+export const BTW_GEOM_KEY = 'pican:btw:window';
 
 export function loadBtwGeometry({ storage = window.localStorage, key = BTW_GEOM_KEY } = {}) {
   try {

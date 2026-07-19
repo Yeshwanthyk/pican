@@ -6,7 +6,7 @@ export function setupComposerExpansion({
   storage,
   onHeightChange = () => {},
 } = {}) {
-  const storageKey = 'pi-chat:composer-expanded:' + (sessionId || 'default');
+  const storageKey = 'pican:chat:composer-expanded:' + (sessionId || 'default');
 
   function apply(expanded) {
     if (!shell) return;

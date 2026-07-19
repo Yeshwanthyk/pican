@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"pi-web/internal/git"
-	"pi-web/internal/sessions"
+	"pican/internal/git"
+	"pican/internal/sessions"
 )
 
 // resolveSessionCwd resolves a session id to its working directory (the cwd

@@ -20,12 +20,12 @@ func TestEncodeProjectName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"/Users/setkyar", "--Users_-setkyar--"},
+		{"/Users/yeshwanthyk", "--Users_-yeshwanthyk--"},
 		{"/home/user/project", "--home_-user_-project--"},
 		{"/a/b/c/d", "--a_-b_-c_-d--"},
-		{"/Users/setkyar/pi-web", "--Users_-setkyar_-pi-web--"},
-		{"/Users/setkyar/my-project", "--Users_-setkyar_-my-project--"},
-		{"/Users/setkyar/_cache", "--Users_-setkyar_-__cache--"},
+		{"/Users/yeshwanthyk/pican", "--Users_-yeshwanthyk_-pican--"},
+		{"/Users/yeshwanthyk/my-project", "--Users_-yeshwanthyk_-my-project--"},
+		{"/Users/yeshwanthyk/_cache", "--Users_-yeshwanthyk_-__cache--"},
 		{"/a/_b/_c", "--a_-__b_-__c--"},
 		// Windows-shaped paths mirror pi's encoding (/, \ and : all map to -)
 		// so the result is a valid Windows directory name.
@@ -48,13 +48,13 @@ func TestDecodeProjectName(t *testing.T) {
 		expected string
 	}{
 		// New format
-		{"--Users_-setkyar--", "/Users/setkyar"},
+		{"--Users_-yeshwanthyk--", "/Users/yeshwanthyk"},
 		{"--home_-user_-project--", "/home/user/project"},
 		{"--a_-b_-c_-d--", "/a/b/c/d"},
-		{"--Users_-setkyar_-my-project--", "/Users/setkyar/my-project"},
-		{"--Users_-setkyar_-__cache--", "/Users/setkyar/_cache"},
+		{"--Users_-yeshwanthyk_-my-project--", "/Users/yeshwanthyk/my-project"},
+		{"--Users_-yeshwanthyk_-__cache--", "/Users/yeshwanthyk/_cache"},
 		// Legacy format (no _ in body) — backward compatible.
-		{"--Users-setkyar--", "/Users/setkyar"},
+		{"--Users-yeshwanthyk--", "/Users/yeshwanthyk"},
 		{"--home-user-project--", "/home/user/project"},
 		{"--a-b-c-d--", "/a/b/c/d"},
 		// Windows dash encoding: drive letter followed by two dashes
@@ -73,11 +73,11 @@ func TestDecodeProjectName(t *testing.T) {
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
 	paths := []string{
-		"/Users/setkyar",
+		"/Users/yeshwanthyk",
 		"/home/user/project",
 		"/a/b/c/d",
-		"/Users/setkyar/my-project",
-		"/Users/setkyar/_cache",
+		"/Users/yeshwanthyk/my-project",
+		"/Users/yeshwanthyk/_cache",
 		"/a/_b/_c",
 		"/project-with-hyphens/sub_dir",
 		"/underscore_test/path",
@@ -664,16 +664,16 @@ func TestParseFileMarksSessionBrokenWhenCwdMissing(t *testing.T) {
 func TestParseSummaryUsesHeaderCwdAsProject(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "s.jsonl")
-	content := `{"type":"session","timestamp":"2026-05-08T10:00:00Z","cwd":"/Users/setkyar/pi-web"}` + "\n"
+	content := `{"type":"session","timestamp":"2026-05-08T10:00:00Z","cwd":"/Users/yeshwanthyk/pican"}` + "\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := ParseSummary(path, "--Users-setkyar-pi-web--", "s.jsonl")
+	s, err := ParseSummary(path, "--Users-yeshwanthyk-pican--", "s.jsonl")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Project != "/Users/setkyar/pi-web" {
-		t.Errorf("Project = %q, want %q", s.Project, "/Users/setkyar/pi-web")
+	if s.Project != "/Users/yeshwanthyk/pican" {
+		t.Errorf("Project = %q, want %q", s.Project, "/Users/yeshwanthyk/pican")
 	}
 }
 
@@ -684,13 +684,13 @@ func TestParseSummaryFallsBackToDirNameWhenCwdMissing(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	// dir name as produced by EncodeProjectName for /Users/setkyar/pi/web.
-	s, err := ParseSummary(path, "--Users_-setkyar_-pi_-web--", "s.jsonl")
+	// dir name as produced by EncodeProjectName for /Users/yeshwanthyk/pi/web.
+	s, err := ParseSummary(path, "--Users_-yeshwanthyk_-pi_-web--", "s.jsonl")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Project != "Users/setkyar/pi/web" {
-		t.Errorf("Project = %q, want %q", s.Project, "Users/setkyar/pi/web")
+	if s.Project != "Users/yeshwanthyk/pi/web" {
+		t.Errorf("Project = %q, want %q", s.Project, "Users/yeshwanthyk/pi/web")
 	}
 }
 

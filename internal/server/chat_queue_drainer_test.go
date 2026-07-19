@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"pi-web/internal/chatqueue"
-	"pi-web/internal/workers"
+	"pican/internal/chatqueue"
+	"pican/internal/workers"
 )
 
 func newDrainerServer(t *testing.T, sender ChatSender) (*Server, *queueDrainer, string) {

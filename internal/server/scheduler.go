@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"pi-web/internal/chat"
-	"pi-web/internal/codex"
-	"pi-web/internal/schedules"
-	"pi-web/internal/sessions"
+	"pican/internal/chat"
+	"pican/internal/codex"
+	"pican/internal/schedules"
+	"pican/internal/sessions"
 )
 
 // scheduleTickInterval is how often the scheduler re-evaluates due schedules.

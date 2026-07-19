@@ -109,7 +109,7 @@ describe('ToolCall', () => {
   it('marks multi-select questions as needing submit', () => {
     const call = {
       id: 'q',
-      name: 'pi_web_ask_user_question',
+      name: 'pican_ask_user_question',
       arguments: {
         questions: [{ question: 'Pick many', multiSelect: true, options: [{ label: 'A' }] }],
       },

@@ -1,6 +1,7 @@
 {
   "name": "pican",
   "short_name": "pican",
+  "id": "/pican",
   "description": "Browse and continue Pi sessions and Codex CLI threads on your machine.",
   "start_url": "/",
   "scope": "/",

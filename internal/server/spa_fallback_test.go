@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"pi-web/internal/auth"
+	"pican/internal/auth"
 )
 
 func TestSPAFallbackServesBrowserRoutesButNotAPIsOrAssets(t *testing.T) {

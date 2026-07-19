@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func (s *Server) initialSettingsFromSource(ctx context.Context, sourceSessionID, targetRuntime string) sessions.InitialSettings {

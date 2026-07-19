@@ -1,4 +1,4 @@
-// Package server hosts the HTTP layer for pi-web: handlers, SSE plumbing,
+// Package server hosts the HTTP layer for pican: handlers, SSE plumbing,
 // the file watcher that drives reload events, and the per-session chat worker
 // orchestration. main.go wires concrete dependencies (renderers, model list,
 // auth) and registers the routes.
@@ -17,15 +17,15 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/auth"
-	"pi-web/internal/chatqueue"
-	"pi-web/internal/codex"
-	"pi-web/internal/render"
-	"pi-web/internal/rpc"
-	"pi-web/internal/schedules"
-	"pi-web/internal/sessions"
-	"pi-web/internal/updater"
+	"pican/internal/agentdir"
+	"pican/internal/auth"
+	"pican/internal/chatqueue"
+	"pican/internal/codex"
+	"pican/internal/render"
+	"pican/internal/rpc"
+	"pican/internal/schedules"
+	"pican/internal/sessions"
+	"pican/internal/updater"
 
 	_ "modernc.org/sqlite"
 )
@@ -75,10 +75,10 @@ type Deps struct {
 	// Updater reports current/latest version + changelog. Optional; when nil
 	// the version endpoints are not registered.
 	Updater *updater.Checker
-	// RunInstall installs the latest pi-web package (e.g. `pi install ...`).
+	// RunInstall installs the latest pican package (e.g. `pi install ...`).
 	// Optional; when nil /api/update responds 503.
 	RunInstall func(ctx context.Context) error
-	// RunRestart restarts the pi-web service (detached) so the new binary
+	// RunRestart restarts the pican service (detached) so the new binary
 	// takes over. Optional; when nil /api/restart responds 503.
 	RunRestart func() error
 }
@@ -154,7 +154,7 @@ type metricsState struct {
 type autoTitleState struct {
 	mu        sync.Mutex
 	inFlight  map[string]bool
-	name      map[string]string // sessID -> the title pi-web last set
+	name      map[string]string // sessID -> the title pican last set
 	count     map[string]int    // sessID -> user-msg count at last titling
 	userOwned map[string]bool   // sessID -> user named it; never auto-title
 }
@@ -257,7 +257,7 @@ func New(deps Deps) (*Server, error) {
 // returned so the server refuses to start rather than running with a
 // half-initialized database that fails opaquely on first use.
 func initDB(agentDir string) (*sql.DB, error) {
-	dbPath := filepath.Join(agentDir, "pi-web.sqlite")
+	dbPath := filepath.Join(agentDir, "pican.sqlite")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)

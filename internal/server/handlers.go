@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/codex"
-	"pi-web/internal/sessions"
-	"pi-web/internal/ui"
+	"pican/internal/agentdir"
+	"pican/internal/codex"
+	"pican/internal/sessions"
+	"pican/internal/ui"
 )
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -687,7 +687,7 @@ func isBrokenPipe(err error) bool {
 }
 
 func (s *Server) handleCustomThemes(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(agentdir.WebDir(s.agentDir), "custom-themes.css")
+	path := filepath.Join(agentdir.PicanDir(s.agentDir), "custom-themes.css")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	if _, err := os.Stat(path); err == nil {

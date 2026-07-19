@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/ui"
+	"pican/internal/agentdir"
+	"pican/internal/ui"
 )
 
 // handleApiSounds scans the assets directory for .mp3 files and returns them sorted.
@@ -19,7 +19,7 @@ func (s *Server) handleApiSounds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	soundsDir := filepath.Join(agentdir.WebDir(s.agentDir), "assets")
+	soundsDir := filepath.Join(agentdir.PicanDir(s.agentDir), "assets")
 	files, err := os.ReadDir(soundsDir)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -67,7 +67,7 @@ func (s *Server) handleSounds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	soundsDir := filepath.Join(agentdir.WebDir(s.agentDir), "assets")
+	soundsDir := filepath.Join(agentdir.PicanDir(s.agentDir), "assets")
 	filePath := filepath.Clean(filepath.Join(soundsDir, name))
 	expectedDir := filepath.Clean(soundsDir)
 

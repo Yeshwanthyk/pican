@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/codex"
-	"pi-web/internal/server"
-	"pi-web/internal/sessions"
+	"pican/internal/codex"
+	"pican/internal/server"
+	"pican/internal/sessions"
 )
 
 type runtimeMode string
@@ -234,7 +234,7 @@ func codexExecutable(flagValue string) string {
 	if flagValue != "" {
 		return flagValue
 	}
-	if value := os.Getenv("PI_WEB_CODEX_COMMAND"); value != "" {
+	if value := os.Getenv("PICAN_CODEX_COMMAND"); value != "" {
 		return value
 	}
 	return "codex"

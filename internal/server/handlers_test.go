@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"pi-web/internal/sessions"
+	"pican/internal/sessions"
 )
 
 func TestHandleApiSessions_ProjectFilter(t *testing.T) {

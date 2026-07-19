@@ -13,23 +13,23 @@ import (
 	"syscall"
 	"time"
 
-	"pi-web/internal/agentdir"
-	"pi-web/internal/auth"
-	"pi-web/internal/codex"
-	"pi-web/internal/frontend"
-	"pi-web/internal/rpc"
-	"pi-web/internal/server"
-	"pi-web/internal/sessions"
-	"pi-web/internal/ui"
-	"pi-web/internal/updater"
-	"pi-web/internal/workers"
-	"pi-web/web"
+	"pican/internal/agentdir"
+	"pican/internal/auth"
+	"pican/internal/codex"
+	"pican/internal/frontend"
+	"pican/internal/rpc"
+	"pican/internal/server"
+	"pican/internal/sessions"
+	"pican/internal/ui"
+	"pican/internal/updater"
+	"pican/internal/workers"
+	"pican/web"
 )
 
 const defaultPort = "31415"
-const tokenEnvVar = "PI_WEB_TOKEN"
+const tokenEnvVar = "PICAN_TOKEN"
 
-// Main runs the pi-web application. version is supplied by cmd/pi-web so
+// Main runs the pican application. version is supplied by cmd/pican so
 // release builds can set it with -ldflags "-X main.version=...".
 func Main(version string) {
 	port := flag.String("p", defaultPort, "port to listen on")
@@ -261,7 +261,7 @@ func Main(version string) {
 	}
 	fmt.Printf("Serving from: %s\n", sessionsDir)
 	if authMiddleware.Enabled() {
-		fmt.Println("Auth: enabled (set PI_WEB_TOKEN to require token)")
+		fmt.Println("Auth: enabled (set PICAN_TOKEN to require token)")
 	} else {
 		fmt.Printf("Auth: disabled — set %s to require a token for access.\n", tokenEnvVar)
 	}

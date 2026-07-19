@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"pi-web/internal/chat"
+	"pican/internal/chat"
 )
 
 type State string
