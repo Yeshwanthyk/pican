@@ -3,14 +3,14 @@
 ## Package Layout
 
 ```
-pi-web/
-├── cmd/pi-web/
+pican/
+├── cmd/pican/
 │   └── main.go                 # Tiny CLI entry point; passes build version to app.Main
 ├── web/
 │   └── assets_embed.go         # Embeds Vite build output from web/dist
 ├── internal/
 │   ├── agentdir/
-│   │   └── agentdir.go         # Resolve ~/.pi/agent dir + the paths pi-web stores under it
+│   │   └── agentdir.go         # Resolve ~/.pi/agent dir + the paths pican stores under it
 │   ├── app/
 │   │   ├── app.go              # CLI flags, dependency wiring, HTTP mux setup
 │   │   ├── network.go          # Bind host / loopback helpers
@@ -20,7 +20,7 @@ pi-web/
 │   │   ├── browser.go          # Open the default browser at startup
 │   │   ├── sounds.go           # Seed default notification sounds into the agent dir
 │   │   ├── update.go           # runInstall / runRestart for self-update
-│   │   └── state_file_*.go     # pi-web-state.json + flock helpers
+│   │   └── state_file_*.go     # pican-state.json + flock helpers
 │   ├── frontend/
 │   │   └── assets.go           # Vite manifest parsing + static asset handlers
 │   ├── ui/
@@ -130,7 +130,7 @@ type Server struct {
     lastKnown     map[string]struct{} // sessions currently broadcast as running
     lastKnownMu   sync.Mutex
     push          *PushManager    // web-push subscriptions + done notifications
-    db            *sql.DB         // SQLite (~/.pi/agent/pi-web.sqlite)
+    db            *sql.DB         // SQLite (~/.pi/agent/pican.sqlite)
     updater       *updater.Checker // optional; nil disables /api/version etc.
     runInstall    func(ctx context.Context) error // optional self-update install
     runRestart    func() error                    // optional self-update restart
@@ -149,7 +149,7 @@ type Server struct {
 
     titleMu        sync.Mutex             // auto-title bookkeeping (see auto_title.go)
     titleInFlight  map[string]bool
-    titledName     map[string]string      // sessID -> title pi-web last set
+    titledName     map[string]string      // sessID -> title pican last set
     titledCount    map[string]int         // sessID -> user-msg count at last titling
     titleUserOwned map[string]bool        // sessID -> user named it; never auto-title
 }
@@ -162,7 +162,7 @@ type Server struct {
 `RunInstall`/`RunRestart` are nil the corresponding endpoints respond `503`.
 
 On `New`, the server opens (and migrates) a SQLite database at
-`~/.pi/agent/pi-web.sqlite` with five tables: `scratchpads` (per project path),
+`~/.pi/agent/pican.sqlite` with five tables: `scratchpads` (per project path),
 `settings` (server-backed user settings key/value), `project_prefs` (which
 projects are enabled), `app_settings` (the project-filter master switch, default
 off), and `btw_sessions` (the btw scratch-chat registry). See
@@ -311,7 +311,7 @@ type piRPCWorker struct {
 | `/api/workflows/run` | GET | `handleApiWorkflowRun` | Validated workflow run detail (`?runId=wf_…`) |
 | `/api/version` | GET | `handleVersion` | Current/latest version (when updater set) |
 | `/api/check-update` | POST | `handleCheckUpdate` | Force a version check |
-| `/api/update` | POST | `handleUpdate` | Install the latest pi-web |
+| `/api/update` | POST | `handleUpdate` | Install the latest pican |
 | `/api/restart` | POST | `handleRestart` | Restart the service onto the new binary |
 
 PWA / static asset routes (registered outside `Server.Register`):
@@ -335,7 +335,7 @@ Request ──▶ auth.Wrap(handler)
         │               │
         ▼               ▼
    extract token    pass through
-   (query → Authorization: Bearer → X-Pi-Token → cookie)
+   (query → Authorization: Bearer → X-Pican-Token → cookie)
         │
         ▼
    constant-time compare

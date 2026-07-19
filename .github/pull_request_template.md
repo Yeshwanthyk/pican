@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to pi-web! Per CONTRIBUTING.md, please open an issue
+Thanks for contributing to pican! Per CONTRIBUTING.md, please open an issue
 first so we can discuss before code is written. Link that issue below.
 -->
 
@@ -26,7 +26,7 @@ Closes #
 ## Live vs. Export
 
 <!--
-If this PR touches session rendering, remember pi-web has two render paths
+If this PR touches session rendering, remember pican has two render paths
 (see AGENTS.md): the live app and the static export/Gist snapshot.
 -->
 

@@ -238,7 +238,7 @@ pause/resume, and per-row delete / send-now / edit actions.
   worker transitions `running → idle`, the periodic 5-second tick fires, or a
   queue mutation arrives, the drainer pops the head item and feeds it to
   `chatSender.Send`. The browser is just a viewer; queues survive refreshes,
-  browser closes, and pi-web restarts.
+  browser closes, and pican restarts.
 - **Pause / Resume** (header button): pause is per-session state in
   `chat_queue_state.paused`, so it persists across tabs and reloads. The
   drainer skips paused sessions; resuming PATCHes `paused=false` and kicks the

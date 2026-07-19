@@ -12,10 +12,9 @@ SRC = SITE / "src"
 USER_DOCS = ROOT / "user-docs" / "en"
 ASSETS = ROOT / "user-docs" / "assets"
 
-HOME_TITLE = "pi-web - Web UI for Pi (Access pi via Remote, Mobile)"
+HOME_TITLE = "pican — Web UI for Pi and Codex"
 DOC_ORDER = [
     "README",
-    "why",
     "install",
     "personal-assistant",
     "keyboard-shortcuts",
@@ -43,7 +42,7 @@ def render_hero() -> str:
         "titleTemplate: false",
         "",
         "hero:",
-        '  name: "pi-web"',
+        '  name: "pican"',
         f"  text: {yaml_scalar(hero['text'])}",
         f"  tagline: {yaml_scalar(hero['tagline'])}",
         "  actions:",

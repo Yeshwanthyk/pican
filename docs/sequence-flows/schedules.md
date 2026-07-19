@@ -6,7 +6,7 @@ first message, and lets pi run autonomously. Each firing is recorded so the
 created sessions can be tagged, filtered, and surfaced in a run log — and so a
 schedule-specific push notification can be sent when the run finishes.
 
-Scheduling state lives in SQLite (`pi-web.sqlite`), not in pi's session files.
+Scheduling state lives in SQLite (`pican.sqlite`), not in pi's session files.
 The `internal/schedules` package owns the store and the cron math; the firing
 loop and the session-creating runner live in `internal/server` because they need
 the chat workers and SSE broadcast.
@@ -84,7 +84,7 @@ it.
 
 ## Missed runs
 
-Schedules only fire while pi-web is running. On startup (and on first sight of
+Schedules only fire while pican is running. On startup (and on first sight of
 any schedule) the loop computes the next fire time from *now*, so occurrences
 that elapsed while the process was down are **skipped** rather than replayed.
 

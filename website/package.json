@@ -1,6 +1,6 @@
 {
-  "name": "pi-web-docs",
-  "description": "VitePress documentation site for pi-web",
+  "name": "pican-docs",
+  "description": "VitePress documentation site for pican",
   "private": true,
   "type": "module",
   "scripts": {

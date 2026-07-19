@@ -1,6 +1,6 @@
-# Contributing to pi-web
+# Contributing to pican
 
-Thanks for your interest in contributing! pi-web is currently in an **early stage** of development, and we are not actively accepting pull requests right now.
+Thanks for your interest in contributing! pican is currently in an **early stage** of development, and we are not actively accepting pull requests right now.
 
 ## How to contribute
 
@@ -11,4 +11,4 @@ Thanks for your interest in contributing! pi-web is currently in an **early stag
 
 If a feature or fix is something I decide to move forward with, I'll invite a pull request at that point.
 
-Thanks for understanding, and I appreciate you taking the time to help make pi-web better!
+Thanks for understanding, and I appreciate you taking the time to help make pican better!

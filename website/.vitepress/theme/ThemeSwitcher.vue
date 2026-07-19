@@ -16,7 +16,7 @@ function apply(id) {
   el.dataset.theme = id
   el.classList.toggle('dark', id !== 'light')
   try {
-    localStorage.setItem('pi-web-docs-theme', id)
+    localStorage.setItem('pican-docs-theme', id)
   } catch (e) {}
   current.value = id
 }
@@ -28,7 +28,7 @@ function cycle() {
 
 onMounted(() => {
   try {
-    current.value = localStorage.getItem('pi-web-docs-theme') || 'dracula'
+    current.value = localStorage.getItem('pican-docs-theme') || 'dracula'
   } catch (e) {
     current.value = 'dracula'
   }

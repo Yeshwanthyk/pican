@@ -6,8 +6,8 @@ import { withBase } from 'vitepress'
   <figure class="hero-demo">
     <img
       class="hero-demo-img"
-      :src="withBase('/assets/pi-web-demo.gif')"
-      alt="pi-web demo on desktop and iOS"
+      :src="withBase('/assets/pican-demo.gif')"
+      alt="pican demo on desktop and iOS"
     />
     <figcaption class="hero-demo-cap">Live demo · desktop + iOS, sped up</figcaption>
   </figure>

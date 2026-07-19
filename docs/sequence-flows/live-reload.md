@@ -1,6 +1,6 @@
 # Sequence Flow: Live Reload
 
-pi-web pushes real-time updates to the browser via **Server-Sent Events (SSE)**. This document covers both the file-watching → SSE path and the status-tracking → SSE path.
+pican pushes real-time updates to the browser via **Server-Sent Events (SSE)**. This document covers both the file-watching → SSE path and the status-tracking → SSE path.
 
 ## Overview
 

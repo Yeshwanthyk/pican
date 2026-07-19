@@ -34,7 +34,7 @@ This flow covers a user clicking **Share** on a Pi or Codex session page, creati
      │             │              │                  │               │              │
      │             │              │◀───────────────── HTML string (no buttons)        │
      │             │              │                  │               │              │
-     │             │              │─── os.MkdirTemp("pi-share-*")                    │
+     │             │              │─── os.MkdirTemp("pican-share-*")                    │
      │             │              │─── os.WriteFile(temp/share-session.html)                │
      │             │              │                  │               │              │
      │             │              │─── gh gist create --public=false temp/share-session.html
@@ -94,12 +94,12 @@ The handler resolves the session by ID through the common parser. For Codex this
 renderExportSessionPage(session, theme)
 ```
 
-The `theme` parameter is extracted from the user's `pi-web-theme` cookie (falling back to `"dark"`) so the exported snapshot opens with the same theme the user had active. The export renderer omits live-only chrome (no back link, no share button, no chat composer) — the exported HTML is meant to be a clean, self-contained document.
+The `theme` parameter is extracted from the user's `pican-theme` cookie (falling back to `"dark"`) so the exported snapshot opens with the same theme the user had active. The export renderer omits live-only chrome (no back link, no share button, no chat composer) — the exported HTML is meant to be a clean, self-contained document.
 
 ### 5. Create Temporary File
 
 ```go
-tmpDir, _ := os.MkdirTemp(os.TempDir(), "pi-share-*")
+tmpDir, _ := os.MkdirTemp(os.TempDir(), "pican-share-*")
 tmpFile := filepath.Join(tmpDir, "share-session.html")
 os.WriteFile(tmpFile, []byte(html), 0644)
 defer os.RemoveAll(tmpDir)
@@ -119,7 +119,7 @@ The gist is created as **private** (`--public=false`).
 
 ```json
 {
-  "gistUrl": "https://gist.github.com/setkyar/abc123",
+  "gistUrl": "https://gist.github.com/yeshwanthyk/abc123",
   "gistId": "abc123",
   "previewUrl": "https://pi.dev/session/#abc123"
 }

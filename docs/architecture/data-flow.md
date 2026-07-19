@@ -4,8 +4,8 @@
 
 The session pipeline reads JSONL from `~/.pi/agent/sessions`, but the ownership model depends on `runtime`:
 
-- **Pi:** the JSONL file is the native, append-only transcript. Pi supplies conversation entries; pi-web only creates new files and appends supported local metadata.
-- **Codex:** `~/.codex` is authoritative. pi-web lists/reads threads through app-server and atomically materializes rebuildable `codex-<thread-id>.jsonl` projections under the matching encoded project directory. Projection refresh preserves local `session_info`, label, model-change, and thinking-level metadata.
+- **Pi:** the JSONL file is the native, append-only transcript. Pi supplies conversation entries; pican only creates new files and appends supported local metadata.
+- **Codex:** `~/.codex` is authoritative. pican lists/reads threads through app-server and atomically materializes rebuildable `codex-<thread-id>.jsonl` projections under the matching encoded project directory. Projection refresh preserves local `session_info`, label, model-change, and thinking-level metadata.
 
 See [codex-runtime.md](./codex-runtime.md) for the protocol and lifecycle boundary.
 
@@ -164,7 +164,7 @@ Browser POST /api/rename-session?id=<id>
            └──▶ Return {"ok": true, "name": "New Name"}
 ```
 
-For Pi, rename preserves the append-only transcript rule. For Codex, the native thread name is authoritative; the rebuilt projection also preserves pi-web-local metadata.
+For Pi, rename preserves the append-only transcript rule. For Codex, the native thread name is authoritative; the rebuilt projection also preserves pican-local metadata.
 
 ## Data Flow: Live Reload
 

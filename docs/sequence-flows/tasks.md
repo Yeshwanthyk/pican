@@ -1,7 +1,7 @@
 # Sequence Flow: Tasks Board
 
 The Tasks board is a read-only view over JSON stores written by the external
-pi-tasks extension. pi-web never creates or modifies task stores or output
+pi-tasks extension. pican never creates or modifies task stores or output
 files.
 
 Project stores live directly under `<project>/.pi/tasks/`: `tasks.json` has

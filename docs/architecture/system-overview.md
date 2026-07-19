@@ -1,8 +1,8 @@
 # System Overview
 
-## What pi-web Does
+## What pican Does
 
-pi-web is a local HTTP server that lets you browse and interact with Pi sessions and Codex threads in a web browser. It presents both runtimes through one session list, viewer, live-update path, and export surface.
+pican is a local HTTP server that lets you browse and interact with Pi sessions and Codex threads in a web browser. It presents both runtimes through one session list, viewer, live-update path, and export surface.
 
 ## Tech Stack
 
@@ -15,7 +15,7 @@ pi-web is a local HTTP server that lets you browse and interact with Pi sessions
 | Live Updates | Server-Sent Events (SSE) |
 | Agent runtime | JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio` |
 | Session Storage | Native Pi JSONL transcripts plus rebuildable Codex projections under `~/.pi/agent/sessions`; Codex remains authoritative in `~/.codex` |
-| Local DB | SQLite (`~/.pi/agent/pi-web.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
+| Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
 ## Component Diagram
@@ -117,16 +117,16 @@ pi-web is a local HTTP server that lets you browse and interact with Pi sessions
 └─────────────────┘                       └─────────────────┘
          │
          ▼
-   Non-loopback →  PI_WEB_TOKEN required  (or --insecure)
+   Non-loopback →  PICAN_TOKEN required  (or --insecure)
    Loopback     →  Auth optional
 
-When no --host override is supplied and Tailscale is running, pi-web also
+When no --host override is supplied and Tailscale is running, pican also
 configures Tailscale Serve:
 
     tailscale serve --bg --https=<port> http://127.0.0.1:<port>
 
 Tailscale owns HTTPS/certificates and exposes the app at the node's MagicDNS
-name, while pi-web itself continues listening only on localhost.
+name, while pican itself continues listening only on localhost.
 ```
 
 ## Session Directory Layout
@@ -143,9 +143,9 @@ name, while pi-web itself continues listening only on localhost.
 ├── session-status/
 │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl   ← terminal writes here
 │   └── …
-├── pi-web.sqlite           ← scratchpads + project visibility prefs + user settings + btw registry
-└── pi-web/
-    ├── pi-web-state.json   ← server state file
+├── pican.sqlite           ← scratchpads + project visibility prefs + user settings + btw registry
+└── pican/
+    ├── pican-state.json   ← server state file
     ├── custom-themes.css   ← optional user custom theme
     ├── vapid.json          ← web-push VAPID keys (when push enabled)
     └── push-subs.json      ← web-push subscriptions (when push enabled)
@@ -182,5 +182,5 @@ across devices. See `internal/server/projects.go`.
 6. Create `Server` → starts file/status watchers, sweepers, scheduler, and queue drainer.
 7. Register routes and embedded Vite assets.
 8. Optionally configure Tailscale Serve HTTPS for localhost.
-9. Write `~/.pi/agent/pi-web/pi-web-state.json` (with flock), optionally open a browser, and warm the Pi model cache when enabled.
+9. Write `~/.pi/agent/pican/pican-state.json` (with flock), optionally open a browser, and warm the Pi model cache when enabled.
 10. Start `http.Server`; on `SIGINT`/`SIGTERM`, stop catalog sync, workers, server goroutines, and HTTP gracefully.

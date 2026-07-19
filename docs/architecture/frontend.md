@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-pi-web uses a single Vite-built Svelte SPA embedded into the Go binary, plus a separate self-contained static export path.
+pican uses a single Vite-built Svelte SPA embedded into the Go binary, plus a separate self-contained static export path.
 
 ## Vite App Frontend
 
@@ -128,12 +128,12 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 | Workflows CSS | `internal/ui/embedded/styles/workflows.css` | bundled into `/styles/app.css` |
 | Tasks CSS | `internal/ui/embedded/styles/tasks.css` | bundled into `/styles/app.css` |
 | Subagents CSS | `internal/ui/embedded/styles/subagents.css` | bundled into `/styles/app.css` |
-| Custom themes | `~/.pi/agent/pi-web/custom-themes.css` (optional) | `/custom-themes.css` |
+| Custom themes | `~/.pi/agent/pican/custom-themes.css` (optional) | `/custom-themes.css` |
 | PWA manifest | `internal/ui/embedded/assets/manifest.webmanifest` | `/manifest.webmanifest` |
 | Service worker | `internal/ui/embedded/assets/sw.js` | `/sw.js` |
 | Icons | `internal/ui/embedded/assets/icon.svg` etc. | `/icon.svg`, `/icon-maskable.svg`, `/pi-logo.svg` |
 | Sound assets | `internal/ui/embedded/assets/cat.webm` | `/cat.webm` |
-| User sound assets | `~/.pi/agent/pi-web/assets/*.mp3` | `/sounds/*.mp3` |
+| User sound assets | `~/.pi/agent/pican/assets/*.mp3` | `/sounds/*.mp3` |
 | SPA bundled stylesheets | `internal/ui/app_styles.go` (index/session/menu/palette/workflows/tasks/subagents CSS joined) | `/styles/app.css?v=<hash>`, content-hash cache-busted, `Cache-Control: public, max-age=31536000, immutable`, served gzip when accepted |
 
 ## Theme System

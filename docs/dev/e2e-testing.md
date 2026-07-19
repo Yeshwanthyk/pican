@@ -1,6 +1,6 @@
 # End-to-End Testing (Playwright)
 
-The `e2e/` project drives a real browser against the **built** `pi-web` binary.
+The `e2e/` project drives a real browser against the **built** `pican` binary.
 It complements the Vitest unit tests (`web/`) and Go tests (`internal/`) by
 exercising whole flows — page rendering, SSE live-reload, settings persistence,
 and chat — across desktop, mobile, and iPad viewports.
@@ -14,7 +14,7 @@ binaries and a running server, so it runs as its own target and CI job.
 make e2e-setup           # one-time: install deps + Playwright browsers
 make e2e                 # build the binary, then run the whole suite
 
-# or, from e2e/ directly (assumes ./pi-web is already built):
+# or, from e2e/ directly (assumes ./pican is already built):
 cd e2e
 npx playwright test                                  # all projects
 npx playwright test --project="Desktop Chrome"       # one project
@@ -99,9 +99,9 @@ reason string, visible with `npx playwright test --reporter=list`.
 
 `global-setup.ts` (see `e2e/lib/server.ts`):
 
-1. Ensures `./pi-web` exists (CI builds it first; locally `make build` if missing).
+1. Ensures `./pican` exists (CI builds it first; locally `make build` if missing).
 2. Creates a temp `PI_CODING_AGENT_DIR` and copies `e2e/fixtures/sessions/` into it.
-3. Picks a free port and starts `pi-web -host 127.0.0.1` (the `-host` flag skips
+3. Picks a free port and starts `pican -host 127.0.0.1` (the `-host` flag skips
    Tailscale auto-serve; auth is disabled).
 4. Prepends `e2e/lib/stub-pi/` to `PATH` so chat spawns the stub, never real pi.
 5. Writes `{ baseURL, sessionsDir, agentDir, pid }` to `e2e/.tmp/server.json`.

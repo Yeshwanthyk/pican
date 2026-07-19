@@ -1,6 +1,6 @@
 # Sequence Flow: Server Startup
 
-This document traces the execution from starting pi-web to the first HTTP request. Pi remains the default runtime; Codex initialization is an optional startup phase.
+This document traces the execution from starting pican to the first HTTP request. Pi remains the default runtime; Codex initialization is an optional startup phase.
 
 ## Sequence Diagram
 
@@ -20,7 +20,7 @@ This document traces the execution from starting pi-web to the first HTTP reques
    │           │             │              │              │            │
    │           │◀─────────── host ──────────│              │            │
    │           │             │              │              │            │
-   │           │─── os.Getenv(PI_WEB_TOKEN) │              │            │
+   │           │─── os.Getenv(PICAN_TOKEN) │              │            │
    │           │             │              │              │            │
    │           │─── auth.New(token) ────────────────────────────────────▶│
    │           │             │              │              │            │
@@ -64,12 +64,12 @@ This document traces the execution from starting pi-web to the first HTTP reques
 port := flag.String("p", "31415", "port to listen on")
 hostOverride := flag.String("host", "", "host/IP to bind; defaults to 127.0.0.1")
 open := flag.Bool("o", false, "auto-open browser")
-insecure := flag.Bool("insecure", false, "allow non-loopback bind without PI_WEB_TOKEN")
+insecure := flag.Bool("insecure", false, "allow non-loopback bind without PICAN_TOKEN")
 runtimeFlag := flag.String("runtime", "pi", "agent runtime: pi, codex, or both")
 codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
 ```
 
-`-runtime` accepts `pi`, `codex`, or `both`. `-codex-command`, then `PI_WEB_CODEX_COMMAND`, selects one executable path; it is not a shell command. The fallback is `codex` from `PATH`, and pi-web appends `app-server --stdio`.
+`-runtime` accepts `pi`, `codex`, or `both`. `-codex-command`, then `PICAN_CODEX_COMMAND`, selects one executable path; it is not a shell command. The fallback is `codex` from `PATH`, and pican appends `app-server --stdio`.
 
 ### 2. Agent & Sessions Directory
 
@@ -78,7 +78,7 @@ agentDir := agentdir.Path() // PI_CODING_AGENT_DIR, else ~/.pi/agent
 sessionsDir := filepath.Join(agentDir, "sessions")
 ```
 
-Pi and `both` modes require the sessions directory to exist. Codex-only mode creates it because pi-web stores rebuildable Codex projections there.
+Pi and `both` modes require the sessions directory to exist. Codex-only mode creates it because pican stores rebuildable Codex projections there.
 
 ### 3. Codex Catalog Initialization
 
@@ -98,18 +98,18 @@ If no `--host` override is supplied and Tailscale is running, startup also runs:
 tailscale serve --bg --https=<port> http://127.0.0.1:<port>
 ```
 
-This gives the user a Tailscale HTTPS endpoint without making pi-web bind to a Tailscale interface or manage TLS certificates itself.
+This gives the user a Tailscale HTTPS endpoint without making pican bind to a Tailscale interface or manage TLS certificates itself.
 
 ### 5. Auth Enforcement
 
 ```go
 if token == "" && !isLoopbackHost(bindHost) && !*insecure {
-    fmt.Fprintf(os.Stderr, "refusing to bind %s without PI_WEB_TOKEN set…\n")
+    fmt.Fprintf(os.Stderr, "refusing to bind %s without PICAN_TOKEN set…\n")
     os.Exit(1)
 }
 ```
 
-Non-loopback binds **require** `PI_WEB_TOKEN` to prevent unauthorized access over the network.
+Non-loopback binds **require** `PICAN_TOKEN` to prevent unauthorized access over the network.
 
 ### 6. Server Construction
 
@@ -187,10 +187,10 @@ Reads Vite manifest to discover the hashed filename of the SPA bundle.
 
 ```go
 writeStateFile(agentDir, bindHost, port, tailscaleServe, tailscaleURL)
-// → ~/.pi/agent/pi-web/pi-web-state.json
+// → ~/.pi/agent/pican/pican-state.json
 ```
 
-Contains PID, port, host, Tailscale Serve flag/URL, and start time. Cleaned up on shutdown. On first run, migrates from the old `~/.pi/agent/pi-web-state.json` location.
+Contains PID, port, host, Tailscale Serve flag/URL, and start time. Cleaned up on shutdown. On first run, migrates from the old `~/.pi/agent/pican-state.json` location.
 
 ### 10. Model Cache Warming
 

@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-This directory contains the architecture documentation for **pi-web**, a local web viewer and controller for Pi sessions and Codex threads.
+This directory contains the architecture documentation for **pican**, a local web viewer and controller for Pi sessions and Codex threads.
 
 ## Documents
 
@@ -26,7 +26,7 @@ This directory contains the architecture documentation for **pi-web**, a local w
                                   │
                                   ▼ HTTP
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        pi-web HTTP Server                            │
+│                        pican HTTP Server                            │
 │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────────┐  │
 │  │   Auth     │ │  Handlers  │ │   SSE      │ │  File Watcher    │  │
 │  │Middleware  │ │  (server)  │ │ (events)   │ │ (fsnotify/poll)  │  │
@@ -47,7 +47,7 @@ This directory contains the architecture documentation for **pi-web**, a local w
 
 ## Key Design Decisions
 
-1. **Runtime-specific authority**: Native Pi transcripts are append-only; Pi supplies conversation entries and pi-web appends supported metadata. Codex remains authoritative in `~/.codex`; pi-web atomically rebuilds `codex-<thread-id>.jsonl` projections while preserving local metadata.
+1. **Runtime-specific authority**: Native Pi transcripts are append-only; Pi supplies conversation entries and pican appends supported metadata. Codex remains authoritative in `~/.codex`; pican atomically rebuilds `codex-<thread-id>.jsonl` projections while preserving local metadata.
 
 2. **Live updates via SSE**: The browser opens an EventSource connection. The server watches session files via `fsnotify` (with polling fallback) and pushes `reload` events; session pages fetch `/api/session` to reconcile canonical JSONL entries. Browser chat can also receive best-effort `chat-preview` SSE events before JSONL reconciliation.
 
@@ -57,4 +57,4 @@ This directory contains the architecture documentation for **pi-web**, a local w
    - **Index page** (`/`): Built with Vite + vanilla JS, served from embedded `web/dist`
    - **Session page** (`/session`): Server-rendered HTML shell with Vite-built session JS
 
-5. **Security**: Token-based auth (`PI_WEB_TOKEN`) is required when binding to non-loopback addresses (e.g., Tailscale).
+5. **Security**: Token-based auth (`PICAN_TOKEN`) is required when binding to non-loopback addresses (e.g., Tailscale).

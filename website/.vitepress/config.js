@@ -1,17 +1,17 @@
 import { defineConfig } from "vitepress";
 
-const SITE_ORIGIN = "https://ygncode.github.io";
-const BASE = "/pi-web/";
+const SITE_ORIGIN = "https://yeshwanthyk.github.io";
+const BASE = "/pican/";
 const OG_IMAGE = `${SITE_ORIGIN}${BASE}assets/og-image.png`;
 
-// Project Pages site: served under https://ygncode.github.io/pi-web/
-// so every asset/link must resolve under the `/pi-web/` base path.
+// Project Pages site: served under https://yeshwanthyk.github.io/pican/
+// so every asset/link must resolve under the `/pican/` base path.
 export default defineConfig({
   base: BASE,
   srcDir: "src",
   outDir: "dist",
   cleanUrls: true,
-  title: "pi-web",
+  title: "pican",
   description:
     "A beautiful web UI and PWA for pi — browse, read, and continue your AI coding sessions from any browser, on any device.",
   // The nav ThemeSwitcher owns theming (4 named themes), so disable VitePress's
@@ -21,12 +21,12 @@ export default defineConfig({
   head: [
     [
       "link",
-      { rel: "icon", type: "image/svg+xml", href: "/pi-web/assets/icon.svg" },
+      { rel: "icon", type: "image/svg+xml", href: "/pican/assets/icon.svg" },
     ],
     ["meta", { name: "theme-color", content: "#282a36" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:site_name", content: "pi-web" }],
+    ["meta", { property: "og:site_name", content: "pican" }],
     ["meta", { property: "og:image", content: OG_IMAGE }],
     ["meta", { property: "og:image:width", content: "1200" }],
     ["meta", { property: "og:image:height", content: "630" }],
@@ -34,7 +34,7 @@ export default defineConfig({
     [
       "script",
       {},
-      "(function(){try{var t=localStorage.getItem('pi-web-docs-theme')||'dracula';var d=document.documentElement;d.dataset.theme=t;d.classList.toggle('dark',t!=='light');}catch(e){}})()",
+      "(function(){try{var t=localStorage.getItem('pican-docs-theme')||'dracula';var d=document.documentElement;d.dataset.theme=t;d.classList.toggle('dark',t!=='light');}catch(e){}})()",
     ],
   ],
   sitemap: { hostname: `${SITE_ORIGIN}${BASE}` },
@@ -66,12 +66,11 @@ export default defineConfig({
       { text: "Guide", link: "/guide" },
       {
         text: "pi.dev",
-        link: "https://pi.dev/packages/@ygncode/pi-web?name=pi-web",
+        link: "https://pi.dev/packages/@yeshwanthyk/pican?name=pican",
       },
     ],
     sidebar: [
-      { text: "Welcome to pi-web", link: "/guide" },
-      { text: "Why pi-web?", link: "/why" },
+      { text: "Welcome to pican", link: "/guide" },
       { text: "Install", link: "/install" },
       { text: "Personal AI Assistant", link: "/personal-assistant" },
       { text: "Keyboard Shortcuts", link: "/keyboard-shortcuts" },
@@ -83,8 +82,8 @@ export default defineConfig({
     search: { provider: "local" },
     footer: {
       message:
-        "pi-web is a community pi package — not official, and not affiliated with pi itself. Released under the MIT License.",
-      copyright: "pi-web — remote-control your pi coding agent.",
+        "pican is a community pi package — not official, and not affiliated with pi itself. Released under the MIT License.",
+      copyright: "pican — remote-control your pi coding agent.",
     },
   },
 });

@@ -1,7 +1,7 @@
 # Sequence Flow: Workflows Dashboard
 
 The Workflows dashboard is a read-only view over run snapshots written by an
-external pi extension under `<agentDir>/workflows/`. pi-web never creates or
+external pi extension under `<agentDir>/workflows/`. pican never creates or
 modifies these files.
 
 Each valid run directory is named `wf_<12 lowercase hex characters>` and has a

@@ -10,7 +10,7 @@
 - In-browser model switching and thinking-level selector, per session
 - Per-session worker status (idle / running / error) with crashed-worker eviction and 10-minute idle reaping
 - Multiple sessions run in parallel — kick off work in one, watch another stream
-- `PI_WEB_TOKEN` for safe LAN exposure — required by default for any explicit non-loopback bind
+- `PICAN_TOKEN` for safe LAN exposure — required by default for any explicit non-loopback bind
 
 ### Reading sessions
 
@@ -20,7 +20,7 @@
 - Deep links to individual messages
 - Download a session as JSONL
 - Share static snapshots as secret GitHub Gists
-- `/web`, `/remote`, `/refresh`, `/pi-web token` and `/pi-web set-token` pi extensions for opening sessions, remote QR, session sync, and token management
+- `/web`, `/remote`, `/refresh`, `/pican token` and `/pican set-token` pi extensions for opening sessions, remote QR, session sync, and token management
 
 ## Requirements
 
@@ -35,34 +35,34 @@
 ### Pi package (recommended)
 
 ```bash
-pi install npm:@ygncode/pi-web@beta
+pi install npm:@yeshwanthyk/pican@beta
 ```
 
 This single command:
 - Installs the npm pi package under pi's package directory
 - Runs the package `postinstall` script (`install.sh`, or `install.ps1` on Windows)
-- Downloads the matching pi-web binary for your package version and platform from GitHub Releases
-- Installs it to `~/.pi/agent/bin/pi-web` (`pi-web.exe` on Windows)
+- Downloads the matching pican binary for your package version and platform from GitHub Releases
+- Installs it to `~/.pi/agent/bin/pican` (`pican.exe` on Windows)
 - Sets up auto-start on login (launchd on macOS, systemd on Linux, a Run-key launcher on Windows)
-- Registers the `/web`, `/remote`, `/refresh`, `/pi-web token`, and `/pi-web set-token` pi commands
+- Registers the `/web`, `/remote`, `/refresh`, `/pican token`, and `/pican set-token` pi commands
 
-Session auto-titling is built into pi-web (not the extension) and configured on the `/settings` page. It's on by default: pi-web names sessions automatically using a free built-in word heuristic (no AI), re-titling on every new message. You can switch to titling once per session, and/or pick a model to write smarter titles instead of the heuristic.
+Session auto-titling is built into pican (not the extension) and configured on the `/settings` page. It's on by default: pican names sessions automatically using a free built-in word heuristic (no AI), re-titling on every new message. You can switch to titling once per session, and/or pick a model to write smarter titles instead of the heuristic.
 
-On Linux, auto-start is configured as a user systemd service at `~/.config/systemd/user/pi-web.service`. The installer rewrites its `ExecStart` to the actual installed binary path. If Tailscale is available at runtime, pi-web publishes the localhost server with Tailscale Serve HTTPS. If user systemd is unavailable, run it manually with `~/.pi/agent/bin/pi-web -o`.
+On Linux, auto-start is configured as a user systemd service at `~/.config/systemd/user/pican.service`. The installer rewrites its `ExecStart` to the actual installed binary path. If Tailscale is available at runtime, pican publishes the localhost server with Tailscale Serve HTTPS. If user systemd is unavailable, run it manually with `~/.pi/agent/bin/pican -o`.
 
 To install only for a specific project (shared with your team via `.pi/settings.json`):
 
 ```bash
-pi install -l npm:@ygncode/pi-web@beta
+pi install -l npm:@yeshwanthyk/pican@beta
 ```
 
-Then restart pi (or run `/reload`), and use `/web`, `/pi-web`, `/remote`, `/refresh`. Manage your access token with `/pi-web token` and `/pi-web set-token`.
+Then restart pi (or run `/reload`), and use `/web`, `/pican`, `/remote`, `/refresh`. Manage your access token with `/pican token` and `/pican set-token`.
 
-If npm aborts with `ENOTEMPTY` while renaming `@ygncode/pi-web`, remove npm's stale hidden backup directories and reinstall the beta channel:
+If npm aborts with `ENOTEMPTY` while renaming `@yeshwanthyk/pican`, remove npm's stale hidden backup directories and reinstall the beta channel:
 
 ```bash
-rm -rf ~/.pi/agent/npm/node_modules/@ygncode/.pi-web-*
-pi install npm:@ygncode/pi-web@beta
+rm -rf ~/.pi/agent/npm/node_modules/@yeshwanthyk/.pican-*
+pi install npm:@yeshwanthyk/pican@beta
 ```
 
 ### Quick install (no build tools needed)
@@ -70,157 +70,157 @@ pi install npm:@ygncode/pi-web@beta
 macOS / Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ygncode/pi-web/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/ygncode/pi-web/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.ps1 | iex
 ```
 
-This downloads the latest pi-web binary, installs it to `/usr/local/bin` (`~/.pi/agent/bin` on Windows), and sets up auto-start on login. No Go, Node, or pi required.
+This downloads the latest pican binary, installs it to `/usr/local/bin` (`~/.pi/agent/bin` on Windows), and sets up auto-start on login. No Go, Node, or pi required.
 
 ### Download binary
 
-Pre-built binaries are attached to each [GitHub Release](https://github.com/ygncode/pi-web/releases).
+Pre-built binaries are attached to each [GitHub Release](https://github.com/Yeshwanthyk/pican/releases).
 
 ```bash
 # macOS (Apple Silicon)
-curl -L -o pi-web https://github.com/ygncode/pi-web/releases/latest/download/pi-web-darwin-arm64
-chmod +x pi-web
+curl -L -o pican https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-darwin-arm64
+chmod +x pican
 
 # macOS (Intel)
-curl -L -o pi-web https://github.com/ygncode/pi-web/releases/latest/download/pi-web-darwin-amd64
-chmod +x pi-web
+curl -L -o pican https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-darwin-amd64
+chmod +x pican
 
 # Linux (amd64)
-curl -L -o pi-web https://github.com/ygncode/pi-web/releases/latest/download/pi-web-linux-amd64
-chmod +x pi-web
+curl -L -o pican https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-linux-amd64
+chmod +x pican
 
 # Linux (arm64)
-curl -L -o pi-web https://github.com/ygncode/pi-web/releases/latest/download/pi-web-linux-arm64
-chmod +x pi-web
+curl -L -o pican https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-linux-arm64
+chmod +x pican
 ```
 
 ```powershell
 # Windows (x64)
-irm -OutFile pi-web.exe https://github.com/ygncode/pi-web/releases/latest/download/pi-web-windows-amd64.exe
+irm -OutFile pican.exe https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-windows-amd64.exe
 
 # Windows (ARM64)
-irm -OutFile pi-web.exe https://github.com/ygncode/pi-web/releases/latest/download/pi-web-windows-arm64.exe
+irm -OutFile pican.exe https://github.com/Yeshwanthyk/pican/releases/latest/download/pican-windows-arm64.exe
 ```
 
 Then move it to your PATH:
 
 ```bash
-cp pi-web ~/.pi/agent/bin/
+cp pican ~/.pi/agent/bin/
 # or system-wide:
-sudo cp pi-web /usr/local/bin/
+sudo cp pican /usr/local/bin/
 ```
 
 ### Build from source
 
 ```bash
-git clone https://github.com/ygncode/pi-web.git
-cd pi-web
+git clone https://github.com/Yeshwanthyk/pican.git
+cd pican
 make build   # builds the Vite bundle, then embeds it into the Go binary
 
 # optional: put it on PATH
-cp pi-web ~/.pi/agent/bin/
+cp pican ~/.pi/agent/bin/
 ```
 
 The frontend bundle is embedded by `web/assets_embed.go`, so `go build` needs
 `web/dist` to exist first. `make build` does both steps in order; if you build
 by hand, run `npm --prefix web install && npm --prefix web run build` before
-`go build ./cmd/pi-web`.
+`go build ./cmd/pican`.
 
 ## Uninstall
 
 ```bash
-pi remove npm:@ygncode/pi-web@beta
+pi remove npm:@yeshwanthyk/pican@beta
 ```
 
 This runs the package `preuninstall` script (`uninstall.sh`, or `uninstall.ps1`
 on Windows), which stops the running instance and removes:
 
-- the pi-web binary (`~/.pi/agent/bin/pi-web`, or `/usr/local/bin/pi-web` for standalone installs)
-- the version file (`~/.pi/agent/pi-web-version`)
-- the runtime state file (`~/.pi/agent/pi-web/pi-web-state.json`)
+- the pican binary (`~/.pi/agent/bin/pican`, or `/usr/local/bin/pican` for standalone installs)
+- the version file (`~/.pi/agent/pican-version`)
+- the runtime state file (`~/.pi/agent/pican/pican-state.json`)
 - the auto-start config (launchd plist on macOS, systemd user service on Linux, Run-key entry + launcher scripts on Windows)
 
 Your data is preserved so a later reinstall picks up where you left off:
-`~/.pi/agent/pi-web.sqlite`, `~/.pi/agent/pi-web-memory.sqlite`, your session
-files under `~/.pi/agent/sessions/`, and `~/.config/pi-web/env` (including
-`PI_WEB_TOKEN`). Remove those manually if you want a clean slate.
+`~/.pi/agent/pican.sqlite`, `~/.pi/agent/pican-memory.sqlite`, your session
+files under `~/.pi/agent/sessions/`, and `~/.config/pican/env` (including
+`PICAN_TOKEN`). Remove those manually if you want a clean slate.
 
 ## Usage
 
 ```bash
 # Start on the default port (31415)
-pi-web
+pican
 
 # Start and open a browser
-pi-web -o
+pican -o
 
 # Custom port
-pi-web -p 8080
+pican -p 8080
 
 # Runtime: pi (default), codex, or both
-pi-web -runtime=both
+pican -runtime=both
 
 # Explicit Codex executable path (not a shell command)
-pi-web -runtime=both -codex-command=/absolute/path/to/codex
+pican -runtime=both -codex-command=/absolute/path/to/codex
 # equivalent fallback when the flag is absent:
-PI_WEB_CODEX_COMMAND=/absolute/path/to/codex pi-web -runtime=both
+PICAN_CODEX_COMMAND=/absolute/path/to/codex pican -runtime=both
 
 # Override bind host (loopback is unauthenticated by default)
-pi-web --host 127.0.0.1
+pican --host 127.0.0.1
 
-# Non-loopback bind requires a token — pi-web refuses to start otherwise
-PI_WEB_TOKEN=$(openssl rand -hex 16) pi-web --host 192.168.1.50
+# Non-loopback bind requires a token — pican refuses to start otherwise
+PICAN_TOKEN=$(openssl rand -hex 16) pican --host 192.168.1.50
 ```
 
-By default, pi-web enables only Pi and binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pi-web also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PI_WEB_TOKEN` to be set; pass `--insecure` to override for local testing.
+By default, pican enables only Pi and binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pican also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PICAN_TOKEN` to be set; pass `--insecure` to override for local testing.
 
 ## Remote Access
 
-Leave pi-web listening locally, then use the printed Tailscale HTTPS URL from your phone or laptop on the tailnet.
+Leave pican listening locally, then use the printed Tailscale HTTPS URL from your phone or laptop on the tailnet.
 
-On Linux, allow your user to manage Tailscale before installing/running pi-web, otherwise `tailscale serve` may require sudo and auto-start can fail:
+On Linux, allow your user to manage Tailscale before installing/running pican, otherwise `tailscale serve` may require sudo and auto-start can fail:
 
 ```bash
 sudo tailscale set --operator=$USER
 ```
 
 ```bash
-# 1. Start pi-web
-pi-web
+# 1. Start pican
+pican
 
 # 2. From any other Tailscale-connected device, open the printed
 #    "Tailscale HTTPS" URL.
 ```
 
-> By default, pi-web refuses to bind to a non-loopback address unless `PI_WEB_TOKEN` is set — anyone who can reach the bound address could otherwise view sessions and send instructions to pi. To override this guard for local-network testing, pass `--insecure`. **Don't use `--insecure` on Tailscale or any address reachable from outside your machine.**
+> By default, pican refuses to bind to a non-loopback address unless `PICAN_TOKEN` is set — anyone who can reach the bound address could otherwise view sessions and send instructions to pi. To override this guard for local-network testing, pass `--insecure`. **Don't use `--insecure` on Tailscale or any address reachable from outside your machine.**
 >
-> Clients can pass the token via the `Authorization: Bearer <token>` header, the `X-Pi-Token` header, or once via `?token=<token>` (which sets a `pi_token` cookie for subsequent requests). Tokens passed via `?token=` end up in browser history, server access logs, and `Referer` headers from any links on the page — prefer the header form for anything beyond the initial bookmark.
+> Clients can pass the token via the `Authorization: Bearer <token>` header, the `X-Pican-Token` header, or once via `?token=<token>` (which sets a `pican_token` cookie for subsequent requests). Tokens passed via `?token=` end up in browser history, server access logs, and `Referer` headers from any links on the page — prefer the header form for anything beyond the initial bookmark.
 
 ## Codex runtime
 
-The installed Codex CLI owns sign-in and persistent thread state. pi-web starts `codex app-server --stdio` with the current environment unchanged, including `HOME`; it never reads `~/.codex/auth.json`. Run `codex` normally first to install/sign in, then choose `-runtime=codex` or `-runtime=both`.
+The installed Codex CLI owns sign-in and persistent thread state. pican starts `codex app-server --stdio` with the current environment unchanged, including `HOME`; it never reads `~/.codex/auth.json`. Run `codex` normally first to install/sign in, then choose `-runtime=codex` or `-runtime=both`.
 
-> **Warning:** pi-web always runs Codex sessions in YOLO mode (`approvalPolicy: never` with `danger-full-access`), equivalent to `codex --yolo`. Model-generated commands can access the whole host filesystem and network without confirmation.
+> **Warning:** pican always runs Codex sessions in YOLO mode (`approvalPolicy: never` with `danger-full-access`), equivalent to `codex --yolo`. Model-generated commands can access the whole host filesystem and network without confirmation.
 
 Startup behavior:
 
 - `codex` mode creates `~/.pi/agent/sessions` if absent and exits if its initial Codex catalog sync fails.
 - `both` mode requires the existing sessions directory. If Codex is unavailable, Pi keeps working and the UI reports Codex unavailable; sync retries every minute.
-- A Codex executable override is one path via `-codex-command` (preferred) or `PI_WEB_CODEX_COMMAND`. pi-web appends `app-server --stdio` itself.
-- Generated auto-start entries invoke pi-web without `-runtime`, so they remain Pi-only by default. To persist `codex`/`both`, add `-runtime=…` (and optional `-codex-command=…`) to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command.
+- A Codex executable override is one path via `-codex-command` (preferred) or `PICAN_CODEX_COMMAND`. pican appends `app-server --stdio` itself.
+- Generated auto-start entries invoke pican without `-runtime`, so they remain Pi-only by default. To persist `codex`/`both`, add `-runtime=…` (and optional `-codex-command=…`) to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command.
 
-Codex remains authoritative under `~/.codex`. pi-web creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, export, and share paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
+Codex remains authoritative under `~/.codex`. pican creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, export, and share paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
 
-Existing projections remain viewable, downloadable, exportable, and shareable while Codex is unavailable. Chat, create, rename, fork/clone, and model/effort operations require the runtime. This is cached local viewing, not browser-offline support: pi-web intentionally does not service-worker-cache session data.
+Existing projections remain viewable, downloadable, exportable, and shareable while Codex is unavailable. Chat, create, rename, fork/clone, and model/effort operations require the runtime. This is cached local viewing, not browser-offline support: pican intentionally does not service-worker-cache session data.
 
 Codex sessions support text/images, steering an active turn, persistent queues, cancel, model and reasoning effort, `/review`, `/compact`, rename, labels, fork/clone, status/SSE, and `codex resume <thread-id>` copying from the session header. YOLO mode bypasses command/file approvals. Unexpected approval requests are declined defensively; permission and user-input requests receive empty responses, and MCP elicitation is declined.
 
@@ -253,8 +253,8 @@ Shared gists are snapshots and do not live-update.
 ### macOS
 
 ```bash
-cp init/com.pi-web.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.pi-web.plist
+cp init/com.pican.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.pican.plist
 ```
 
 ### Linux (systemd)
@@ -262,46 +262,46 @@ launchctl load ~/Library/LaunchAgents/com.pi-web.plist
 ```bash
 # Install the systemd user service
 mkdir -p ~/.config/systemd/user
-cp init/pi-web.service ~/.config/systemd/user/
+cp init/pican.service ~/.config/systemd/user/
 
-# Optional: set your PI_WEB_TOKEN for non-loopback binds
-# (or use /pi-web set-token <token> from inside pi)
-mkdir -p ~/.config/pi-web
-echo 'PI_WEB_TOKEN=your-token-here' > ~/.config/pi-web/env
+# Optional: set your PICAN_TOKEN for non-loopback binds
+# (or use /pican set-token <token> from inside pi)
+mkdir -p ~/.config/pican
+echo 'PICAN_TOKEN=your-token-here' > ~/.config/pican/env
 
 # Enable and start
 systemctl --user daemon-reload
-systemctl --user enable --now pi-web.service
+systemctl --user enable --now pican.service
 
 # Check status
-systemctl --user status pi-web.service
+systemctl --user status pican.service
 
 # View logs
-journalctl --user -u pi-web.service -f
+journalctl --user -u pican.service -f
 ```
 
 > For the service to start at boot (before login), use a system service instead:
-> copy `init/pi-web.service` to `/etc/systemd/system/` and use `sudo systemctl`.
+> copy `init/pican.service` to `/etc/systemd/system/` and use `sudo systemctl`.
 
 ### Windows
 
 The installer configures this automatically, without needing admin rights: a
-`pi-web` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-launches `~/.config/pi-web/pi-web-start.vbs` at login, which starts the binary
-hidden (no console window) after loading `~/.config/pi-web/env`
-(`PI_WEB_TOKEN`, `PATH`, ...).
+`pican` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+launches `~/.config/pican/pican-start.vbs` at login, which starts the binary
+hidden (no console window) after loading `~/.config/pican/env`
+(`PICAN_TOKEN`, `PATH`, ...).
 
 To manage it by hand:
 
 ```powershell
 # Start / stop
-wscript.exe "$HOME\.config\pi-web\pi-web-start.vbs"
-taskkill /IM pi-web.exe /F
+wscript.exe "$HOME\.config\pican\pican-start.vbs"
+taskkill /IM pican.exe /F
 
 # Remove auto-start
-Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'pi-web'
+Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'pican'
 ```
 
-There is no service supervision on Windows: if pi-web crashes it stays down
+There is no service supervision on Windows: if pican crashes it stays down
 until the next login (launchd/systemd restart it automatically on the other
 platforms).

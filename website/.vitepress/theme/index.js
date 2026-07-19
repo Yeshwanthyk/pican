@@ -5,7 +5,7 @@ import ThemeSwitcher from './ThemeSwitcher.vue'
 import HeroImage from './HeroImage.vue'
 import './custom.css'
 
-// Match the pi-web app's four named themes (dark/light/nord/dracula) via a
+// Match the pican app's four named themes (dark/light/nord/dracula) via a
 // data-theme attribute, driven by a custom switcher in the nav, plus a GitHub
 // "Star" call-to-action. The hero image slot renders the demo GIF with a
 // caption. The default theme + flash-free first paint are set by the inline

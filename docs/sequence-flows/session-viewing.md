@@ -117,4 +117,4 @@ For Pi, the server appends a `session_info` line, preserving the append-only tra
 
 ## Runtime unavailable / cached viewing
 
-Availability is applied after parsing. If Codex is unavailable, an existing projection still loads through the normal cache and renderer, including download, export, and share. Chat and runtime-dependent mutations are disabled with the current reason until periodic sync recovers. This does not mean the browser works without the pi-web HTTP server: the service worker intentionally does not cache session pages or JSON.
+Availability is applied after parsing. If Codex is unavailable, an existing projection still loads through the normal cache and renderer, including download, export, and share. Chat and runtime-dependent mutations are disabled with the current reason until periodic sync recovers. This does not mean the browser works without the pican HTTP server: the service worker intentionally does not cache session pages or JSON.

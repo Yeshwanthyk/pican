@@ -1,6 +1,6 @@
 # Sequence Flows
 
-This directory documents the key runtime sequences in pi-web.
+This directory documents the key runtime sequences in pican.
 
 | Document | Description |
 |----------|-------------|

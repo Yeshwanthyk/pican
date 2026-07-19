@@ -66,7 +66,7 @@ is an ordinary session as far as the worker is concerned.
 
 btw chats are **hidden from the sessions list by default**:
 
-- `showBtwInIndex()` reads the `pi-web:v1:show-btw-in-index` setting (default
+- `showBtwInIndex()` reads the `pican:v1:show-btw-in-index` setting (default
   `false`; toggled on the `/settings` page — `settings.showBtw`).
 - `filterBtwSummaries(...)` drops every id in `btwSessionIDs()` (all btws, active
   or orphaned) from the list unless showing is enabled. Applied server-side in the
