@@ -1,13 +1,74 @@
-import { getJSON, postJSON } from "../shared/api.js";
+import { effects } from "../shared/api.js";
+import type { FetchLike } from "../lib/http";
+import { runPromise } from "../lib/runtime";
+import { NewSessionResponseSchema, RuntimesResponseSchema } from "../lib/schema";
+import type { RecentLocations, RuntimesResponse, Session, SessionList } from "../lib/schema";
 import { t } from "../shared/strings.js";
+
+export interface NormalizedSession {
+  id: string;
+  sessionUUID: string;
+  runtime: string;
+  nativeId: string;
+  project: string;
+  lastActivity: string;
+  name: string;
+  messageCount: number;
+  tokenTotal: number;
+  costTotal: number;
+  model: string;
+  modelProvider: string;
+  chatAvailable: boolean;
+  chatDisabledReason: string;
+  pinned: boolean;
+}
+
+export interface NormalizedRuntime {
+  readonly id: string;
+  readonly available: boolean;
+  readonly reason: string;
+}
+
+export interface NormalizedRuntimesResponse {
+  readonly defaultRuntime: string;
+  readonly runtimes: ReadonlyArray<NormalizedRuntime>;
+  readonly selectedRuntime: string;
+}
+
+interface FetchOptions {
+  readonly fetchImpl?: FetchLike;
+}
+
+interface SessionActivity {
+  readonly lastActivity?: string | null;
+  readonly LastActivity?: string | null;
+}
+
+interface SessionModel {
+  readonly model?: string | null;
+  readonly modelProvider?: string | null;
+}
+
+interface SessionSearch extends SessionModel {
+  readonly name?: string | null;
+  readonly project?: string | null;
+  readonly sessionUUID?: string | null;
+  readonly runtime?: string | null;
+  readonly nativeId?: string | null;
+}
+
+interface SessionMetrics {
+  readonly tokenTotal?: number | null;
+  readonly costTotal?: number | null;
+}
 
 export const layoutStorageKey = "pican:view-layout";
 export const collapsedProjectsStorageKey = "pican:collapsed-projects";
 
-export const sessionsCountLabel = (n) =>
+export const sessionsCountLabel = (n: number): string =>
   n === 1 ? t("index.sessionCountOne") : t("index.sessionsCount", { count: n });
 
-export function normalizeSession(raw = {}) {
+export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession {
   return {
     id: raw.id || raw.ID || "",
     sessionUUID: raw.sessionUUID || raw.SessionUUID || "",
@@ -30,9 +91,11 @@ export function normalizeSession(raw = {}) {
 // splitPinnedSessions separates pinned sessions from the rest, sorting the
 // pinned group by activity (newest first) so it reads like its own mini
 // timeline above the regular groups.
-export function splitPinnedSessions(sessions = []) {
-  const pinned = [];
-  const rest = [];
+export function splitPinnedSessions<T extends SessionActivity & { readonly pinned?: boolean }>(
+  sessions: ReadonlyArray<T> = [],
+): { pinned: T[]; rest: T[] } {
+  const pinned: T[] = [];
+  const rest: T[] = [];
   for (const session of sessions) {
     if (session?.pinned) pinned.push(session);
     else rest.push(session);
@@ -48,21 +111,33 @@ export function splitPinnedSessions(sessions = []) {
 // is unknown/empty (a brand-new session should appear promptly); otherwise
 // only after throttleMs has elapsed since the last known-id-triggered
 // refetch.
-export function shouldRefetchOnReload({ id, knownIds, lastRefreshAt, now, throttleMs }) {
+export function shouldRefetchOnReload({
+  id,
+  knownIds,
+  lastRefreshAt,
+  now,
+  throttleMs,
+}: {
+  readonly id?: string;
+  readonly knownIds: ReadonlySet<string>;
+  readonly lastRefreshAt: number;
+  readonly now: number;
+  readonly throttleMs: number;
+}): boolean {
   if (!id || !knownIds.has(id)) return true;
   return now - lastRefreshAt >= throttleMs;
 }
 
-export function activityMs(session) {
+export function activityMs(session: SessionActivity | null | undefined): number {
   const ms = Date.parse(session?.lastActivity || session?.LastActivity || "");
   return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
 }
 
-export function formatRelativeTime(timestamp, now = Date.now()) {
+export function formatRelativeTime(timestamp: string | number | Date, now = Date.now()): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return "";
   const seconds = Math.max(0, Math.floor((now - date.getTime()) / 1000));
-  const units = [
+  const units: ReadonlyArray<readonly [string, number]> = [
     ["year", 31536000],
     ["month", 2592000],
     ["week", 604800],
@@ -77,16 +152,16 @@ export function formatRelativeTime(timestamp, now = Date.now()) {
   return "just now";
 }
 
-export function sessionModelLabel(session = {}) {
+export function sessionModelLabel(session: SessionModel = {}): string {
   if (!session.model) return "";
   return session.modelProvider ? `${session.modelProvider}/${session.model}` : session.model;
 }
 
-export function sessionSearchText(session = {}) {
+export function sessionSearchText(session: SessionSearch = {}): string {
   return `${session.name || ""} ${session.project || ""} ${sessionModelLabel(session)} ${session.sessionUUID || ""} ${session.runtime || "pi"} ${session.nativeId || ""}`.trim();
 }
 
-export function normalizeRuntimesResponse(raw = {}) {
+export function normalizeRuntimesResponse(raw: RuntimesResponse = {}): NormalizedRuntimesResponse {
   const runtimes = (Array.isArray(raw.runtimes) ? raw.runtimes : [])
     .map((entry) => ({
       id: String(entry?.id || "")
@@ -116,7 +191,7 @@ export function normalizeRuntimesResponse(raw = {}) {
 
 // formatTokenAbbrev renders a token count with a k/M suffix (one decimal,
 // trimmed when it's a whole number), e.g. 12300 -> "12.3k", 1500000 -> "1.5M".
-function formatTokenAbbrev(n) {
+function formatTokenAbbrev(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
   return String(Math.round(n));
@@ -125,16 +200,22 @@ function formatTokenAbbrev(n) {
 // formatSessionMetrics renders the card's subtle "12.3k tok · $0.42" metadata
 // line from already-fetched summary fields. Either half is omitted when zero;
 // the whole line is '' when both are.
-export function formatSessionMetrics(session = {}) {
+export function formatSessionMetrics(session: SessionMetrics = {}): string {
   const tokens = Number(session.tokenTotal) || 0;
   const cost = Number(session.costTotal) || 0;
-  const parts = [];
+  const parts: string[] = [];
   if (tokens > 0) parts.push(`${formatTokenAbbrev(tokens)} tok`);
   if (cost > 0) parts.push(`$${cost.toFixed(2)}`);
   return parts.join(" · ");
 }
 
-export function formatRunningModel(status) {
+export interface RunningStatus {
+  readonly modelName?: string;
+  readonly model?: string;
+  readonly modelProvider?: string;
+}
+
+export function formatRunningModel(status: RunningStatus | null | undefined): string {
   if (!status || typeof status !== "object") return "";
   const model =
     typeof status.modelName === "string" && status.modelName
@@ -147,9 +228,18 @@ export function formatRunningModel(status) {
   return model || provider;
 }
 
-export function groupSessionsByProject(sessions = []) {
-  const groups = [];
-  const byProject = new Map();
+export interface ProjectSessionGroup<T> {
+  readonly project: string;
+  readonly sessions: T[];
+  latest: number;
+  readonly index: number;
+}
+
+export function groupSessionsByProject<T extends SessionActivity & { readonly project?: string }>(
+  sessions: ReadonlyArray<T> = [],
+): Array<ProjectSessionGroup<T>> {
+  const groups: Array<ProjectSessionGroup<T>> = [];
+  const byProject = new Map<string, ProjectSessionGroup<T>>();
   for (const session of sessions) {
     const project = session.project || "";
     let group = byProject.get(project);
@@ -166,9 +256,17 @@ export function groupSessionsByProject(sessions = []) {
   return groups;
 }
 
-export const dateBucketOrder = ["today", "yesterday", "previous7days", "previous30days", "older"];
+export const dateBucketOrder = [
+  "today",
+  "yesterday",
+  "previous7days",
+  "previous30days",
+  "older",
+] as const;
 
-export function dateBucketFor(ms, now = Date.now()) {
+export type DateBucket = (typeof dateBucketOrder)[number];
+
+export function dateBucketFor(ms: number, now = Date.now()): DateBucket {
   if (!Number.isFinite(ms)) return "older";
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
@@ -181,9 +279,17 @@ export function dateBucketFor(ms, now = Date.now()) {
   return "older";
 }
 
-export function groupSessionsByDate(sessions = [], now = Date.now()) {
+export interface DateSessionGroup<T> {
+  readonly bucket: DateBucket;
+  readonly sessions: T[];
+}
+
+export function groupSessionsByDate<T extends SessionActivity>(
+  sessions: ReadonlyArray<T> = [],
+  now = Date.now(),
+): Array<DateSessionGroup<T>> {
   const sorted = [...sessions].sort((a, b) => activityMs(b) - activityMs(a));
-  const byBucket = new Map();
+  const byBucket = new Map<DateBucket, DateSessionGroup<T>>();
   for (const session of sorted) {
     const bucket = dateBucketFor(activityMs(session), now);
     let group = byBucket.get(bucket);
@@ -195,32 +301,55 @@ export function groupSessionsByDate(sessions = [], now = Date.now()) {
   }
   return dateBucketOrder
     .filter((bucket) => byBucket.has(bucket))
-    .map((bucket) => byBucket.get(bucket));
+    .flatMap((bucket) => {
+      const group = byBucket.get(bucket);
+      return group ? [group] : [];
+    });
 }
 
-export function defaultFetchSessions({ limit, offset, query } = {}) {
-  const params = new URLSearchParams();
-  if (Number.isFinite(limit) && limit > 0) params.set("limit", String(limit));
-  if (Number.isFinite(offset) && offset > 0) params.set("offset", String(offset));
-  if (query) params.set("q", query);
-  const qs = params.toString();
-  return getJSON("/api/sessions" + (qs ? "?" + qs : ""));
+export function defaultFetchSessions(
+  values: { readonly limit?: number; readonly offset?: number; readonly query?: string } = {},
+): Promise<SessionList> {
+  return runPromise(effects.sessions.list(values));
 }
-export function defaultFetchRecent() {
-  return getJSON("/api/recent-locations");
+export function defaultFetchRecent(): Promise<RecentLocations> {
+  return runPromise(effects.sessions.recentLocations);
 }
-export function defaultFetchRuntimes(options) {
-  return getJSON("/api/runtimes", options);
+export function normalizeRecentLocations(response: RecentLocations): string[] {
+  return response.locations.map((location) =>
+    typeof location === "string" ? location : location.path,
+  );
 }
-export function defaultCreateSession(path, runtime = "pi", options) {
-  return postJSON("/api/new-session", { path, runtime: runtime || "pi" }, options);
+export function defaultFetchRuntimes({ fetchImpl = globalThis.fetch }: FetchOptions = {}) {
+  const legacyFetch: FetchLike = (input) =>
+    fetchImpl(input, { headers: { Accept: "application/json" } });
+  return runPromise(
+    effects.get("/api/runtimes", RuntimesResponseSchema, { fetchImpl: legacyFetch }),
+  );
+}
+export function defaultCreateSession(
+  path: string,
+  runtime = "pi",
+  { fetchImpl = globalThis.fetch }: FetchOptions = {},
+) {
+  const legacyFetch: FetchLike = (input, init) =>
+    fetchImpl(input, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: init?.body,
+    });
+  return runPromise(
+    effects.post("/api/new-session", { path, runtime: runtime || "pi" }, NewSessionResponseSchema, {
+      fetchImpl: legacyFetch,
+    }),
+  );
 }
 export function defaultFetchProjects() {
-  return getJSON("/api/projects");
+  return runPromise(effects.sessions.projects);
 }
-export function defaultUpdateProject(path, action) {
-  return postJSON("/api/projects", { path, action });
+export function defaultUpdateProject(path: string, action: string) {
+  return runPromise(effects.sessions.updateProject(path, action));
 }
-export function defaultUpdatePin(sessionId, pinned) {
-  return postJSON("/api/pins", { sessionId, pinned });
+export function defaultUpdatePin(sessionId: string, pinned: boolean) {
+  return runPromise(effects.sessions.updatePin(sessionId, pinned));
 }

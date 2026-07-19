@@ -98,7 +98,7 @@ describe("index sessions helpers", () => {
       { id: "mid", project: "a", lastActivity: "2024-01-02T00:00:00Z" },
     ]);
     expect(groups.map((g) => g.project)).toEqual(["b", "a"]);
-    expect(groups[1].sessions.map((s) => s.id)).toEqual(["mid", "old"]);
+    expect(groups[1]?.sessions.map((s) => s.id)).toEqual(["mid", "old"]);
   });
 
   it("keeps one group per project even when sessions are interleaved in time", () => {
@@ -108,7 +108,7 @@ describe("index sessions helpers", () => {
       { id: "3", project: "a", lastActivity: "2024-01-01T00:00:00Z" },
     ]);
     expect(groups.map((g) => g.project)).toEqual(["a", "b"]);
-    expect(groups[0].sessions.map((s) => s.id)).toEqual(["1", "3"]);
+    expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["1", "3"]);
   });
 
   it("buckets timestamps by recency relative to now", () => {
@@ -135,7 +135,7 @@ describe("index sessions helpers", () => {
       now,
     );
     expect(groups.map((g) => g.bucket)).toEqual(["today", "yesterday", "older"]);
-    expect(groups[0].sessions.map((s) => s.id)).toEqual(["today-a", "today-b"]);
+    expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["today-a", "today-b"]);
   });
 
   it("splits pinned sessions out, sorted by activity, and leaves the rest untouched", () => {

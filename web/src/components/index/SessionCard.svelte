@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { t } from '../../shared/strings.js';
   import { handleNavClick } from '../../shared/navigation.js';
   import { prefetchSession } from '../../routes/session-prefetch.js';
@@ -11,9 +11,18 @@
     formatSessionMetrics,
     sessionModelLabel,
     sessionSearchText,
+    type NormalizedSession,
+    type RunningStatus,
   } from '../../index/sessions.js';
 
-  let { session, running = false, runningStatus = null, now = Date.now() } = $props();
+  interface Props {
+    session: NormalizedSession;
+    running?: boolean;
+    runningStatus?: RunningStatus | null;
+    now?: number;
+  }
+
+  let { session, running = false, runningStatus = null, now = Date.now() }: Props = $props();
 
   const href = $derived(`/session?id=${encodeURIComponent(session.id || '')}`);
   const title = $derived(session.name || session.id || '');
@@ -37,7 +46,7 @@
   // shared with the page's reactive session list, so this alone moves the card
   // between the Pinned section and its normal group), then persist. On failure
   // revert and let the user know via toast.
-  async function togglePin(event) {
+  async function togglePin(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (pinBusy || !session?.id) return;
@@ -46,9 +55,9 @@
     pinBusy = true;
     try {
       await defaultUpdatePin(session.id, next);
-    } catch (error) {
+    } catch (error: unknown) {
       session.pinned = !next;
-      showToast(error.message || t('index.networkError'));
+      showToast(error instanceof Error ? error.message : t('index.networkError'));
     } finally {
       pinBusy = false;
     }
@@ -90,7 +99,7 @@
         class:session-pin-btn--pinned={session.pinned}
         type="button"
         aria-label={pinLabel}
-        aria-pressed={String(!!session.pinned)}
+        aria-pressed={!!session.pinned}
         title={pinLabel}
         disabled={pinBusy}
         onclick={togglePin}

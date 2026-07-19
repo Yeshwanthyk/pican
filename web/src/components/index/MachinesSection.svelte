@@ -1,18 +1,24 @@
-<script>
+<script lang="ts">
   import { icon, ChevronDown } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import PeerSessionRow from './PeerSessionRow.svelte';
+  import type { NormalizedPeerHost } from '../../index/peers.js';
 
-  let { hosts = [], now = Date.now() } = $props();
+  interface Props {
+    hosts?: ReadonlyArray<NormalizedPeerHost>;
+    now?: number;
+  }
 
-  let expanded = $state({});
+  let { hosts = [], now = Date.now() }: Props = $props();
+
+  let expanded = $state<Record<string, boolean>>({});
   const onlineCount = $derived(hosts.filter((h) => h.online).length);
 
-  function toggle(name) {
+  function toggle(name: string) {
     expanded = { ...expanded, [name]: !expanded[name] };
   }
 
-  function sessionCountLabel(host) {
+  function sessionCountLabel(host: NormalizedPeerHost) {
     const n = host.sessions.length;
     return n === 1
       ? t('index.machineSessionCountOne')
@@ -36,7 +42,7 @@
         <button
           type="button"
           class="machine-toggle"
-          aria-expanded={String(isExpanded)}
+          aria-expanded={isExpanded}
           disabled={host.sessions.length === 0}
           onclick={() => toggle(host.name)}
         >

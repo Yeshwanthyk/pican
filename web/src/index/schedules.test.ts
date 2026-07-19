@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildCron, parseCron, describeFrequency, FREQUENCIES } from "./schedules.js";
+import type { Frequency } from "./schedules.js";
 
 describe("buildCron", () => {
   it("returns empty for manual and custom", () => {
@@ -28,7 +29,8 @@ describe("parseCron", () => {
     expect(parseCron("").frequency).toBe("manual");
   });
   it("round-trips presets built by buildCron", () => {
-    for (const f of ["hourly", "daily", "weekdays", "weekly"]) {
+    const presets: Frequency[] = ["hourly", "daily", "weekdays", "weekly"];
+    for (const f of presets) {
       const expr = buildCron({ frequency: f, minute: 15, hour: 10, weekday: 3 });
       const parsed = parseCron(expr);
       expect(parsed.frequency).toBe(f);
@@ -45,7 +47,8 @@ describe("parseCron", () => {
 });
 
 describe("describeFrequency", () => {
-  const tr = (key, params) => `${key}:${JSON.stringify(params || {})}`;
+  const tr = (key: string, params?: Readonly<Record<string, unknown>>) =>
+    `${key}:${JSON.stringify(params || {})}`;
   it("describes manual", () => {
     expect(describeFrequency({ cronExpr: "" }, tr)).toContain("freqManual");
   });

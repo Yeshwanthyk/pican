@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte';
   import CommandPalette from '../components/shared/CommandPalette.svelte';
   import HomeMenu from '../components/index/HomeMenu.svelte';
@@ -17,6 +17,8 @@
   } from '../shared/settings-store.js';
   import { navigate } from '../shared/navigation.js';
   import { t } from '../shared/strings.js';
+  import { describeError } from '../lib/errors';
+  import type { Project } from '../lib/schema';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
   import {
     defaultCreateSession,
@@ -25,41 +27,46 @@
     defaultFetchSessions,
     defaultUpdateProject,
     layoutStorageKey,
+    normalizeRecentLocations,
     normalizeSession,
     shouldRefetchOnReload,
+    type NormalizedSession,
+    type RunningStatus,
   } from '../index/sessions.js';
   import {
     defaultFetchPeers,
     defaultFetchPeerSessions,
     normalizePeerHost,
+    type NormalizedPeerHost,
   } from '../index/peers.js';
 
   const PAGE_SIZE = 100;
+  type Layout = 'timeline' | 'projects';
 
-  let sessions = $state([]);
+  let sessions = $state<NormalizedSession[]>([]);
   let total = $state(0);
   let loadingMore = $state(false);
   let loading = $state(true);
   let layoutReady = $state(false);
-  let layout = $state('timeline');
-  const runningSessionIds = new SvelteSet();
-  const runningStatuses = new SvelteMap();
+  let layout = $state<Layout>('timeline');
+  const runningSessionIds = new SvelteSet<string>();
+  const runningStatuses = new SvelteMap<string, RunningStatus>();
   let newSessionOpen = $state(false);
   let newSessionPath = $state('');
   let newSessionDropdownOpen = $state(false);
   let newSessionRuntime = $state('pi');
-  let recentLocations = $state([]);
+  let recentLocations = $state<string[]>([]);
   let creating = $state(false);
   let newSessionError = $state('');
   let menuOpen = $state(false);
   let projectsOpen = $state(false);
-  let projects = $state([]);
+  let projects = $state<Project[]>([]);
   let projectsFilterEnabled = $state(false);
   let projectsBusy = $state(false);
   let projectsError = $state('');
   let refreshInflight = false;
   let peersConfigured = false;
-  let peerHosts = $state([]);
+  let peerHosts = $state<NormalizedPeerHost[]>([]);
   let peersRefreshInflight = false;
 
   const totalSessionsLabel = $derived(
@@ -68,16 +75,27 @@
   const hasMore = $derived(sessions.length < total);
   const runningCount = $derived(runningSessionIds.size);
 
-  function setRunningSessions(snapshot) {
-    const ids = Array.isArray(snapshot) ? snapshot : snapshot?.ids;
-    const statuses = snapshot && !Array.isArray(snapshot) ? snapshot.statuses : {};
+  function setRunningSessions(snapshot: {
+    readonly ids: ReadonlyArray<string>;
+    readonly statuses: Readonly<Record<string, unknown>>;
+  }): void {
     runningSessionIds.clear();
-    for (const id of Array.isArray(ids) ? ids : []) runningSessionIds.add(id);
+    for (const id of snapshot.ids) runningSessionIds.add(id);
     runningStatuses.clear();
-    for (const [key, value] of Object.entries(statuses || {})) runningStatuses.set(key, value);
+    for (const [key, value] of Object.entries(snapshot.statuses)) {
+      if (typeof value !== 'object' || value === null) continue;
+      const modelName = Reflect.get(value, 'modelName');
+      const model = Reflect.get(value, 'model');
+      const modelProvider = Reflect.get(value, 'modelProvider');
+      runningStatuses.set(key, {
+        modelName: typeof modelName === 'string' ? modelName : undefined,
+        model: typeof model === 'string' ? model : undefined,
+        modelProvider: typeof modelProvider === 'string' ? modelProvider : undefined,
+      });
+    }
   }
 
-  function setSessionRunning(id, running, status = {}) {
+  function setSessionRunning(id: string, running: boolean, status: RunningStatus = {}): void {
     if (running) {
       runningSessionIds.add(id);
       runningStatuses.set(id, status);
@@ -123,12 +141,12 @@
   }
 
   const RELOAD_DEBOUNCE_MS = 500;
-  let reloadTimer = null;
-  function scheduleReload() {
+  let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleReload(): void {
     if (reloadTimer) clearTimeout(reloadTimer);
     if (newSessionOpen) return;
     reloadTimer = setTimeout(() => {
-      reloadTimer = null;
+      reloadTimer = undefined;
       refreshSessions({ preserveWindow: true });
       refreshPeerHosts();
     }, RELOAD_DEBOUNCE_MS);
@@ -141,7 +159,7 @@
   // known session's reload can change here is its activity time/ordering.
   const KNOWN_ID_REFRESH_THROTTLE_MS = 5000;
   let lastKnownIdRefreshAt = 0;
-  function handleReload({ id }) {
+  function handleReload({ id }: { readonly id: string }): void {
     const now = Date.now();
     const knownIds = new Set(sessions.map((session) => session.id));
     if (
@@ -185,7 +203,7 @@
     if (peersConfigured) await refreshPeerHosts();
   }
 
-  function setLayout(nextLayout) {
+  function setLayout(nextLayout: string): void {
     layout = nextLayout === 'projects' ? 'projects' : 'timeline';
     writeSetting(layoutStorageKey, layout, { storage: localStorage });
   }
@@ -201,7 +219,7 @@
     document.body?.classList.add('modal-sheet-open');
     try {
       const response = await defaultFetchRecent();
-      recentLocations = (response.locations || []).slice(0, 10);
+      recentLocations = normalizeRecentLocations(response).slice(0, 10);
     } catch {
       recentLocations = [];
     }
@@ -229,9 +247,9 @@
         navigate('/session?id=' + encodeURIComponent(response.id));
         return;
       }
-      newSessionError = response.error || t('index.failedCreateSession');
-    } catch (error) {
-      newSessionError = error.message || t('index.networkError');
+      newSessionError = t('index.failedCreateSession');
+    } catch (error: unknown) {
+      newSessionError = describeError(error) || t('index.networkError');
     } finally {
       creating = false;
     }
@@ -251,8 +269,8 @@
       const response = await defaultFetchProjects();
       projects = Array.isArray(response.projects) ? response.projects : [];
       projectsFilterEnabled = !!response.filterEnabled;
-    } catch (error) {
-      projectsError = error.message || t('index.failedLoadProjects');
+    } catch (error: unknown) {
+      projectsError = describeError(error) || t('index.failedLoadProjects');
     } finally {
       projectsBusy = false;
     }
@@ -271,15 +289,15 @@
     document.body?.classList.remove('modal-sheet-open');
   }
 
-  async function updateProject(path, action) {
+  async function updateProject(path: string, action: string): Promise<void> {
     projectsBusy = true;
     projectsError = '';
     try {
       await defaultUpdateProject(path, action);
       await refreshSessions();
       await refreshProjectsList();
-    } catch (error) {
-      projectsError = error.message || t('index.failedUpdateProject');
+    } catch (error: unknown) {
+      projectsError = describeError(error) || t('index.failedUpdateProject');
     } finally {
       projectsBusy = false;
     }
@@ -308,7 +326,12 @@
 
     const statusEvents = createStatusEvents({
       onSnapshot: (snapshot) => setRunningSessions(snapshot),
-      onDelta: (status) => setSessionRunning(status.id, status.running, status),
+      onDelta: (status) =>
+        setSessionRunning(status.id, status.running, {
+          model: status.model,
+          modelName: status.modelName,
+          modelProvider: status.modelProvider,
+        }),
       onMessage: (message) => {
         if (message === 'new-session') refreshSessions({ preserveWindow: true });
       },
@@ -322,11 +345,17 @@
       statusEvents.connect();
     } catch {}
 
-    const keydown = (e) => {
+    const keydown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         e.stopPropagation();
-        toggleTheme(window, document);
+        toggleTheme(
+          {
+            localStorage: window.localStorage,
+            getComputedStyle: () => window.getComputedStyle(document.documentElement),
+          },
+          document,
+        );
         syncThemeIcons(document);
         return;
       }
@@ -392,7 +421,7 @@
   onclick={openNewSessionModal}>+</button
 >
 
-<CommandPalette onNewSession={openNewSessionModal} navigate={(url) => navigate(url)} />
+<CommandPalette onNewSession={openNewSessionModal} navigate={(url: string) => navigate(url)} />
 
 <SessionsList
   {sessions}

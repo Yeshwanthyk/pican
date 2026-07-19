@@ -1,6 +1,19 @@
-<script>
+<script lang="ts">
   import { icon, MoreHorizontal, CalendarClock } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
+
+  type Layout = 'timeline' | 'projects';
+
+  interface Props {
+    layout?: Layout;
+    totalSessionsLabel?: string;
+    runningCount?: number;
+    runningVisible?: boolean;
+    onSearch?: () => void;
+    onToggleMenu?: () => void;
+    onLayoutChange?: (layout: Layout) => void;
+    onSchedules?: () => void;
+  }
 
   let {
     layout = 'timeline',
@@ -11,7 +24,7 @@
     onToggleMenu = () => {},
     onLayoutChange = () => {},
     onSchedules = () => {},
-  } = $props();
+  }: Props = $props();
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
@@ -38,7 +51,7 @@
           id="web-menu-btn"
           type="button"
           aria-haspopup="menu"
-          aria-expanded={String(false)}
+          aria-expanded={false}
           aria-controls="web-menu"
           onclick={(e) => {
             e.stopPropagation();
@@ -61,13 +74,13 @@
           <button
             type="button"
             data-layout-btn="timeline"
-            aria-pressed={String(layout === 'timeline')}
+            aria-pressed={layout === 'timeline'}
             onclick={() => onLayoutChange('timeline')}>{t('index.layoutTimeline')}</button
           >
           <button
             type="button"
             data-layout-btn="projects"
-            aria-pressed={String(layout === 'projects')}
+            aria-pressed={layout === 'projects'}
             onclick={() => onLayoutChange('projects')}>{t('index.layoutProjects')}</button
           >
         </div>

@@ -1,7 +1,24 @@
-<script>
+<script lang="ts">
   import { icon, ArrowLeft } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { sessionsCountLabel } from '../../index/sessions.js';
+  import type { Project } from '../../lib/schema';
+
+  type MaybePromise = void | Promise<void>;
+
+  interface Props {
+    open?: boolean;
+    projects?: ReadonlyArray<Project>;
+    filterEnabled?: boolean;
+    error?: string;
+    busy?: boolean;
+    onClose?: () => void;
+    onToggleProject?: (path: string, enabled: boolean) => MaybePromise;
+    onToggleAll?: (enabled: boolean) => MaybePromise;
+    onToggleFilter?: (enabled: boolean) => MaybePromise;
+    onRegister?: (path: string) => MaybePromise;
+    onRemove?: (path: string) => MaybePromise;
+  }
 
   let {
     open = false,
@@ -15,7 +32,7 @@
     onToggleFilter = async () => {},
     onRegister = async () => {},
     onRemove = async () => {},
-  } = $props();
+  }: Props = $props();
 
   let query = $state('');
   let addPath = $state('');

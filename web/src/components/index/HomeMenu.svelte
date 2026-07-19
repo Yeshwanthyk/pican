@@ -1,17 +1,24 @@
-<script>
+<script lang="ts">
   import { t } from '../../shared/strings.js';
   import { icon, SquarePen, FolderGit2, Settings, Tag } from '../../shared/icons.js';
   import { openVersionModal } from '../../shared/version.js';
   import { handleNavClick } from '../../shared/navigation.js';
+
+  interface Props {
+    open?: boolean;
+    onClose?: () => void;
+    onNewSession?: () => void;
+    onManageProjects?: () => void;
+  }
 
   let {
     open = false,
     onClose = () => {},
     onNewSession = () => {},
     onManageProjects = () => {},
-  } = $props();
+  }: Props = $props();
 
-  function handleBackdropClick(e) {
+  function handleBackdropClick(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
     onClose();
   }

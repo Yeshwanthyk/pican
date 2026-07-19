@@ -1,9 +1,12 @@
+import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import SessionCard from "./SessionCard.svelte";
+import { normalizeSession } from "../../index/sessions.js";
+import type { NormalizedSession } from "../../index/sessions.js";
 
-function session(overrides = {}) {
-  return {
+function session(overrides: Partial<NormalizedSession> = {}): NormalizedSession {
+  return normalizeSession({
     id: "session.jsonl",
     name: "Session",
     project: "/repo",
@@ -13,7 +16,7 @@ function session(overrides = {}) {
     modelProvider: "provider",
     runtime: "pi",
     ...overrides,
-  };
+  });
 }
 
 describe("SessionCard runtime badge", () => {
@@ -27,7 +30,9 @@ describe("SessionCard runtime badge", () => {
       "/codex-icon.svg",
     );
     expect(container.querySelector(".session-card-mark")).not.toBeInTheDocument();
-    expect(container.querySelector(".session-card").dataset.search).toContain("codex thread-1");
+    const card = container.querySelector<HTMLElement>(".session-card");
+    expect(card).not.toBeNull();
+    expect(card?.dataset.search).toContain("codex thread-1");
   });
 
   it("preserves the legacy Pi card treatment by default", () => {
@@ -36,6 +41,8 @@ describe("SessionCard runtime badge", () => {
     });
     expect(screen.queryByText("Codex")).not.toBeInTheDocument();
     expect(container.querySelector(".session-card-mark")).toHaveAttribute("src", "/pi-icon.svg");
-    expect(container.querySelector(".session-card").dataset.search).toContain("pi");
+    const card = container.querySelector<HTMLElement>(".session-card");
+    expect(card).not.toBeNull();
+    expect(card?.dataset.search).toContain("pi");
   });
 });

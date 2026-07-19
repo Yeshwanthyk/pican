@@ -99,21 +99,21 @@ func TestStaticExportKeepsInlineSessionRenderer(t *testing.T) {
 }
 
 func TestIndexSourceReferencesAPINewSession(t *testing.T) {
-	data, err := os.ReadFile(repoPath("web/src/index/sessions.js"))
+	data, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/index/sessions.js: %v", err)
+		t.Fatalf("read web/src/index/sessions.ts: %v", err)
 	}
 	if !strings.Contains(string(data), "/api/new-session") {
-		t.Fatal("web/src/index/sessions.js missing /api/new-session reference")
+		t.Fatal("web/src/index/sessions.ts missing /api/new-session reference")
 	}
 }
 
 func TestIndexSourceReferencesAPIRecentLocations(t *testing.T) {
-	data, err := os.ReadFile(repoPath("web/src/index/sessions.js"))
+	data, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/index/sessions.js: %v", err)
+		t.Fatalf("read web/src/index/sessions.ts: %v", err)
 	}
-	if !strings.Contains(string(data), "/api/recent-locations") {
-		t.Fatal("web/src/index/sessions.js missing /api/recent-locations reference")
+	if !strings.Contains(string(data), "effects.sessions.recentLocations") {
+		t.Fatal("web/src/index/sessions.ts missing recent-locations Effect reference")
 	}
 }
