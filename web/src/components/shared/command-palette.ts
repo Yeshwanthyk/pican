@@ -19,6 +19,8 @@ export interface PaletteSession {
   readonly meta: string;
   readonly href: string;
   readonly searchText: string;
+  readonly pinned: boolean;
+  readonly pinOrder: number;
   readonly [key: string]: unknown;
 }
 
@@ -30,6 +32,15 @@ const stringField = (session: PaletteSessionInput, ...keys: ReadonlyArray<string
     if (typeof value === "string" && value) return value;
   }
   return "";
+};
+const booleanField = (session: PaletteSessionInput, ...keys: ReadonlyArray<string>): boolean =>
+  keys.some((key) => session[key] === true);
+const numberField = (session: PaletteSessionInput, ...keys: ReadonlyArray<string>): number => {
+  for (const key of keys) {
+    const value = session[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return 0;
 };
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -52,6 +63,8 @@ export function normalizePaletteSession(session: PaletteSessionInput): PaletteSe
     title,
     meta,
     href,
+    pinned: booleanField(session, "pinned", "Pinned"),
+    pinOrder: numberField(session, "pinOrder", "PinOrder"),
     searchText: (
       explicitSearch ||
       [title, id, meta, project, model, provider, runtime, nativeId].filter(Boolean).join(" ")
@@ -133,4 +146,21 @@ export function filterPaletteSessions(
   if (!query) return sessions;
   const normalized = query.toLowerCase();
   return sessions.filter((session) => session.searchText.includes(normalized));
+}
+
+export function prioritizePinnedPaletteSessions(
+  sessions: ReadonlyArray<PaletteSession>,
+): ReadonlyArray<PaletteSession> {
+  return sessions
+    .map((session, index) => ({ session, index }))
+    .sort((a, b) => {
+      if (a.session.pinned !== b.session.pinned) return a.session.pinned ? -1 : 1;
+      if (a.session.pinned && b.session.pinned) {
+        const aOrder = a.session.pinOrder || Number.MAX_SAFE_INTEGER;
+        const bOrder = b.session.pinOrder || Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+      }
+      return a.index - b.index;
+    })
+    .map(({ session }) => session);
 }

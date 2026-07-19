@@ -8,6 +8,7 @@
     fetchPaletteSessions,
     filterPaletteSessions,
     normalizePaletteSession,
+    prioritizePinnedPaletteSessions,
   } from './command-palette';
   import type { PaletteSessionInput } from './command-palette';
   import type { FetchLike } from '../../lib/http';
@@ -60,7 +61,9 @@
   let loadGeneration = 0;
 
   const effectiveFetch = $derived(fetchImpl || window.fetch.bind(window));
-  const visibleSessions = $derived(filterPaletteSessions(allSessions, query).slice(0, limit));
+  const visibleSessions = $derived(
+    prioritizePinnedPaletteSessions(filterPaletteSessions(allSessions, query)).slice(0, limit),
+  );
 
   function go(url: string) {
     if (!url) return;
