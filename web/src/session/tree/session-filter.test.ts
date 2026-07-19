@@ -62,9 +62,9 @@ describe("session filter helpers", () => {
     expect(entries[0] ? getSearchableText(entries[0], "Greeting") : "").toContain(
       "greeting user hello world",
     );
-    expect(getSearchableText({ id: "summary", type: "branch_summary", summary: "summary text" })).toContain(
-      "branch summary summary text",
-    );
+    expect(
+      getSearchableText({ id: "summary", type: "branch_summary", summary: "summary text" }),
+    ).toContain("branch summary summary text");
   });
 
   it("applies default filter and hides assistant tool-only messages", () => {

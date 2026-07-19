@@ -1,4 +1,4 @@
-<script module>
+<script module lang="ts">
   import { t } from '../../shared/strings.js';
   import { runChatComposer } from './chat/chat-composer-runtime.js';
   // runChatComposer is the live-only DOM/runtime glue (used by onMount below).
@@ -7,8 +7,16 @@
   export { runChatComposer };
 </script>
 
-<script>
+<script lang="ts">
+  import { Schema } from 'effect';
   import { onMount } from 'svelte';
+  import * as Http from '../../lib/http.js';
+  import { runPromise } from '../../lib/runtime.js';
+  import {
+    isUnknownRecord,
+    sessionEntryFromUnknown,
+    type SessionEntry,
+  } from '../../session/data/session-types.js';
   import { escapeHtml } from '../../session/render/session-format.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import * as chatApi from '../../session/chat/chat-api.js';
@@ -23,7 +31,7 @@
   import { ChatToolbarState } from './chat/chat-toolbar-state.svelte.js';
   import { QueueStore } from './chat/queue-store.svelte.js';
   import { createQueueApi } from './chat/queue-api.js';
-  import { reducePendingExtensionUI } from './chat/extension-ui-state.js';
+  import { reducePendingExtensionUI, type ExtensionRequest } from './chat/extension-ui-state.js';
   import { showToast } from '../../shared/toast.js';
 
   let {
@@ -32,7 +40,29 @@
     chatDisabledReason = '',
     cwd = '',
     modelLabel = '',
+  }: {
+    sessionId?: string;
+    chatAvailable?: boolean;
+    chatDisabledReason?: string;
+    cwd?: string;
+    modelLabel?: string;
   } = $props();
+
+  const ExtensionRequestSchema = Schema.Struct({
+    id: Schema.String,
+    method: Schema.optionalKey(Schema.Literals(['select', 'confirm', 'input', 'editor'])),
+    title: Schema.optionalKey(Schema.String),
+    message: Schema.optionalKey(Schema.String),
+    options: Schema.optionalKey(Schema.Array(Schema.String)),
+    placeholder: Schema.optionalKey(Schema.String),
+    prefill: Schema.optionalKey(Schema.String),
+    timeout: Schema.optionalKey(Schema.Number),
+    _receivedAt: Schema.optionalKey(Schema.Number),
+  });
+  const PendingExtensionResponse = Schema.Struct({
+    requests: Schema.optionalKey(Schema.Array(ExtensionRequestSchema)),
+  });
+  const isExtensionRequest = Schema.is(ExtensionRequestSchema);
 
   // Reactive toolbar state owned here so the live runtime can mutate it while
   // <ChatToolbar> renders from it.
@@ -50,10 +80,10 @@
         })
       : null)();
   const queueStore = new QueueStore({ api: queueApi });
-  let pendingExtensionUI = $state([]);
-  const resolvedExtensionUI = [];
+  let pendingExtensionUI = $state<ExtensionRequest[]>([]);
+  const resolvedExtensionUI: string[] = [];
 
-  function resolveExtensionUI(id) {
+  function resolveExtensionUI(id: string): void {
     if (id && !resolvedExtensionUI.includes(id)) resolvedExtensionUI.push(id);
     pendingExtensionUI = reducePendingExtensionUI(pendingExtensionUI, { type: 'resolve', id });
   }
@@ -65,23 +95,30 @@
   onMount(() => {
     const target = window;
     const runtime = getSessionRuntime();
-    const model = runtime.model;
-    globalThis.__PI_TEST_CHAT_COMPOSER_HOOK__?.();
+    const model = isUnknownRecord(runtime.model) ? runtime.model : null;
+    const entries: SessionEntry[] = Array.isArray(model?.entries)
+      ? model.entries.flatMap((entry) => {
+          const parsed = sessionEntryFromUnknown(entry);
+          return parsed ? [parsed] : [];
+        })
+      : [];
+    const testHook = Reflect.get(globalThis, '__PI_TEST_CHAT_COMPOSER_HOOK__');
+    if (typeof testHook === 'function') testHook();
     const composerRuntime = runChatComposer({
       documentImpl: document,
       windowImpl: target,
       locationImpl: target.location,
-      localEntries: model?.entries || [],
+      localEntries: entries,
       sessionId,
-      leafId: model?.leafId || '',
-      urlTargetId: model?.urlTargetId || '',
-      byId: model?.byId || new Map(),
+      leafId: typeof model?.leafId === 'string' ? model.leafId : '',
+      urlTargetId: typeof model?.urlTargetId === 'string' ? model.urlTargetId : '',
+      byId: new Map(entries.flatMap((entry) => (entry.id ? [[entry.id, entry]] : []))),
       // Live getter: steer-queue uses this on every pi-session-reload to look
       // for a matching user entry and clear the corresponding steer chip once
       // pi has folded the steer into the conversation.
-      getLiveEntries: () => (model ? model.entries : []),
-      navigateTo: runtime.navigateTo,
-      escapeHtml: (text) => escapeHtml(text, { documentImpl: document }),
+      getLiveEntries: () => entries,
+      navigateTo: runtime.navigateTo ?? undefined,
+      escapeHtml: (text: unknown) => escapeHtml(text, { documentImpl: document }),
       chatApi,
       FormDataImpl: target.FormData,
       URLSearchParamsImpl: target.URLSearchParams,
@@ -97,34 +134,56 @@
     // immediately. The EventSource is shared with <LiveReload> — both attach
     // their own listeners.
     void queueStore.refresh?.();
-    const onQueueEvent = () => queueStore.refresh?.();
-    const onExtensionRequest = (event) => {
-      if (resolvedExtensionUI.includes(event.detail?.id)) return;
+    const onQueueEvent = (): void => {
+      void queueStore.refresh?.();
+    };
+    const onExtensionRequest = (event: Event): void => {
+      if (!(event instanceof CustomEvent) || !isExtensionRequest(event.detail)) return;
+      if (resolvedExtensionUI.includes(event.detail.id)) return;
       pendingExtensionUI = reducePendingExtensionUI(pendingExtensionUI, {
         type: 'add',
         request: event.detail,
       });
     };
-    const onExtensionResolved = (event) => resolveExtensionUI(event.detail?.id);
-    const onExtensionNotify = (event) => {
-      const notification = event.detail || {};
-      showToast(notification.message || t('extensionUi.notification'), {
-        id: 'extension-notify',
-        duration: 6000,
-        title: notification.type || '',
-      });
+    const onExtensionResolved = (event: Event): void => {
+      if (
+        event instanceof CustomEvent &&
+        isUnknownRecord(event.detail) &&
+        typeof event.detail.id === 'string'
+      )
+        resolveExtensionUI(event.detail.id);
+    };
+    const onExtensionNotify = (event: Event): void => {
+      const notification =
+        event instanceof CustomEvent && isUnknownRecord(event.detail) ? event.detail : {};
+      showToast(
+        typeof notification.message === 'string'
+          ? notification.message
+          : t('extensionUi.notification'),
+        {
+          id: 'extension-notify',
+          duration: 6000,
+          title: typeof notification.type === 'string' ? notification.type : '',
+        },
+      );
     };
     target.addEventListener('pi-queue-event', onQueueEvent);
     target.addEventListener('pi-extension-ui-request', onExtensionRequest);
     target.addEventListener('pi-extension-ui-resolved', onExtensionResolved);
     target.addEventListener('pi-extension-notify', onExtensionNotify);
-    void target
-      .fetch('/api/extension-ui/pending?session=' + encodeURIComponent(sessionId))
-      .then((response) => (response.ok ? response.json() : { requests: [] }))
-      .then((data) => {
-        for (const request of data.requests || []) onExtensionRequest({ detail: request });
-      })
-      .catch(() => {});
+    void runPromise(
+      Http.get(
+        '/api/extension-ui/pending?session=' + encodeURIComponent(sessionId),
+        PendingExtensionResponse,
+      ),
+    ).then(
+      (data) => {
+        for (const request of data.requests ?? []) {
+          onExtensionRequest(new CustomEvent('pi-extension-ui-request', { detail: request }));
+        }
+      },
+      () => undefined,
+    );
     return () => {
       composerRuntime?.dispose?.();
       target.removeEventListener('pi-queue-event', onQueueEvent);
@@ -176,7 +235,7 @@
     <div id="pi-chat-attachments" class="pi-chat-attachments"></div>
     <ChatSelectorPopups />
     <ChatToolbar {chatAvailable} {toolbar} {modelLabel} />
-    <ContextUsage popover />
+    <ContextUsage popover={true} />
   </div>
   <TextAttachmentModal />
   <GitFooter {sessionId} />

@@ -1,7 +1,7 @@
-import { Effect, Schema } from 'effect';
-import { AbortError, NetworkError } from '../../lib/errors';
-import type { FetchLike } from '../../lib/http';
-import { runPromise } from '../../lib/runtime';
+import { Effect, Schema } from "effect";
+import { AbortError, NetworkError } from "../../lib/errors";
+import type { FetchLike } from "../../lib/http";
+import { runPromise } from "../../lib/runtime";
 
 interface FetchOptions {
   readonly fetchImpl?: FetchLike;
@@ -30,18 +30,18 @@ const request = (
         resume(new AbortError());
         return;
       }
-      requestSignal?.addEventListener('abort', abort, { once: true });
-      signal?.addEventListener('abort', abort, { once: true });
-      effectSignal.addEventListener('abort', abort, { once: true });
+      requestSignal?.addEventListener("abort", abort, { once: true });
+      signal?.addEventListener("abort", abort, { once: true });
+      effectSignal.addEventListener("abort", abort, { once: true });
       const response = init === undefined ? fetchImpl(url) : fetchImpl(url, init);
       response.then(
         (response) => resume(Effect.succeed(response)),
         (cause) => resume(requestSignal?.aborted ? new AbortError() : new NetworkError({ cause })),
       );
       return Effect.sync(() => {
-        requestSignal?.removeEventListener('abort', abort);
-        signal?.removeEventListener('abort', abort);
-        effectSignal.removeEventListener('abort', abort);
+        requestSignal?.removeEventListener("abort", abort);
+        signal?.removeEventListener("abort", abort);
+        effectSignal.removeEventListener("abort", abort);
       });
     }),
   );
@@ -52,8 +52,8 @@ const requestJson = (url: string, value: unknown, options: FetchOptions): Promis
       Effect.flatMap((body) =>
         Effect.callback<Response, NetworkError>((resume) => {
           (options.fetchImpl ?? globalThis.fetch)(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body,
           }).then(
             (response) => resume(Effect.succeed(response)),
@@ -69,7 +69,7 @@ export function chatUrl(path: string, sessionId: string): string {
 }
 
 export function cancelChat(sessionId: string, options: FetchOptions = {}): Promise<Response> {
-  return request(chatUrl('/api/chat/cancel', sessionId), { method: 'POST' }, options);
+  return request(chatUrl("/api/chat/cancel", sessionId), { method: "POST" }, options);
 }
 
 export function sendChat(
@@ -77,15 +77,15 @@ export function sendChat(
   body: BodyInit | null,
   options: FetchOptions = {},
 ): Promise<Response> {
-  return request(chatUrl('/api/chat', sessionId), { method: 'POST', body }, options);
+  return request(chatUrl("/api/chat", sessionId), { method: "POST", body }, options);
 }
 
 export function getWorkerStatus(sessionId: string, options: FetchOptions = {}): Promise<Response> {
-  return request(chatUrl('/api/worker-status', sessionId), undefined, options);
+  return request(chatUrl("/api/worker-status", sessionId), undefined, options);
 }
 
-export function listModels(sessionId = '', options: FetchOptions = {}): Promise<Response> {
-  return request(sessionId ? chatUrl('/api/models', sessionId) : '/api/models', undefined, options);
+export function listModels(sessionId = "", options: FetchOptions = {}): Promise<Response> {
+  return request(sessionId ? chatUrl("/api/models", sessionId) : "/api/models", undefined, options);
 }
 
 export function getCommands(
@@ -93,7 +93,7 @@ export function getCommands(
   { load = false }: { readonly load?: boolean } = {},
   options: FetchOptions = {},
 ): Promise<Response> {
-  const url = chatUrl('/api/commands', sessionId) + (load ? '&load=1' : '');
+  const url = chatUrl("/api/commands", sessionId) + (load ? "&load=1" : "");
   return request(url, options.signal ? { signal: options.signal } : undefined, options);
 }
 
@@ -102,7 +102,7 @@ export function getFiles(
   query: string,
   options: FetchOptions = {},
 ): Promise<Response> {
-  const url = chatUrl('/api/files', sessionId) + '&q=' + encodeURIComponent(query || '');
+  const url = chatUrl("/api/files", sessionId) + "&q=" + encodeURIComponent(query || "");
   return request(url, { signal: options.signal }, options);
 }
 
@@ -111,7 +111,7 @@ export function setModel(
   { provider, modelId }: ModelSelection,
   options: FetchOptions = {},
 ): Promise<Response> {
-  return requestJson(chatUrl('/api/set-model', sessionId), { provider, modelId }, options);
+  return requestJson(chatUrl("/api/set-model", sessionId), { provider, modelId }, options);
 }
 
 export function setThinkingLevel(
@@ -119,5 +119,5 @@ export function setThinkingLevel(
   level: string,
   options: FetchOptions = {},
 ): Promise<Response> {
-  return requestJson(chatUrl('/api/set-thinking-level', sessionId), { level }, options);
+  return requestJson(chatUrl("/api/set-thinking-level", sessionId), { level }, options);
 }

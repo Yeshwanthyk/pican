@@ -20,11 +20,11 @@ export function getSearchableText(entry: TreeEntry, label?: string): string {
   if (label) parts.push(label);
 
   if (entry.type === "message") {
-      const msg = entry.message;
-      if (!msg) return parts.join(" ").toLowerCase();
-      if (msg.role) parts.push(msg.role);
-      if (msg.content) parts.push(extractContent(msg.content));
-      if (msg.role === "bashExecution" && msg.command) parts.push(msg.command);
+    const msg = entry.message;
+    if (!msg) return parts.join(" ").toLowerCase();
+    if (msg.role) parts.push(msg.role);
+    if (msg.content) parts.push(extractContent(msg.content));
+    if (msg.role === "bashExecution" && msg.command) parts.push(msg.command);
   } else if (entry.type === "custom_message") {
     if (entry.customType) parts.push(entry.customType);
     parts.push(typeof entry.content === "string" ? entry.content : extractContent(entry.content));
@@ -141,7 +141,10 @@ export function recalculateVisualStructure(
 export function filterNodes(
   flatNodes: FlatTreeNode[],
   currentLeafId: string,
-  { filterMode = "default", searchQuery = "" }: {
+  {
+    filterMode = "default",
+    searchQuery = "",
+  }: {
     readonly filterMode?: "default" | "user-only" | "no-tools" | "labeled-only" | "all";
     readonly searchQuery?: string;
   } = {},
@@ -168,8 +171,7 @@ export function filterNodes(
       filterMode === "user-only"
         ? entry.type === "message" && entry.message?.role === "user"
         : filterMode === "no-tools"
-          ? !isSettingsEntry &&
-            !(entry.type === "message" && entry.message?.role === "toolResult")
+          ? !isSettingsEntry && !(entry.type === "message" && entry.message?.role === "toolResult")
           : filterMode === "labeled-only"
             ? label !== undefined
             : filterMode === "all"

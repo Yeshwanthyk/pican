@@ -111,7 +111,10 @@ export function loadToggleState({
 
 export function saveToggleState(
   state: ToggleState,
-  { sessionId = "", storage = globalThis.localStorage }: {
+  {
+    sessionId = "",
+    storage = globalThis.localStorage,
+  }: {
     readonly sessionId?: string;
     readonly storage?: ToggleStorage;
   } = {},
@@ -126,7 +129,10 @@ export function saveToggleState(
   saveStored(TOGGLE_STATE_STORAGE_KEY, map, storage);
 }
 
-export function applyToggleStateToNode(node: ParentNode | null | undefined, state: ToggleState): void {
+export function applyToggleStateToNode(
+  node: ParentNode | null | undefined,
+  state: ToggleState,
+): void {
   if (!node) return;
   node.querySelectorAll<HTMLElement>(".thinking-text").forEach((el) => {
     el.style.display = state.thinkingExpanded ? "" : "none";
@@ -155,9 +161,18 @@ export function applyToggleStateToNode(node: ParentNode | null | undefined, stat
 
 export function syncToggleButtons(documentImpl: Document, state: ToggleState): void {
   const buttons: ReadonlyArray<readonly [HTMLButtonElement | null, boolean]> = [
-    [documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-thinking"]'), state.thinkingExpanded],
-    [documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-tools"]'), state.toolsVisible],
-    [documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-tool-output"]'), state.toolOutputsExpanded],
+    [
+      documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-thinking"]'),
+      state.thinkingExpanded,
+    ],
+    [
+      documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-tools"]'),
+      state.toolsVisible,
+    ],
+    [
+      documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-tool-output"]'),
+      state.toolOutputsExpanded,
+    ],
   ];
   buttons.forEach(([btn, isActive]) => {
     if (!btn) return;
@@ -169,7 +184,9 @@ export function syncToggleButtons(documentImpl: Document, state: ToggleState): v
   // already display:none. Disable it (and its keyboard shortcut, see
   // createToggleController.toggleToolOutputs) so the control doesn't claim to
   // do something it can't until tools are turned back on.
-  const toolOutputBtn = documentImpl.querySelector<HTMLButtonElement>('[data-action="toggle-tool-output"]');
+  const toolOutputBtn = documentImpl.querySelector<HTMLButtonElement>(
+    '[data-action="toggle-tool-output"]',
+  );
   if (toolOutputBtn) {
     toolOutputBtn.disabled = !state.toolsVisible;
   }

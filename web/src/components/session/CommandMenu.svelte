@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   // Session actions menu — Svelte port of live/command-menu.js. Renders the
   // desktop popover + mobile panel (+ the session-list <CommandPalette>) and, in
   // onMount, wires open/close + the action dispatch. Several actions delegate to
   // shared live runtime helpers or click hidden relay buttons (share/new/terminal).
   import { onMount } from 'svelte';
+  import type { IconNode } from 'lucide';
   import CommandPalette from '../shared/CommandPalette.svelte';
   import { t } from '../../shared/strings.js';
   import {
@@ -42,7 +43,31 @@
     renameSession,
   } from '../../session/session-menu-actions.js';
 
-  let { sessionId = '', cwd = '' } = $props();
+  let { sessionId = '', cwd = '' }: { sessionId?: string; cwd?: string } = $props();
+
+  interface MenuLabelItem {
+    readonly icon: IconNode;
+    readonly label: string;
+  }
+
+  interface PrimaryItem extends MenuLabelItem {
+    readonly action: string;
+    readonly kbd?: string;
+  }
+
+  type FooterItem =
+    | (MenuLabelItem & {
+        readonly kind: 'link';
+        readonly href: string;
+        readonly kbd?: string;
+        readonly external?: boolean;
+        readonly desktopOnly?: boolean;
+      })
+    | (MenuLabelItem & {
+        readonly kind: 'version';
+        readonly action: string;
+        readonly desktopOnly?: boolean;
+      });
 
   // Close animations must outlast the matching CSS transitions before the panel
   // is display:none'd (see command-menu styles).
@@ -51,7 +76,7 @@
 
   // Primary actions shared by the desktop popover and mobile panel. kbd hints
   // render on desktop only.
-  const primaryItems = [
+  const primaryItems: readonly PrimaryItem[] = [
     { action: 'list-sessions', icon: Search, label: 'menu.searchSessions', kbd: '⌘K' },
     { action: 'rename', icon: Pencil, label: 'menu.rename' },
     { action: 'share', icon: Share2, label: 'menu.share' },
@@ -67,15 +92,17 @@
   ];
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
-  const footerItems = [
+  const footerItems: readonly FooterItem[] = [
     { kind: 'link', href: '/settings', icon: Settings, label: 'common.settings', kbd: '⌘,' },
     { kind: 'version', action: 'version', icon: Tag, label: 'common.version', desktopOnly: true },
   ];
 
-  const toast = (message) => showToast(message, { id: 'command-menu-toast' });
+  const toast = (message: string): void => {
+    showToast(message, { id: 'command-menu-toast' });
+  };
 
-  const clickHidden = (id) => document.getElementById(id)?.click();
-  const isMobile = () => sidebarApi.isMobileLayout();
+  const clickHidden = (id: string): void => document.getElementById(id)?.click();
+  const isMobile = (): boolean => sidebarApi.isMobileLayout();
 
   onMount(() => {
     const menuBtn = document.getElementById('command-menu-btn');
@@ -86,7 +113,7 @@
 
     let open = false;
 
-    const openMobilePanel = () => {
+    const openMobilePanel = (): void => {
       if (!mobileBackdrop || !mobilePanel) return;
       mobileBackdrop.style.display = '';
       mobilePanel.style.display = '';
@@ -95,7 +122,7 @@
         mobilePanel.classList.add('open');
       });
     };
-    const closeMobilePanel = () => {
+    const closeMobilePanel = (): void => {
       if (!mobileBackdrop || !mobilePanel) return;
       mobileBackdrop.classList.remove('open');
       mobilePanel.classList.remove('open');
@@ -106,12 +133,12 @@
         }
       }, MOBILE_PANEL_CLOSE_MS);
     };
-    const openDesktopPopover = () => {
+    const openDesktopPopover = (): void => {
       if (!desktopPopover) return;
       desktopPopover.style.display = '';
       requestAnimationFrame(() => desktopPopover.classList.add('open'));
     };
-    const closeDesktopPopover = () => {
+    const closeDesktopPopover = (): void => {
       if (!desktopPopover) return;
       desktopPopover.classList.remove('open');
       setTimeout(() => {
@@ -119,20 +146,20 @@
       }, DESKTOP_POPOVER_CLOSE_MS);
     };
 
-    const openMenu = () => {
+    const openMenu = (): void => {
       open = true;
       menuBtn.setAttribute('aria-expanded', 'true');
       if (isMobile()) openMobilePanel();
       else openDesktopPopover();
     };
-    const closeMenu = () => {
+    const closeMenu = (): void => {
       open = false;
       menuBtn.setAttribute('aria-expanded', 'false');
       closeMobilePanel();
       closeDesktopPopover();
     };
 
-    function handleAction(action) {
+    function handleAction(action: string): void {
       switch (action) {
         case 'share':
           clickHidden('share-btn');
@@ -164,40 +191,50 @@
           const trimmed = next ? next.trim() : '';
           closeMenu();
           if (!trimmed || trimmed === current) break;
-          renameSession(sessionId, trimmed)
-            .then((data) => {
-              setSessionTitle((data && data.name) || trimmed);
+          void renameSession(sessionId, trimmed).then(
+            (data) => {
+              setSessionTitle(typeof data.name === 'string' ? data.name : trimmed);
               toast(t('menu.renamed'));
-            })
-            .catch(() => toast(t('git.renameFailed')));
+            },
+            () => toast(t('git.renameFailed')),
+          );
           break;
         }
         case 'fork': {
           closeMenu();
-          loadForkEntries(sessionId)
-            .then((entries) => {
-              const onSelect = (entryId) => {
-                forkSession(sessionId, entryId)
-                  .then((data) => {
-                    if (data.id) navigate('/session?id=' + encodeURIComponent(data.id));
-                    else toast(data.error || t('menu.forkFailed'));
-                  })
-                  .catch(() => toast(t('menu.forkFailed')));
+          void loadForkEntries(sessionId).then(
+            (entries) => {
+              const onSelect = (entryId: string): void => {
+                void forkSession(sessionId, entryId).then(
+                  (data) => {
+                    if (typeof data.id === 'string') {
+                      navigate('/session?id=' + encodeURIComponent(data.id));
+                    } else {
+                      toast(typeof data.error === 'string' ? data.error : t('menu.forkFailed'));
+                    }
+                  },
+                  () => toast(t('menu.forkFailed')),
+                );
               };
-              const opened = openFork({ entries, onSelect });
+              const opened = openFork({ entries: [...entries], onSelect });
               if (opened === false) toast(t('menu.noUserMessagesToFork'));
-            })
-            .catch(() => toast(t('menu.loadMessagesFailed')));
+            },
+            () => toast(t('menu.loadMessagesFailed')),
+          );
           break;
         }
         case 'clone': {
           closeMenu();
-          cloneSession(sessionId)
-            .then((data) => {
-              if (data.id) navigate('/session?id=' + encodeURIComponent(data.id));
-              else toast(data.error || t('menu.cloneFailed'));
-            })
-            .catch(() => toast(t('menu.cloneFailed')));
+          void cloneSession(sessionId).then(
+            (data) => {
+              if (typeof data.id === 'string') {
+                navigate('/session?id=' + encodeURIComponent(data.id));
+              } else {
+                toast(typeof data.error === 'string' ? data.error : t('menu.cloneFailed'));
+              }
+            },
+            () => toast(t('menu.cloneFailed')),
+          );
           break;
         }
         case 'version':
@@ -230,30 +267,33 @@
       }
     }
 
-    const onMenuBtnClick = (e) => {
+    const onMenuBtnClick = (e: MouseEvent): void => {
       e.stopPropagation();
       if (open) closeMenu();
       else openMenu();
     };
-    const onDocClick = (e) => {
+    const onDocClick = (e: MouseEvent): void => {
       if (!open) return;
-      if (desktopPopover && desktopPopover.contains(e.target)) return;
-      if (menuBtn.contains(e.target)) return;
+      if (e.target instanceof Node && desktopPopover?.contains(e.target)) return;
+      if (e.target instanceof Node && menuBtn.contains(e.target)) return;
       closeMenu();
     };
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && open) {
         e.preventDefault();
         e.stopPropagation();
         closeMenu();
       }
     };
-    const onContainerClick = (e) => {
+    const onContainerClick = (e: MouseEvent): void => {
+      if (!(e.target instanceof Element)) return;
       const item =
         e.target.closest('.mobile-command-item') || e.target.closest('.command-menu-item');
-      if (item?.dataset.action) handleAction(item.dataset.action);
+      if (item instanceof HTMLElement && item.dataset.action) handleAction(item.dataset.action);
     };
-    const containers = [mobilePanel, desktopPopover].filter(Boolean);
+    const containers = [mobilePanel, desktopPopover].filter(
+      (container): container is HTMLElement => container instanceof HTMLElement,
+    );
 
     menuBtn.addEventListener('click', onMenuBtnClick);
     mobileBackdrop?.addEventListener('click', closeMenu);
@@ -273,11 +313,11 @@
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
 
-{#snippet label(item)}
+{#snippet label(item: MenuLabelItem)}
   <span class="menu-item-label">{@html icon(item.icon, { size: 15 })}{t(item.label)}</span>
 {/snippet}
 
-{#snippet menuBody(itemClass, sectionClass, desktop)}
+{#snippet menuBody(itemClass: string, sectionClass: string, desktop: boolean)}
   <div class={sectionClass}>
     {#each primaryItems as item (item.action)}
       <button class={itemClass} type="button" data-action={item.action}
@@ -309,10 +349,6 @@
               id="command-menu-version-status"
               data-version-status>…</span
             ></button
-          >
-        {:else}
-          <button class={itemClass} type="button" data-action={item.action}
-            >{@render label(item)}</button
           >
         {/if}
       {/if}

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import ChatComposer from './ChatComposer.svelte';
   import LiveReload from './LiveReload.svelte';
   import CommandMenu from './CommandMenu.svelte';

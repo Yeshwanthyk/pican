@@ -289,7 +289,10 @@ function indexToolResults(entries: ReadonlyArray<SessionEntry>): Map<string, Too
 }
 
 /** A tool call counts as "applied" only once its result lands without error. */
-function toolSucceeded(callId: string | undefined, results: ReadonlyMap<string, ToolResult>): boolean {
+function toolSucceeded(
+  callId: string | undefined,
+  results: ReadonlyMap<string, ToolResult>,
+): boolean {
   if (!callId) return false;
   const r = results.get(callId);
   return !!r && r.isError !== true;

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // One row in the session tree sidebar. Pure presentational + live-safe (no
   // SSE/fetch/live-only imports) so it can be used by BOTH the live app and the
   // static export. Keeps the established tree-node markup so existing CSS and
@@ -10,15 +10,31 @@
   //     <span class="tree-content">…html…</span>
   //   </div>
   //
-  let { id, prefix = '', displayHtml = '', onPath = false, active = false, onnavigate } = $props();
+  interface Props {
+    readonly id: string;
+    readonly prefix?: string;
+    readonly displayHtml?: string;
+    readonly onPath?: boolean;
+    readonly active?: boolean;
+    readonly onnavigate?: (id: string) => void;
+  }
 
-  function activate() {
+  let {
+    id,
+    prefix = '',
+    displayHtml = '',
+    onPath = false,
+    active = false,
+    onnavigate,
+  }: Props = $props();
+
+  function activate(): void {
     // Ignore clicks that are really the end of a text selection.
-    if (typeof window !== 'undefined' && window.getSelection?.().toString()) return;
+    if (typeof window !== 'undefined' && window.getSelection?.()?.toString()) return;
     onnavigate?.(id);
   }
 
-  function onKeydown(e) {
+  function onKeydown(e: KeyboardEvent): void {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       activate();

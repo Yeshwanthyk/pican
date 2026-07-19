@@ -25,10 +25,7 @@ function baseDom(): JSDOM {
   return dom;
 }
 
-function setupUi(
-  dom: JSDOM,
-  overrides: Partial<Parameters<typeof setupSessionUi>[0]> = {},
-) {
+function setupUi(dom: JSDOM, overrides: Partial<Parameters<typeof setupSessionUi>[0]> = {}) {
   const markdownApi = {
     configureSessionMarkdown: vi.fn(),
     safeMarkedParse: vi.fn((text) => `<p>${text}</p>`),

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // Live reload (SSE) — drives the streaming chat preview, follow/scroll, stats,
   // and reconciles the shared reactive model when the session JSONL changes. The
   // Svelte <SessionContent> owns #messages and re-renders from the model, so this
@@ -12,8 +12,8 @@
   // events, follow-scroll, stats, and chat-preview all have focused unit tests.
   import { onMount, tick } from 'svelte';
   import { marked } from 'marked';
+  import { Effect, Option, Schema } from 'effect';
   import { escapeHtml } from '../../session/render/session-format.js';
-  import { safeMarkedParse } from '../../session/render/markdown.js';
   import {
     clearChatPreviewState,
     finishChatPreviewState,
@@ -30,43 +30,63 @@
   import { updateStatsDom } from '../../session/live/live-stats.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import { setSessionTitle } from '../../session/session-title.svelte.js';
+  import { SessionDataModel } from '../../session/data/session-data.svelte.js';
+  import type { SessionEntry } from '../../session/data/session-types.js';
+  import type { ChatPreviewState } from '../../session/live/chat-preview.js';
+  import { NetworkError } from '../../lib/errors.js';
+  import { runPromise, runSync } from '../../lib/runtime.js';
+
+  const ChatSentDetailSchema = Schema.Struct({ message: Schema.optional(Schema.Unknown) });
+  const decodeChatSentDetail = Schema.decodeUnknownOption(ChatSentDetailSchema);
 
   onMount(() => {
     const documentImpl = document;
     const windowImpl = window;
     const runtime = getSessionRuntime();
-    const model = runtime.model;
-    const reconcileEntries = runtime.reconcileEntries || (() => {});
-    globalThis.__PI_TEST_LIVE_RELOAD_HOOK__?.();
+    const model = runtime.model instanceof SessionDataModel ? runtime.model : null;
+    const reconcileEntries = (
+      entries: ReadonlyArray<SessionEntry>,
+      options: { readonly isDelta: boolean; readonly replaceExisting: boolean },
+    ): unknown => runtime.reconcileEntries?.(entries, options);
+    const testHook: unknown = Object.getOwnPropertyDescriptor(
+      globalThis,
+      '__PI_TEST_LIVE_RELOAD_HOOK__',
+    )?.value;
+    if (typeof testHook === 'function') testHook();
 
     const fetchImpl = windowImpl.fetch.bind(windowImpl);
     const requestAnimationFrame = windowImpl.requestAnimationFrame.bind(windowImpl);
     const setTimeout = windowImpl.setTimeout.bind(windowImpl);
 
-    const cleanups = [];
-    const on = (host, type, handler, opts) => {
+    const cleanups: Array<() => void> = [];
+    const on = (
+      host: EventTarget,
+      type: string,
+      handler: EventListener,
+      opts?: boolean | AddEventListenerOptions,
+    ): void => {
       host.addEventListener(type, handler, opts);
       cleanups.push(() => host.removeEventListener(type, handler, opts));
     };
 
     // Markdown for the streaming preview — globally-configured (sanitized) marked
     // with an escapeHtml fallback (matches the former live-renderer.renderMarkdown).
-    const renderMarkdown = (text) => {
-      try {
-        return safeMarkedParse(text, { marked });
-      } catch {
-        return escapeHtml(text, { documentImpl });
-      }
-    };
+    const renderMarkdown = (text: string): string =>
+      runSync(
+        Effect.try({
+          try: () => marked.parse(text, { async: false }),
+          catch: () => escapeHtml(text, { documentImpl }),
+        }).pipe(Effect.catch((fallback) => Effect.succeed(fallback))),
+      );
 
     // New-entry highlight (after Svelte renders the reactive path).
-    function highlightNewEntry(node) {
+    function highlightNewEntry(node: HTMLElement): void {
       node.classList.add('new-entry-highlight');
       setTimeout(() => {
         node.classList.remove('new-entry-highlight');
       }, 1500);
     }
-    function highlightNewEntries(newIds) {
+    function highlightNewEntries(newIds: string[]): void {
       requestAnimationFrame(() => {
         newIds.forEach((id) => {
           const el = documentImpl.getElementById('entry-' + id);
@@ -77,8 +97,8 @@
 
     // "seen" set seeded from the model (the DOM may not be flushed yet at startup).
     const LIVE_ENTRY_STATE = {
-      seen: new Set((model?.entries || []).map((e) => e.id).filter(Boolean)),
-      liveRendered: new Set(),
+      seen: new Set<string>((model?.entries || []).map((entry) => entry.id)),
+      liveRendered: new Set<string>(),
     };
 
     // ── Follow mode (auto-scroll + follow-button decisions) ────────────────────
@@ -86,7 +106,6 @@
     // performs the initial scroll-to-bottom; we just dispose it on unmount.
     const followScroll = createFollowScrollController({
       documentImpl,
-      windowImpl,
       requestAnimationFrameImpl: requestAnimationFrame,
       setTimeoutImpl: setTimeout,
     });
@@ -101,28 +120,32 @@
       isAtBottom,
     } = followScroll;
 
-    on(windowImpl, 'pi-chat-message-sent', (event) => {
+    on(windowImpl, 'pi-chat-message-sent', (event: Event) => {
       followScroll.extendPreviewFollow(30000);
-      if (event && event.detail && event.detail.message) {
-        renderPendingChat(event.detail.message);
+      const detail: { readonly message?: unknown } =
+        event instanceof CustomEvent
+          ? Option.getOrElse(decodeChatSentDetail(event.detail), () => ({}))
+          : {};
+      if (detail.message) {
+        renderPendingChat(detail.message);
       } else {
         forceFollowToBottom(true);
       }
     });
 
-    function updateStats(entries) {
+    function updateStats(entries: SessionEntry[]): boolean {
       return updateStatsDom(entries, { documentImpl });
     }
-    function updateTitle(name) {
+    function updateTitle(name: string): void {
       setSessionTitle(name);
     }
 
     const sessId = getSessionIdFromLocation({ locationImpl: windowImpl.location });
 
     // ── Streaming chat preview ─────────────────────────────────────────────────
-    const CHAT_PREVIEW_STATE = { chatPreviewEl: null, pendingUserEl: null };
+    const CHAT_PREVIEW_STATE: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
 
-    function clearChatPreview() {
+    function clearChatPreview(): void {
       const statusEl = documentImpl.getElementById('pi-chat-status');
       const isChatRunning = statusEl && statusEl.classList.contains('running');
       const hasDoneClass =
@@ -131,11 +154,11 @@
       const keepAssistant = !!(isChatRunning && !hasDoneClass);
       return clearChatPreviewState(CHAT_PREVIEW_STATE, { keepAssistant });
     }
-    function finishChatPreview() {
+    function finishChatPreview(): void {
       finishChatPreviewState(CHAT_PREVIEW_STATE);
     }
-    function renderChatPreview(payload) {
-      return renderChatPreviewState(payload, CHAT_PREVIEW_STATE, {
+    function renderChatPreview(payload: unknown): void {
+      renderChatPreviewState(payload, CHAT_PREVIEW_STATE, {
         documentImpl,
         windowImpl,
         renderMarkdown,
@@ -144,7 +167,7 @@
         scrollAfterLayout,
       });
     }
-    function renderPendingChat(message) {
+    function renderPendingChat(message: unknown): boolean {
       return renderPendingChatState(message, CHAT_PREVIEW_STATE, {
         documentImpl,
         windowImpl,
@@ -166,34 +189,40 @@
     const getEntryCount = () => getReloadEntryCount(model);
     let reloadGeneration = 0;
 
-    function triggerReload() {
+    function triggerReload(): void {
       const generation = ++reloadGeneration;
-      return handleSessionReload({
-        sessionId: sessId,
-        fetchImpl,
-        entryState: LIVE_ENTRY_STATE,
-        clearChatPreview,
-        // Reactive mode: the Svelte model owns #messages, so no DOM patchers.
-        updateStats,
-        updateTitle,
-        isFollowing,
-        isAtBottom,
-        scrollAfterLayout,
-        incrementPending,
-        showFollowButton,
-        getEntryCount,
-        shouldApply: () => generation === reloadGeneration,
-        onReloaded: async (data) => {
-          reconcileEntries(data.entries, {
-            isDelta: data.isDelta,
-            replaceExisting: model.header?.runtime === 'codex',
-          });
-          await tick();
-        },
-        onNewEntries: highlightNewEntries,
-      }).catch((err) => {
-        console.error('Live update failed:', err);
-      });
+      void runPromise(
+        Effect.tryPromise({
+          try: () =>
+            handleSessionReload({
+              sessionId: sessId,
+              fetchImpl,
+              entryState: LIVE_ENTRY_STATE,
+              clearChatPreview,
+              // Reactive mode: the Svelte model owns #messages, so no DOM patchers.
+              updateStats,
+              updateTitle,
+              isFollowing,
+              isAtBottom,
+              scrollAfterLayout,
+              incrementPending,
+              showFollowButton,
+              getEntryCount,
+              shouldApply: () => generation === reloadGeneration,
+              onReloaded: async (data) => {
+                reconcileEntries(data.entries, {
+                  isDelta: data.isDelta,
+                  replaceExisting: model?.header.runtime === 'codex',
+                });
+                await tick();
+              },
+              onNewEntries: highlightNewEntries,
+            }),
+          catch: (cause) => new NetworkError({ cause }),
+        }).pipe(
+          Effect.catch((error) => Effect.sync(() => console.error('Live update failed:', error))),
+        ),
+      );
     }
 
     on(windowImpl, 'pi-worker-done', () => {
@@ -205,7 +234,6 @@
 
     const liveConnection = setupSessionLiveConnection({
       documentImpl,
-      windowImpl,
       sessionId: sessId,
       onReload: triggerReload,
       onChatPreview: renderChatPreview,

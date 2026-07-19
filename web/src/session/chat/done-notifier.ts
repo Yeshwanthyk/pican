@@ -100,7 +100,9 @@ const decodeResponse = <A, R>(
 export const DONE_NOTIFY_STORAGE_KEY = "pican:v1:notify-on-done";
 export const DONE_SOUND_STORAGE_KEY = "pican:v1:done-sound";
 
-export function isDoneNotifyEnabled({ storage = globalThis.localStorage }: StorageOptions = {}): boolean {
+export function isDoneNotifyEnabled({
+  storage = globalThis.localStorage,
+}: StorageOptions = {}): boolean {
   return bestEffort(() => storage?.getItem(DONE_NOTIFY_STORAGE_KEY) === "true", false);
 }
 
@@ -111,7 +113,9 @@ export function setDoneNotifyEnabled(
   writeSetting(DONE_NOTIFY_STORAGE_KEY, String(!!enabled), { storage });
 }
 
-export function getSelectedSound({ storage = globalThis.localStorage }: StorageOptions = {}): string {
+export function getSelectedSound({
+  storage = globalThis.localStorage,
+}: StorageOptions = {}): string {
   return bestEffort(() => storage?.getItem(DONE_SOUND_STORAGE_KEY) || "cat.mp3", "cat.mp3");
 }
 
@@ -163,15 +167,15 @@ export function showDoneNotification({
 export function requestNotifyPermission({
   windowImpl = globalThis.window,
 }: WindowOptions = {}): Promise<NotificationPermission> {
-    const N = windowImpl.Notification;
-    if (!N) return Promise.resolve("denied");
-    if (N.permission === "granted" || N.permission === "denied") return Promise.resolve(N.permission);
-    return runPromise(
-      Effect.tryPromise({
-        try: () => N.requestPermission(),
-        catch: (cause) => new NetworkError({ cause }),
-      }).pipe(Effect.catch(() => Effect.succeed("denied" as const))),
-    );
+  const N = windowImpl.Notification;
+  if (!N) return Promise.resolve("denied");
+  if (N.permission === "granted" || N.permission === "denied") return Promise.resolve(N.permission);
+  return runPromise(
+    Effect.tryPromise({
+      try: () => N.requestPermission(),
+      catch: (cause) => new NetworkError({ cause }),
+    }).pipe(Effect.catch(() => Effect.succeed("denied" as const))),
+  );
 }
 
 // Decodes the URL-safe base64 VAPID key the server returns into the
@@ -208,7 +212,10 @@ async function _subscribePush(
             ? Effect.tryPromise({
                 try: () => stale.unsubscribe(),
                 catch: (cause) => new NetworkError({ cause }),
-              }).pipe(Effect.catch(() => Effect.succeed(false)), Effect.andThen(subscribe))
+              }).pipe(
+                Effect.catch(() => Effect.succeed(false)),
+                Effect.andThen(subscribe),
+              )
             : subscribe,
         ),
       ),

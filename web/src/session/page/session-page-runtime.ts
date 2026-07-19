@@ -36,7 +36,11 @@ interface RuntimeModel {
 
 const isRuntimeModel = (value: unknown): value is RuntimeModel => {
   if (!isUnknownRecord(value)) return false;
-  return Array.isArray(value.entries) && value.toolCallMap instanceof Map && value.labelMap instanceof Map;
+  return (
+    Array.isArray(value.entries) &&
+    value.toolCallMap instanceof Map &&
+    value.labelMap instanceof Map
+  );
 };
 
 export function startSessionPageRuntime({

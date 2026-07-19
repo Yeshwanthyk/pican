@@ -172,8 +172,9 @@ describe("toggle state helpers", () => {
     const dom = new JSDOM(
       `<button data-action="toggle-thinking"></button><button data-action="toggle-tools"></button><button data-action="toggle-tool-output"></button>`,
     );
-    const toolOutputBtn =
-      dom.window.document.querySelector<HTMLButtonElement>('[data-action="toggle-tool-output"]');
+    const toolOutputBtn = dom.window.document.querySelector<HTMLButtonElement>(
+      '[data-action="toggle-tool-output"]',
+    );
 
     syncToggleButtons(dom.window.document, {
       thinkingExpanded: true,

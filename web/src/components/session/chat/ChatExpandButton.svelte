@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { icon, Maximize2 } from '../../../shared/icons.js';
   import { t } from '../../../shared/strings.js';
 

@@ -1,10 +1,15 @@
-<script>
+<script lang="ts">
   // The "btw" floating, draggable, resizable scratch-chat opened from the git
   // bar (#pi-btw-button, in <ChatComposer>). Its own per-parent btw session is
   // persisted server-side and synced over SSE. The transcript renders reactively;
   // drag/resize/SSE/status-polling/submit stay imperative. Live-only — never in
   // the export bundle. See docs/sequence-flows/btw.md.
+  import { Effect, Schema } from 'effect';
   import { onMount } from 'svelte';
+  import * as Http from '../../lib/http.js';
+  import { runPromise } from '../../lib/runtime.js';
+  import { sessionEntryFromUnknown, type SessionEntry } from '../../session/data/session-types.js';
+  import { sendChat as sendChatApi } from '../../session/chat/chat-api.js';
   import { getSpinnerConfig } from '../../session/live/chat-preview.js';
   import { t } from '../../shared/strings.js';
   import { icon, X, Square, Send } from '../../shared/icons.js';
@@ -15,6 +20,7 @@
     placeBtwInitial,
     saveBtwGeometry,
   } from './btw-geometry.js';
+  import type { BtwGeometry } from './btw-geometry.js';
   import {
     closeBtwEventSource,
     setupBtwParentEvents,
@@ -22,7 +28,16 @@
   } from './btw-events.js';
   import { btwContentText, createBtwMarkdownRenderer, renderBtwEntryParts } from './btw-render.js';
 
-  let { cwd = '', parentId = '' } = $props();
+  let { cwd = '', parentId = '' }: { cwd?: string; parentId?: string } = $props();
+
+  const TranscriptResponse = Schema.Struct({
+    entries: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+  });
+  const WorkerStatusResponse = Schema.Struct({ state: Schema.optionalKey(Schema.String) });
+  const BtwSessionResponse = Schema.Struct({ sessionId: Schema.optionalKey(Schema.String) });
+  const BtwNewResponse = Schema.Struct({ id: Schema.String });
+  const ChatResponse = Schema.Struct({ error: Schema.optionalKey(Schema.String) });
+  const decodeChatResponse = Schema.decodeUnknownEffect(Schema.fromJsonString(ChatResponse));
 
   const GLOBAL_PARENT = '__global__';
   // After a send, ignore an "idle" status for this long so the spinner doesn't
@@ -31,60 +46,70 @@
   const STATUS_POLL_MS = 1500;
 
   let open = $state(false);
-  let entries = $state([]);
-  let pendingUser = $state(null);
+  let entries = $state<SessionEntry[]>([]);
+  let pendingUser = $state<string | null>(null);
   let streamingText = $state('');
   let running = $state(false);
   let sessionId = $state('');
   let spinnerChar = $state('');
   let spinnerStyle = $state('');
 
-  let winEl, headerEl, bodyEl, inputEl;
+  let winEl = $state<HTMLDivElement | null>(null);
+  let headerEl = $state<HTMLDivElement | null>(null);
+  let bodyEl = $state<HTMLDivElement | null>(null);
+  let inputEl = $state<HTMLInputElement | null>(null);
   // Non-reactive runtime handles.
-  let btnEl = null;
-  let eventSource = null;
-  let globalSource = null;
-  let statusTimer = null;
-  let spinnerTimer = null;
+  let btnEl: HTMLElement | null = null;
+  let eventSource: EventSource | null = null;
+  let globalSource: EventSource | null = null;
+  let statusTimer: number | null = null;
+  let spinnerTimer: number | null = null;
   let spinnerFrame = 0;
-  let spinnerConfig = null;
+  let spinnerConfig: ReturnType<typeof getSpinnerConfig> | null = null;
   let lastSentAt = 0;
   let nearBottom = true;
 
-  const parentTopic = () => parentId || GLOBAL_PARENT;
-  const isMobile = () =>
+  const parentTopic = (): string => parentId || GLOBAL_PARENT;
+  const isMobile = (): boolean =>
     !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
-  const doFetch = (...args) => window.fetch(...args);
   const toHtml = createBtwMarkdownRenderer({ documentImpl: document });
-  const renderEntryParts = (entry) => renderBtwEntryParts(entry, { toHtml });
+  const renderEntryParts = (entry: SessionEntry) => renderBtwEntryParts(entry, { toHtml });
 
-  const renderedEntries = $derived(entries.map(renderEntryParts).filter(Boolean));
+  const renderedEntries = $derived(
+    entries
+      .map(renderEntryParts)
+      .filter((entry): entry is NonNullable<ReturnType<typeof renderEntryParts>> => entry !== null),
+  );
   const isEmpty = $derived(
     renderedEntries.length === 0 && !pendingUser && !(running || streamingText),
   );
 
-  const loadGeom = () => loadBtwGeometry({ storage: window.localStorage });
-  const saveGeom = (patch) => saveBtwGeometry(patch, { storage: window.localStorage });
+  const loadGeom = (): BtwGeometry | null => loadBtwGeometry({ storage: window.localStorage });
+  const saveGeom = (patch: BtwGeometry): void =>
+    saveBtwGeometry(patch, { storage: window.localStorage });
 
-  function atBottom() {
+  function atBottom(): boolean {
     if (!bodyEl) return true;
     return bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight < 40;
   }
-  function scrollToBottom() {
+  function scrollToBottom(): void {
     if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight;
   }
 
   // ── data loading + live updates ──
-  function loadTranscript() {
+  function loadTranscript(): Promise<void> {
     if (!sessionId) {
       entries = [];
       return Promise.resolve();
     }
-    return doFetch('/api/session?id=' + encodeURIComponent(sessionId))
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        entries = data.entries || [];
+    return runPromise(
+      Http.get('/api/session?id=' + encodeURIComponent(sessionId), TranscriptResponse),
+    ).then(
+      (data) => {
+        entries = (data.entries ?? []).flatMap((entry) => {
+          const parsed = sessionEntryFromUnknown(entry);
+          return parsed ? [parsed] : [];
+        });
         if (pendingUser) {
           const arrived = entries.some(
             (e) =>
@@ -96,19 +121,20 @@
           );
           if (arrived) pendingUser = null;
         }
-      })
-      .catch(() => {});
+      },
+      () => undefined,
+    );
   }
 
-  function subscribe() {
+  function subscribe(): void {
     unsubscribe();
     eventSource = setupBtwSessionEvents({
       sessionId,
       EventSourceImpl: window.EventSource,
       onReload: () => {
         streamingText = '';
-        loadTranscript();
-        refreshStatus();
+        void loadTranscript();
+        void refreshStatus();
       },
       onChatPreview: (payload) => {
         streamingText = payload.content || '';
@@ -116,11 +142,11 @@
       },
     });
   }
-  function unsubscribe() {
+  function unsubscribe(): void {
     closeBtwEventSource(eventSource);
     eventSource = null;
   }
-  function subscribeGlobal() {
+  function subscribeGlobal(): void {
     if (globalSource) return;
     globalSource = setupBtwParentEvents({
       parentTopic: parentTopic(),
@@ -130,29 +156,30 @@
       },
     });
   }
-  function unsubscribeGlobal() {
+  function unsubscribeGlobal(): void {
     closeBtwEventSource(globalSource);
     globalSource = null;
   }
 
   // ── worker running state (spinner + cancel button) ──
-  function startSpinner() {
+  function startSpinner(): void {
     if (spinnerTimer) return;
     spinnerConfig = getSpinnerConfig(window);
-    spinnerStyle = `font-family:${spinnerConfig.fontFamily};width:${spinnerConfig.width}`;
-    spinnerChar = spinnerConfig.frames[spinnerFrame % spinnerConfig.frames.length] || '';
+    const config = spinnerConfig;
+    spinnerStyle = `font-family:${config.fontFamily};width:${config.width}`;
+    spinnerChar = config.frames[spinnerFrame % config.frames.length] || '';
     spinnerTimer = window.setInterval(() => {
       spinnerFrame += 1;
-      spinnerChar = spinnerConfig.frames[spinnerFrame % spinnerConfig.frames.length] || '';
-    }, spinnerConfig.interval || 100);
+      spinnerChar = config.frames[spinnerFrame % config.frames.length] || '';
+    }, config.interval || 100);
   }
-  function stopSpinner() {
+  function stopSpinner(): void {
     if (spinnerTimer) {
       window.clearInterval(spinnerTimer);
       spinnerTimer = null;
     }
   }
-  function setRunning(on) {
+  function setRunning(on: boolean): void {
     running = !!on;
     if (running) startSpinner();
     else {
@@ -161,39 +188,43 @@
     }
   }
 
-  function refreshStatus() {
+  function refreshStatus(): Promise<void> {
     if (!sessionId) return Promise.resolve();
-    return doFetch('/api/worker-status?id=' + encodeURIComponent(sessionId))
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
+    return runPromise(
+      Http.get('/api/worker-status?id=' + encodeURIComponent(sessionId), WorkerStatusResponse),
+    ).then(
+      (data) => {
         if (data.state === 'running') setRunning(true);
         else if (data.state === 'idle') {
           if (Date.now() - lastSentAt > IDLE_GRACE_MS) setRunning(false);
         } else if (data.state === 'error') setRunning(false);
-      })
-      .catch(() => {});
+      },
+      () => undefined,
+    );
   }
-  function startStatusPolling() {
+  function startStatusPolling(): void {
     if (statusTimer) return;
-    statusTimer = window.setInterval(() => refreshStatus(), STATUS_POLL_MS);
+    statusTimer = window.setInterval(() => void refreshStatus(), STATUS_POLL_MS);
   }
-  function stopStatusPolling() {
+  function stopStatusPolling(): void {
     if (statusTimer) {
       window.clearInterval(statusTimer);
       statusTimer = null;
     }
   }
 
-  function cancel() {
+  function cancel(): void {
     if (!sessionId) return;
-    doFetch('/api/chat/cancel?id=' + encodeURIComponent(sessionId), { method: 'POST' })
-      .then(() => setRunning(false))
-      .catch(() => {});
+    void runPromise(
+      Http.post('/api/chat/cancel?id=' + encodeURIComponent(sessionId), undefined, Schema.Unknown),
+    ).then(
+      () => setRunning(false),
+      () => undefined,
+    );
   }
 
   // ── actions ──
-  function setSession(id) {
+  function setSession(id: string): void {
     sessionId = id || '';
     entries = [];
     pendingUser = null;
@@ -201,60 +232,68 @@
     setRunning(false);
     if (sessionId) {
       subscribe();
-      loadTranscript();
-      refreshStatus();
+      void loadTranscript();
+      void refreshStatus();
     } else {
       unsubscribe();
     }
   }
-  function createSession() {
-    return doFetch('/api/btw/new', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: cwd, parent: parentId }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && data.id) {
-          setSession(data.id);
-          return data.id;
-        }
-        throw new Error(data && data.error ? data.error : 'failed to create btw session');
-      });
+  function createSession(): Promise<string> {
+    return runPromise(
+      Http.post('/api/btw/new', { path: cwd, parent: parentId }, BtwNewResponse),
+    ).then((data) => {
+      setSession(data.id);
+      return data.id;
+    });
   }
   // Lazy "new": clear to the empty state without creating a session file.
-  function startNewSession() {
+  function startNewSession(): void {
     setSession('');
     inputEl?.focus();
   }
-  async function submitMessage() {
-    const message = inputEl ? inputEl.value.trim() : '';
+  function sendChatRequest(message: string, targetSessionId: string) {
+    return Effect.gen(function* () {
+      const body = new FormData();
+      body.set('message', message);
+      const response = yield* Effect.tryPromise({
+        try: () => sendChatApi(targetSessionId, body),
+        catch: (cause) => cause,
+      });
+      const responseText = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: (cause) => cause,
+      });
+      const data = yield* decodeChatResponse(responseText);
+      if (!response.ok) {
+        return yield* Effect.fail(new Error(data.error ?? 'chat request failed'));
+      }
+    });
+  }
+
+  function submitMessage(): void {
+    const input = inputEl;
+    if (!input) return;
+    const message = input.value.trim();
     if (!message) return;
-    inputEl.value = '';
+    input.value = '';
     pendingUser = message;
     lastSentAt = Date.now();
-    try {
-      if (!sessionId) await createSession();
-      // createSession() runs setSession() which clears optimistic state; re-show.
-      pendingUser = message;
-      setRunning(true);
-      const body = new window.FormData();
-      body.set('message', message);
-      const resp = await doFetch('/api/chat?id=' + encodeURIComponent(sessionId), {
-        method: 'POST',
-        body,
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(data.error || 'chat request failed');
-    } catch {
+    const restore = (): void => {
       pendingUser = null;
       setRunning(false);
       if (inputEl) inputEl.value = message;
-    }
+    };
+    const sessionReady = sessionId ? Promise.resolve(sessionId) : createSession();
+    void sessionReady.then((targetSessionId) => {
+      // createSession() runs setSession() which clears optimistic state; re-show.
+      pendingUser = message;
+      setRunning(true);
+      void runPromise(sendChatRequest(message, targetSessionId)).then(() => undefined, restore);
+    }, restore);
   }
 
   // ── open / close ──
-  function openWindow() {
+  function openWindow(): void {
     open = true;
     // Clear `hidden` synchronously (Svelte's flush from `open` is async) so the
     // window has real dimensions when initial placement measures it.
@@ -272,20 +311,22 @@
     saveGeom({ open: true });
     subscribeGlobal();
     startStatusPolling();
-    doFetch('/api/btw?parent=' + encodeURIComponent(parentTopic()))
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        const id = data && data.sessionId ? data.sessionId : '';
+    void runPromise(
+      Http.get('/api/btw?parent=' + encodeURIComponent(parentTopic()), BtwSessionResponse),
+    ).then(
+      (data) => {
+        const id = data.sessionId ?? '';
         if (id !== sessionId) setSession(id);
         else if (id) {
-          loadTranscript();
-          refreshStatus();
+          void loadTranscript();
+          void refreshStatus();
         }
-      })
-      .catch(() => {});
+      },
+      () => undefined,
+    );
     inputEl?.focus();
   }
-  function closeWindow() {
+  function closeWindow(): void {
     open = false;
     btnEl?.setAttribute('aria-expanded', 'false');
     saveGeom({ open: false });
@@ -294,16 +335,16 @@
     stopStatusPolling();
     stopSpinner();
   }
-  function toggle() {
+  function toggle(): void {
     if (open) closeWindow();
     else openWindow();
   }
 
-  function onSubmit(e) {
+  function onSubmit(e: SubmitEvent): void {
     e.preventDefault();
     submitMessage();
   }
-  function onSend() {
+  function onSend(): void {
     if (running) cancel();
     else submitMessage();
   }
@@ -330,13 +371,13 @@
       });
       persistBtwResize(winEl, { windowImpl: window, saveGeometry: saveGeom });
     }
-    const onBodyScroll = () => {
+    const onBodyScroll = (): void => {
       nearBottom = atBottom();
     };
     bodyEl?.addEventListener('scroll', onBodyScroll);
 
     btnEl = document.getElementById('pi-btw-button');
-    const onBtnClick = (e) => {
+    const onBtnClick = (e: MouseEvent): void => {
       e.preventDefault();
       toggle();
     };
@@ -347,7 +388,7 @@
     }
 
     const composerTextarea = document.getElementById('pi-chat-message');
-    const onComposerFocus = () => {
+    const onComposerFocus = (): void => {
       if (isMobile() && open) closeWindow();
     };
     composerTextarea?.addEventListener('focus', onComposerFocus);

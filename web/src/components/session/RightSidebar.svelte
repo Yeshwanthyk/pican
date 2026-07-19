@@ -1,25 +1,45 @@
-<script>
+<script lang="ts">
+  import { Effect } from 'effect';
   import { onMount } from 'svelte';
+  import { runSync } from '../../lib/runtime.js';
   import { icon, CircleHelp, Maximize2, X } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import ArtifactPanel from './ArtifactPanel.svelte';
   import { sessionRuntime } from '../../session/session-runtime.js';
   import { createScratchpadController } from './right-sidebar-scratchpad.js';
 
-  let { scratchpad = '', projectPath = '' } = $props();
+  let { scratchpad = '', projectPath = '' }: { scratchpad?: string; projectPath?: string } =
+    $props();
 
   const RIGHT_SIDEBAR_COLLAPSED_KEY = 'pican:v1:right-sidebar-collapsed';
   const RIGHT_SIDEBAR_WIDTH_KEY = 'pican:v1:right-sidebar-width';
   const RIGHT_SIDEBAR_TAB_KEY = 'pican:v1:right-sidebar-tab';
   const MIN_CONTENT_WIDTH = 320;
   const DEFAULT_WIDTH_PX = 320; // double-click reset width
-  const TAB_PANES = ['scratchpad', 'artifacts'];
+  type SidebarTab = 'scratchpad' | 'artifacts';
+  const TAB_PANES: readonly SidebarTab[] = ['scratchpad', 'artifacts'];
 
-  function readInitialTab() {
-    try {
-      const stored = globalThis.localStorage?.getItem(RIGHT_SIDEBAR_TAB_KEY);
-      if (stored && TAB_PANES.includes(stored)) return stored;
-    } catch {}
+  function readStorage(key: string): string | null {
+    return runSync(
+      Effect.try({
+        try: () => globalThis.localStorage?.getItem(key) ?? null,
+        catch: () => null,
+      }),
+    );
+  }
+
+  function writeStorage(key: string, value: string): void {
+    runSync(
+      Effect.try({
+        try: () => globalThis.localStorage?.setItem(key, value),
+        catch: () => undefined,
+      }).pipe(Effect.orElseSucceed(() => undefined)),
+    );
+  }
+
+  function readInitialTab(): SidebarTab {
+    const stored = readStorage(RIGHT_SIDEBAR_TAB_KEY);
+    if (stored === 'scratchpad' || stored === 'artifacts') return stored;
     return 'scratchpad';
   }
 
@@ -28,31 +48,26 @@
   // callers/tests expect it to react synchronously, so it stays imperative below.
   let activeTab = $state(readInitialTab());
 
-  function activateTab(pane) {
-    if (!TAB_PANES.includes(pane)) return;
+  function activateTab(pane: SidebarTab): void {
     activeTab = pane;
-    try {
-      globalThis.localStorage?.setItem(RIGHT_SIDEBAR_TAB_KEY, pane);
-    } catch {}
+    writeStorage(RIGHT_SIDEBAR_TAB_KEY, pane);
   }
 
   // Assigned in onMount once the scratchpad controller exists; the visibility
   // helpers below call it when un-collapsing the sidebar.
-  let loadScratchpad = () => {};
+  let loadScratchpad: () => void = () => undefined;
 
-  function isCollapsed() {
+  function isCollapsed(): boolean {
     return document.body.classList.contains('right-sidebar-collapsed');
   }
-  function setCollapsed(collapsed) {
+  function setCollapsed(collapsed: boolean): void {
     document.body.classList.toggle('right-sidebar-collapsed', collapsed);
-    try {
-      globalThis.localStorage?.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, String(collapsed));
-    } catch {}
+    writeStorage(RIGHT_SIDEBAR_COLLAPSED_KEY, String(collapsed));
   }
-  function setExpanded(expanded) {
+  function setExpanded(expanded: boolean): void {
     document.body.classList.toggle('right-sidebar-expanded', expanded);
   }
-  function toggleSidebar() {
+  function toggleSidebar(): void {
     if (isCollapsed()) {
       setCollapsed(false);
       loadScratchpad();
@@ -61,17 +76,17 @@
       setExpanded(false);
     }
   }
-  function openSidebar() {
+  function openSidebar(): void {
     if (isCollapsed()) {
       setCollapsed(false);
       loadScratchpad();
     }
   }
-  function collapseSidebar() {
+  function collapseSidebar(): void {
     setExpanded(false);
     setCollapsed(true);
   }
-  function toggleExpanded() {
+  function toggleExpanded(): void {
     if (document.body.classList.contains('right-sidebar-expanded')) {
       setExpanded(false);
     } else {
@@ -84,15 +99,13 @@
   onMount(() => {
     const documentImpl = document;
     const windowImpl = window;
-    const storage = globalThis.localStorage;
-
     const sidebar = documentImpl.getElementById('right-sidebar');
     const resizer = documentImpl.getElementById('right-sidebar-resizer');
-    const textarea = documentImpl.getElementById('scratchpad-textarea');
+    const textarea = documentImpl.querySelector<HTMLTextAreaElement>('#scratchpad-textarea');
     const statusEl = documentImpl.getElementById('scratchpad-status');
     const toggleBtn = documentImpl.getElementById('toggle-right-sidebar-btn');
     const backdrop = documentImpl.getElementById('right-sidebar-backdrop');
-    const cleanups = [];
+    const cleanups: Array<() => void> = [];
 
     // The toggle button lives in <SessionHeader>; the backdrop is a
     // non-interactive overlay — both are wired by id to avoid an a11y lint on a
@@ -127,38 +140,32 @@
       statusEl,
       fetchImpl: fetch,
     });
-    loadScratchpad = scratchpadController.load;
+    loadScratchpad = () => void scratchpadController.load();
     if (textarea) cleanups.push(scratchpadController.bind());
 
-    function getRightSidebarBounds() {
+    function getRightSidebarBounds(): { minWidth: number; maxWidth: number } {
       const rootStyles = windowImpl.getComputedStyle(documentImpl.documentElement);
       const minWidth = parseFloat(rootStyles.getPropertyValue('--right-sidebar-min-width')) || 240;
       const maxWidth = parseFloat(rootStyles.getPropertyValue('--right-sidebar-max-width')) || 640;
       const viewportMaxWidth = windowImpl.innerWidth - MIN_CONTENT_WIDTH;
       return { minWidth, maxWidth: Math.max(minWidth, Math.min(maxWidth, viewportMaxWidth)) };
     }
-    function clampWidth(width) {
+    function clampWidth(width: number): number {
       const { minWidth, maxWidth } = getRightSidebarBounds();
       return Math.max(minWidth, Math.min(maxWidth, width));
     }
-    function applyWidth(width) {
+    function applyWidth(width: number): void {
       const clamped = Math.round(clampWidth(width));
       documentImpl.documentElement.style.setProperty('--right-sidebar-width', `${clamped}px`);
     }
-    function loadWidth() {
-      try {
-        const raw = storage?.getItem(RIGHT_SIDEBAR_WIDTH_KEY);
-        if (raw == null) return null;
-        const w = Number(raw);
-        return Number.isFinite(w) ? w : null;
-      } catch {
-        return null;
-      }
+    function loadWidth(): number | null {
+      const raw = readStorage(RIGHT_SIDEBAR_WIDTH_KEY);
+      if (raw === null) return null;
+      const width = Number(raw);
+      return Number.isFinite(width) ? width : null;
     }
-    function saveWidth(width) {
-      try {
-        storage?.setItem(RIGHT_SIDEBAR_WIDTH_KEY, String(Math.round(clampWidth(width))));
-      } catch {}
+    function saveWidth(width: number): void {
+      writeStorage(RIGHT_SIDEBAR_WIDTH_KEY, String(Math.round(clampWidth(width))));
     }
 
     // ── Resize (drag left edge) ──────────────────────────────────────────────
@@ -166,16 +173,16 @@
       const savedWidth0 = loadWidth();
       if (savedWidth0 !== null) applyWidth(savedWidth0);
 
-      let cleanupDrag = null;
+      let cleanupDrag: ((pointerId: number) => void) | null = null;
 
-      const stopDrag = (pointerId) => {
+      const stopDrag = (pointerId: number): void => {
         if (cleanupDrag) {
           cleanupDrag(pointerId);
           cleanupDrag = null;
         }
       };
 
-      const onPointerDown = (e) => {
+      const onPointerDown = (e: PointerEvent): void => {
         if (e.button !== 0) return;
         e.preventDefault();
         const startX = e.clientX;
@@ -183,13 +190,13 @@
         documentImpl.body.classList.add('right-sidebar-resizing');
         resizer.setPointerCapture?.(e.pointerId);
 
-        const onPointerMove = (ev) => {
+        const onPointerMove = (ev: PointerEvent): void => {
           applyWidth(startWidth + (startX - ev.clientX));
         };
-        const onPointerUp = (ev) => stopDrag(ev.pointerId);
-        const onPointerCancel = (ev) => stopDrag(ev.pointerId);
+        const onPointerUp = (ev: PointerEvent): void => stopDrag(ev.pointerId);
+        const onPointerCancel = (ev: PointerEvent): void => stopDrag(ev.pointerId);
 
-        cleanupDrag = (ptrId) => {
+        cleanupDrag = (ptrId: number): void => {
           documentImpl.body.classList.remove('right-sidebar-resizing');
           resizer.releasePointerCapture?.(ptrId);
           windowImpl.removeEventListener('pointermove', onPointerMove);
@@ -205,14 +212,14 @@
       resizer.addEventListener('pointerdown', onPointerDown);
       cleanups.push(() => resizer.removeEventListener('pointerdown', onPointerDown));
 
-      const onDblClick = () => {
+      const onDblClick = (): void => {
         applyWidth(DEFAULT_WIDTH_PX);
         saveWidth(DEFAULT_WIDTH_PX);
       };
       resizer.addEventListener('dblclick', onDblClick);
       cleanups.push(() => resizer.removeEventListener('dblclick', onDblClick));
 
-      const onWindowResize = () => {
+      const onWindowResize = (): void => {
         applyWidth(sidebar.getBoundingClientRect().width);
       };
       windowImpl.addEventListener('resize', onWindowResize);
@@ -226,7 +233,7 @@
     const savedWidth = loadWidth();
     if (savedWidth !== null) applyWidth(savedWidth);
     if (textarea && !textarea.value && projectPath) {
-      scratchpadController.load();
+      void scratchpadController.load();
     } else {
       scratchpadController.adoptCurrentValue();
     }
@@ -236,16 +243,17 @@
     const helpBtn = documentImpl.getElementById('artifact-help-btn');
     const helpModal = documentImpl.getElementById('artifact-help-modal');
     if (helpBtn && helpModal) {
-      const hideHelp = () => {
+      const hideHelp = (): void => {
         helpModal.hidden = true;
       };
-      const onHelpBtn = () => {
+      const onHelpBtn = (): void => {
         helpModal.hidden = false;
       };
-      const onHelpModal = (e) => {
-        if (e.target.closest('[data-action="close-artifact-help"]')) hideHelp();
+      const onHelpModal = (e: MouseEvent): void => {
+        if (e.target instanceof Element && e.target.closest('[data-action="close-artifact-help"]'))
+          hideHelp();
       };
-      const onHelpKeydown = (e) => {
+      const onHelpKeydown = (e: KeyboardEvent): void => {
         if (e.key === 'Escape' && !helpModal.hidden) hideHelp();
       };
       helpBtn.addEventListener('click', onHelpBtn);

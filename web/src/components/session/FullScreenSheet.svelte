@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // Reusable full-screen sheet: a centered dialog on desktop, a fullscreen
   // bottom-sheet on mobile (≤ 900px). Svelte port of the former
   // live/full-screen-sheet.js (showSheet) — same markup/classes/behavior:
@@ -8,9 +8,26 @@
   // Driven by a single bindable `open`; internal triggers (Escape, backdrop,
   // back/close buttons, mobile popstate) set `open = false` and an $effect runs
   // the open/close side effects. Body content is provided as the default snippet.
-  import { onMount, tick } from 'svelte';
+  import { Effect } from 'effect';
+  import { onMount, tick, type Snippet } from 'svelte';
+  import { runSync } from '../../lib/runtime.js';
   import { icon, ArrowLeft, X } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
+
+  interface Props {
+    open?: boolean;
+    title?: string;
+    showBack?: boolean;
+    showClose?: boolean;
+    closeOnEscape?: boolean;
+    closeOnBackdrop?: boolean;
+    onClose?: (() => void) | null;
+    backdropClass?: string;
+    panelClass?: string;
+    bodyClass?: string;
+    children: Snippet;
+    headerExtra?: Snippet | null;
+  }
 
   let {
     open = $bindable(false),
@@ -31,7 +48,7 @@
     // in the header bar instead of a second toolbar row underneath — useful
     // on mobile where vertical space is scarce.
     headerExtra = null,
-  } = $props();
+  }: Props = $props();
 
   const SHEET_BREAKPOINT = 900;
   const REMOVE_DELAY = 300; // must match the CSS transition duration
@@ -39,23 +56,23 @@
   let mounted = $state(false); // DOM presence (stays true through the close anim)
   let shown = $state(false); // toggles the `.open` class for the CSS transition
   let mobile = $state(false);
-  let backdropEl = $state(null);
-  let panelEl = $state(null);
+  let backdropEl = $state<HTMLDivElement | null>(null);
+  let panelEl = $state<HTMLDivElement | null>(null);
 
-  let previousActive = null;
-  let removeTimer = null;
-  let popHandler = null;
+  let previousActive: HTMLElement | null = null;
+  let removeTimer: ReturnType<typeof setTimeout> | undefined;
+  let popHandler: (() => void) | null = null;
   let historyMarker = '';
   let skipHistoryOnce = false;
 
   // Backdrop click-to-close, attached imperatively (not inline onclick) to match
   // the codebase's delegated-listener convention and avoid an a11y lint on a
   // non-interactive element — Escape (onKey) is the keyboard equivalent.
-  function onBackdrop(e) {
+  function onBackdrop(e: MouseEvent): void {
     if (closeOnBackdrop && e.target === backdropEl) open = false;
   }
 
-  function isMobile() {
+  function isMobile(): boolean {
     return (
       typeof window.matchMedia === 'function' &&
       window.matchMedia(`(max-width: ${SHEET_BREAKPOINT}px)`).matches
@@ -65,7 +82,7 @@
   let scrollLocked = false;
 
   // Ref-counted page-scroll lock so nested/stacked sheets don't unlock early.
-  function lockScroll() {
+  function lockScroll(): void {
     if (scrollLocked) return;
     scrollLocked = true;
     const body = document.body;
@@ -73,7 +90,7 @@
     body.dataset.piSheetCount = String(count);
     body.classList.add('pi-sheet-open');
   }
-  function unlockScroll() {
+  function unlockScroll(): void {
     if (!scrollLocked) return;
     scrollLocked = false;
     const body = document.body;
@@ -86,16 +103,16 @@
     }
   }
 
-  function getFocusable() {
+  function getFocusable(): HTMLElement[] {
     if (!panelEl) return [];
     return Array.from(
-      panelEl.querySelectorAll(
+      panelEl.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       ),
     );
   }
 
-  function onKey(e) {
+  function onKey(e: KeyboardEvent): void {
     if (closeOnEscape && e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -103,6 +120,8 @@
       return;
     }
     if (e.key !== 'Tab') return;
+    const panel = panelEl;
+    if (!panel) return;
     const focusables = getFocusable();
     if (focusables.length === 0) {
       e.preventDefault();
@@ -110,22 +129,31 @@
     }
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
+    if (!first || !last) return;
     if (e.shiftKey) {
-      if (document.activeElement === first || !panelEl.contains(document.activeElement)) {
+      if (document.activeElement === first || !panel.contains(document.activeElement)) {
         e.preventDefault();
         last.focus();
       }
-    } else if (document.activeElement === last || !panelEl.contains(document.activeElement)) {
+    } else if (document.activeElement === last || !panel.contains(document.activeElement)) {
       e.preventDefault();
       first.focus();
     }
   }
 
-  async function doOpen() {
+  function ignoreFailure(action: () => void): void {
+    runSync(
+      Effect.try({ try: action, catch: () => undefined }).pipe(
+        Effect.orElseSucceed(() => undefined),
+      ),
+    );
+  }
+
+  async function doOpen(): Promise<void> {
     mounted = true;
     shown = false;
     mobile = isMobile();
-    previousActive = document.activeElement;
+    previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     lockScroll();
     document.addEventListener('keydown', onKey);
 
@@ -135,11 +163,9 @@
         window.history.state && typeof window.history.state === 'object'
           ? window.history.state
           : {};
-      try {
+      ignoreFailure(() => {
         window.history.pushState({ ...cur, __piSheet: historyMarker }, '', window.location?.href);
-      } catch {
-        /* ignore */
-      }
+      });
       popHandler = () => {
         skipHistoryOnce = true;
         open = false;
@@ -160,17 +186,13 @@
     });
   }
 
-  function doClose() {
+  function doClose(): void {
     backdropEl?.removeEventListener('click', onBackdrop);
     document.removeEventListener('keydown', onKey);
     if (popHandler) {
       window.removeEventListener('popstate', popHandler);
       if (!skipHistoryOnce && window.history?.state?.__piSheet === historyMarker) {
-        try {
-          window.history.back();
-        } catch {
-          /* ignore */
-        }
+        ignoreFailure(() => window.history.back());
       }
       popHandler = null;
     }

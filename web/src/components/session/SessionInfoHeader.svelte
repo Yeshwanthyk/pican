@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   // The in-content session header card (#header-container). Reactive, live-safe
   // (no SSE/fetch) → used by both the live app and the static export. Markup
   // mirrors the old session-header-renderer.js so CSS + the toggle controller
@@ -6,60 +6,105 @@
   // docs/dev/svelte-migration-plan.md (Phase 2).
   import { getSessionModel } from '../../session/session-context.js';
   import {
+    isUnknownRecord,
+    type SessionEntry,
+    type UnknownRecord,
+  } from '../../session/data/session-types.js';
+  import {
     computeSessionStats,
     summarizeSessionStats,
   } from '../../session/render/session-stats.js';
   import { icon, Download } from '../../shared/icons.js';
   import { SvelteSet } from 'svelte/reactivity';
 
-  let { model = getSessionModel() } = $props();
+  interface HeaderModel {
+    entries: readonly SessionEntry[];
+    header?: UnknownRecord | null;
+    systemPrompt?: unknown;
+    tools?: unknown;
+  }
+
+  interface ToolDefinition {
+    readonly name: string;
+    readonly description: string;
+    readonly parameters?: UnknownRecord;
+  }
+
+  interface ToolParameter {
+    readonly name: string;
+    readonly type: string;
+    readonly required: boolean;
+    readonly description: string;
+  }
+
+  let { model = getSessionModel<HeaderModel>() }: { model?: HeaderModel } = $props();
 
   const SYSTEM_PROMPT_PREVIEW_LINES = 10;
 
   const stats = $derived(summarizeSessionStats(computeSessionStats(model.entries)));
-  const sessionIdText = $derived(model.header?.id || 'unknown');
-  const dateText = $derived(
-    model.header?.timestamp ? new Date(model.header.timestamp).toLocaleString() : 'unknown',
+  const sessionIdText = $derived(
+    typeof model.header?.id === 'string' ? model.header.id : 'unknown',
   );
-  const systemPrompt = $derived(model.systemPrompt || '');
+  const dateText = $derived(
+    typeof model.header?.timestamp === 'string'
+      ? new Date(model.header.timestamp).toLocaleString()
+      : 'unknown',
+  );
+  const systemPrompt = $derived(typeof model.systemPrompt === 'string' ? model.systemPrompt : '');
   const promptLines = $derived(systemPrompt ? systemPrompt.split('\n') : []);
   const promptIsLong = $derived(promptLines.length > SYSTEM_PROMPT_PREVIEW_LINES);
   const promptPreview = $derived(promptLines.slice(0, SYSTEM_PROMPT_PREVIEW_LINES).join('\n'));
-  const tools = $derived(Array.isArray(model.tools) ? model.tools : []);
+  const tools = $derived(
+    Array.isArray(model.tools)
+      ? model.tools.flatMap((candidate): ToolDefinition[] => {
+          if (!isUnknownRecord(candidate) || typeof candidate.name !== 'string') return [];
+          return [
+            {
+              name: candidate.name,
+              description: typeof candidate.description === 'string' ? candidate.description : '',
+              parameters: isUnknownRecord(candidate.parameters) ? candidate.parameters : undefined,
+            },
+          ];
+        })
+      : [],
+  );
 
   let promptExpanded = $state(false);
-  let expandedTools = new SvelteSet();
+  let expandedTools = new SvelteSet<number>();
 
-  function hasSelection() {
-    return typeof window !== 'undefined' && !!window.getSelection?.().toString();
+  function hasSelection(): boolean {
+    return typeof window !== 'undefined' && !!window.getSelection?.()?.toString();
   }
-  function togglePrompt() {
+  function togglePrompt(): void {
     if (hasSelection()) return;
     promptExpanded = !promptExpanded;
   }
-  function toggleTool(i) {
+  function toggleTool(i: number): void {
     if (hasSelection()) return;
     if (expandedTools.has(i)) expandedTools.delete(i);
     else expandedTools.add(i);
   }
-  function toolParams(tool) {
+  function toolParams(tool: ToolDefinition): ToolParameter[] | null {
     const params = tool.parameters;
-    const hasParams =
-      params &&
-      typeof params === 'object' &&
-      params.properties &&
-      Object.keys(params.properties).length > 0;
-    if (!hasParams) return null;
-    const required = params.required || [];
-    return Object.entries(params.properties).map(([name, prop]) => ({
-      name,
-      type: prop.type || 'any',
-      required: required.includes(name),
-      description: prop.description || '',
-    }));
+    const properties = params && isUnknownRecord(params.properties) ? params.properties : null;
+    const hasParams = properties && Object.keys(properties).length > 0;
+    if (!hasParams || !properties) return null;
+    const required = Array.isArray(params?.required)
+      ? params.required.filter((name): name is string => typeof name === 'string')
+      : [];
+    return Object.entries(properties).map(([name, value]) => {
+      const prop = isUnknownRecord(value) ? value : {};
+      return {
+        name,
+        type: typeof prop.type === 'string' ? prop.type : 'unknown',
+        required: required.includes(name),
+        description: typeof prop.description === 'string' ? prop.description : '',
+      };
+    });
   }
-  function downloadJson() {
-    window.downloadSessionJson?.();
+  function downloadJson(): void {
+    const target = window as Window & { readonly downloadSessionJson?: () => void };
+    target.downloadSessionJson?.();
   }
 </script>
 

@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { icon, Play, Pause, X, CornerDownRight, Layers } from '../../../shared/icons.js';
   import { t } from '../../../shared/strings.js';
+  import type { QueueDisplayItem, QueueStore } from './queue-store.svelte.js';
 
-  let { store } = $props();
+  let { store }: { store: QueueStore } = $props();
 
   // Hide the whole panel when there are no items, so the composer collapses
   // back to its normal height.
@@ -17,35 +18,35 @@
   const countLabel = $derived(formatCount(queuedCount, steerCount));
   const activeDescendantId = $derived(
     store.focusIndex >= 0 && store.focusIndex < store.items.length
-      ? `pi-queue-item-${store.items[store.focusIndex].id}`
+      ? `pi-queue-item-${store.items[store.focusIndex]?.id ?? ''}`
       : '',
   );
 
-  function formatCount(queued, steers) {
+  function formatCount(queued: number, steers: number): string {
     if (queued === 0 && steers === 0) return '';
     if (queued === 0) return `${steers} ${t('composer.queueSteeringCount')}`;
     if (steers === 0) return `${queued} ${t('composer.queueQueuedCount')}`;
     return `${queued} ${t('composer.queueQueuedCount')} · ${steers} ${t('composer.queueSteeringCount')}`;
   }
 
-  function chipText(item) {
+  function chipText(item: QueueDisplayItem): string {
     const raw = (item.displayText || item.text || '').trim();
     return raw || t('composer.attachmentText');
   }
 
-  function onResume() {
+  function onResume(): void {
     store.actions.resume?.();
   }
 
-  function onPause() {
+  function onPause(): void {
     store.setPaused(true);
   }
 
-  function onItemClick(index) {
+  function onItemClick(index: number): void {
     store.setFocusIndex(index);
   }
 
-  function onDelete(item) {
+  function onDelete(item: QueueDisplayItem): void {
     store.removeById(item.id);
   }
 
@@ -55,17 +56,21 @@
   // Rule: shortcuts only fire when the textarea is empty (or the focus is not
   // inside any editable field). Once the user starts typing, every key — arrows,
   // backspace, enter, the letter "E" — goes to the textarea unmolested.
-  function isEditableTarget(target) {
-    if (!target) return false;
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
     const tag = target.tagName;
     if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return true;
     return !!target.isContentEditable;
   }
 
-  function shouldHandleShortcut(target, key) {
+  function shouldHandleShortcut(target: EventTarget | null, key: string): boolean {
     if (key === 'Escape') return true;
     const composer = document.getElementById('pi-chat-composer');
-    if (target && composer?.contains(target) && target.id === 'pi-chat-message') {
+    if (
+      target instanceof HTMLTextAreaElement &&
+      composer?.contains(target) &&
+      target.id === 'pi-chat-message'
+    ) {
       // Inside the textarea: allow navigation/action keys only when empty.
       return target.value === '';
     }
@@ -73,7 +78,7 @@
     return !isEditableTarget(target);
   }
 
-  function onDocumentKeydown(event) {
+  function onDocumentKeydown(event: KeyboardEvent): void {
     if (!visible) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key;
@@ -105,7 +110,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       store.setFocusIndex(-1);
-      const textarea = document.getElementById('pi-chat-message');
+      const textarea = document.getElementById('pi-chat-message') as HTMLTextAreaElement | null;
       textarea?.focus?.();
       return;
     }

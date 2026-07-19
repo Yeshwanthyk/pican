@@ -108,7 +108,9 @@ export function buildTree(
 // forms one chain. The session-header line ({type:'session'}) is metadata, not a
 // conversation root, and is left untouched. Returns the input unchanged when there
 // is nothing to stitch (the common single-segment case).
-export function stitchOrphanRoots(entries: ReadonlyArray<TreeEntry> = []): ReadonlyArray<TreeEntry> {
+export function stitchOrphanRoots(
+  entries: ReadonlyArray<TreeEntry> = [],
+): ReadonlyArray<TreeEntry> {
   let result: TreeEntry[] | null = null;
   let prevLeafId: string | null = null;
   let seenRoot = false;

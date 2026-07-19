@@ -1,9 +1,13 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { marked } from 'marked';
-  import { safeMarkedParse } from '../../session/render/markdown.js';
+  import { Effect, Option, Schema } from 'effect';
+  import type { HLJSApi } from 'highlight.js';
   import { getSessionModel } from '../../session/session-context.js';
-  import { collectArtifacts } from '../../session/artifacts/artifact-registry.js';
+  import {
+    collectArtifacts,
+    type ArtifactDescriptor,
+  } from '../../session/artifacts/artifact-registry.js';
   import {
     filterArtifacts,
     readArtifactSettings,
@@ -12,17 +16,76 @@
   import { t } from '../../shared/strings.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionRuntime } from '../../session/session-runtime.js';
+  import type { ArtifactRuntime } from '../../session/session-runtime.js';
+  import { SessionDataModel } from '../../session/data/session-data.svelte.js';
+  import { isUnknownRecord, type SessionEntry } from '../../session/data/session-types.js';
+  import { NetworkError } from '../../lib/errors.js';
+  import { runPromise, runSync } from '../../lib/runtime.js';
+
+  const ArtifactViewSchema = Schema.Struct({
+    id: Schema.String,
+    kind: Schema.Literals(['preview', 'code']),
+    previewType: Schema.optional(Schema.String),
+    title: Schema.String,
+    lang: Schema.String,
+    content: Schema.String,
+    filePath: Schema.optional(Schema.NullOr(Schema.String)),
+  });
+  type ArtifactView = typeof ArtifactViewSchema.Type;
+  type FilterableArtifactView = ArtifactView & { readonly [key: string]: unknown };
+  const decodeArtifactView = Schema.decodeUnknownOption(ArtifactViewSchema);
+  interface ImperativeArtifacts {
+    readonly visible: ArtifactView[];
+    readonly hiddenCount: number;
+  }
+  type ArtifactPanelRuntime = ArtifactRuntime & {
+    readonly setArtifacts: (
+      artifacts: ReadonlyArray<unknown>,
+      options?: { readonly hiddenCount?: number },
+    ) => void;
+    readonly selectArtifact: (id: string) => void;
+    readonly render: () => void;
+    readonly getSelectedId: () => string;
+    readonly getArtifact: (id: string) => ArtifactView | null;
+    readonly getCount: () => number;
+  };
+  type Highlight = (code: string, language: string) => string | null;
+  interface RegistryToolCall {
+    readonly type?: string;
+    readonly id?: string;
+    readonly name?: string;
+    readonly arguments?: Readonly<Record<string, unknown>>;
+    readonly text?: string;
+  }
+  interface RegistryEntry {
+    readonly id: string;
+    readonly type?: string;
+    readonly message?: {
+      readonly role?: string;
+      readonly content?: string | ReadonlyArray<RegistryToolCall>;
+      readonly toolCallId?: string;
+      readonly isError?: boolean;
+      readonly cancelled?: boolean;
+      readonly exitCode?: number;
+      readonly command?: string;
+    };
+  }
+  interface Props {
+    readonly highlight?: Highlight | null;
+    readonly renderMarkdown?: ((text: string) => string) | null;
+  }
 
   // `highlight`/`renderMarkdown` are injectable for tests; in the live app the
   // component lazy-loads highlight.js itself and renders markdown via marked.
-  let { highlight = null, renderMarkdown = null } = $props();
+  let { highlight = null, renderMarkdown = null }: Props = $props();
 
   // The panel collects artifacts straight from the shared reactive model: on
   // mount and whenever entries change (live reload), it re-runs collection +
   // filtering. Standalone (tests, no context) the model is undefined and the
   // panel is driven imperatively via the sessionRuntime.artifacts.setArtifacts
   // handle instead.
-  const model = getSessionModel();
+  const contextModel = getSessionModel<unknown>();
+  const model = contextModel instanceof SessionDataModel ? contextModel : null;
   const COPIED_RESET_MS = 1500;
   // Bumped by the cross-tab `storage` listener so `collected` re-reads the
   // artifact settings (enable/include filter) without a reload.
@@ -30,18 +93,56 @@
 
   // Standalone/imperative mode (tests, no shared model): artifacts pushed in via
   // sessionRuntime.artifacts.setArtifacts. In live mode `collected` drives them.
-  let imperative = $state(null);
+  let imperative = $state<ImperativeArtifacts | null>(null);
   let pickedId = $state('');
   // Preview is opt-in (click-to-run): never auto-execute artifact content.
   let previewing = $state(false);
-  let loadedHljs = $state(null);
+  let loadedHljs = $state<HLJSApi | null>(null);
+
+  function toRegistryEntry(entry: SessionEntry): RegistryEntry {
+    const message = entry.message;
+    return {
+      id: entry.id,
+      type: entry.type,
+      message: message
+        ? {
+            role: message.role,
+            content:
+              typeof message.content === 'string'
+                ? message.content
+                : message.content?.map((block) => ({
+                    type: block.type,
+                    id: block.id,
+                    name: block.name,
+                    arguments: isUnknownRecord(block.arguments) ? block.arguments : undefined,
+                    text: block.text,
+                  })),
+            toolCallId: message.toolCallId,
+            isError: message.isError,
+            cancelled: message.cancelled,
+            exitCode: message.exitCode ?? undefined,
+            command: message.command,
+          }
+        : undefined,
+    };
+  }
 
   // Collected artifacts from the shared model (live only; null standalone).
   // Recomputes when entries change (live reload) or the settings tick bumps.
   const collected = $derived.by(() => {
     if (!model) return null;
-    settingsTick;
-    const all = collectArtifacts(model.entries);
+    void settingsTick;
+    const all: FilterableArtifactView[] = collectArtifacts(model.entries.map(toRegistryEntry)).map(
+      (artifact: ArtifactDescriptor) => ({
+        id: artifact.id,
+        kind: artifact.kind,
+        previewType: artifact.previewType,
+        title: artifact.title,
+        lang: artifact.lang,
+        content: artifact.content,
+        filePath: artifact.filePath,
+      }),
+    );
     const settings = readArtifactSettings(window.localStorage);
     const { visible, hiddenCount: hidden } = filterArtifacts(all, settings);
     return { visible, hiddenCount: hidden, enabled: settings.enabled };
@@ -57,37 +158,41 @@
   const selected = $derived(artifacts.find((a) => a.id === selectedId) || null);
   const noun = $derived(hiddenCount === 1 ? t('artifact.nounOne') : t('artifact.nounMany'));
 
-  const effectiveHighlight = $derived(
-    highlight ||
-      (loadedHljs
-        ? (code, lang) => {
-            try {
-              return lang && loadedHljs.getLanguage(lang)
-                ? loadedHljs.highlight(code, { language: lang }).value
-                : loadedHljs.highlightAuto(code).value;
-            } catch {
-              return null;
-            }
-          }
-        : null),
-  );
+  const safeHighlight = (api: HLJSApi, code: string, lang: string): string | null =>
+    runSync(
+      Effect.try({
+        try: () =>
+          lang && api.getLanguage(lang)
+            ? api.highlight(code, { language: lang }).value
+            : api.highlightAuto(code).value,
+        catch: () => null,
+      }).pipe(Effect.catch((fallback) => Effect.succeed(fallback))),
+    );
+
+  const effectiveHighlight = $derived.by<Highlight | null>(() => {
+    const highlighter = loadedHljs;
+    return (
+      highlight || (highlighter ? (code, lang) => safeHighlight(highlighter, code, lang) : null)
+    );
+  });
 
   // Highlighted HTML for the selected artifact's source, or null (→ plain text +
   // data-highlight-pending so the session's lazy highlighter can finish later).
   const codeHtml = $derived.by(() => {
     const a = selected;
     if (!a || !effectiveHighlight) return null;
-    try {
-      return effectiveHighlight(a.content, a.lang);
-    } catch {
-      return null;
-    }
+    return runSync(
+      Effect.try({
+        try: () => effectiveHighlight(a.content, a.lang),
+        catch: () => null,
+      }).pipe(Effect.catch((fallback) => Effect.succeed(fallback))),
+    );
   });
 
-  const renderMd = (text) =>
-    renderMarkdown ? renderMarkdown(text) : safeMarkedParse(text, { marked });
+  const renderMd = (text: string): string =>
+    renderMarkdown ? renderMarkdown(text) : marked.parse(text, { async: false });
 
-  function previewSrcdoc(a) {
+  function previewSrcdoc(a: ArtifactView): string {
     const csp =
       "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline'";
     return (
@@ -102,7 +207,10 @@
     return selected?.previewType === 'markdown' ? t('artifact.preview') : t('artifact.runPreview');
   });
 
-  async function copyArtifactSource(textValue, button) {
+  async function copyArtifactSource(
+    textValue: string,
+    button: HTMLButtonElement,
+  ): Promise<boolean> {
     const ok = await copyToClipboard(textValue);
     if (ok && button) {
       const original = button.textContent;
@@ -116,7 +224,7 @@
     return ok;
   }
 
-  function download(a) {
+  function download(a: ArtifactView): void {
     const blob = new Blob([a.content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -128,14 +236,23 @@
     URL.revokeObjectURL(url);
   }
 
-  function setArtifacts(next, { hiddenCount: hidden = 0 } = {}) {
+  function setArtifacts(
+    next: ReadonlyArray<unknown>,
+    { hiddenCount: hidden = 0 }: { readonly hiddenCount?: number } = {},
+  ): void {
+    const visible = next.flatMap((value) =>
+      Option.match(decodeArtifactView(value), {
+        onNone: () => [],
+        onSome: (artifact) => [artifact],
+      }),
+    );
     imperative = {
-      visible: Array.isArray(next) ? next : [],
+      visible,
       hiddenCount: Number.isFinite(hidden) && hidden > 0 ? hidden : 0,
     };
   }
 
-  function selectArtifact(id) {
+  function selectArtifact(id: string): void {
     if (!artifacts.some((a) => a.id === id)) return;
     if (id !== pickedId) previewing = false;
     pickedId = id;
@@ -143,7 +260,7 @@
 
   // Hide the Artifacts tab entirely when the feature is disabled; if it was the
   // active tab, fall back to Scratchpad so the user isn't left on a blank pane.
-  function applyArtifactsEnabled(enabled) {
+  function applyArtifactsEnabled(enabled: boolean): void {
     const tab = document.getElementById('right-tab-artifacts');
     if (!tab) return;
     tab.hidden = !enabled;
@@ -177,28 +294,37 @@
 
   onMount(() => {
     if (!highlight) {
-      import('highlight.js')
-        .then(({ default: loaded }) => {
-          loadedHljs = loaded;
-        })
-        .catch(() => {});
+      void runPromise(
+        Effect.tryPromise({
+          try: () => import('highlight.js'),
+          catch: (cause) => new NetworkError({ cause }),
+        }).pipe(
+          Effect.match({
+            onFailure: () => undefined,
+            onSuccess: ({ default: loaded }) => {
+              loadedHljs = loaded;
+            },
+          }),
+        ),
+      );
     }
     // Reflect artifact-setting changes made on the /settings page (in another
     // tab) without a reload. The `storage` event fires only in other documents,
     // so this won't double-fire for changes originating in this same tab. A null
     // key means storage was cleared — re-read defaults.
-    const onStorage = (e) => {
+    const onStorage = (e: StorageEvent): void => {
       if (e.key === null || ARTIFACT_SETTING_KEYS.includes(e.key)) settingsTick += 1;
     };
     if (model) window.addEventListener('storage', onStorage);
-    sessionRuntime.artifacts = {
+    const artifactRuntime: ArtifactPanelRuntime = {
       setArtifacts,
       selectArtifact,
       render: () => {},
       getSelectedId: () => selectedId,
-      getArtifact: (id) => artifacts.find((a) => a.id === id) || null,
+      getArtifact: (id: string) => artifacts.find((a) => a.id === id) || null,
       getCount: () => artifacts.length,
     };
+    sessionRuntime.artifacts = artifactRuntime;
     return () => {
       if (model) window.removeEventListener('storage', onStorage);
       sessionRuntime.artifacts = null;

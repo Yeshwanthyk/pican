@@ -1,5 +1,9 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
+  import * as Http from '../../lib/http.js';
+  import { describeError } from '../../lib/errors.js';
+  import { runPromise } from '../../lib/runtime.js';
+  import { NewSessionResponseSchema } from '../../lib/schema.js';
   import {
     icon,
     ArrowLeft,
@@ -22,9 +26,16 @@
     runtime = 'pi',
     nativeId = '',
     sessionUUID = '',
+  }: {
+    title?: string;
+    cwd?: string;
+    sessionId?: string;
+    runtime?: string;
+    nativeId?: string;
+    sessionUUID?: string;
   } = $props();
 
-  function bodySessionUUID() {
+  function bodySessionUUID(): string {
     const resumeSessionArg =
       typeof document !== 'undefined' ? document.body.dataset.sessionUuid || '' : '';
     return resumeSessionArg;
@@ -58,57 +69,60 @@
   // Phase 3). These are hidden command-relay buttons that the command menu and
   // header buttons .click() by id; live-only (export omits this header).
 
-  async function copyText(text, onCopied) {
+  async function copyText(text: string, onCopied: () => void): Promise<void> {
     if (await copyToClipboard(text)) onCopied();
   }
 
   // Passive "Copied" toast — does NOT mutate the resume button's own text.
-  function showResumeCopiedNotice(command) {
+  function showResumeCopiedNotice(command: string): void {
     showToast(t('common.copied'), { id: 'resume-copy-notice', duration: 1200, title: command });
   }
 
-  const newSessionToast = (text) => showToast(text, { id: 'new-session-toast', duration: 2500 });
+  const newSessionToast = (text: string): void => {
+    showToast(text, { id: 'new-session-toast', duration: 2500 });
+  };
 
   onMount(() => {
     const resumeBtn = document.getElementById('resume-btn');
-    const newBtn = document.getElementById('new-btn');
+    const newElement = document.getElementById('new-btn');
+    const newBtn = newElement instanceof HTMLButtonElement ? newElement : null;
 
-    const onResume = () => {
+    const onResume = (): void => {
       if (!resumeCommand) {
         showToast(t('session.resumeUnavailable'));
         return;
       }
-      copyText(resumeCommand, () => showResumeCopiedNotice(resumeCommand));
+      void copyText(resumeCommand, () => showResumeCopiedNotice(resumeCommand));
     };
 
-    const onNew = async () => {
+    const onNew = (): void => {
       if (!cwd) {
         newSessionToast(t('session.noWorkingDirectory'));
         return;
       }
+      if (!newBtn) return;
       const originalHTML = newBtn.innerHTML;
       newBtn.innerHTML = '<span class="working-dots"></span>';
       newBtn.disabled = true;
-      try {
-        const response = await fetch('/api/new-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: cwd, sourceSessionId: sessionId, runtime }),
-        });
-        const data = await response.json();
-        if (data.error) {
-          newSessionToast(data.error || t('index.failedCreateSession'));
-        } else if (data.id) {
+      const restore = (): void => {
+        newBtn.innerHTML = originalHTML;
+        newBtn.disabled = false;
+      };
+      void runPromise(
+        Http.post(
+          '/api/new-session',
+          { path: cwd, sourceSessionId: sessionId, runtime },
+          NewSessionResponseSchema,
+        ),
+      ).then(
+        (data) => {
           navigate('/session?id=' + encodeURIComponent(data.id));
-          return;
-        } else {
-          newSessionToast(t('index.failedCreateSession'));
-        }
-      } catch (err) {
-        newSessionToast(err.message || t('index.networkError'));
-      }
-      newBtn.innerHTML = originalHTML;
-      newBtn.disabled = false;
+        },
+        (error: unknown) => {
+          newSessionToast(describeError(error) || t('index.networkError'));
+          restore();
+        },
+      );
     };
 
     resumeBtn?.addEventListener('click', onResume);

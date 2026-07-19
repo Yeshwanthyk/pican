@@ -23,8 +23,7 @@ export function setupSessionSearchAndFilters({
 }: SearchFilterOptions) {
   const searchElement = documentImpl.getElementById("tree-search");
   const InputElement = documentImpl.defaultView?.HTMLInputElement;
-  const searchInput =
-    InputElement && searchElement instanceof InputElement ? searchElement : null;
+  const searchInput = InputElement && searchElement instanceof InputElement ? searchElement : null;
   searchInput?.addEventListener("input", (e) => {
     if (e.currentTarget !== searchInput) return;
     setSearchQuery(searchInput.value);

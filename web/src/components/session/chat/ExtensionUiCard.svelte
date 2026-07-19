@@ -1,9 +1,27 @@
-<script>
+<script lang="ts">
+  import { Schema } from 'effect';
   import { onMount } from 'svelte';
+  import * as Http from '../../../lib/http.js';
+  import type { FetchLike } from '../../../lib/http.js';
+  import { runPromise } from '../../../lib/runtime.js';
   import { t } from '../../../shared/strings.js';
-  import { extensionRequestExpiresAt } from './extension-ui-state.js';
+  import { extensionRequestExpiresAt, type ExtensionRequest } from './extension-ui-state.js';
 
-  let { request, sessionId, onResolved = () => {}, fetchImpl = globalThis.fetch } = $props();
+  type ResponseFields =
+    | { readonly value: string }
+    | { readonly confirmed: boolean }
+    | { readonly cancelled: true };
+
+  interface Props {
+    readonly request: ExtensionRequest;
+    readonly sessionId: string;
+    readonly onResolved?: (id: string) => void;
+    readonly fetchImpl?: FetchLike;
+  }
+
+  const ExtensionResponse = Schema.Struct({ ok: Schema.Boolean });
+
+  let { request, sessionId, onResolved = () => {}, fetchImpl = globalThis.fetch }: Props = $props();
 
   let value = $state('');
   let submitting = $state(false);
@@ -15,28 +33,30 @@
   const countdown = $derived(Math.max(0, Math.ceil(remainingMs / 1000)));
   const disabled = $derived(submitting || expired);
 
-  async function respond(fields) {
+  function respond(fields: ResponseFields): void {
     if (disabled) return;
     submitting = true;
     failed = false;
-    try {
-      const response = await fetchImpl('/api/extension-ui/respond', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session: sessionId, id: request.id, ...fields }),
-      });
-      if (!response.ok) throw new Error('extension UI response failed');
-      onResolved(request.id);
-    } catch {
-      failed = true;
-      submitting = false;
-    }
+    void runPromise(
+      Http.post(
+        '/api/extension-ui/respond',
+        { session: sessionId, id: request.id, ...fields },
+        ExtensionResponse,
+        { fetchImpl },
+      ),
+    ).then(
+      () => onResolved(request.id),
+      () => {
+        failed = true;
+        submitting = false;
+      },
+    );
   }
 
   onMount(() => {
     if (request?.method === 'editor') value = request?.prefill || '';
     if (expiresAt === null) return;
-    const update = () => {
+    const update = (): void => {
       remainingMs = Math.max(0, expiresAt - Date.now());
       if (remainingMs === 0 && !expired) {
         expired = true;

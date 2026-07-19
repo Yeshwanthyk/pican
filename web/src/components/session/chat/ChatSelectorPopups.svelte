@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { t } from '../../../shared/strings.js';
 </script>
 

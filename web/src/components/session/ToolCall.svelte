@@ -1,10 +1,18 @@
-<script>
+<script lang="ts">
   // One assistant tool call. Dispatches on the tool name to a declarative
   // rendering of its arguments + (looked-up) result. Mirrors the former
   // renderToolCall(). {@html} is used only for pre-rendered (ANSI) custom-tool
   // HTML; everything else is escaped Svelte template. The result element keeps
   // the `entry-<resultId>` anchor so scroll still works.
   import { formatToolFoldSummary, shortenPath } from '../../session/render/session-format.js';
+  import {
+    contentBlocksFromUnknown,
+    isUnknownRecord,
+    type ContentBlock,
+    type SessionEntry,
+    type SessionMessage,
+    type UnknownRecord,
+  } from '../../session/data/session-types.js';
   import { t } from '../../shared/strings.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
   import ToolOutput, { toggleExpanded } from './ToolOutput.svelte';
@@ -13,40 +21,89 @@
   import SubagentToolCard from './SubagentToolCard.svelte';
   import WorkflowToolCard from './WorkflowToolCard.svelte';
 
-  let { call, model } = $props();
+  interface ToolCallModel {
+    readonly entries?: readonly SessionEntry[];
+    readonly renderedTools?: unknown;
+  }
+
+  interface ResultImage {
+    readonly mimeType: string;
+    readonly data: string;
+  }
+
+  interface RenderedTool {
+    readonly callHtml?: string;
+    readonly resultHtmlCollapsed?: string;
+    readonly resultHtmlExpanded?: string;
+  }
+
+  let { call, model }: { call: ContentBlock; model?: ToolCallModel | null } = $props();
+
+  const toolName = $derived(typeof call.name === 'string' ? call.name : 'tool');
+  const callId = $derived(typeof call.id === 'string' ? call.id : '');
 
   const resultEntry = $derived.by(() => {
     for (const entry of model?.entries || []) {
       if (
         entry.type === 'message' &&
-        entry.message.role === 'toolResult' &&
-        entry.message.toolCallId === call.id
+        entry.message?.role === 'toolResult' &&
+        entry.message.toolCallId === callId
       )
         return entry;
     }
     return null;
   });
-  const result = $derived(resultEntry?.message || null);
+  const result = $derived<SessionMessage | null>(resultEntry?.message ?? null);
+  const resultDetails = $derived(isUnknownRecord(result?.details) ? result.details : null);
   const statusClass = $derived(
     result ? (result.isRunning ? 'pending' : result.isError ? 'error' : 'success') : 'pending',
   );
-  const args = $derived(call.arguments || {});
+  const args = $derived<UnknownRecord>(isUnknownRecord(call.arguments) ? call.arguments : {});
+  const resultBlocks = $derived(contentBlocksFromUnknown(result?.content));
 
   const resultText = $derived(
-    result
-      ? result.content
-          .filter((c) => c.type === 'text')
-          .map((c) => c.text)
-          .join('\n')
-      : '',
+    resultBlocks
+      .filter((block) => block.type === 'text')
+      .map((block) => (typeof block.text === 'string' ? block.text : ''))
+      .join('\n'),
   );
-  const resultImages = $derived(result ? result.content.filter((c) => c.type === 'image') : []);
-  const rendered = $derived(model?.renderedTools?.[call.id] || null);
-  const toolSummary = $derived(formatToolFoldSummary(call.name, args, result));
+  const resultImages = $derived<ResultImage[]>(
+    resultBlocks.flatMap((block) =>
+      block.type === 'image' && typeof block.data === 'string'
+        ? [
+            {
+              data: block.data,
+              mimeType: typeof block.mimeType === 'string' ? block.mimeType : 'image/png',
+            },
+          ]
+        : [],
+    ),
+  );
+  const rendered = $derived.by((): RenderedTool | null => {
+    if (!callId || !isUnknownRecord(model?.renderedTools)) return null;
+    const candidate = model.renderedTools[callId];
+    if (!isUnknownRecord(candidate)) return null;
+    return {
+      callHtml: typeof candidate.callHtml === 'string' ? candidate.callHtml : undefined,
+      resultHtmlCollapsed:
+        typeof candidate.resultHtmlCollapsed === 'string'
+          ? candidate.resultHtmlCollapsed
+          : undefined,
+      resultHtmlExpanded:
+        typeof candidate.resultHtmlExpanded === 'string' ? candidate.resultHtmlExpanded : undefined,
+    };
+  });
+  const toolSummary = $derived(
+    formatToolFoldSummary(toolName, args, resultDetails ? { details: resultDetails } : null),
+  );
+  const diffText = $derived(typeof resultDetails?.diff === 'string' ? resultDetails.diff : '');
+  const offset = $derived(typeof args.offset === 'number' ? args.offset : 1);
+  const limit = $derived(typeof args.limit === 'number' ? args.limit : null);
+  const toolResult = $derived(resultDetails ? { details: resultDetails } : null);
 
   // read/write/edit/ls share a file-path arg; compute it once.
   const filePath = $derived(str(args.file_path ?? args.path));
-  const taskTools = new Set([
+  const taskTools = new Set<string>([
     'TaskCreate',
     'TaskList',
     'TaskGet',
@@ -56,7 +113,7 @@
     'TaskStop',
     'TaskExecute',
   ]);
-  const subagentTools = new Set([
+  const subagentTools = new Set<string>([
     'subagent_spawn',
     'subagent_wait',
     'subagent_check',
@@ -73,24 +130,24 @@
   state.toolsVisible is false so an assistant message whose only content is a
   tool call doesn't render as a stranded timestamp.
 -->
-<div class="tool-call-collapsed">Tool: {call.name} ...</div>
+<div class="tool-call-collapsed">Tool: {toolName} ...</div>
 <div class="tool-execution {statusClass}" id={resultEntry ? `entry-${resultEntry.id}` : undefined}>
   <details class="tool-fold" open={result?.isError || undefined}>
     <summary class="tool-fold-summary">
       <span class="tool-fold-status {statusClass}" aria-hidden="true"></span>
-      <span class="tool-fold-name">{call.name}</span>
+      <span class="tool-fold-name">{toolName}</span>
       {#if toolSummary}<span class="tool-fold-description">{toolSummary}</span>{/if}
       {#if result?.isError}<span class="tool-fold-error">{t('session.error')}</span>{/if}
     </summary>
     <div class="tool-fold-body">
-      {#if call.name === 'bash'}
+      {#if toolName === 'bash'}
         {@const command = str(args.command)}
         <div class="tool-command">
           $ {#if command === null}<span class="tool-error">[invalid arg]</span>{:else}{command ||
               '...'}{/if}
         </div>
         {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={5} />{/if}
-      {:else if call.name === 'read'}
+      {:else if toolName === 'read'}
         <div class="tool-header">
           <span class="tool-name">read</span>
           <span class="tool-path"
@@ -99,16 +156,14 @@
                 filePath || '',
               )}{#if args.offset !== undefined || args.limit !== undefined}<span
                   class="line-numbers"
-                  >:{args.offset ?? 1}{args.limit !== undefined
-                    ? '-' + ((args.offset ?? 1) + args.limit - 1)
-                    : ''}</span
+                  >:{offset}{limit !== null ? '-' + (offset + limit - 1) : ''}</span
                 >{/if}{/if}</span
           >
         </div>
         {#if result}
           {#if resultImages.length > 0}<div class="tool-images">
               {#each resultImages as img, imgIndex (imgIndex)}<img
-                  src={`data:${img.mimeType || 'image/png'};base64,${img.data}`}
+                  src={`data:${img.mimeType};base64,${img.data}`}
                   class="tool-image"
                   alt=""
                 />{/each}
@@ -119,7 +174,7 @@
               lang={filePath ? getLanguageFromPath(filePath) : null}
             />{/if}
         {/if}
-      {:else if call.name === 'write'}
+      {:else if toolName === 'write'}
         {@const content = str(args.content)}
         {@const lineCount = content ? content.split('\n').length : 0}
         <div class="tool-header">
@@ -140,7 +195,7 @@
         {#if result && resultText.trim()}<div class="tool-output">
             <div>{resultText.trim()}</div>
           </div>{/if}
-      {:else if call.name === 'edit'}
+      {:else if toolName === 'edit'}
         <div class="tool-header">
           <span class="tool-name">edit</span>
           <span class="tool-path"
@@ -148,9 +203,9 @@
               >{:else}{shortenPath(filePath || '')}{/if}</span
           >
         </div>
-        {#if result?.details?.diff}
+        {#if diffText}
           <div class="tool-diff">
-            {#each result.details.diff.split('\n') as line, lineIndex (lineIndex)}<div
+            {#each diffText.split('\n') as line, lineIndex (lineIndex)}<div
                 class={line.match(/^\+/)
                   ? 'diff-added'
                   : line.match(/^-/)
@@ -163,7 +218,7 @@
         {:else if result && resultText.trim()}<div class="tool-output">
             <pre>{resultText.trim()}</pre>
           </div>{/if}
-      {:else if call.name === 'ls'}
+      {:else if toolName === 'ls'}
         <div class="tool-header">
           <span class="tool-name">ls</span>
           <span class="tool-path"
@@ -173,19 +228,19 @@
           >
         </div>
         {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={20} />{/if}
-      {:else if call.name === 'ask_user_question' || call.name === 'pican_ask_user_question'}
+      {:else if toolName === 'ask_user_question' || toolName === 'pican_ask_user_question'}
         <AskQuestion {args} {result} />
-      {:else if taskTools.has(call.name)}
-        <TaskToolCard name={call.name} {args} {resultText} />
-      {:else if subagentTools.has(call.name)}
-        <SubagentToolCard name={call.name} {result} {resultText} />
-      {:else if call.name === 'workflow'}
-        <WorkflowToolCard {result} {resultText} />
+      {:else if taskTools.has(toolName)}
+        <TaskToolCard name={toolName} {args} {resultText} />
+      {:else if subagentTools.has(toolName)}
+        <SubagentToolCard name={toolName} result={toolResult} {resultText} />
+      {:else if toolName === 'workflow'}
+        <WorkflowToolCard result={toolResult} {resultText} />
       {:else if rendered && (rendered.callHtml || rendered.resultHtmlCollapsed || rendered.resultHtmlExpanded)}
         {#if rendered.callHtml}<div class="tool-header ansi-rendered">
             {@html rendered.callHtml}
           </div>{:else}<div class="tool-header">
-            <span class="tool-name">{call.name}</span>
+            <span class="tool-name">{toolName}</span>
           </div>{/if}
         {#if rendered.resultHtmlCollapsed && rendered.resultHtmlExpanded && rendered.resultHtmlCollapsed !== rendered.resultHtmlExpanded}
           <div
@@ -200,7 +255,7 @@
           <div class="tool-output ansi-rendered">{@html rendered.resultHtmlExpanded}</div>
         {:else if result && resultText}<ToolOutput text={resultText} maxLines={10} />{/if}
       {:else}
-        <div class="tool-header"><span class="tool-name">{call.name}</span></div>
+        <div class="tool-header"><span class="tool-name">{toolName}</span></div>
         <div class="tool-output"><pre>{JSON.stringify(args, null, 2)}</pre></div>
         {#if result && resultText}<ToolOutput text={resultText} maxLines={10} />{/if}
       {/if}

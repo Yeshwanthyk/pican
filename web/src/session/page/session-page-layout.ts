@@ -17,9 +17,7 @@ const readStorage = (storage: LayoutStorage, key: string): string | null =>
     Effect.try({
       try: () => storage.getItem(key),
       catch: (cause) => new StorageError({ key, op: "read", cause }),
-    }).pipe(
-      Effect.catch(() => Effect.succeed(null)),
-    ),
+    }).pipe(Effect.catch(() => Effect.succeed(null))),
   );
 
 export function applySessionPageBodyClasses({

@@ -1,15 +1,26 @@
-<script>
+<script lang="ts">
   // Share dialog — Svelte port of live/share-overlay.js. Wires the hidden
   // #share-btn relay (in SessionHeader) to POST /share, then shows the gist /
   // preview URLs (or an error) in a reactive overlay with copy-to-clipboard.
   // Live-only (the export snapshot omits #share-btn). See svelte-migration-plan.
+  import { Schema } from 'effect';
   import { onMount } from 'svelte';
+  import * as Http from '../../lib/http.js';
+  import { describeError } from '../../lib/errors.js';
+  import { runPromise } from '../../lib/runtime.js';
   import { icon, Share2 } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
 
-  let { sessionId = '' } = $props();
+  let { sessionId = '' }: { sessionId?: string } = $props();
+
+  const ShareResponse = Schema.Struct({
+    error: Schema.optionalKey(Schema.String),
+    stderr: Schema.optionalKey(Schema.String),
+    gistUrl: Schema.optionalKey(Schema.String),
+    previewUrl: Schema.optionalKey(Schema.String),
+  });
 
   let open = $state(false);
   let isError = $state(false);
@@ -17,9 +28,9 @@
   let gistUrl = $state('');
   let previewUrl = $state('');
   let errorMsg = $state('');
-  let overlayEl = $state(null);
+  let overlayEl = $state<HTMLDivElement | null>(null);
 
-  function showShareCopiedNotice(label, text) {
+  function showShareCopiedNotice(label: string, text: string): void {
     showToast(t('share.copiedSuffix', { label }), {
       id: 'share-copy-notice',
       duration: 1200,
@@ -27,24 +38,30 @@
     });
   }
 
-  async function copyShareUrl(text, label) {
+  async function copyShareUrl(text: string, label: string): Promise<void> {
     if (await copyToClipboard(text)) showShareCopiedNotice(label, text);
   }
 
-  function close() {
+  function close(): void {
     open = false;
   }
 
   onMount(() => {
-    const shareBtn = document.getElementById('share-btn');
-    const onShare = () => {
+    const shareElement = document.getElementById('share-btn');
+    const shareBtn = shareElement instanceof HTMLButtonElement ? shareElement : null;
+    const onShare = (): void => {
+      if (!shareBtn) return;
       shareBtn.innerHTML = '<span class="working-dots"></span>';
       shareBtn.disabled = true;
-      fetch('/share?id=' + encodeURIComponent(sessionId), { method: 'POST' })
-        .then((r) => r.json())
-        .then((data) => {
-          shareBtn.innerHTML = icon(Share2, { size: 14 }) + t('menu.share');
-          shareBtn.disabled = false;
+      const restore = (): void => {
+        shareBtn.innerHTML = icon(Share2, { size: 14 }) + t('menu.share');
+        shareBtn.disabled = false;
+      };
+      void runPromise(
+        Http.post('/share?id=' + encodeURIComponent(sessionId), undefined, ShareResponse),
+      ).then(
+        (data) => {
+          restore();
           if (data.error) {
             isError = true;
             title = t('share.failedTitle');
@@ -52,24 +69,24 @@
           } else {
             isError = false;
             title = t('share.successTitle');
-            gistUrl = data.gistUrl;
-            previewUrl = data.previewUrl;
+            gistUrl = data.gistUrl ?? '';
+            previewUrl = data.previewUrl ?? '';
           }
           open = true;
-        })
-        .catch((err) => {
-          shareBtn.innerHTML = icon(Share2, { size: 14 }) + t('menu.share');
-          shareBtn.disabled = false;
+        },
+        (error: unknown) => {
+          restore();
           isError = true;
           title = t('share.failedTitle');
-          errorMsg = err.message || t('share.networkError');
+          errorMsg = describeError(error) || t('share.networkError');
           open = true;
-        });
+        },
+      );
     };
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && open) close();
     };
-    const onBackdrop = (e) => {
+    const onBackdrop = (e: MouseEvent): void => {
       if (e.target === overlayEl) close();
     };
 
@@ -118,13 +135,14 @@
         id="share-copy-gist"
         class="share-btn-primary"
         style:display={isError ? 'none' : ''}
-        onclick={() => copyShareUrl(gistUrl, t('share.gistLabel'))}>{t('share.copyGist')}</button
+        onclick={() => void copyShareUrl(gistUrl, t('share.gistLabel'))}
+        >{t('share.copyGist')}</button
       >
       <button
         id="share-copy-preview"
         class="share-btn-secondary"
         style:display={isError ? 'none' : ''}
-        onclick={() => copyShareUrl(previewUrl, t('share.previewLabel'))}
+        onclick={() => void copyShareUrl(previewUrl, t('share.previewLabel'))}
         >{t('share.copyPreview')}</button
       >
       <button id="share-close" class="share-btn-secondary" onclick={close}

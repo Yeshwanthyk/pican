@@ -37,9 +37,9 @@ describe("setSidebarOpen", () => {
     const jsdom = dom();
     setSidebarOpen(true, { documentImpl: jsdom.window.document });
     expect(jsdom.window.document.getElementById("sidebar")?.classList.contains("open")).toBe(true);
-    expect(jsdom.window.document.getElementById("sidebar-overlay")?.classList.contains("open")).toBe(
-      true,
-    );
+    expect(
+      jsdom.window.document.getElementById("sidebar-overlay")?.classList.contains("open"),
+    ).toBe(true);
     expect(jsdom.window.document.body.classList.contains("sidebar-open")).toBe(true);
     expect(jsdom.window.document.getElementById("hamburger")?.style.display).toBe("none");
 
