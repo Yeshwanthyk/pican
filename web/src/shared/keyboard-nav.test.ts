@@ -1,5 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import { isComposerPopupOpen, isEditableTarget, setupKeyboardNav } from "./keyboard-nav.js";
+import type { KeyboardDocument, KeyboardElement, KeyboardEvent } from "./keyboard-nav.js";
+
+interface DispatchInit {
+  readonly key?: string;
+  readonly metaKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly altKey?: boolean;
+  readonly shiftKey?: boolean;
+}
+
+interface MockKeyboardEvent extends KeyboardEvent {
+  readonly stopImmediatePropagation: () => void;
+}
+
+interface MockKeyboardDocument extends KeyboardDocument {
+  querySelectorAll?: (selector: string) => Iterable<KeyboardElement>;
+  _dispatch(type: string, init: DispatchInit): MockKeyboardEvent;
+}
 
 describe("isEditableTarget", () => {
   it("returns false for null/undefined", () => {
@@ -73,29 +91,37 @@ describe("setupKeyboardNav", () => {
     };
   }
 
-  function createMockDocument(activeElement = null, queryResult = null, contentElement = null) {
-    const listeners = [];
-    const doc = {
+  function createMockDocument(
+    activeElement: KeyboardElement | null = null,
+    queryResult: KeyboardElement | null = null,
+    contentElement: KeyboardElement | null = null,
+  ): MockKeyboardDocument {
+    const listeners: Array<{
+      readonly type: string;
+      readonly handler: (event: KeyboardEvent) => void;
+      readonly options?: { readonly capture?: boolean };
+    }> = [];
+    const doc: MockKeyboardDocument = {
       activeElement,
       documentElement: { scrollHeight: 5000 },
       querySelector: vi.fn(() => queryResult),
-      getElementById: vi.fn((id) => {
+      getElementById: vi.fn((id: string) => {
         if (id === "content") return contentElement;
         return null;
       }),
-      addEventListener(type, handler, options) {
+      addEventListener(type: "keydown", handler: (event: KeyboardEvent) => void, options) {
         listeners.push({ type, handler, options });
       },
-      _dispatch(type, init) {
+      _dispatch(type: string, init: DispatchInit) {
         const e = {
           key: init.key || "",
           metaKey: init.metaKey || false,
           ctrlKey: init.ctrlKey || false,
           altKey: init.altKey || false,
           shiftKey: init.shiftKey || false,
-          preventDefault: vi.fn(),
-          stopPropagation: vi.fn(),
-          stopImmediatePropagation: vi.fn(),
+          preventDefault: vi.fn<() => void>(),
+          stopPropagation: vi.fn<() => void>(),
+          stopImmediatePropagation: vi.fn<() => void>(),
         };
         for (const l of listeners) {
           if (l.type === type) l.handler(e);
@@ -107,9 +133,9 @@ describe("setupKeyboardNav", () => {
   }
 
   function createFakeTimers() {
-    let pending = null;
+    let pending: (() => void) | null = null;
     return {
-      setTimeout: (fn) => {
+      setTimeout: (fn: () => void) => {
         pending = fn;
         return 1;
       },
@@ -118,7 +144,7 @@ describe("setupKeyboardNav", () => {
       },
       firePending() {
         if (pending) {
-          const fn = pending;
+          const fn: () => void = pending;
           pending = null;
           fn();
         }
@@ -182,7 +208,7 @@ describe("setupKeyboardNav", () => {
 
   it("registers Escape handler in capture phase", () => {
     const doc = createMockDocument();
-    const calls = [];
+    const calls: Array<{ type: string; options?: { readonly capture?: boolean } }> = [];
     const orig = doc.addEventListener;
     doc.addEventListener = (type, handler, options) => {
       calls.push({ type, options });

@@ -2,25 +2,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { showToast } from "./toast.js";
 
 function fakeElement() {
-  const classes = new Set();
+  const classes = new Set<string>();
   return {
     id: "",
     className: "",
     textContent: "",
     title: "",
     classList: {
-      add: (c) => classes.add(c),
-      remove: (c) => classes.delete(c),
-      contains: (c) => classes.has(c),
+      add: (className: string) => {
+        classes.add(className);
+      },
+      remove: (className: string) => {
+        classes.delete(className);
+      },
+      contains: (className: string) => classes.has(className),
     },
   };
 }
 
 function fakeDocument() {
-  const byId = new Map();
+  const byId = new Map<string, ReturnType<typeof fakeElement>>();
   return {
-    body: { appendChild: (el) => byId.set(el.id, el) },
-    getElementById: (id) => byId.get(id) ?? null,
+    body: {
+      appendChild: (element: ReturnType<typeof fakeElement>) => {
+        byId.set(element.id, element);
+      },
+    },
+    getElementById: (id: string) => byId.get(id) ?? null,
     createElement: () => fakeElement(),
   };
 }

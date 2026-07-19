@@ -61,9 +61,13 @@ import {
   X,
   CircleX,
 } from "lucide";
+import type { IconNode } from "lucide";
 
 // Lucide's default SVG presentation attributes (24x24 grid, 2px round strokes).
-const DEFAULT_ATTRS = {
+type SvgAttribute = string | number | boolean | null | undefined;
+type SvgAttributes = Record<string, SvgAttribute>;
+
+const DEFAULT_ATTRS: SvgAttributes = {
   xmlns: "http://www.w3.org/2000/svg",
   viewBox: "0 0 24 24",
   fill: "none",
@@ -73,7 +77,7 @@ const DEFAULT_ATTRS = {
   "stroke-linejoin": "round",
 };
 
-const attrString = (attrs) =>
+const attrString = (attrs: Readonly<SvgAttributes>): string =>
   Object.entries(attrs)
     .filter(([, v]) => v !== undefined && v !== null && v !== false)
     .map(([k, v]) => `${k}="${String(v)}"`)
@@ -85,8 +89,21 @@ const attrString = (attrs) =>
  * @param {{ size?: number, class?: string, strokeWidth?: number|string }} [opts]
  * @returns {string}
  */
-export function icon(node, { size = 16, class: className = "", strokeWidth } = {}) {
-  const attrs = {
+interface IconOptions {
+  readonly size?: number;
+  readonly class?: string;
+  readonly strokeWidth?: number | string;
+}
+
+interface IconNodeOptions extends IconOptions {
+  readonly documentImpl?: Document;
+}
+
+export function icon(
+  node: IconNode,
+  { size = 16, class: className = "", strokeWidth }: IconOptions = {},
+): string {
+  const attrs: SvgAttributes = {
     ...DEFAULT_ATTRS,
     width: size,
     height: size,
@@ -99,11 +116,11 @@ export function icon(node, { size = 16, class: className = "", strokeWidth } = {
 }
 
 export function iconNode(
-  node,
-  { size = 16, class: className = "", strokeWidth, documentImpl = document } = {},
-) {
+  node: IconNode,
+  { size = 16, class: className = "", strokeWidth, documentImpl = document }: IconNodeOptions = {},
+): SVGSVGElement {
   const svg = documentImpl.createElementNS("http://www.w3.org/2000/svg", "svg");
-  const attrs = {
+  const attrs: SvgAttributes = {
     ...DEFAULT_ATTRS,
     width: size,
     height: size,
@@ -120,7 +137,11 @@ export function iconNode(
   return svg;
 }
 
-export function setIconElement(el, node, opts = {}) {
+export function setIconElement(
+  el: Element | null | undefined,
+  node: IconNode,
+  opts: IconNodeOptions = {},
+): void {
   if (!el) return;
   el.replaceChildren(
     iconNode(node, { ...opts, documentImpl: opts.documentImpl || el.ownerDocument || document }),
@@ -130,7 +151,7 @@ export function setIconElement(el, node, opts = {}) {
 // Theme -> Lucide icon. Keep this in sync with the inlined theme-icon SVGs in
 // the boot script (internal/ui/live_page.go), which paints the icon before the
 // JS bundle loads — both must emit identical markup to avoid a swap on load.
-const THEME_ICONS = {
+const THEME_ICONS: Readonly<Record<string, IconNode>> = {
   dark: Moon,
   light: Sun,
   nord: Snowflake,
@@ -149,12 +170,16 @@ const THEME_ICONS = {
 };
 
 /** SVG markup string for a theme's indicator icon. */
-export function themeIcon(theme, opts = {}) {
-  return icon(THEME_ICONS[theme] || THEME_ICONS.dark, { size: 14, ...opts });
+export function themeIcon(theme: string, opts: IconOptions = {}): string {
+  return icon(THEME_ICONS[theme] ?? Moon, { size: 14, ...opts });
 }
 
-export function setThemeIconElement(el, theme, opts = {}) {
-  setIconElement(el, THEME_ICONS[theme] || THEME_ICONS.dark, { size: 14, ...opts });
+export function setThemeIconElement(
+  el: Element | null | undefined,
+  theme: string,
+  opts: IconNodeOptions = {},
+): void {
+  setIconElement(el, THEME_ICONS[theme] ?? Moon, { size: 14, ...opts });
 }
 
 export {

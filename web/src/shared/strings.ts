@@ -3,8 +3,10 @@
 // renderers while keeping the application English-only.
 import english from "./english.js";
 
-export function t(key, params) {
-  let value = key in english ? english[key] : key;
+const catalog: Readonly<Record<string, string>> = english;
+
+export function t(key: string, params?: Readonly<Record<string, unknown>>): string {
+  let value = catalog[key] ?? key;
   if (params && typeof value === "string") {
     value = value.replace(/\{(\w+)\}/g, (match, name) =>
       name in params ? String(params[name]) : match,

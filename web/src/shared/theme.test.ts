@@ -2,20 +2,27 @@ import { describe, expect, it } from "vitest";
 import { applyTheme, THEME_IDS, toggleTheme } from "./theme.js";
 
 function fakeStorage() {
-  const values = new Map();
+  const values = new Map<string, string>();
   return {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, String(value)),
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, String(value));
+    },
   };
 }
 
+interface FakeThemeRoot {
+  readonly dataset: Record<string, string | undefined>;
+  readonly style: { backgroundColor?: string };
+}
+
 function fakeDocument() {
-  const root = { dataset: {}, style: {} };
+  const root: FakeThemeRoot = { dataset: {}, style: {} };
   const meta = { content: "" };
   return {
     documentElement: root,
     cookie: "",
-    querySelector: (selector) => (selector === 'meta[name="theme-color"]' ? meta : null),
+    querySelector: (selector: string) => (selector === 'meta[name="theme-color"]' ? meta : null),
     _meta: meta,
   };
 }
@@ -55,7 +62,7 @@ describe("theme helpers", () => {
       localStorage: storage,
       navigator: { windowControlsOverlay: { visible: true } },
       getComputedStyle: () => ({
-        getPropertyValue: (property) => (property === "--chrome-bg" ? "  #181825  " : ""),
+        getPropertyValue: (property: string) => (property === "--chrome-bg" ? "  #181825  " : ""),
       }),
     };
 

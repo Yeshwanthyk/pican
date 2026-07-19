@@ -122,14 +122,14 @@ func TestPrepareSessionPageDataUsesLastNonLabelEntryWithIDAsLeaf(t *testing.T) {
 
 func TestClipboardHelperGuardsAndFallsBack(t *testing.T) {
 	// The clipboard guard + insecure-context execCommand fallback live in one
-	// shared helper (web/src/shared/clipboard.js); the copy sites delegate to it.
-	source, err := os.ReadFile(repoPath("web/src/shared/clipboard.js"))
+	// shared helper (web/src/shared/clipboard.ts); the copy sites delegate to it.
+	source, err := os.ReadFile(repoPath("web/src/shared/clipboard.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/shared/clipboard.js: %v", err)
+		t.Fatalf("read web/src/shared/clipboard.ts: %v", err)
 	}
 	for _, want := range []string{
-		"export async function copyToClipboard(",
-		"navigatorImpl.clipboard && navigatorImpl.clipboard.writeText",
+		"export function copyToClipboard(",
+		"navigatorImpl.clipboard?.writeText",
 		`documentImpl.execCommand("copy")`,
 	} {
 		if !strings.Contains(string(source), want) {

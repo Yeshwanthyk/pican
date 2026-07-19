@@ -24,24 +24,26 @@ export const FONT_KEYWORDS = {
   system: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   sans: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   serif: "Georgia, 'Times New Roman', Times, serif",
-};
+} satisfies Readonly<Record<string, string>>;
 
 // Strip a raw family name to a safe subset (letters, digits, spaces, hyphens).
-export function sanitizeFontFamily(value) {
+export function sanitizeFontFamily(value: unknown): string {
   return String(value || "")
     .replace(/[^A-Za-z0-9 -]/g, "")
     .trim()
     .slice(0, 64);
 }
 
-export function resolveFontStack(value) {
-  if (FONT_KEYWORDS[value]) return FONT_KEYWORDS[value];
+export function resolveFontStack(value: unknown): string {
+  if (typeof value === "string" && value in FONT_KEYWORDS) {
+    return FONT_KEYWORDS[value as keyof typeof FONT_KEYWORDS];
+  }
   const family = sanitizeFontFamily(value);
   if (!family) return FONT_KEYWORDS.mono;
   return `'${family}', ${FONT_KEYWORDS.mono}`;
 }
 
-export function clampSize(value, fallback = 12) {
+export function clampSize(value: unknown, fallback = 12): number {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return fallback;
   return Math.min(FONT_MAX_SIZE, Math.max(FONT_MIN_SIZE, n));
@@ -52,7 +54,24 @@ export function clampSize(value, fallback = 12) {
  * (inline element-level styles win over any stylesheet rule). Any field may be
  * omitted.
  */
-export function applyFonts(documentImpl, { ui, content, code, uiSize, contentSize } = {}) {
+interface FontDocument {
+  readonly documentElement?: {
+    readonly style?: { setProperty(name: string, value: string): void };
+  };
+}
+
+interface FontOptions {
+  readonly ui?: unknown;
+  readonly content?: unknown;
+  readonly code?: unknown;
+  readonly uiSize?: unknown;
+  readonly contentSize?: unknown;
+}
+
+export function applyFonts(
+  documentImpl: FontDocument | null | undefined,
+  { ui, content, code, uiSize, contentSize }: FontOptions = {},
+): void {
   const root = documentImpl?.documentElement;
   if (!root || !root.style) return;
   if (ui) root.style.setProperty("--font-sans", resolveFontStack(ui));

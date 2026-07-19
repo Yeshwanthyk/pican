@@ -1,4 +1,5 @@
 import { navigate } from "./navigation.js";
+import type { NavigationWindow } from "./navigation.js";
 
 const SCROLL_AMOUNT = 300;
 const GG_TIMEOUT = 500; // ms window for double-tap 'gg'
@@ -7,7 +8,55 @@ const GG_TIMEOUT = 500; // ms window for double-tap 'gg'
  * Returns true when the element is an input, textarea, select, or
  * contenteditable region where the user types text.
  */
-export function isEditableTarget(element) {
+export interface KeyboardElement {
+  readonly tagName?: string;
+  readonly isContentEditable?: boolean;
+  readonly style?: { readonly display?: string };
+  readonly scrollHeight?: number;
+  closest?(selector: string): unknown;
+  blur?(): void;
+  focus?(): void;
+  scrollBy?(options: ScrollToOptions): void;
+  scrollTo?(options: ScrollToOptions): void;
+}
+
+export interface KeyboardEvent {
+  readonly key: string;
+  readonly metaKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly shiftKey?: boolean;
+  readonly altKey?: boolean;
+  preventDefault(): void;
+  stopPropagation(): void;
+}
+
+export interface KeyboardDocument {
+  readonly activeElement: KeyboardElement | null;
+  readonly documentElement: { readonly scrollHeight: number };
+  addEventListener(
+    type: "keydown",
+    handler: (event: KeyboardEvent) => void,
+    options?: { readonly capture?: boolean },
+  ): void;
+  querySelector(selector: string): KeyboardElement | null;
+  querySelectorAll?(selector: string): Iterable<KeyboardElement>;
+  getElementById?(id: string): KeyboardElement | null;
+}
+
+export interface KeyboardWindow extends NavigationWindow {
+  scrollBy(options: ScrollToOptions): void;
+  scrollTo(options: ScrollToOptions): void;
+}
+
+interface KeyboardNavOptions {
+  readonly windowImpl?: KeyboardWindow;
+  readonly documentImpl?: KeyboardDocument;
+  readonly setTimeoutImpl?: (callback: () => void, millis: number) => unknown;
+  readonly clearTimeoutImpl?: (timer: unknown) => void;
+  readonly focusSelector?: string;
+}
+
+export function isEditableTarget(element: KeyboardElement | null | undefined): boolean {
   if (!element) return false;
   const tagName = element.tagName;
   if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
@@ -21,7 +70,9 @@ export function isEditableTarget(element) {
  * file list) is currently displayed. These popups handle their own Escape via
  * the composer keydown listener, so document-level nav must not intercept it.
  */
-export function isComposerPopupOpen(documentImpl = document) {
+export function isComposerPopupOpen(
+  documentImpl: Pick<KeyboardDocument, "querySelectorAll"> = document,
+): boolean {
   const popups = documentImpl.querySelectorAll?.("#pi-chat-slash-popup, #pi-chat-mention-popup");
   if (!popups) return false;
   for (const popup of popups) {
@@ -46,11 +97,11 @@ export function isComposerPopupOpen(documentImpl = document) {
 export function setupKeyboardNav({
   windowImpl = window,
   documentImpl = document,
-  setTimeoutImpl = setTimeout,
-  clearTimeoutImpl = clearTimeout,
+  setTimeoutImpl = (callback, millis) => setTimeout(callback, millis),
+  clearTimeoutImpl = (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
   focusSelector = "#pi-chat-message",
-} = {}) {
-  let ggTimer = null;
+}: KeyboardNavOptions = {}): void {
+  let ggTimer: unknown | null = null;
 
   // Capture phase so Escape blurs the main input *before* bubble-phase
   // handlers see the event — but only when the user isn't inside a popup
@@ -61,6 +112,7 @@ export function setupKeyboardNav({
       if (e.key === "Escape") {
         const active = documentImpl.activeElement;
         if (!isEditableTarget(active)) return;
+        if (!active) return;
         // Don't steal Escape from popups / modals / overlays.
         if (
           active.closest?.(
@@ -75,7 +127,7 @@ export function setupKeyboardNav({
         if (isComposerPopupOpen(documentImpl)) return;
         e.preventDefault();
         e.stopPropagation();
-        active.blur();
+        active?.blur?.();
       }
     },
     { capture: true },
@@ -101,7 +153,7 @@ export function setupKeyboardNav({
           ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollBy({ top: SCROLL_AMOUNT, behavior: "instant" });
+        content.scrollBy?.({ top: SCROLL_AMOUNT, behavior: "instant" });
       } else {
         windowImpl.scrollBy({ top: SCROLL_AMOUNT, behavior: "instant" });
       }
@@ -112,7 +164,7 @@ export function setupKeyboardNav({
           ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollBy({ top: -SCROLL_AMOUNT, behavior: "instant" });
+        content.scrollBy?.({ top: -SCROLL_AMOUNT, behavior: "instant" });
       } else {
         windowImpl.scrollBy({ top: -SCROLL_AMOUNT, behavior: "instant" });
       }
@@ -127,7 +179,7 @@ export function setupKeyboardNav({
             ? documentImpl.getElementById("content")
             : null;
         if (content) {
-          content.scrollTo({ top: 0, behavior: "instant" });
+          content.scrollTo?.({ top: 0, behavior: "instant" });
         } else {
           windowImpl.scrollTo({ top: 0, behavior: "instant" });
         }
@@ -144,7 +196,7 @@ export function setupKeyboardNav({
           ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollTo({ top: content.scrollHeight, behavior: "instant" });
+        content.scrollTo?.({ top: content.scrollHeight, behavior: "instant" });
       } else {
         windowImpl.scrollTo({
           top: documentImpl.documentElement.scrollHeight,
@@ -154,7 +206,7 @@ export function setupKeyboardNav({
     } else if (e.key === "I") {
       e.preventDefault();
       const el = documentImpl.querySelector(focusSelector);
-      if (el) el.focus();
+      el?.focus?.();
     }
   });
 }

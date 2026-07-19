@@ -42,12 +42,12 @@ describe("clampSize", () => {
 
 describe("applyFonts", () => {
   function fakeDoc() {
-    const props = {};
+    const props: Record<string, string> = {};
     return {
       _props: props,
       documentElement: {
         style: {
-          setProperty: (n, v) => {
+          setProperty: (n: string, v: string) => {
             props[n] = v;
           },
         },

@@ -133,10 +133,10 @@ export const VersionInfoSchema = Schema.Struct({
   current: Schema.String,
   latest: Schema.String,
   hasUpdate: Schema.Boolean,
-  isDev: Schema.Boolean,
-  changelog: Schema.String,
-  changelogUrl: Schema.String,
-  checkedAt: Schema.String,
+  isDev: optionalBoolean,
+  changelog: optionalString,
+  changelogUrl: optionalString,
+  checkedAt: optionalString,
 });
 export type VersionInfo = typeof VersionInfoSchema.Type;
 
