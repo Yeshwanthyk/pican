@@ -19,6 +19,7 @@
   import { t } from '../shared/strings.js';
   import { describeError } from '../lib/errors';
   import type { Project } from '../lib/schema';
+  import { ignoreFailure, recoverSync, settle } from '../components/shared/ui-effect';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
   import {
     defaultCreateSession,
@@ -108,36 +109,34 @@
   async function refreshSessions({ preserveWindow = false } = {}) {
     if (refreshInflight || newSessionOpen) return;
     refreshInflight = true;
-    try {
-      const limit = preserveWindow ? Math.max(PAGE_SIZE, sessions.length) : PAGE_SIZE;
-      const response = await defaultFetchSessions({ limit });
-      sessions = (response.sessions || []).map(normalizeSession);
-      total = response.total ?? sessions.length;
+    const limit = preserveWindow ? Math.max(PAGE_SIZE, sessions.length) : PAGE_SIZE;
+    const result = await settle(() => defaultFetchSessions({ limit }));
+    if (result.ok) {
+      sessions = (result.value.sessions || []).map(normalizeSession);
+      total = result.value.total ?? sessions.length;
       await tick();
       refreshSessionPalette();
-    } catch {
-      // Keep existing list if a soft refresh fails.
-    } finally {
-      refreshInflight = false;
-      loading = false;
-      layoutReady = true;
     }
+    // Keep the existing list if a soft refresh fails.
+    refreshInflight = false;
+    loading = false;
+    layoutReady = true;
   }
 
   async function loadMore() {
     if (loadingMore || refreshInflight) return;
     loadingMore = true;
-    try {
-      const response = await defaultFetchSessions({ limit: PAGE_SIZE, offset: sessions.length });
-      const more = (response.sessions || []).map(normalizeSession);
+    const result = await settle(() =>
+      defaultFetchSessions({ limit: PAGE_SIZE, offset: sessions.length }),
+    );
+    if (result.ok) {
+      const more = (result.value.sessions || []).map(normalizeSession);
       const seen = new Set(sessions.map((session) => session.id));
       sessions = [...sessions, ...more.filter((session) => !seen.has(session.id))];
-      total = response.total ?? total;
-    } catch {
-      // Leave the loaded list untouched if a page fails to load.
-    } finally {
-      loadingMore = false;
+      total = result.value.total ?? total;
     }
+    // Leave the loaded list untouched if a page fails to load.
+    loadingMore = false;
   }
 
   const RELOAD_DEBOUNCE_MS = 500;
@@ -183,23 +182,17 @@
   async function refreshPeerHosts() {
     if (!peersConfigured || peersRefreshInflight) return;
     peersRefreshInflight = true;
-    try {
-      const response = await defaultFetchPeerSessions();
-      peerHosts = (response.hosts || []).map(normalizePeerHost);
-    } catch {
-      // Keep last-known state if a poll fails.
-    } finally {
-      peersRefreshInflight = false;
+    const result = await settle(defaultFetchPeerSessions);
+    if (result.ok) {
+      peerHosts = (result.value.hosts || []).map(normalizePeerHost);
     }
+    // Keep last-known state if a poll fails.
+    peersRefreshInflight = false;
   }
 
   async function initPeers() {
-    try {
-      const response = await defaultFetchPeers();
-      peersConfigured = (response.peers || []).length > 0;
-    } catch {
-      peersConfigured = false;
-    }
+    const result = await settle(defaultFetchPeers);
+    peersConfigured = result.ok && (result.value.peers || []).length > 0;
     if (peersConfigured) await refreshPeerHosts();
   }
 
@@ -217,12 +210,8 @@
     newSessionRuntime = 'pi';
     newSessionError = '';
     document.body?.classList.add('modal-sheet-open');
-    try {
-      const response = await defaultFetchRecent();
-      recentLocations = normalizeRecentLocations(response).slice(0, 10);
-    } catch {
-      recentLocations = [];
-    }
+    const result = await settle(defaultFetchRecent);
+    recentLocations = result.ok ? normalizeRecentLocations(result.value).slice(0, 10) : [];
     await tick();
     document.getElementById('sessionPath')?.focus();
   }
@@ -241,18 +230,18 @@
     }
     creating = true;
     newSessionError = '';
-    try {
-      const response = await defaultCreateSession(path, newSessionRuntime);
-      if (response.ok && response.id) {
-        navigate('/session?id=' + encodeURIComponent(response.id));
+    const result = await settle(() => defaultCreateSession(path, newSessionRuntime));
+    if (result.ok) {
+      if (result.value.ok && result.value.id) {
+        creating = false;
+        navigate('/session?id=' + encodeURIComponent(result.value.id));
         return;
       }
       newSessionError = t('index.failedCreateSession');
-    } catch (error: unknown) {
-      newSessionError = describeError(error) || t('index.networkError');
-    } finally {
-      creating = false;
+    } else {
+      newSessionError = describeError(result.error.cause) || t('index.networkError');
     }
+    creating = false;
   }
 
   function closeMenu() {
@@ -265,15 +254,14 @@
   async function refreshProjectsList() {
     projectsError = '';
     projectsBusy = true;
-    try {
-      const response = await defaultFetchProjects();
-      projects = Array.isArray(response.projects) ? response.projects : [];
-      projectsFilterEnabled = !!response.filterEnabled;
-    } catch (error: unknown) {
-      projectsError = describeError(error) || t('index.failedLoadProjects');
-    } finally {
-      projectsBusy = false;
+    const result = await settle(defaultFetchProjects);
+    if (result.ok) {
+      projects = Array.isArray(result.value.projects) ? result.value.projects : [];
+      projectsFilterEnabled = !!result.value.filterEnabled;
+    } else {
+      projectsError = describeError(result.error.cause) || t('index.failedLoadProjects');
     }
+    projectsBusy = false;
   }
 
   async function openProjectsModal() {
@@ -292,15 +280,14 @@
   async function updateProject(path: string, action: string): Promise<void> {
     projectsBusy = true;
     projectsError = '';
-    try {
-      await defaultUpdateProject(path, action);
+    const result = await settle(() => defaultUpdateProject(path, action));
+    if (result.ok) {
       await refreshSessions();
       await refreshProjectsList();
-    } catch (error: unknown) {
-      projectsError = describeError(error) || t('index.failedUpdateProject');
-    } finally {
-      projectsBusy = false;
+    } else {
+      projectsError = describeError(result.error.cause) || t('index.failedUpdateProject');
     }
+    projectsBusy = false;
   }
 
   function openPalette() {
@@ -313,16 +300,16 @@
     configureSettingsSync({ fetchImpl: window.fetch.bind(window) });
     setupKeyboardNav({ windowImpl: window, documentImpl: document });
 
-    try {
-      layout = localStorage.getItem(layoutStorageKey) === 'projects' ? 'projects' : 'timeline';
-    } catch {}
-    hydrateSettings({ storage: localStorage })
-      .then((settings) => {
-        if (!settings) return;
-        const serverLayout = settings[layoutStorageKey] === 'projects' ? 'projects' : 'timeline';
-        if (serverLayout !== layout) setLayout(serverLayout);
-      })
-      .catch(() => {});
+    layout = recoverSync(
+      () => (localStorage.getItem(layoutStorageKey) === 'projects' ? 'projects' : 'timeline'),
+      'timeline' as Layout,
+    );
+    ignoreFailure(async () => {
+      const settings = await hydrateSettings({ storage: localStorage });
+      if (!settings) return;
+      const serverLayout = settings[layoutStorageKey] === 'projects' ? 'projects' : 'timeline';
+      if (serverLayout !== layout) setLayout(serverLayout);
+    });
 
     const statusEvents = createStatusEvents({
       onSnapshot: (snapshot) => setRunningSessions(snapshot),
@@ -341,9 +328,10 @@
       // happens to arrive.
       onReconnect: () => refreshSessions({ preserveWindow: true }),
     });
-    try {
+    recoverSync(() => {
       statusEvents.connect();
-    } catch {}
+      return true;
+    }, false);
 
     const keydown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'l') {

@@ -16,6 +16,7 @@
     type NormalizedRuntime,
   } from '../../index/sessions.js';
   import type { DirEntry, Project, RuntimesResponse } from '../../lib/schema';
+  import { ignoreFailure, settle } from '../shared/ui-effect';
 
   interface Props {
     open?: boolean;
@@ -68,17 +69,21 @@
   async function loadProjectsOnce() {
     if (projectsLoaded) return;
     projectsLoaded = true;
-    try {
-      const response = await defaultFetchProjects();
-      projects = Array.isArray(response.projects) ? response.projects : [];
-    } catch {
-      projects = [];
-    }
+    const result = await settle(defaultFetchProjects);
+    projects = result.ok && Array.isArray(result.value.projects) ? result.value.projects : [];
   }
 
   $effect(() => {
     if (open) loadProjectsOnce();
   });
+
+  async function loadRuntimes(generation: number): Promise<void> {
+    const result = await settle(fetchRuntimes);
+    if (generation !== runtimeGeneration) return;
+    const normalized = normalizeRuntimesResponse(result.ok ? result.value : undefined);
+    runtimes = normalized.runtimes;
+    runtime = normalized.selectedRuntime;
+  }
 
   $effect(() => {
     if (!open) {
@@ -88,19 +93,7 @@
     const generation = ++runtimeGeneration;
     runtimes = [];
     runtime = '';
-    fetchRuntimes()
-      .then((response) => {
-        if (generation !== runtimeGeneration) return;
-        const normalized = normalizeRuntimesResponse(response);
-        runtimes = normalized.runtimes;
-        runtime = normalized.selectedRuntime;
-      })
-      .catch(() => {
-        if (generation !== runtimeGeneration) return;
-        const normalized = normalizeRuntimesResponse();
-        runtimes = normalized.runtimes;
-        runtime = normalized.selectedRuntime;
-      });
+    ignoreFailure(() => loadRuntimes(generation));
     return () => {
       runtimeGeneration += 1;
     };
@@ -113,14 +106,13 @@
   async function runBrowse() {
     if (!isPathLikeQuery(path)) return;
     const generation = ++browseGeneration;
-    try {
-      const response = await defaultBrowsePath(path);
-      if (generation !== browseGeneration) return;
-      browsedEntries = Array.isArray(response.entries) ? response.entries : [];
-      parentPath = response.parentPath || '';
-      pathExists = !!response.exists;
-    } catch {
-      if (generation !== browseGeneration) return;
+    const result = await settle(() => defaultBrowsePath(path));
+    if (generation !== browseGeneration) return;
+    if (result.ok) {
+      browsedEntries = Array.isArray(result.value.entries) ? result.value.entries : [];
+      parentPath = result.value.parentPath || '';
+      pathExists = !!result.value.exists;
+    } else {
       browsedEntries = [];
       pathExists = false;
     }

@@ -4,6 +4,8 @@
   import { prefetchSession } from '../../routes/session-prefetch.js';
   import { icon, Pin, PinOff } from '../../shared/icons.js';
   import { showToast } from '../../shared/toast.js';
+  import { describeError } from '../../lib/errors';
+  import { settle } from '../shared/ui-effect';
   import {
     defaultUpdatePin,
     formatRelativeTime,
@@ -53,14 +55,12 @@
     const next = !session.pinned;
     session.pinned = next;
     pinBusy = true;
-    try {
-      await defaultUpdatePin(session.id, next);
-    } catch (error: unknown) {
+    const result = await settle(() => defaultUpdatePin(session.id, next));
+    if (!result.ok) {
       session.pinned = !next;
-      showToast(error instanceof Error ? error.message : t('index.networkError'));
-    } finally {
-      pinBusy = false;
+      showToast(describeError(result.error.cause) || t('index.networkError'));
     }
+    pinBusy = false;
   }
 </script>
 
