@@ -33,6 +33,8 @@
   import { createQueueApi } from './chat/queue-api.js';
   import { reducePendingExtensionUI, type ExtensionRequest } from './chat/extension-ui-state.js';
   import { showToast } from '../../shared/toast.js';
+  import { copyToClipboard } from '../../shared/clipboard.js';
+  import { sessionResumeCommand } from '../../session/session-resume.js';
 
   let {
     sessionId = '',
@@ -40,13 +42,34 @@
     chatDisabledReason = '',
     cwd = '',
     modelLabel = '',
+    runtime = 'pi',
+    nativeId = '',
+    sessionUUID = '',
+    workerStatus = { state: 'idle' },
   }: {
     sessionId?: string;
     chatAvailable?: boolean;
     chatDisabledReason?: string;
     cwd?: string;
     modelLabel?: string;
+    runtime?: string;
+    nativeId?: string;
+    sessionUUID?: string;
+    workerStatus?: { readonly state: string; readonly exitCode?: number };
   } = $props();
+
+  const workerDown = $derived(workerStatus.state === 'error');
+  const composerAvailable = $derived(chatAvailable && !workerDown);
+  const composerDisabledReason = $derived(
+    workerDown ? t('composer.restartWorker') : chatDisabledReason,
+  );
+  const resumeCommand = $derived(sessionResumeCommand({ runtime, nativeId, sessionUUID }));
+
+  async function copyResumeCommand(): Promise<void> {
+    if (!resumeCommand) return;
+    const copied = await copyToClipboard(resumeCommand);
+    showToast(copied ? t('common.copied') : t('common.copyFailed'));
+  }
 
   const ExtensionRequestSchema = Schema.Struct({
     id: Schema.String,
@@ -109,6 +132,7 @@
   // both are ready before this onMount. <LiveReload> mounts first, so its
   // pi-chat-message-sent listener is attached before the user can send. Live-only.
   onMount(() => {
+    if (!chatAvailable) return;
     const target = window;
     const runtime = getSessionRuntime();
     const model = isSessionRuntimeModel(runtime.model) ? runtime.model : null;
@@ -209,49 +233,62 @@
   });
 </script>
 
-<form
-  id="pi-chat-composer"
-  class="pi-chat-composer"
-  data-session-id={sessionId}
-  data-chat-available={chatAvailable}
-  data-chat-disabled-reason={chatDisabledReason}
->
-  <input
-    id="pi-chat-images"
-    name="images"
-    type="file"
-    accept="image/*"
-    multiple
-    hidden
-    disabled={!chatAvailable}
-  />
-  {#if pendingExtensionUI.length > 0}
-    <div class="extension-ui-stack">
-      {#each pendingExtensionUI as request (request.id)}
-        <ExtensionUiCard {request} {sessionId} onResolved={resolveExtensionUI} />
-      {/each}
-    </div>
-  {/if}
-  <QueuePanel store={queueStore} />
-  <div class="pi-chat-shell composer-collapsed">
-    <ChatExpandButton {chatAvailable} />
-    {#if cwd}<div class="pi-chat-toolbar pi-chat-cwd-bar">
-        <span class="pi-chat-cwd" title={t('composer.copyPath')} data-cwd={cwd}>cwd: {cwd}</span
-        ><span class="pi-chat-focus-shortcut">{t('composer.focusShortcut')}</span>
-      </div>{/if}
-    {#if !chatAvailable}<div class="pi-chat-disabled-notice">{chatDisabledReason}</div>{/if}
-    <textarea
-      id="pi-chat-message"
-      name="message"
-      rows="1"
-      placeholder={t('composer.placeholder')}
-      disabled={!chatAvailable}
-    ></textarea>
-    <div id="pi-chat-attachments" class="pi-chat-attachments"></div>
-    <ChatSelectorPopups />
-    <ChatToolbar {chatAvailable} {toolbar} {modelLabel} />
-    <ContextUsage popover={true} />
+{#if !chatAvailable}
+  <div class="pi-chat-composer pi-chat-composer--view-only">
+    <button
+      type="button"
+      class="plain-state plain-state--view-only"
+      title={t('session.copyResumeCommand', { command: resumeCommand })}
+      disabled={!resumeCommand}
+      onclick={copyResumeCommand}>{t('session.viewOnlyResume', { command: resumeCommand })}</button
+    >
   </div>
-  <TextAttachmentModal />
-  <GitFooter {sessionId} />
-</form>
+{:else}<form
+    id="pi-chat-composer"
+    class="pi-chat-composer"
+    data-session-id={sessionId}
+    data-chat-available={composerAvailable}
+    data-chat-disabled-reason={composerDisabledReason}
+  >
+    <input
+      id="pi-chat-images"
+      name="images"
+      type="file"
+      accept="image/*"
+      multiple
+      hidden
+      disabled={!composerAvailable}
+    />
+    {#if !workerDown && pendingExtensionUI.length > 0}
+      <div class="extension-ui-stack">
+        {#each pendingExtensionUI as request (request.id)}
+          <ExtensionUiCard {request} {sessionId} onResolved={resolveExtensionUI} />
+        {/each}
+      </div>
+    {/if}
+    {#if !workerDown}<QueuePanel store={queueStore} />{/if}
+    <div class="pi-chat-shell composer-collapsed">
+      <ChatExpandButton chatAvailable={composerAvailable} />
+      {#if cwd}<div class="pi-chat-toolbar pi-chat-cwd-bar">
+          <span class="pi-chat-cwd" title={t('composer.copyPath')} data-cwd={cwd}>cwd: {cwd}</span
+          ><span class="pi-chat-focus-shortcut">{t('composer.focusShortcut')}</span>
+        </div>{/if}
+      {#if !composerAvailable}<div class="pi-chat-disabled-notice">
+          {composerDisabledReason}
+        </div>{/if}
+      <textarea
+        id="pi-chat-message"
+        name="message"
+        rows="1"
+        placeholder={t('composer.placeholder')}
+        disabled={!composerAvailable}
+      ></textarea>
+      <div id="pi-chat-attachments" class="pi-chat-attachments"></div>
+      <ChatSelectorPopups />
+      <ChatToolbar chatAvailable={composerAvailable} {toolbar} {modelLabel} />
+      <ContextUsage popover={true} />
+    </div>
+    <TextAttachmentModal />
+    <GitFooter {sessionId} />
+  </form>
+{/if}

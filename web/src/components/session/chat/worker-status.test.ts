@@ -91,6 +91,28 @@ describe("setupWorkerStatusPolling", () => {
     expect(events).toEqual(["pi-worker-done"]);
   });
 
+  it("dispatches the worker exit code for the reactive session model", async () => {
+    const target = new EventTarget();
+    const details: unknown[] = [];
+    target.addEventListener("pi-worker-status", (event) => {
+      if (event instanceof CustomEvent) details.push(event.detail);
+    });
+
+    setupWorkerStatusPolling({
+      windowImpl: statusWindow(target),
+      chatApi: {
+        getWorkerStatus: vi.fn(() =>
+          Promise.resolve(response({ state: "error", error: "exit status 31", exitCode: 31 })),
+        ),
+      },
+      setIntervalImpl: () => 0,
+      CustomEventImpl: CustomEvent,
+    });
+    await tick();
+
+    expect(details).toEqual([{ state: "error", error: "exit status 31", exitCode: 31 }]);
+  });
+
   it("refreshes immediately on session reload", async () => {
     const windowImpl = new EventTarget();
     const getWorkerStatus = vi.fn(() => Promise.resolve(response({ state: "idle" })));

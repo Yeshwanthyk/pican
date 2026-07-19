@@ -331,6 +331,34 @@ describe("live events", () => {
     expect(onError).toHaveBeenCalled();
   });
 
+  it("decodes worker-status SSE with the process exit code", () => {
+    const addEventListener =
+      vi.fn<(type: string, listener: (event: SessionEvent) => void) => void>();
+    const eventSource: EventSourceLike & { addEventListener: typeof addEventListener } = {
+      addEventListener,
+    };
+    const onWorkerStatus = vi.fn();
+    wireSessionEvents({
+      eventSource,
+      onReload: vi.fn(),
+      onChatPreview: vi.fn(),
+      onWorkerStatus,
+    });
+    const workerHandler = addEventListener.mock.calls.find(
+      ([type]) => type === "worker-status",
+    )?.[1];
+
+    workerHandler?.({
+      data: JSON.stringify({ state: "error", error: "exit status 19", exitCode: 19 }),
+    });
+
+    expect(onWorkerStatus).toHaveBeenCalledWith({
+      state: "error",
+      error: "exit status 19",
+      exitCode: 19,
+    });
+  });
+
   it("reconciles on a chat-preview done (covers a dropped first-write reload)", () => {
     const addEventListener =
       vi.fn<(type: string, listener: (event: SessionEvent) => void) => void>();

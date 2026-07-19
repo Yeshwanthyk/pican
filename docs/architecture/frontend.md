@@ -78,6 +78,8 @@ Export rules:
 - no `/static/assets/...` dependency
 - reusable rendering helpers may be shared with the live app when they are side-effect-free
 
+Plain live states such as worker-down and the view-only composer are supplied only by the SPA. Static exports do not import the worker-status stream, composer, or live header state.
+
 The export's session tree stays a docked `<aside id="sidebar">` (in `internal/ui/embedded/share-session.html`), not the live app's `FullScreenSheet` overlay — it has no resize handle or desktop collapse (those affordances were dropped along with the live docked sidebar), just a mobile hamburger/overlay/close drawer via `sidebar.js`'s `isMobileLayout`/`setSidebarOpen`, wired in `session-ui-runner.js`.
 
 ## Live Reload
@@ -86,6 +88,9 @@ The session route listens to `/events?id=<sessionId>` via `web/src/session/live/
 
 - `reload` / canonical transcript or projection updates
 - `chat-preview` streaming preview updates
+- `worker-status` process state updates, including the worker process exit code when it crashes
+
+Worker crash status is read-only UI state. The server preserves the process exit code in `WorkerStatus`, sends it through `/api/worker-status` and the session-scoped SSE stream, and the live `SessionDataModel` projects it into the transcript, header, streaming caret, and composer. This path does not restart or otherwise change worker lifecycle behavior: session files remain append-only, the manager still owns one worker per session, crashed workers are evicted by the existing manager path, and idle workers are reaped after 10 minutes.
 
 Codex worker callbacks use the same contract: app-server notifications update status/preview, projection replacement emits reload, and the browser reconciles from `/api/session`.
 

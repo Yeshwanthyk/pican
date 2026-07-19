@@ -1202,7 +1202,25 @@ button.session-header-back {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 40vw;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
+
+.session-header-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-header-state {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.session-header-state--danger { color: var(--danger); }
+.session-header-state--attention { color: var(--attention); }
 
 .session-header-runtime {
   display: inline-flex;
@@ -1545,6 +1563,36 @@ button.session-header-back {
 .streaming-live,
 .streaming-caret {
   color: var(--accent);
+}
+
+.worker-down .streaming-live,
+.worker-down .streaming-caret {
+  color: var(--danger);
+}
+
+.worker-down .streaming-caret {
+  background: var(--danger);
+  animation: none;
+}
+
+.plain-state--worker-down {
+  padding: 24px var(--line-height) 8px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.plain-state-line--danger {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.plain-state-hint {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.72;
 }
 
 .streaming-caret {
@@ -3679,6 +3727,37 @@ button.session-header-back {
   font-size: 11px;
 }
 
+.pi-chat-composer--view-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+
+.plain-state--view-only {
+  min-height: 40px;
+  max-width: 100%;
+  padding: 8px 12px;
+  overflow: hidden;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  cursor: copy;
+  transition: color 0.12s ease, transform 0.12s ease;
+}
+
+.plain-state--view-only:hover,
+.plain-state--view-only:focus-visible { color: var(--text-soft); }
+.plain-state--view-only:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plain-state--view-only:active { transform: scale(0.96); }
+.plain-state--view-only:disabled { cursor: default; opacity: 0.72; }
+
 #pi-chat-message {
   display: block;
   width: 100%;
@@ -3701,6 +3780,7 @@ button.session-header-back {
 }
 
 @media (max-width: 900px) {
+  .plain-state--view-only { min-height: 44px; }
   .pi-chat-shell.composer-collapsed:not(.expanded) .pi-chat-cwd-bar,
   .pi-chat-shell.composer-collapsed:not(.expanded) .pi-chat-toolbar,
   .pi-chat-shell.composer-collapsed:not(.expanded) .pi-chat-context-usage,

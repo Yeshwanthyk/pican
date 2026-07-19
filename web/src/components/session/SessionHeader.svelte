@@ -26,6 +26,8 @@
     runtime = 'pi',
     nativeId = '',
     sessionUUID = '',
+    chatAvailable = true,
+    workerStatus = { state: 'idle' },
   }: {
     title?: string;
     cwd?: string;
@@ -33,6 +35,8 @@
     runtime?: string;
     nativeId?: string;
     sessionUUID?: string;
+    chatAvailable?: boolean;
+    workerStatus?: { readonly state: string; readonly exitCode?: number };
   } = $props();
 
   function bodySessionUUID(): string {
@@ -167,7 +171,7 @@
     >
   </div>
   <span class="session-header-title" id="session-header-title">
-    <span>{sessionTitle.name || title}</span>
+    <span class="session-header-title-text">{sessionTitle.name || title}</span>
     {#if runtime === 'codex'}
       <span
         class="session-header-runtime"
@@ -177,6 +181,15 @@
         <img class="session-header-runtime-mark" src="/codex-icon.svg" alt="" aria-hidden="true" />
         {t('runtime.codex')}
       </span>
+    {/if}
+    {#if workerStatus.state === 'error'}
+      <span class="session-header-state session-header-state--danger"
+        >{t('session.workerDown')}</span
+      >
+    {:else if !chatAvailable}
+      <span class="session-header-state session-header-state--attention"
+        >{t('session.viewOnly')}</span
+      >
     {/if}
   </span>
   <div class="session-header-right">

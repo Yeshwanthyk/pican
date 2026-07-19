@@ -1,5 +1,7 @@
 import { assert, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import ChatComposer from "./ChatComposer.svelte";
 import { runChatComposer } from "./chat/chat-composer-runtime.js";
 import { ChatToolbarState } from "./chat/chat-toolbar-state.svelte.js";
 
@@ -29,6 +31,44 @@ function childRequired<T extends Element = HTMLElement>(root: Element, selector:
 }
 
 describe("chat composer runner", () => {
+  it("replaces view-only chat with a tap-to-copy resume command", async () => {
+    const writeText = vi.fn(async () => undefined);
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const { container } = render(ChatComposer, {
+      props: { chatAvailable: false, runtime: "pi", sessionUUID: "session-uuid" },
+    });
+    const resume = screen.getByRole("button", {
+      name: "view only · resume in terminal: pi --session session-uuid",
+    });
+    expect(container.querySelector("#pi-chat-composer")).not.toBeInTheDocument();
+    await fireEvent.click(resume);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("pi --session session-uuid"));
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: originalClipboard,
+    });
+  });
+
+  it("disables the existing composer when the worker is down", () => {
+    const { container } = render(ChatComposer, {
+      props: {
+        chatAvailable: true,
+        workerStatus: { state: "error", exitCode: 7 },
+      },
+    });
+
+    expect(container.querySelector("#pi-chat-message")).toBeDisabled();
+    expect(container.querySelector(".pi-chat-disabled-notice")).toHaveTextContent(
+      "restart the worker to continue…",
+    );
+  });
+
   it("returns without composer form", () => {
     const dom = new JSDOM("<body></body>");
     expect(() =>

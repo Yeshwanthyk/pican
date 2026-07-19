@@ -4,6 +4,7 @@ import { runPromise, runSync } from "../../../lib/runtime";
 const WorkerStatusData = Schema.Struct({
   state: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.String),
+  exitCode: Schema.optionalKey(Schema.Number),
   model: Schema.optionalKey(Schema.String),
   modelProvider: Schema.optionalKey(Schema.String),
   thinkingLevel: Schema.optionalKey(Schema.String),
@@ -96,6 +97,17 @@ export function setupWorkerStatusPolling({
           if (data.state === "running") setStatus("running", "running");
           if (data.state === "idle") setStatus("idle", "");
           if (data.state === "error") setStatus(data.error || "worker error", "error");
+          if (data.state) {
+            runSync(
+              Effect.try({
+                try: () =>
+                  windowImpl.dispatchEvent(
+                    new CustomEventImpl("pi-worker-status", { detail: data }),
+                  ),
+                catch: () => false,
+              }),
+            );
+          }
           if (lastWorkerState === "running" && data.state === "idle") {
             runSync(
               Effect.try({

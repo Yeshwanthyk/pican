@@ -1,5 +1,11 @@
 export type UnknownRecord = Record<string, unknown>;
 
+export interface WorkerProcessStatus {
+  readonly state: string;
+  readonly error?: string;
+  readonly exitCode?: number;
+}
+
 export interface ContentBlock extends UnknownRecord {
   type?: string;
   id?: string;

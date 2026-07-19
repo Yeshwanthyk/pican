@@ -5,6 +5,7 @@ import {
   sessionEntryFromUnknown,
   type SessionEntry,
   type UnknownRecord,
+  type WorkerProcessStatus,
 } from "../data/session-types.js";
 
 export interface SessionEvent {
@@ -243,6 +244,7 @@ export function wireSessionEvents({
   eventSource,
   onReload,
   onChatPreview,
+  onWorkerStatus = () => {},
   onError = () => {},
   windowImpl = typeof window !== "undefined" ? window : null,
   CustomEventImpl = typeof CustomEvent !== "undefined" ? CustomEvent : null,
@@ -250,6 +252,7 @@ export function wireSessionEvents({
   readonly eventSource: EventSourceLike;
   readonly onReload: (event?: SessionEvent) => MaybePromise;
   readonly onChatPreview: (payload: UnknownRecord) => void;
+  readonly onWorkerStatus?: (status: WorkerProcessStatus) => void;
   readonly onError?: (error?: unknown) => void;
   readonly windowImpl?: { dispatchEvent(event: unknown): boolean } | null;
   readonly CustomEventImpl?:
@@ -312,6 +315,16 @@ export function wireSessionEvents({
           dispatchReloadedEvent();
         }
       }
+    });
+  });
+  eventSource.addEventListener("worker-status", (event) => {
+    withEventRecord(event, (payload) => {
+      if (typeof payload.state !== "string") return;
+      onWorkerStatus?.({
+        state: payload.state,
+        error: typeof payload.error === "string" ? payload.error : undefined,
+        exitCode: typeof payload.exitCode === "number" ? payload.exitCode : undefined,
+      });
     });
   });
   // 'queue' is fired by the backend whenever the per-session chat_queue

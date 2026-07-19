@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/svelte";
 import CommandPalette from "./CommandPalette.svelte";
 import { filterPaletteSessions, normalizePaletteSession } from "./command-palette";
@@ -46,5 +46,21 @@ describe("CommandPalette", () => {
     expect(getSessionPaletteApi()).toBeTruthy();
     await openSessionPalette();
     expect(await screen.findByText("Session one")).toBeTruthy();
+  });
+
+  it("renders the plain search-empty state and Escape clears the query", async () => {
+    const onQueryChange = vi.fn();
+    render(CommandPalette, {
+      props: { loadSessions: async () => [], onQueryChange },
+    });
+    await openSessionPalette();
+    const input = screen.getByPlaceholderText("Search sessions...");
+    await fireEvent.input(input, { target: { value: "missing" } });
+    expect(await screen.findByText('no matches for "missing"')).toBeInTheDocument();
+    expect(screen.getByText("esc clears the search")).toBeInTheDocument();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+    expect(input).toHaveValue("");
+    expect(onQueryChange).toHaveBeenLastCalledWith("");
   });
 });

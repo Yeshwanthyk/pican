@@ -148,6 +148,12 @@
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
+      if (query) {
+        query = '';
+        onQueryChange?.(query);
+        void reloadSessions();
+        return;
+      }
       close();
       return;
     }
@@ -249,7 +255,16 @@
       {#if error}
         <div class="palette-empty">{error}</div>
       {:else if visibleSessions.length === 0}
-        <div class="palette-empty">{t('palette.noSessionsFound')}</div>
+        <div class="palette-empty plain-state" data-empty="search">
+          <div class="plain-state-line">
+            {query.trim()
+              ? t('palette.noMatches', { query: query.trim() })
+              : t('palette.noSessionsFound')}
+          </div>
+          {#if query.trim()}
+            <div class="plain-state-hint">{t('palette.clearSearchHint')}</div>
+          {/if}
+        </div>
       {:else}
         {#each visibleSessions as session, i (session.id || session.href || i)}
           <button

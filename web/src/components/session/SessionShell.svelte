@@ -24,6 +24,7 @@
     syncTreeUrlParam,
   } from '../../session/session-modals.svelte.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
+  import type { WorkerProcessStatus } from '../../session/data/session-types.js';
 
   let {
     sessionModel,
@@ -42,6 +43,10 @@
   } = $props();
 
   const liveRuntime = getSessionRuntime();
+  const workerStatus = $derived(
+    (sessionModel.workerStatus ?? { state: 'idle' }) as WorkerProcessStatus,
+  );
+  const workerDown = $derived(workerStatus.state === 'error');
 
   // Restore the diff sheet from `?diff=open` on first load. Must seed
   // sessionModals.diff before the sync $effect runs, or that effect would see
@@ -80,7 +85,16 @@
   });
 </script>
 
-<SessionHeader {title} {cwd} {sessionId} {runtime} {nativeId} {sessionUUID} />
+<SessionHeader
+  {title}
+  {cwd}
+  {sessionId}
+  {runtime}
+  {nativeId}
+  {sessionUUID}
+  {chatAvailable}
+  {workerStatus}
+/>
 
 <CommandMenu {sessionId} {cwd} />
 
@@ -88,7 +102,7 @@
      "message sent" listener is attached before the user can send. -->
 <LiveReload />
 
-<div id="app">
+<div id="app" class:worker-down={workerDown}>
   <div id="content-container" class="content-container">
     <main id="content">
       <div id="header-container"><SessionInfoHeader model={sessionModel} /></div>
@@ -103,7 +117,17 @@
         />
       </div>
     </main>
-    <ChatComposer {sessionId} {chatAvailable} {chatDisabledReason} {cwd} {modelLabel} />
+    <ChatComposer
+      {sessionId}
+      {chatAvailable}
+      {chatDisabledReason}
+      {cwd}
+      {modelLabel}
+      {runtime}
+      {nativeId}
+      {sessionUUID}
+      {workerStatus}
+    />
   </div>
   <RightSidebar {scratchpad} projectPath={cwd} />
   <ImageModal />

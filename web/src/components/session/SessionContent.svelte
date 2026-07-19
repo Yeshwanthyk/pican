@@ -7,6 +7,7 @@
   // imperative layer still owns. Shared by the live app + the static export.
   import { getSessionModel } from '../../session/session-context.js';
   import type { SessionEntry as SessionEntryData } from '../../session/data/session-types.js';
+  import { t } from '../../shared/strings.js';
   import { groupToolRuns } from '../../session/render/group-tool-runs.js';
   import type { ToolRunRenderItem } from '../../session/render/group-tool-runs.js';
   import ActivityFold from './ActivityFold.svelte';
@@ -16,6 +17,7 @@
     readonly activePath: readonly SessionEntryData[];
     readonly entries?: readonly SessionEntryData[];
     readonly renderedTools?: unknown;
+    readonly workerStatus?: { readonly state: string; readonly exitCode?: number };
   }
 
   interface Props {
@@ -69,4 +71,12 @@
       <SessionEntry entry={item.entry} {model} {live} {modelLabel} {sessionId} />
     {/if}
   {/each}
+  {#if model.workerStatus?.state === 'error'}
+    <div class="plain-state plain-state--worker-down" role="status" aria-live="polite">
+      <div class="plain-state-line plain-state-line--danger">
+        {t('session.workerExited', { code: model.workerStatus.exitCode ?? '?' })}
+      </div>
+      <div class="plain-state-hint">{t('session.workerExitedHint')}</div>
+    </div>
+  {/if}
 </div>

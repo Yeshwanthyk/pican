@@ -75,6 +75,8 @@
   let peersRefreshInflight = false;
   let schedules = $state<Schedule[]>([]);
 
+  const defaultProject = $derived(recentLocations[0] || t('index.defaultProject'));
+
   const totalSessionsLabel = $derived(
     total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total }),
   );
@@ -403,6 +405,10 @@
     window.addEventListener('click', click);
 
     refreshSessions();
+    ignoreFailure(async () => {
+      const recent = await defaultFetchRecent();
+      recentLocations = normalizeRecentLocations(recent).slice(0, 10);
+    });
     initPeers();
     refreshSchedules();
 
@@ -450,6 +456,7 @@
     {hasMore}
     {loadingMore}
     onLoadMore={loadMore}
+    {defaultProject}
   />
   <HomeRail
     {waitingSessions}

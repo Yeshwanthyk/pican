@@ -87,4 +87,21 @@ describe("SessionHeader runtime commands", () => {
       signal: expect.any(AbortSignal),
     });
   });
+
+  it("shows danger worker-down and attention view-only substates", () => {
+    const crashed = render(SessionHeader, {
+      props: { title: "Crashed", workerStatus: { state: "error", exitCode: 9 } },
+    });
+    expect(crashed.container.querySelector(".session-header-state--danger")).toHaveTextContent(
+      "worker down",
+    );
+    crashed.unmount();
+
+    const viewOnly = render(SessionHeader, {
+      props: { title: "Archive", chatAvailable: false },
+    });
+    expect(viewOnly.container.querySelector(".session-header-state--attention")).toHaveTextContent(
+      "view only",
+    );
+  });
 });

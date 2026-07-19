@@ -52,6 +52,9 @@ function contentModel(model: SessionDataModel) {
     get renderedTools(): unknown {
       return model.renderedTools;
     },
+    get workerStatus() {
+      return model.workerStatus;
+    },
   };
 }
 
@@ -209,5 +212,16 @@ describe("SessionContent", () => {
     await Promise.resolve();
     expect(afterRender).toHaveBeenCalled();
     expect(afterRender.mock.calls[0]?.[0]?.id).toBe("messages-list");
+  });
+
+  it("renders the worker crash at the end of the saved transcript", () => {
+    const model = new SessionDataModel({ entries, header: {}, leafId: "leaf" });
+    model.setWorkerStatus({ state: "error", exitCode: 23 });
+    const { container } = render(SessionContent, { props: { model: contentModel(model) } });
+
+    const marker = container.querySelector(".plain-state--worker-down");
+    expect(marker?.textContent).toContain("worker exited (23) — stream ended here");
+    expect(marker?.textContent).toContain("restart from the ⋯ menu · transcript is saved");
+    expect(container.querySelector("#messages-list")?.lastElementChild).toBe(marker);
   });
 });

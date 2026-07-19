@@ -232,11 +232,23 @@
       triggerReload();
     });
 
+    on(windowImpl, 'pi-worker-status', (event: Event) => {
+      if (!(event instanceof CustomEvent) || !model) return;
+      const detail = event.detail;
+      if (typeof detail !== 'object' || detail === null || typeof detail.state !== 'string') return;
+      model.setWorkerStatus({
+        state: detail.state,
+        error: typeof detail.error === 'string' ? detail.error : undefined,
+        exitCode: typeof detail.exitCode === 'number' ? detail.exitCode : undefined,
+      });
+    });
+
     const liveConnection = setupSessionLiveConnection({
       documentImpl,
       sessionId: sessId,
       onReload: triggerReload,
       onChatPreview: renderChatPreview,
+      onWorkerStatus: (status) => model?.setWorkerStatus(status),
     });
     liveConnection.connect();
     cleanups.push(liveConnection.dispose);

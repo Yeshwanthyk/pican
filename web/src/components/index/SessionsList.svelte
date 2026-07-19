@@ -35,6 +35,7 @@
     hasMore?: boolean;
     loadingMore?: boolean;
     onLoadMore?: () => void | Promise<void>;
+    defaultProject?: string;
   }
 
   let {
@@ -47,6 +48,7 @@
     hasMore = false,
     loadingMore = false,
     onLoadMore = () => {},
+    defaultProject = t('index.defaultProject'),
   }: Props = $props();
 
   let now = $state(Date.now());
@@ -108,14 +110,16 @@
   data-sessions-content
 >
   {#if loading && sessions.length === 0}
-    <div class="empty-state">
-      <h3>{t('index.loadingSessions')}</h3>
-      <p>{t('index.loadingSessionsHint')}</p>
+    <div class="empty-state plain-state">
+      <div class="plain-state-line">{t('index.loadingSessions')}</div>
+      <div class="plain-state-hint">{t('index.loadingSessionsHint')}</div>
     </div>
   {:else if sessions.length === 0}
-    <div class="empty-state">
-      <h3>{t('index.noSessionsYet')}</h3>
-      <p>{t('index.noSessionsYetHint')}</p>
+    <div class="empty-state plain-state" data-empty="first-run">
+      <div class="plain-state-line">{t('index.noSessionsYet')}</div>
+      <div class="plain-state-hint">
+        {t('index.noSessionsYetHint', { project: defaultProject })}
+      </div>
     </div>
   {:else}
     {#if nowSessions.length > 0}

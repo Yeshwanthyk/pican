@@ -32,6 +32,7 @@ import type {
   SessionPayload,
   ToolCallInfo,
   UnknownRecord,
+  WorkerProcessStatus,
 } from "./session-types.js";
 import {
   buildTree,
@@ -71,6 +72,7 @@ export class SessionDataModel {
   total = $state(0);
   from = $state(0);
   truncated = $state(false);
+  workerStatus = $state<WorkerProcessStatus>({ state: "idle" });
 
   // Stable, in-place-mutated reactive lookup Maps (see header comment).
   // SvelteMap makes .set/.clear reactive while keeping a stable object identity.
@@ -182,6 +184,10 @@ export class SessionDataModel {
   navigateTo(leafId: string, targetId = leafId): void {
     this.currentLeafId = leafId;
     this.currentTargetId = targetId;
+  }
+
+  setWorkerStatus(status: WorkerProcessStatus): void {
+    this.workerStatus = status;
   }
 
   // Newest leaf under a node — used for click-to-navigate.

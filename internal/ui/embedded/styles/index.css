@@ -613,10 +613,22 @@ a { color: inherit; }
     margin-bottom: 4px;
 }
 .empty-state {
-    padding: 72px 0;
+    padding: 72px 16px;
     color: var(--muted);
+    text-align: center;
 }
-.empty-state h3 { color: var(--text); font-size: 14px; margin-bottom: 6px; }
+.plain-state-line {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.plain-state-hint {
+    margin-top: 3px;
+    color: var(--dim-text, var(--muted));
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.72;
+}
 
 .not-found {
     display: flex;

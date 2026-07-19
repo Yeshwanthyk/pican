@@ -21,6 +21,7 @@ const (
 type WorkerStatus struct {
 	State         State  `json:"state"`
 	Error         string `json:"error,omitempty"`
+	ExitCode      *int   `json:"exitCode,omitempty"`
 	Model         string `json:"model,omitempty"`
 	ModelName     string `json:"modelName,omitempty"`
 	ModelProvider string `json:"modelProvider,omitempty"`

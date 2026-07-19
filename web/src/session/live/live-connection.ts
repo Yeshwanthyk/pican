@@ -55,6 +55,7 @@ export function setupSessionLiveConnection({
   wireEvents = wireSessionEvents,
   onReload = () => {},
   onChatPreview = () => {},
+  onWorkerStatus = () => {},
   onError = () => {},
   setTimeoutImpl = windowImpl.setTimeout.bind(windowImpl),
   clearTimeoutImpl = windowImpl.clearTimeout.bind(windowImpl),
@@ -67,6 +68,9 @@ export function setupSessionLiveConnection({
   readonly wireEvents?: (options: Parameters<typeof wireSessionEvents>[0]) => unknown;
   readonly onReload?: (event?: SessionEvent) => unknown;
   readonly onChatPreview?: (payload: unknown) => void;
+  readonly onWorkerStatus?: (
+    status: import("../data/session-types.js").WorkerProcessStatus,
+  ) => void;
   readonly onError?: (error?: unknown) => void;
   readonly setTimeoutImpl?: (handler: () => void, timeout: number) => number;
   readonly clearTimeoutImpl?: (timer: number) => void;
@@ -106,6 +110,7 @@ export function setupSessionLiveConnection({
       eventSource,
       onReload,
       onChatPreview,
+      onWorkerStatus,
       onError: (error) => {
         onError(error);
         if (!eventSource || eventSource.readyState !== EVENT_SOURCE_CLOSED) return;
