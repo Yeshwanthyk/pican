@@ -3,6 +3,7 @@ import {
   dateBucketFor,
   defaultCreateSession,
   formatRelativeTime,
+  formatElapsed,
   formatSessionMetrics,
   groupSessionsByDate,
   groupSessionsByProject,
@@ -11,6 +12,7 @@ import {
   sessionModelLabel,
   sessionSearchText,
   splitPinnedSessions,
+  splitHomeSessions,
   shouldRefetchOnReload,
 } from "./sessions.js";
 
@@ -27,6 +29,9 @@ describe("index sessions helpers", () => {
       nativeId: "",
       chatAvailable: true,
       pinned: false,
+      btw: false,
+      currentActivity: "",
+      waitingQuestion: "",
     });
     expect(normalizeSession({ id: "a", pinned: true })).toMatchObject({ pinned: true });
     expect(normalizeSession({ ID: "a", Pinned: true })).toMatchObject({ pinned: true });
@@ -75,6 +80,13 @@ describe("index sessions helpers", () => {
       "2 minutes ago",
     );
     expect(formatRelativeTime("not a date")).toBe("");
+  });
+
+  it("formats compact elapsed durations", () => {
+    const now = Date.parse("2024-01-01T01:00:00Z");
+    expect(formatElapsed("2024-01-01T00:59:42Z", now)).toBe("18s");
+    expect(formatElapsed("2024-01-01T00:42:00Z", now)).toBe("18m");
+    expect(formatElapsed("2023-12-31T23:00:00Z", now)).toBe("2h");
   });
 
   it("builds labels and search text", () => {
@@ -152,6 +164,27 @@ describe("index sessions helpers", () => {
   it("returns empty pinned/rest for no sessions", () => {
     expect(splitPinnedSessions([])).toEqual({ pinned: [], rest: [] });
     expect(splitPinnedSessions()).toEqual({ pinned: [], rest: [] });
+  });
+
+  it("splits live and waiting into Now and excludes them from pinned and lower groups", () => {
+    const split = splitHomeSessions(
+      [
+        { id: "idle", pinned: false, lastActivity: "2024-01-01T00:00:00Z" },
+        { id: "live", pinned: true, lastActivity: "2024-01-04T00:00:00Z" },
+        {
+          id: "waiting",
+          pinned: true,
+          waitingQuestion: "Ship?",
+          lastActivity: "2024-01-03T00:00:00Z",
+        },
+        { id: "pinned", pinned: true, lastActivity: "2024-01-02T00:00:00Z" },
+      ],
+      new Set(["live", "waiting"]),
+    );
+    expect(split.live.map((session) => session.id)).toEqual(["live"]);
+    expect(split.waiting.map((session) => session.id)).toEqual(["waiting"]);
+    expect(split.pinned.map((session) => session.id)).toEqual(["pinned"]);
+    expect(split.rest.map((session) => session.id)).toEqual(["idle"]);
   });
 
   it("damps reload refetches for known sessions but not new ones", () => {

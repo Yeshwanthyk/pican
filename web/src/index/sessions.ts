@@ -21,6 +21,12 @@ export interface NormalizedSession {
   chatAvailable: boolean;
   chatDisabledReason: string;
   pinned: boolean;
+  btw: boolean;
+  currentActivity: string;
+  activityStartedAt: string;
+  waitingQuestion: string;
+  waitingSince: string;
+  waitingOptions: string[];
 }
 
 export interface NormalizedRuntime {
@@ -85,7 +91,41 @@ export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession 
     chatAvailable: raw.chatAvailable ?? raw.ChatAvailable ?? true,
     chatDisabledReason: raw.chatDisabledReason || raw.ChatDisabledReason || "",
     pinned: raw.pinned ?? raw.Pinned ?? false,
+    btw: raw.btw ?? raw.Btw ?? false,
+    currentActivity: raw.currentActivity || raw.CurrentActivity || "",
+    activityStartedAt: raw.activityStartedAt || raw.ActivityStartedAt || "",
+    waitingQuestion: raw.waitingQuestion || raw.WaitingQuestion || "",
+    waitingSince: raw.waitingSince || raw.WaitingSince || "",
+    waitingOptions: [...(raw.waitingOptions || raw.WaitingOptions || [])],
   };
+}
+
+export interface HomeSessionSplit<T> {
+  readonly live: T[];
+  readonly waiting: T[];
+  readonly pinned: T[];
+  readonly rest: T[];
+}
+
+export function splitHomeSessions<
+  T extends SessionActivity & {
+    readonly id: string;
+    readonly pinned?: boolean;
+    readonly waitingQuestion?: string;
+  },
+>(sessions: ReadonlyArray<T>, runningIds: ReadonlySet<string>): HomeSessionSplit<T> {
+  const live: T[] = [];
+  const waiting: T[] = [];
+  const lower: T[] = [];
+  for (const session of sessions) {
+    if (session.waitingQuestion) waiting.push(session);
+    else if (runningIds.has(session.id)) live.push(session);
+    else lower.push(session);
+  }
+  live.sort((a, b) => activityMs(b) - activityMs(a));
+  waiting.sort((a, b) => activityMs(b) - activityMs(a));
+  const { pinned, rest } = splitPinnedSessions(lower);
+  return { live, waiting, pinned, rest };
 }
 
 // splitPinnedSessions separates pinned sessions from the rest, sorting the
@@ -195,6 +235,18 @@ function formatTokenAbbrev(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
   return String(Math.round(n));
+}
+
+export function formatElapsed(timestamp: string, now = Date.now()): string {
+  const startedAt = Date.parse(timestamp);
+  if (!Number.isFinite(startedAt)) return "";
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  if (seconds < 60) return t("index.durationSeconds", { count: seconds });
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t("index.durationMinutes", { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("index.durationHours", { count: hours });
+  return t("index.durationDays", { count: Math.floor(hours / 24) });
 }
 
 // formatSessionMetrics renders the card's subtle "12.3k tok · $0.42" metadata

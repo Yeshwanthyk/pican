@@ -19,30 +19,57 @@ function session(overrides: Partial<NormalizedSession> = {}): NormalizedSession 
   });
 }
 
-describe("SessionCard runtime badge", () => {
-  it("shows a semantic Codex badge and does not use the Pi mark", () => {
+describe("SessionCard ticker row", () => {
+  it("renders the flat title, context, metrics, and inline markers", () => {
     const { container } = render(SessionCard, {
-      props: { session: session({ runtime: "codex", nativeId: "thread-1" }) },
+      props: {
+        session: session({
+          runtime: "codex",
+          nativeId: "thread-1",
+          pinned: true,
+          btw: true,
+          tokenTotal: 1200,
+          costTotal: 0.25,
+        }),
+        now: Date.parse("2026-01-01T00:01:00Z"),
+      },
     });
-    expect(screen.getByText("Codex")).toHaveAttribute("title", "Codex runtime");
-    expect(container.querySelector(".session-card-runtime-mark")).toHaveAttribute(
-      "src",
-      "/codex-icon.svg",
-    );
-    expect(container.querySelector(".session-card-mark")).not.toBeInTheDocument();
-    const card = container.querySelector<HTMLElement>(".session-card");
-    expect(card).not.toBeNull();
-    expect(card?.dataset.search).toContain("codex thread-1");
+    const row = container.querySelector<HTMLElement>(".session-ticker-row");
+    expect(row).not.toBeNull();
+    expect(row?.dataset.search).toContain("codex thread-1");
+    expect(container.querySelector(".session-card")).not.toBeInTheDocument();
+    expect(screen.getByText("⌖")).toBeInTheDocument();
+    expect(screen.getByText("~")).toBeInTheDocument();
+    expect(screen.getByText("/repo")).toBeInTheDocument();
+    expect(screen.getByText("provider/model")).toBeInTheDocument();
+    expect(screen.getByText("1.2k tok · $0.25")).toBeInTheDocument();
   });
 
-  it("preserves the legacy Pi card treatment by default", () => {
-    const { container } = render(SessionCard, {
-      props: { session: session({ runtime: undefined }) },
+  it("renders running and waiting status lines with distinct semantics", () => {
+    const now = Date.parse("2026-01-01T00:02:00Z");
+    const running = render(SessionCard, {
+      props: {
+        session: session({ currentActivity: "bash", activityStartedAt: "2026-01-01T00:00:00Z" }),
+        running: true,
+        now,
+      },
     });
-    expect(screen.queryByText("Codex")).not.toBeInTheDocument();
-    expect(container.querySelector(".session-card-mark")).toHaveAttribute("src", "/pi-icon.svg");
-    const card = container.querySelector<HTMLElement>(".session-card");
-    expect(card).not.toBeNull();
-    expect(card?.dataset.search).toContain("pi");
+    expect(running.container.querySelector(".session-ticker-row--running")).toBeInTheDocument();
+    expect(screen.getByText("bash · 2m")).toBeInTheDocument();
+    running.unmount();
+
+    const waiting = render(SessionCard, {
+      props: {
+        session: session({
+          waitingQuestion: "Ship it?",
+          waitingSince: "2026-01-01T00:00:00Z",
+          waitingOptions: ["Ship", "Hold"],
+        }),
+        running: true,
+        now,
+      },
+    });
+    expect(waiting.container.querySelector(".session-ticker-row--waiting")).toBeInTheDocument();
+    expect(screen.getByText("waiting 2m — Ship it?")).toBeInTheDocument();
   });
 });

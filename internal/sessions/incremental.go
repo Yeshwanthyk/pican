@@ -143,7 +143,7 @@ func parseSummaryCached(path, dirName, fileName string, prior *cacheEntry) (Sess
 	}
 
 	if prior != nil && prior.parse.canExtend(size, hash, hashLen) {
-		fold := prior.parse.fold // value copy: SessionSummary + plain strings only.
+		fold := prior.parse.fold.clone()
 		newOffset, scanErr := scanAppendedLines(f, prior.parse.offset, func(line []byte) {
 			var raw summaryLine
 			if json.Unmarshal(line, &raw) == nil {

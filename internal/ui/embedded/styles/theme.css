@@ -54,6 +54,7 @@
     --accent: #9cc7c0;
     --border-accent: #9cc7c0;
     --danger: #ef767a;
+    --attention: #d8b45a;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -145,6 +146,7 @@
     --accent: #496f69;
     --border-accent: #496f69;
     --danger: #b23b42;
+    --attention: #8a651d;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -236,6 +238,7 @@
     --accent: #88c0d0;
     --border-accent: #88c0d0;
     --danger: #bf616a;
+    --attention: #ebcb8b;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -327,6 +330,7 @@
     --accent: #ff79c6;
     --border-accent: #ff79c6;
     --danger: #ff5555;
+    --attention: #f1fa8c;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -418,6 +422,7 @@
     --accent: #89b4fa;
     --border-accent: #89b4fa;
     --danger: #f38ba8;
+    --attention: #f9e2af;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -509,6 +514,7 @@
     --accent: #1e66f5;
     --border-accent: #1e66f5;
     --danger: #d20f39;
+    --attention: #b66b00;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -600,6 +606,7 @@
     --accent: #83a598;
     --border-accent: #83a598;
     --danger: #fb4934;
+    --attention: #d79921;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -691,6 +698,7 @@
     --accent: #7aa2f7;
     --border-accent: #7aa2f7;
     --danger: #f7768e;
+    --attention: #e0af68;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -782,6 +790,7 @@
     --accent: #c4a7e7;
     --border-accent: #c4a7e7;
     --danger: #eb6f92;
+    --attention: #f6c177;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -873,6 +882,7 @@
     --accent: #2f81f7;
     --border-accent: #2f81f7;
     --danger: #f85149;
+    --attention: #d29922;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -964,6 +974,7 @@
     --accent: #0969da;
     --border-accent: #0969da;
     --danger: #cf222e;
+    --attention: #825500;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -1055,6 +1066,7 @@
     --accent: #61afef;
     --border-accent: #61afef;
     --danger: #e06c75;
+    --attention: #e5c07b;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -1146,6 +1158,7 @@
     --accent: #a7c080;
     --border-accent: #a7c080;
     --danger: #e67e80;
+    --attention: #dbbc7f;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);
@@ -1237,6 +1250,7 @@
     --accent: #7e9cd8;
     --border-accent: #7e9cd8;
     --danger: #e82424;
+    --attention: #c0a36e;
 
     --pi-menu-bg: var(--surface);
     --pi-menu-border: var(--dim);

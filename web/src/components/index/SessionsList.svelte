@@ -9,14 +9,12 @@
     groupSessionsByDate,
     groupSessionsByProject,
     sessionsCountLabel,
-    splitPinnedSessions,
+    splitHomeSessions,
     type NormalizedSession,
     type RunningStatus,
     type DateSessionGroup,
     type ProjectSessionGroup,
   } from '../../index/sessions.js';
-  import type { NormalizedPeerHost } from '../../index/peers.js';
-  import MachinesSection from './MachinesSection.svelte';
   import SessionCard from './SessionCard.svelte';
 
   const dateBucketLabels: Readonly<Record<DateBucket, string>> = {
@@ -37,7 +35,6 @@
     hasMore?: boolean;
     loadingMore?: boolean;
     onLoadMore?: () => void | Promise<void>;
-    peerHosts?: ReadonlyArray<NormalizedPeerHost>;
   }
 
   let {
@@ -50,14 +47,14 @@
     hasMore = false,
     loadingMore = false,
     onLoadMore = () => {},
-    peerHosts = [],
   }: Props = $props();
 
   let now = $state(Date.now());
   let collapsed = $state<Record<string, true>>({});
 
   const isTimeline = $derived(layout === 'timeline');
-  const split = $derived(splitPinnedSessions(sessions));
+  const split = $derived(splitHomeSessions(sessions, runningSessionIds));
+  const nowSessions = $derived([...split.live, ...split.waiting]);
   const pinnedSessions = $derived(split.pinned);
   const timelineGroups = $derived(groupSessionsByDate(split.rest, now));
   const projectGroups = $derived(groupSessionsByProject(split.rest));
@@ -121,6 +118,24 @@
       <p>{t('index.noSessionsYetHint')}</p>
     </div>
   {:else}
+    {#if nowSessions.length > 0}
+      <div class="timeline-section timeline-section--now" data-bucket="now">
+        <div class="date-separator">
+          <span class="date-separator-label">{t('index.now')}</span>
+          <span class="date-separator-count">{sessionsCountLabel(nowSessions.length)}</span>
+        </div>
+        <div class="session-grid">
+          {#each nowSessions as session (session.id)}
+            <SessionCard
+              {session}
+              running={runningSessionIds.has(session.id)}
+              runningStatus={runningStatuses.get(session.id)}
+              {now}
+            />
+          {/each}
+        </div>
+      </div>
+    {/if}
     {#if pinnedSessions.length > 0}
       <div class="timeline-section" data-bucket="pinned">
         <div class="date-separator">
@@ -138,9 +153,6 @@
           {/each}
         </div>
       </div>
-    {/if}
-    {#if peerHosts.length > 0}
-      <MachinesSection hosts={peerHosts} {now} />
     {/if}
     {#if isTimeline}
       {#each timelineGroups as group (group.bucket)}

@@ -375,6 +375,68 @@ func TestLabelSessionEntryAppendsLabelAndClearEntries(t *testing.T) {
 	}
 }
 
+func TestParseSummaryTracksPendingToolAndWaitingQuestion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	content := `{"type":"session","version":3,"id":"sid","timestamp":"2026-05-08T10:00:00Z"}` + "\n" +
+		`{"type":"message","id":"assistant","timestamp":"2026-05-08T10:01:00Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"q1","name":"ask_user_question","arguments":{"questions":[{"question":"Ship this change?","options":[{"label":"Ship"},{"label":"Hold"}]}]}}]}}` + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ParseSummary(path, "--proj--", "s.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CurrentActivity != "ask_user_question" || summary.ActivityStartedAt != "2026-05-08T10:01:00Z" {
+		t.Fatalf("activity = %q at %q", summary.CurrentActivity, summary.ActivityStartedAt)
+	}
+	if summary.WaitingQuestion != "Ship this change?" || strings.Join(summary.WaitingOptions, ",") != "Ship,Hold" {
+		t.Fatalf("waiting summary = %q %#v", summary.WaitingQuestion, summary.WaitingOptions)
+	}
+
+	result := `{"type":"message","id":"result","timestamp":"2026-05-08T10:02:00Z","message":{"role":"toolResult","toolCallId":"q1","details":{"awaitingChatReply":true},"content":[{"type":"text","text":"waiting"}]}}` + "\n"
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(result); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err = ParseSummary(path, "--proj--", "s.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.WaitingQuestion != "Ship this change?" {
+		t.Fatalf("awaiting-chat result cleared waiting question: %+v", summary)
+	}
+
+	answer := `{"type":"message","id":"answer","timestamp":"2026-05-08T10:03:00Z","message":{"role":"user","content":"Ship"}}` + "\n"
+	f, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(answer); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err = ParseSummary(path, "--proj--", "s.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CurrentActivity != "" || summary.WaitingQuestion != "" || len(summary.WaitingOptions) != 0 {
+		t.Fatalf("resolved tool remained pending: %+v", summary)
+	}
+}
+
 func TestLabelSessionEntryRejectsMissingTarget(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")
 	if err := os.WriteFile(path, []byte(`{"type":"session"}`+"\n"), 0644); err != nil {

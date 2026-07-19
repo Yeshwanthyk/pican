@@ -40,11 +40,17 @@ type summaryLine struct {
 }
 
 type summaryMsg struct {
-	Role     string          `json:"role"`
-	Provider string          `json:"provider"`
-	Model    string          `json:"model"`
-	Content  json.RawMessage `json:"content"`
-	Usage    summaryUsage    `json:"usage"`
+	Role       string          `json:"role"`
+	Provider   string          `json:"provider"`
+	Model      string          `json:"model"`
+	Content    json.RawMessage `json:"content"`
+	ToolCallID string          `json:"toolCallId"`
+	Details    summaryDetails  `json:"details"`
+	Usage      summaryUsage    `json:"usage"`
+}
+
+type summaryDetails struct {
+	AwaitingChatReply bool `json:"awaitingChatReply"`
 }
 
 type summaryUsage struct {
@@ -74,7 +80,13 @@ type SessionSummary struct {
 	ChatDisabledReason string
 	// Pinned is set by the server from pican's SQLite session_pins table; it
 	// is never derived from the session file itself.
-	Pinned bool `json:"pinned,omitempty"`
+	Pinned            bool     `json:"pinned,omitempty"`
+	Btw               bool     `json:"btw,omitempty"`
+	CurrentActivity   string   `json:"currentActivity,omitempty"`
+	ActivityStartedAt string   `json:"activityStartedAt,omitempty"`
+	WaitingQuestion   string   `json:"waitingQuestion,omitempty"`
+	WaitingSince      string   `json:"waitingSince,omitempty"`
+	WaitingOptions    []string `json:"waitingOptions,omitempty"`
 }
 
 type Session struct {
@@ -219,15 +231,27 @@ func applySummaryContext(s *SessionSummary, path, fileName, sessionInfoName, hea
 // parse) so the two code paths can never drift on how a line updates the
 // running summary.
 type summaryFoldState struct {
-	s               SessionSummary
-	headerName      string
-	sessionInfoName string
-	firstUserText   string
-	headerCwd       string
+	s                SessionSummary
+	headerName       string
+	sessionInfoName  string
+	firstUserText    string
+	headerCwd        string
+	pendingTools     map[string]summaryPendingTool
+	pendingToolOrder []string
+}
+
+type summaryPendingTool struct {
+	name      string
+	startedAt string
+	question  string
+	options   []string
 }
 
 func newSummaryFoldState(dirName, fileName string) summaryFoldState {
-	return summaryFoldState{s: newSessionSummary(dirName, fileName)}
+	return summaryFoldState{
+		s:            newSessionSummary(dirName, fileName),
+		pendingTools: make(map[string]summaryPendingTool),
+	}
 }
 
 func (fs *summaryFoldState) foldLine(raw summaryLine) {
@@ -275,6 +299,7 @@ func (fs *summaryFoldState) foldLine(raw summaryLine) {
 		if fs.firstUserText == "" && msg.Role == "user" {
 			fs.firstUserText = extractRawText(msg.Content)
 		}
+		fs.foldToolActivity(raw.Timestamp, msg)
 	case "model_change":
 		if raw.Timestamp != "" {
 			fs.s.LastActivity = raw.Timestamp
@@ -295,8 +320,88 @@ func (fs *summaryFoldState) foldLine(raw summaryLine) {
 // public SessionSummary from the running fold state.
 func (fs *summaryFoldState) finalize(path, fileName string) SessionSummary {
 	s := fs.s
+	for i := len(fs.pendingToolOrder) - 1; i >= 0; i-- {
+		tool, ok := fs.pendingTools[fs.pendingToolOrder[i]]
+		if !ok {
+			continue
+		}
+		s.CurrentActivity = tool.name
+		s.ActivityStartedAt = tool.startedAt
+		if tool.question != "" {
+			s.WaitingQuestion = tool.question
+			s.WaitingSince = tool.startedAt
+			s.WaitingOptions = append([]string(nil), tool.options...)
+		}
+		break
+	}
 	applySummaryContext(&s, path, fileName, fs.sessionInfoName, fs.headerName, fs.firstUserText, fs.headerCwd)
 	return s
+}
+
+func (fs *summaryFoldState) clone() summaryFoldState {
+	cloned := *fs
+	cloned.pendingTools = make(map[string]summaryPendingTool, len(fs.pendingTools))
+	for id, tool := range fs.pendingTools {
+		tool.options = append([]string(nil), tool.options...)
+		cloned.pendingTools[id] = tool
+	}
+	cloned.pendingToolOrder = append([]string(nil), fs.pendingToolOrder...)
+	return cloned
+}
+
+func (fs *summaryFoldState) foldToolActivity(timestamp string, msg *summaryMsg) {
+	if msg.Role == "toolResult" && msg.ToolCallID != "" {
+		if !msg.Details.AwaitingChatReply {
+			delete(fs.pendingTools, msg.ToolCallID)
+		}
+		return
+	}
+	if msg.Role == "user" {
+		for id, tool := range fs.pendingTools {
+			if tool.question != "" {
+				delete(fs.pendingTools, id)
+			}
+		}
+		return
+	}
+	if msg.Role != "assistant" || len(msg.Content) == 0 || msg.Content[0] != '[' {
+		return
+	}
+	var blocks []struct {
+		Type      string          `json:"type"`
+		ID        string          `json:"id"`
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if json.Unmarshal(msg.Content, &blocks) != nil {
+		return
+	}
+	for _, block := range blocks {
+		if block.Type != "toolCall" || block.ID == "" || block.Name == "" {
+			continue
+		}
+		tool := summaryPendingTool{name: block.Name, startedAt: timestamp}
+		if block.Name == "ask_user_question" || block.Name == "pican_ask_user_question" {
+			var args struct {
+				Questions []struct {
+					Question string `json:"question"`
+					Options  []struct {
+						Label string `json:"label"`
+					} `json:"options"`
+				} `json:"questions"`
+			}
+			if json.Unmarshal(block.Arguments, &args) == nil && len(args.Questions) > 0 {
+				tool.question = args.Questions[0].Question
+				for _, option := range args.Questions[0].Options {
+					if option.Label != "" {
+						tool.options = append(tool.options, option.Label)
+					}
+				}
+			}
+		}
+		fs.pendingTools[block.ID] = tool
+		fs.pendingToolOrder = append(fs.pendingToolOrder, block.ID)
+	}
 }
 
 // ParseSummary streams path line-by-line, accumulating only the fields the

@@ -8,8 +8,10 @@
     layout?: Layout;
     totalSessionsLabel?: string;
     runningCount?: number;
-    runningVisible?: boolean;
+    waitingCount?: number;
+    menuOpen?: boolean;
     onSearch?: () => void;
+    onNewSession?: () => void;
     onToggleMenu?: () => void;
     onLayoutChange?: (layout: Layout) => void;
     onSchedules?: () => void;
@@ -19,84 +21,88 @@
     layout = 'timeline',
     totalSessionsLabel = t('index.sessionsCount', { count: 0 }),
     runningCount = 0,
-    runningVisible = false,
+    waitingCount = 0,
+    menuOpen = false,
     onSearch = () => {},
+    onNewSession = () => {},
     onToggleMenu = () => {},
     onLayoutChange = () => {},
     onSchedules = () => {},
   }: Props = $props();
 </script>
 
-<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
+<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG -->
 
-<div class="header">
+<header class="header">
   <div class="header-inner">
-    <div class="header-top">
-      <h1>
-        <img class="pi-logo-mark" src="/app-icon.png" alt="" aria-hidden="true" /><span
-          >{t('index.title')}</span
-        >
-      </h1>
-      <div class="header-actions">
-        <button
-          class="nav-search-btn"
-          id="open-search"
-          type="button"
-          aria-haspopup="dialog"
-          aria-controls="sessionPalette"
-          onclick={onSearch}><span>{t('index.searchSessions')}</span><kbd>⌘K</kbd></button
-        >
-        <button
-          class="nav-menu-btn"
-          id="web-menu-btn"
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={false}
-          aria-controls="web-menu"
-          onclick={(e) => {
-            e.stopPropagation();
-            onToggleMenu();
-          }}>{@html icon(MoreHorizontal, { size: 16 })}</button
-        >
+    <div class="header-identity">
+      <img class="pi-logo-mark" src="/app-icon.png" alt="" aria-hidden="true" />
+      <span class="header-title-desktop">{t('index.title')}</span>
+      <span class="header-title-mobile">{t('index.mobileTitle')}</span>
+      <div class="workspace-stats" data-total-count>
+        <span>{totalSessionsLabel}</span>
+        {#if runningCount > 0}
+          <span class="workspace-stat-running"
+            >{t('index.runningCount', { count: runningCount })}</span
+          >
+        {/if}
+        {#if waitingCount > 0}
+          <span class="workspace-stat-waiting"
+            >{t('index.needsYouCount', { count: waitingCount })}</span
+          >
+        {/if}
+        {#if runningCount === 0 && waitingCount === 0}<span>{t('index.allIdle')}</span>{/if}
       </div>
     </div>
-    <div class="workspace-summary">
-      <div class="workspace-stats">
-        <span data-total-count>{totalSessionsLabel}</span>
-        <span class="stat-running" class:visible={runningVisible} id="statRunning" data-running-stat
-          ><span class="status-dot" aria-hidden="true"></span><span data-running-count
-            >{runningCount}</span
-          ><span class="stat-running-label"> {t('index.active')}</span></span
-        >
-      </div>
-      <div class="workspace-views">
-        <div class="layout-toggle" aria-label={t('index.sessionLayout')}>
-          <button
-            type="button"
-            data-layout-btn="timeline"
-            aria-pressed={layout === 'timeline'}
-            onclick={() => onLayoutChange('timeline')}>{t('index.layoutTimeline')}</button
-          >
-          <button
-            type="button"
-            data-layout-btn="projects"
-            aria-pressed={layout === 'projects'}
-            onclick={() => onLayoutChange('projects')}>{t('index.layoutProjects')}</button
-          >
-        </div>
+    <div class="header-actions">
+      <div class="layout-toggle" aria-label={t('index.sessionLayout')}>
         <button
           type="button"
-          class="schedules-nav-btn"
-          data-schedules-btn
-          title={t('schedules.navTitle')}
-          onclick={onSchedules}
-          ><span class="schedules-nav-icon" aria-hidden="true"
-            >{@html icon(CalendarClock, {
-              size: 15,
-            })}</span
-          ><span>{t('schedules.navTitle')}</span></button
+          data-layout-btn="timeline"
+          aria-pressed={layout === 'timeline'}
+          onclick={() => onLayoutChange('timeline')}>{t('index.layoutTimeline')}</button
+        >
+        <button
+          type="button"
+          data-layout-btn="projects"
+          aria-pressed={layout === 'projects'}
+          onclick={() => onLayoutChange('projects')}>{t('index.layoutProjects')}</button
         >
       </div>
+      <button
+        class="nav-search-btn"
+        id="open-search"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="sessionPalette"
+        onclick={onSearch}><span>{t('index.searchSessions')}</span><kbd>⌘K</kbd></button
+      >
+      <button class="header-new-session" type="button" onclick={onNewSession}
+        ><span aria-hidden="true">+</span>{t('index.newSessionShort')}</button
+      >
+      <button
+        type="button"
+        class="schedules-nav-btn"
+        data-schedules-btn
+        title={t('schedules.navTitle')}
+        onclick={onSchedules}
+        ><span aria-hidden="true">{@html icon(CalendarClock, { size: 15 })}</span><span
+          >{t('schedules.navTitle')}</span
+        ></button
+      >
+      <button
+        class="nav-menu-btn"
+        id="web-menu-btn"
+        type="button"
+        aria-label={t('index.openMenu')}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls="web-menu"
+        onclick={(event) => {
+          event.stopPropagation();
+          onToggleMenu();
+        }}>{@html icon(MoreHorizontal, { size: 17 })}</button
+      >
     </div>
   </div>
-</div>
+</header>

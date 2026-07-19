@@ -109,6 +109,7 @@ Every component (the index list cards, sidebar tree, chat bubbles, buttons, and 
 - `--dim`: Outer dividing rules and borders.
 - `--dim-2`: Inner subtle divisions.
 - `--accent`: Brand focus, highlight borders, and state changes.
+- `--attention`: Waiting-for-user and other non-error states that need action.
 
 ### Syntax Highlighting & Diffs
 - `--syntaxKeyword`: Language keywords.

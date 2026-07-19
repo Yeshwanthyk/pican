@@ -3,6 +3,7 @@
   import CommandPalette from '../components/shared/CommandPalette.svelte';
   import HomeMenu from '../components/index/HomeMenu.svelte';
   import IndexHeader from '../components/index/IndexHeader.svelte';
+  import HomeRail from '../components/index/HomeRail.svelte';
   import NewSessionModal from '../components/index/NewSessionModal.svelte';
   import ProjectsModal from '../components/index/ProjectsModal.svelte';
   import SessionsList from '../components/index/SessionsList.svelte';
@@ -18,7 +19,10 @@
   import { navigate } from '../shared/navigation.js';
   import { t } from '../shared/strings.js';
   import { describeError } from '../lib/errors';
-  import type { Project } from '../lib/schema';
+  import type { Project, Schedule } from '../lib/schema';
+  import { sendChat } from '../session/chat/chat-api.js';
+  import { defaultFetchSchedules } from '../index/schedules.js';
+  import { showToast } from '../shared/toast.js';
   import { ignoreFailure, recoverSync, settle } from '../components/shared/ui-effect';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
   import {
@@ -69,12 +73,18 @@
   let peersConfigured = false;
   let peerHosts = $state<NormalizedPeerHost[]>([]);
   let peersRefreshInflight = false;
+  let schedules = $state<Schedule[]>([]);
 
   const totalSessionsLabel = $derived(
     total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total }),
   );
   const hasMore = $derived(sessions.length < total);
-  const runningCount = $derived(runningSessionIds.size);
+  const waitingSessions = $derived(sessions.filter((session) => session.waitingQuestion));
+  const waitingIds = $derived(new Set(waitingSessions.map((session) => session.id)));
+  const waitingCount = $derived(waitingSessions.length);
+  const runningCount = $derived(
+    [...runningSessionIds].filter((sessionId) => !waitingIds.has(sessionId)).length,
+  );
 
   function normalizeRunningStatus(value: unknown): RunningStatus | undefined {
     if (typeof value !== 'object' || value === null) return undefined;
@@ -158,7 +168,7 @@
   // append to any streaming session, indefinitely. A brand-new (unknown) id
   // still refreshes right away so it appears promptly; a known id only
   // refreshes at most once per KNOWN_ID_REFRESH_THROTTLE_MS, since all a
-  // known session's reload can change here is its activity time/ordering.
+  // known session's reload updates activity/waiting summaries at a bounded rate.
   const KNOWN_ID_REFRESH_THROTTLE_MS = 5000;
   let lastKnownIdRefreshAt = 0;
   function handleReload({ id }: { readonly id: string }): void {
@@ -197,6 +207,28 @@
     const result = await settle(defaultFetchPeers);
     peersConfigured = result.ok && (result.value.peers || []).length > 0;
     if (peersConfigured) await refreshPeerHosts();
+  }
+
+  async function refreshSchedules() {
+    const result = await settle(defaultFetchSchedules);
+    if (result.ok) schedules = [...result.value.schedules];
+  }
+
+  async function answerWaitingQuestion(
+    session: NormalizedSession,
+    answer: string,
+  ): Promise<boolean> {
+    const question = session.waitingQuestion;
+    const body = new FormData();
+    body.set('message', `"${question}" = "${answer}"`);
+    const result = await settle(() => sendChat(session.id, body));
+    if (!result.ok || !result.value.ok) {
+      showToast(t('index.answerFailed'));
+      return false;
+    }
+    session.waitingQuestion = '';
+    session.waitingOptions = [];
+    return true;
   }
 
   function setLayout(nextLayout: string): void {
@@ -372,6 +404,7 @@
 
     refreshSessions();
     initPeers();
+    refreshSchedules();
 
     return () => {
       document.title = previousTitle;
@@ -388,8 +421,10 @@
   {layout}
   {totalSessionsLabel}
   {runningCount}
-  runningVisible={runningCount > 0}
+  {waitingCount}
+  {menuOpen}
   onSearch={openPalette}
+  onNewSession={openNewSessionModal}
   onToggleMenu={toggleMenu}
   onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
@@ -402,30 +437,54 @@
   onManageProjects={openProjectsModal}
 />
 
-<button
-  class="new-session-btn new-session-btn-mobile"
-  id="newSessionBtn"
-  type="button"
-  data-new-session-btn
-  aria-label={t('index.startNewSession')}
-  title={t('index.newSession')}
-  onclick={openNewSessionModal}>+</button
->
-
 <CommandPalette onNewSession={openNewSessionModal} navigate={(url: string) => navigate(url)} />
 
-<SessionsList
-  {sessions}
-  {layout}
-  {runningSessionIds}
-  {runningStatuses}
-  {loading}
-  {layoutReady}
-  {hasMore}
-  {loadingMore}
-  onLoadMore={loadMore}
-  {peerHosts}
-/>
+<main class="home-layout">
+  <SessionsList
+    {sessions}
+    {layout}
+    {runningSessionIds}
+    {runningStatuses}
+    {loading}
+    {layoutReady}
+    {hasMore}
+    {loadingMore}
+    onLoadMore={loadMore}
+  />
+  <HomeRail
+    {waitingSessions}
+    {schedules}
+    {peerHosts}
+    onAnswer={answerWaitingQuestion}
+    onSchedules={() => navigate('/schedules')}
+  />
+</main>
+
+<nav class="mobile-thumb-bar" aria-label={t('index.mobileActions')}>
+  <button type="button" class="mobile-thumb-search" onclick={openPalette}
+    ><span>{t('index.searchSessions')}</span><kbd>⌘K</kbd></button
+  >
+  <button
+    type="button"
+    class="mobile-thumb-new"
+    data-new-session-btn
+    aria-label={t('index.startNewSession')}
+    onclick={openNewSessionModal}>+</button
+  >
+  <button
+    type="button"
+    class="mobile-thumb-menu"
+    id="web-menu-btn-mobile"
+    aria-label={t('index.openMenu')}
+    aria-haspopup="menu"
+    aria-expanded={menuOpen}
+    aria-controls="web-menu"
+    onclick={(event) => {
+      event.stopPropagation();
+      toggleMenu();
+    }}>⋯</button
+  >
+</nav>
 
 <NewSessionModal
   open={newSessionOpen}

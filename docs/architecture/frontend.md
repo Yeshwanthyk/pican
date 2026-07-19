@@ -41,9 +41,9 @@ API, SSE, PWA, sound, and static asset routes remain server-handled and are not 
 
 ## Sessions Index (`/`)
 
-`SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the sessions list, session cards, command palette, home menu, new-session modal, and project management modal. Timeline, Projects, Schedules, and Subagents are the global index views; Workflows and Tasks are session-scoped actions in `CommandMenu.svelte`. `web/src/index/` now contains pure data/API helpers (`sessions.js`) for normalization, grouping, filtering, and API calls.
+`SessionsPage.svelte` owns the page shell and orchestrates Svelte components for the ticker-row session list, desktop right rail, mobile thumb bar, command palette, home menu, new-session modal, and project management modal. Timeline, Projects, Schedules, and Subagents are the global index views; Workflows and Tasks are session-scoped actions in `CommandMenu.svelte`. `web/src/index/` contains pure data/API helpers (`sessions.ts`) for normalization, Now/pinned/date/project grouping, filtering, and API calls.
 
-Data comes from APIs such as `/api/sessions`, `/api/runtimes`, `/api/new-session`, `/api/projects`, `/api/recent-locations`, and `/events?id=__all__`. Summaries normalize `runtime`/`nativeId`; Codex cards show a runtime badge, and runtime plus native ID participate in search. The new-session modal selects among configured, currently available runtimes and sends the choice to `/api/new-session`. Running-session status is pushed through the shared SSE helpers and reflected reactively in the cards/counts.
+Data comes from APIs such as `/api/sessions`, `/api/runtimes`, `/api/new-session`, `/api/projects`, `/api/recent-locations`, and `/events?id=__all__`. Session summaries include the latest unresolved tool activity; an unresolved `ask_user_question` carries its first question and answer labels so the home rail can reply through the existing `/api/chat` path. Runtime plus native ID participate in search. The new-session modal selects among configured, currently available runtimes and sends the choice to `/api/new-session`. Running-session status remains pushed through the shared SSE helpers and combines with summary activity to drive the Now group and header counts.
 
 ## Session Viewer (`/session?id=…`)
 
