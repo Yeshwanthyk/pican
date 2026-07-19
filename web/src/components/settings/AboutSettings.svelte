@@ -12,7 +12,7 @@
   <div class="settings-row">
     <div class="settings-row-label">
       <span class="name">{t('common.version')}</span>
-      <span class="hint">pi-web</span>
+      <span class="hint">{t('common.productName')}</span>
     </div>
     <div class="settings-control">
       <button class="settings-link" type="button" data-version-row

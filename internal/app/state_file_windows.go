@@ -17,7 +17,7 @@ func lockStateFile(f *os.File) error {
 		windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY,
 		0, 1, 0, new(windows.Overlapped))
 	if err == windows.ERROR_LOCK_VIOLATION {
-		return fmt.Errorf("another pi-web instance appears to be running (state file at %s is locked); exit it first, or remove the file if stale", f.Name())
+		return fmt.Errorf("another pican instance appears to be running (state file at %s is locked); exit it first, or remove the file if stale", f.Name())
 	}
 	return err
 }

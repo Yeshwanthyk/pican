@@ -13,7 +13,7 @@ import (
 func lockStateFile(f *os.File) error {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if err == syscall.EWOULDBLOCK {
-			return fmt.Errorf("another pi-web instance appears to be running (state file at %s is locked); exit it first, or remove the file if stale", f.Name())
+			return fmt.Errorf("another pican instance appears to be running (state file at %s is locked); exit it first, or remove the file if stale", f.Name())
 		}
 		return err
 	}

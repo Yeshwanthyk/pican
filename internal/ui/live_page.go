@@ -53,11 +53,11 @@ func SetFontProvider(fn func() (string, string, string, string, string)) {
 // /custom-themes.css — so a parser-blocking <script> guarantees those styles are
 // loaded and getComputedStyle can resolve the custom theme's --body-bg.
 // It does two things:
-//   1. Sets data-theme + an inline background-color on <html> matching the
-//      current theme and WCO state so the correct colour is present from the
-//      very first paint, eliminating the white/gray flash in the title-bar
-//      area. Every theme resolves through the palette variables loaded above.
-//   2. Toggles the `wco` class when Window Controls Overlay is active.
+//  1. Sets data-theme + an inline background-color on <html> matching the
+//     current theme and WCO state so the correct colour is present from the
+//     very first paint, eliminating the white/gray flash in the title-bar
+//     area. Every theme resolves through the palette variables loaded above.
+//  2. Toggles the `wco` class when Window Controls Overlay is active.
 const wcoBootScript = `<script>
 (function(){
   // Detect WCO via the display-mode media query — the reliable, synchronous
@@ -123,7 +123,7 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 	b.WriteString("<meta name=\"theme-color\" content=\"#0e0e13\">\n")
 	b.WriteString("<meta name=\"mobile-web-app-capable\" content=\"yes\">\n")
 	b.WriteString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n")
-	b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"Pi Sessions\">\n")
+	b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"pican\">\n")
 	b.WriteString("<meta name=\"pi-web-theme\" content=\"")
 	b.WriteString(template.HTMLEscapeString(themeProvider()))
 	b.WriteString("\">\n")

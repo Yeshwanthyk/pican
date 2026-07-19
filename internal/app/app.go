@@ -255,7 +255,7 @@ func Main(version string) {
 			}
 		}
 	}
-	fmt.Printf("Pi Sessions Viewer -> %s\n", url)
+	fmt.Printf("pican -> %s\n", url)
 	if tailscaleURL != "" {
 		fmt.Printf("Tailscale HTTPS -> %s\n", tailscaleURL)
 	}

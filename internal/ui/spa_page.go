@@ -49,7 +49,7 @@ func RenderAppShell(w io.Writer, bootstrap string) error {
 		LiveDocumentEnd   template.HTML
 	}{
 		LiveDocumentStart: template.HTML(renderLiveDocumentStart(liveDocumentData{
-			Title:   "pi-web",
+			Title:   "pican",
 			Preload: preload,
 			Styles:  appStylesheets(),
 		})),

@@ -9,7 +9,7 @@ function jsonResponse(body, ok = true, status = 200) {
 
 beforeEach(() => {
   document.body.innerHTML =
-    '<button data-version-row data-action="version"><span>pi-web</span><span class="version-status" data-version-status>…</span></button>';
+    '<button data-version-row data-action="version"><span>pican</span><span class="version-status" data-version-status>…</span></button>';
 });
 
 afterEach(() => {

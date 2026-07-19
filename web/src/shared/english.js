@@ -15,13 +15,14 @@ export default {
   'common.back': 'Back',
   'common.copied': 'Copied',
   'common.copyFailed': 'Copy failed',
+  'common.productName': 'pican',
 
   // ── Runtimes ──
   'runtime.pi': 'Pi',
   'runtime.codex': 'Codex',
 
   // ── Sessions index ──
-  'index.title': 'Sessions',
+  'index.title': 'pican',
   'index.searchSessions': 'Search sessions...',
   'index.sessionsCount': '{count} sessions',
   'index.sessionCountOne': '1 session',
@@ -448,7 +449,7 @@ export default {
 
   'settings.sessionTitles': 'Session Titles',
   'settings.autoTitle': 'Auto-generate titles',
-  'settings.autoTitleHint': 'Let pi-web name sessions automatically from the first message.',
+  'settings.autoTitleHint': 'Let pican name sessions automatically from the first message.',
   'settings.whenToTitle': 'When to title',
   'settings.whenToTitleHint': 'Title a session once, or refresh it as the focus shifts.',
   'settings.titleOnce': 'Once per session',
@@ -485,18 +486,18 @@ export default {
 
   'settings.about': 'About',
   'settings.docs': 'Documentation',
-  'settings.docsHint': 'Guides and architecture docs for pi-web.',
+  'settings.docsHint': 'Guides and architecture docs for pican.',
   'settings.openDocs': 'Open docs',
   'settings.github': 'GitHub',
-  'settings.githubHint': 'If pi-web is useful to you, please give the repo a ⭐.',
+  'settings.githubHint': 'If pican is useful to you, please give the repo a ⭐.',
   'settings.starGithub': 'Star on GitHub',
   'settings.sponsor': 'Sponsor',
-  'settings.sponsorHint': 'Support continued development of pi-web by sponsoring the creator.',
+  'settings.sponsorHint': 'Support continued development of pican by sponsoring the creator.',
   'settings.becomeSponsor': 'Become a sponsor',
 
   'settings.machines': 'Machines',
   'settings.machinesHint':
-    'Other pi-web instances reached over Tailscale. Their sessions appear read-only on the homepage with a link back to that machine — nothing is proxied through this one.',
+    'Other pican instances reached over Tailscale. Their sessions appear read-only on the homepage with a link back to that machine — nothing is proxied through this one.',
   'settings.machineName': 'Name',
   'settings.machineNamePlaceholder': 'mac-mini',
   'settings.machineBaseUrl': 'Base URL',
@@ -585,6 +586,7 @@ export default {
     "Artifacts are part of the live view only and aren't included in exported snapshots.",
 
   // ── Version modal ──
+  'version.dialogLabel': 'pican version',
   'version.unavailable': 'Version information is unavailable.',
   'version.checkForUpdates': 'Check for updates',
   'version.checking': 'Checking…',

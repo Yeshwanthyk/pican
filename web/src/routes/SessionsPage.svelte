@@ -291,7 +291,7 @@
 
   onMount(() => {
     const previousTitle = document.title;
-    document.title = 'Pi Sessions';
+    document.title = t('common.productName');
     configureSettingsSync({ fetchImpl: window.fetch.bind(window) });
     setupKeyboardNav({ windowImpl: window, documentImpl: document });
 

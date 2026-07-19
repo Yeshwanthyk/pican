@@ -161,8 +161,8 @@ func TestAuthRejectsBrowserWithHTMLPrompt(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want text/html", ct)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "pi-web") {
-		t.Fatal("expected HTML token prompt in response body")
+	if !strings.Contains(body, "pican") {
+		t.Fatal("expected branded HTML token prompt in response body")
 	}
 	if !strings.HasPrefix(strings.ToLower(body), "<!doctype html>") {
 		t.Fatal("expected HTML response")

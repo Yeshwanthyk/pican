@@ -23,7 +23,7 @@ describe('App', () => {
 
     mounted = mountApp({ props: { path: '/' } });
 
-    expect(document.querySelector('.header h1')?.textContent).toContain('Sessions');
+    expect(document.querySelector('.header h1')?.textContent).toContain('pican');
     expect(document.querySelector('[data-sessions-content]')).toBeTruthy();
   });
 
