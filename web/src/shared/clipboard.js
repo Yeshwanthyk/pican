@@ -14,13 +14,13 @@ export async function copyToClipboard(
     /* fall through to execCommand */
   }
   try {
-    const ta = documentImpl.createElement('textarea');
+    const ta = documentImpl.createElement("textarea");
     ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
     documentImpl.body.appendChild(ta);
     ta.select();
-    const ok = documentImpl.execCommand('copy');
+    const ok = documentImpl.execCommand("copy");
     documentImpl.body.removeChild(ta);
     return ok;
   } catch {

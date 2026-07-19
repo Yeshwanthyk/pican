@@ -1,4 +1,4 @@
-import { icon, ArrowDown } from '../../shared/icons.js';
+import { icon, ArrowDown } from "../../shared/icons.js";
 
 export function chatComposerHeight() {
   return 0;
@@ -7,7 +7,7 @@ export function chatComposerHeight() {
 export function isAtBottom({ documentImpl = document, windowImpl = window, threshold = 80 } = {}) {
   const de = documentImpl.documentElement;
   const body = documentImpl.body;
-  const content = documentImpl.getElementById('content');
+  const content = documentImpl.getElementById("content");
 
   // If the window has scrollable height, the main window is the active scroll container (Desktop).
   // Otherwise, #content is the active scroll container (Mobile).
@@ -34,13 +34,13 @@ export function isAtBottom({ documentImpl = document, windowImpl = window, thres
 }
 
 export function scrollToBottom(smooth, { documentImpl = document, windowImpl = window } = {}) {
-  const content = documentImpl.getElementById('content');
+  const content = documentImpl.getElementById("content");
   if (content && content.scrollHeight > content.clientHeight) {
-    content.scrollTo({ top: content.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    content.scrollTo({ top: content.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   }
   windowImpl.scrollTo({
     top: Math.max(documentImpl.documentElement.scrollHeight, documentImpl.body.scrollHeight),
-    behavior: smooth ? 'smooth' : 'auto',
+    behavior: smooth ? "smooth" : "auto",
   });
 }
 
@@ -54,13 +54,13 @@ export function scrollElementAboveComposer(
     return;
   }
   const gap = chatComposerHeight({ documentImpl }) + 24;
-  const content = documentImpl.getElementById('content');
+  const content = documentImpl.getElementById("content");
   if (content && content.contains(el)) {
     const contentRect = content.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const delta = elRect.bottom - (contentRect.bottom - gap);
     if (delta > 0) {
-      content.scrollTo({ top: content.scrollTop + delta, behavior: smooth ? 'smooth' : 'auto' });
+      content.scrollTo({ top: content.scrollTop + delta, behavior: smooth ? "smooth" : "auto" });
     }
   }
   const rect = el.getBoundingClientRect();
@@ -68,7 +68,7 @@ export function scrollElementAboveComposer(
   if (viewportDelta > 0) {
     windowImpl.scrollTo({
       top: (windowImpl.scrollY || windowImpl.pageYOffset) + viewportDelta,
-      behavior: smooth ? 'smooth' : 'auto',
+      behavior: smooth ? "smooth" : "auto",
     });
   }
 }
@@ -78,15 +78,15 @@ export function createFollowButton({
   requestAnimationFrameImpl = requestAnimationFrame,
   onClick,
 } = {}) {
-  const button = documentImpl.createElement('button');
-  button.className = 'follow-button';
-  button.setAttribute('aria-label', 'Scroll to bottom');
+  const button = documentImpl.createElement("button");
+  button.className = "follow-button";
+  button.setAttribute("aria-label", "Scroll to bottom");
   button.innerHTML = icon(ArrowDown, { size: 18 });
   documentImpl.body.appendChild(button);
   requestAnimationFrameImpl(() => {
-    button.classList.add('visible');
+    button.classList.add("visible");
   });
-  if (onClick) button.addEventListener('click', onClick);
+  if (onClick) button.addEventListener("click", onClick);
   return button;
 }
 
@@ -96,7 +96,7 @@ export function setFollowButtonText(button, _pendingCount) {
 
 export function removeFollowButton(button, { windowImpl = window } = {}) {
   if (!button) return;
-  button.classList.remove('visible');
+  button.classList.remove("visible");
   windowImpl.setTimeout(() => {
     if (button.parentNode) button.parentNode.removeChild(button);
   }, 200);

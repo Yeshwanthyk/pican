@@ -1,9 +1,9 @@
-import { mount } from 'svelte';
-import App from './App.svelte';
+import { mount } from "svelte";
+import App from "./App.svelte";
 
 function defaultTarget() {
-  if (typeof document === 'undefined') return null;
-  return document.getElementById('spa-root') || document.getElementById('app');
+  if (typeof document === "undefined") return null;
+  return document.getElementById("spa-root") || document.getElementById("app");
 }
 
 export function mountApp({ target = defaultTarget(), props = {} } = {}) {
@@ -11,8 +11,8 @@ export function mountApp({ target = defaultTarget(), props = {} } = {}) {
   return mount(App, { target, props });
 }
 
-const appTarget = typeof document !== 'undefined' ? defaultTarget() : null;
+const appTarget = typeof document !== "undefined" ? defaultTarget() : null;
 if (appTarget && !appTarget.dataset.picanSvelteMounted) {
-  appTarget.dataset.picanSvelteMounted = 'true';
+  appTarget.dataset.picanSvelteMounted = "true";
   mountApp({ target: appTarget });
 }

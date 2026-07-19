@@ -1,8 +1,8 @@
-export const TOGGLE_STATE_STORAGE_KEY = 'pican:session-detail:toggle-state';
+export const TOGGLE_STATE_STORAGE_KEY = "pican:session-detail:toggle-state";
 export const TOGGLE_DEFAULT_SETTING_KEYS = {
-  thinkingExpanded: 'pican:v1:toggle:thinking',
-  toolsVisible: 'pican:v1:toggle:tools',
-  toolOutputsExpanded: 'pican:v1:toggle:tool-outputs',
+  thinkingExpanded: "pican:v1:toggle:thinking",
+  toolsVisible: "pican:v1:toggle:tools",
+  toolOutputsExpanded: "pican:v1:toggle:tool-outputs",
 };
 export const toggleStateDefaults = {
   thinkingExpanded: true,
@@ -13,8 +13,8 @@ export const toggleStateDefaults = {
 function readBoolSetting(storage, key, fallback) {
   try {
     const raw = storage?.getItem(key);
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
+    if (raw === "true") return true;
+    if (raw === "false") return false;
   } catch (_) {}
   return fallback;
 }
@@ -28,11 +28,11 @@ function readSessionMap(storage) {
     const raw = storage?.getItem(TOGGLE_STATE_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return {};
+    if (!parsed || typeof parsed !== "object") return {};
     if (
-      'thinkingExpanded' in parsed ||
-      'toolsVisible' in parsed ||
-      'toolOutputsExpanded' in parsed
+      "thinkingExpanded" in parsed ||
+      "toolsVisible" in parsed ||
+      "toolOutputsExpanded" in parsed
     ) {
       // Old flat-state shape — treat as no overrides.
       return {};
@@ -52,24 +52,24 @@ function readSessionMap(storage) {
 //    open the SAME session it remembers their last choice. Other sessions are
 //    not affected, so changing a default in /settings takes effect everywhere
 //    the user hasn't explicitly overridden it.
-export function loadToggleState({ sessionId = '', storage = globalThis.localStorage } = {}) {
+export function loadToggleState({ sessionId = "", storage = globalThis.localStorage } = {}) {
   const state = { ...toggleStateDefaults };
   for (const [stateKey, settingKey] of Object.entries(TOGGLE_DEFAULT_SETTING_KEYS)) {
     state[stateKey] = readBoolSetting(storage, settingKey, state[stateKey]);
   }
   if (!sessionId) return state;
   const saved = readSessionMap(storage)[sessionId];
-  if (saved && typeof saved === 'object') {
-    if (typeof saved.thinkingExpanded === 'boolean')
+  if (saved && typeof saved === "object") {
+    if (typeof saved.thinkingExpanded === "boolean")
       state.thinkingExpanded = saved.thinkingExpanded;
-    if (typeof saved.toolsVisible === 'boolean') state.toolsVisible = saved.toolsVisible;
-    if (typeof saved.toolOutputsExpanded === 'boolean')
+    if (typeof saved.toolsVisible === "boolean") state.toolsVisible = saved.toolsVisible;
+    if (typeof saved.toolOutputsExpanded === "boolean")
       state.toolOutputsExpanded = saved.toolOutputsExpanded;
   }
   return state;
 }
 
-export function saveToggleState(state, { sessionId = '', storage = globalThis.localStorage } = {}) {
+export function saveToggleState(state, { sessionId = "", storage = globalThis.localStorage } = {}) {
   if (!sessionId) return;
   try {
     const map = readSessionMap(storage);
@@ -84,28 +84,28 @@ export function saveToggleState(state, { sessionId = '', storage = globalThis.lo
 
 export function applyToggleStateToNode(node, state) {
   if (!node) return;
-  node.querySelectorAll('.thinking-text').forEach((el) => {
-    el.style.display = state.thinkingExpanded ? '' : 'none';
+  node.querySelectorAll(".thinking-text").forEach((el) => {
+    el.style.display = state.thinkingExpanded ? "" : "none";
   });
-  node.querySelectorAll('.thinking-collapsed').forEach((el) => {
-    el.style.display = state.thinkingExpanded ? 'none' : 'block';
+  node.querySelectorAll(".thinking-collapsed").forEach((el) => {
+    el.style.display = state.thinkingExpanded ? "none" : "block";
   });
-  node.querySelectorAll('.tool-execution, .compaction').forEach((el) => {
-    el.style.display = state.toolsVisible ? '' : 'none';
+  node.querySelectorAll(".tool-execution, .compaction").forEach((el) => {
+    el.style.display = state.toolsVisible ? "" : "none";
   });
   // Mirrors the .thinking-text / .thinking-collapsed pair: show a "Tool: <name>
   // ..." placeholder so a hidden tool call still has a visible marker (and an
   // assistant message whose only content is a tool call isn't a stranded
   // timestamp). The placeholder lives next to each .tool-execution in
   // ToolCall.svelte.
-  node.querySelectorAll('.tool-call-collapsed').forEach((el) => {
-    el.style.display = state.toolsVisible ? 'none' : 'block';
+  node.querySelectorAll(".tool-call-collapsed").forEach((el) => {
+    el.style.display = state.toolsVisible ? "none" : "block";
   });
-  node.querySelectorAll('.tool-output.expandable').forEach((el) => {
-    el.classList.toggle('expanded', state.toolOutputsExpanded);
+  node.querySelectorAll(".tool-output.expandable").forEach((el) => {
+    el.classList.toggle("expanded", state.toolOutputsExpanded);
   });
-  node.querySelectorAll('.compaction').forEach((el) => {
-    el.classList.toggle('expanded', state.toolOutputsExpanded);
+  node.querySelectorAll(".compaction").forEach((el) => {
+    el.classList.toggle("expanded", state.toolOutputsExpanded);
   });
 }
 
@@ -117,8 +117,8 @@ export function syncToggleButtons(documentImpl, state) {
   ];
   buttons.forEach(([btn, isActive]) => {
     if (!btn) return;
-    btn.classList.toggle('active', isActive);
-    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
   // The tool-output toggle has no visible effect while tool calls are hidden,
   // since the output blocks live inside the .tool-execution wrapper that's
@@ -134,7 +134,7 @@ export function syncToggleButtons(documentImpl, state) {
 export function createToggleController({
   documentImpl = document,
   storage = globalThis.localStorage,
-  sessionId = '',
+  sessionId = "",
   initialState = loadToggleState({ sessionId, storage }),
 } = {}) {
   const state = initialState;
@@ -161,13 +161,13 @@ export function createToggleController({
     },
     applyToNode,
     syncButtons,
-    toggleThinking: () => toggle('thinkingExpanded'),
-    toggleToolsVisibility: () => toggle('toolsVisible'),
+    toggleThinking: () => toggle("thinkingExpanded"),
+    toggleToolsVisibility: () => toggle("toolsVisible"),
     toggleToolOutputs: () => {
       // Hidden tool calls have no visible output to expand or collapse — no-op
       // so the P shortcut and a disabled button click both stay quiet.
       if (!state.toolsVisible) return;
-      toggle('toolOutputsExpanded');
+      toggle("toolOutputsExpanded");
     },
     // Re-read storage and re-apply. Used by the session runtime once
     // hydrateSettings() resolves so a cold-cache first paint (no server-backed
@@ -184,13 +184,13 @@ export function createToggleController({
     attachHeaderHandlers() {
       documentImpl
         .querySelector('[data-action="toggle-thinking"]')
-        ?.addEventListener('click', this.toggleThinking);
+        ?.addEventListener("click", this.toggleThinking);
       documentImpl
         .querySelector('[data-action="toggle-tools"]')
-        ?.addEventListener('click', this.toggleToolsVisibility);
+        ?.addEventListener("click", this.toggleToolsVisibility);
       documentImpl
         .querySelector('[data-action="toggle-tool-output"]')
-        ?.addEventListener('click', this.toggleToolOutputs);
+        ?.addEventListener("click", this.toggleToolOutputs);
       syncButtons();
     },
   };

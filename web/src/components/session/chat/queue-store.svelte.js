@@ -43,11 +43,11 @@ export class QueueStore {
   }
 
   get queuedCount() {
-    return this.items.filter((item) => item.kind === 'queued').length;
+    return this.items.filter((item) => item.kind === "queued").length;
   }
 
   get steerCount() {
-    return this.items.filter((item) => item.kind === 'steer').length;
+    return this.items.filter((item) => item.kind === "steer").length;
   }
 
   get persistsLocally() {
@@ -80,13 +80,13 @@ export class QueueStore {
 
   #mergeServerSnapshot(snapshot) {
     const serverItems = Array.isArray(snapshot?.items) ? snapshot.items : [];
-    const steers = this.items.filter((item) => item.kind === 'steer');
+    const steers = this.items.filter((item) => item.kind === "steer");
     const queued = serverItems.map((entry) => ({
       id: `q-${entry.position}`,
-      kind: 'queued',
+      kind: "queued",
       position: entry.position,
-      text: String(entry.message ?? ''),
-      displayText: String(entry.displayText ?? entry.message ?? ''),
+      text: String(entry.message ?? ""),
+      displayText: String(entry.displayText ?? entry.message ?? ""),
       files: [],
     }));
     this.items = [...queued, ...steers];
@@ -109,10 +109,10 @@ export class QueueStore {
       this.#mergeServerSnapshot(snapshot);
       return {
         id: `q-${item.position}`,
-        kind: 'queued',
+        kind: "queued",
         position: item.position,
-        text: String(item.message ?? message ?? ''),
-        displayText: String(item.displayText ?? displayText ?? message ?? ''),
+        text: String(item.message ?? message ?? ""),
+        displayText: String(item.displayText ?? displayText ?? message ?? ""),
       };
     } catch {
       return null;
@@ -123,16 +123,16 @@ export class QueueStore {
   pushSteer = (item) => {
     this.items.push({
       id: `s-${++this.#steerSeq}-${Date.now().toString(36)}`,
-      kind: 'steer',
-      text: String(item.text ?? ''),
-      displayText: String(item.displayText ?? item.text ?? ''),
+      kind: "steer",
+      text: String(item.text ?? ""),
+      displayText: String(item.displayText ?? item.text ?? ""),
     });
     this.#clampFocus();
   };
 
   clearSteers = () => {
     if (this.steerCount === 0) return;
-    this.items = this.items.filter((item) => item.kind !== 'steer');
+    this.items = this.items.filter((item) => item.kind !== "steer");
     this.#clampFocus();
   };
 
@@ -146,7 +146,7 @@ export class QueueStore {
     this.items = next;
     if (this.focusIndex >= this.items.length) this.focusIndex = this.items.length - 1;
     else if (idx < this.focusIndex) this.focusIndex -= 1;
-    if (item.kind === 'queued' && this.#api && Number.isInteger(item.position)) {
+    if (item.kind === "queued" && this.#api && Number.isInteger(item.position)) {
       try {
         await this.#api.remove(item.position);
       } catch {

@@ -3,8 +3,8 @@
 // highlight.js). Called after the message pane renders + re-renders. Live-only.
 
 export function applyLazyHighlighting(documentImpl) {
-  import('highlight.js').then(({ default: hljs }) => {
-    documentImpl.querySelectorAll('code[data-highlight-pending]').forEach((el) => {
+  import("highlight.js").then(({ default: hljs }) => {
+    documentImpl.querySelectorAll("code[data-highlight-pending]").forEach((el) => {
       const lang = el.dataset.lang;
       const text = el.textContent;
       try {
@@ -15,8 +15,8 @@ export function applyLazyHighlighting(documentImpl) {
       } catch {
         /* keep plain text */
       }
-      el.removeAttribute('data-highlight-pending');
-      el.removeAttribute('data-lang');
+      el.removeAttribute("data-highlight-pending");
+      el.removeAttribute("data-lang");
     });
   });
 }

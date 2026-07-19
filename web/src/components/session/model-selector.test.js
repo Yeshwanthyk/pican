@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import { setupModelSelector } from './chat/model-selector.js';
+import { describe, expect, it, vi } from "vitest";
+import { setupModelSelector } from "./chat/model-selector.js";
 
 function createDom() {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.innerHTML = `
     <button id="pi-chat-model-label">Model</button>
     <div id="pi-chat-model-popup" style="display:none">
@@ -19,83 +19,83 @@ function cleanupDom(el) {
   el.remove();
 }
 
-describe('setupModelSelector', () => {
-  it('requests models for the current session and returns { open, close } API', async () => {
+describe("setupModelSelector", () => {
+  it("requests models for the current session and returns { open, close } API", async () => {
     const el = createDom();
     const chatApi = {
       listModels: vi.fn(() =>
         Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       ),
     };
-    const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-    expect(api).toHaveProperty('open');
-    expect(api).toHaveProperty('close');
-    await vi.waitFor(() => expect(chatApi.listModels).toHaveBeenCalledWith('s'));
+    const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+    expect(api).toHaveProperty("open");
+    expect(api).toHaveProperty("close");
+    await vi.waitFor(() => expect(chatApi.listModels).toHaveBeenCalledWith("s"));
     cleanupDom(el);
   });
 
-  describe('open', () => {
-    it('shows the popup and focuses the search input', () => {
+  describe("open", () => {
+    it("shows the popup and focuses the search input", () => {
       const el = createDom();
       const chatApi = {
         listModels: () =>
           Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       };
-      const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-      const popup = document.getElementById('pi-chat-model-popup');
-      const search = document.getElementById('pi-chat-model-search');
+      const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+      const popup = document.getElementById("pi-chat-model-popup");
+      const search = document.getElementById("pi-chat-model-search");
       search.focus = vi.fn();
 
       api.open();
 
-      expect(popup.style.display).toBe('flex');
+      expect(popup.style.display).toBe("flex");
       expect(search.focus).toHaveBeenCalled();
       cleanupDom(el);
     });
 
-    it('clears the search input on open', () => {
+    it("clears the search input on open", () => {
       const el = createDom();
       const chatApi = {
         listModels: () =>
           Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       };
-      const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-      const search = document.getElementById('pi-chat-model-search');
-      search.value = 'stale text';
+      const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+      const search = document.getElementById("pi-chat-model-search");
+      search.value = "stale text";
 
       api.open();
 
-      expect(search.value).toBe('');
+      expect(search.value).toBe("");
       cleanupDom(el);
     });
   });
 
-  describe('close', () => {
-    it('hides the popup', () => {
+  describe("close", () => {
+    it("hides the popup", () => {
       const el = createDom();
       const chatApi = {
         listModels: () =>
           Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       };
-      const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-      const popup = document.getElementById('pi-chat-model-popup');
+      const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+      const popup = document.getElementById("pi-chat-model-popup");
 
       api.open();
-      expect(popup.style.display).toBe('flex');
+      expect(popup.style.display).toBe("flex");
 
       api.close();
-      expect(popup.style.display).toBe('none');
+      expect(popup.style.display).toBe("none");
       cleanupDom(el);
     });
 
-    it('re-focuses the chat textarea when close(true) is called', () => {
+    it("re-focuses the chat textarea when close(true) is called", () => {
       const el = createDom();
       const chatApi = {
         listModels: () =>
           Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       };
-      const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-      const textarea = document.getElementById('pi-chat-message');
+      const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+      const textarea = document.getElementById("pi-chat-message");
       textarea.focus = vi.fn();
 
       api.open();
@@ -105,14 +105,14 @@ describe('setupModelSelector', () => {
       cleanupDom(el);
     });
 
-    it('does not focus the textarea when close(false) is called', () => {
+    it("does not focus the textarea when close(false) is called", () => {
       const el = createDom();
       const chatApi = {
         listModels: () =>
           Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
       };
-      const api = setupModelSelector({ documentImpl: document, sessionId: 's', chatApi });
-      const textarea = document.getElementById('pi-chat-message');
+      const api = setupModelSelector({ documentImpl: document, sessionId: "s", chatApi });
+      const textarea = document.getElementById("pi-chat-message");
       textarea.focus = vi.fn();
 
       api.open();

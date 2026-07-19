@@ -1,11 +1,11 @@
 export function isRunningStatus(text, cls) {
   return (
-    cls === 'running' ||
-    text === 'running' ||
-    text === 'sending' ||
-    text === 'queued' ||
-    text === 'accepted' ||
-    text === 'cancelling'
+    cls === "running" ||
+    text === "running" ||
+    text === "sending" ||
+    text === "queued" ||
+    text === "accepted" ||
+    text === "cancelling"
   );
 }
 
@@ -14,19 +14,19 @@ export function isRunningStatus(text, cls) {
 // component reads them through bindings. Replaces the former imperative
 // getElementById/textContent DOM mutation. Live-only.
 export class ChatToolbarState {
-  statusText = $state('');
-  statusClass = $state('');
-  modelLabel = $state('');
-  thinkingLevel = $state('');
-  knownModelLabel = $state('');
-  knownThinkingLevel = $state('');
+  statusText = $state("");
+  statusClass = $state("");
+  modelLabel = $state("");
+  thinkingLevel = $state("");
+  knownModelLabel = $state("");
+  knownThinkingLevel = $state("");
 
   // Injected by the runtime once the context-usage controller exists.
   updateContextUsage = () => {};
 
   isRunning = $derived(isRunningStatus(this.statusText, this.statusClass));
 
-  setStatus = (text, cls = '') => {
+  setStatus = (text, cls = "") => {
     this.statusText = text;
     this.statusClass = cls;
   };
@@ -37,7 +37,7 @@ export class ChatToolbarState {
   };
 
   setThinkingLabel = (level) => {
-    this.thinkingLevel = level || '';
+    this.thinkingLevel = level || "";
   };
 
   getKnownModelLabel = () => this.knownModelLabel;

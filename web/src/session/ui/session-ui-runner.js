@@ -1,10 +1,10 @@
-import { sessionRuntime } from '../session-runtime.js';
+import { sessionRuntime } from "../session-runtime.js";
 
 export function setupSessionUi({
   documentImpl = document,
   windowImpl = window,
   storage = localStorage,
-  sessionId = '',
+  sessionId = "",
   marked,
   hljs,
   escapeHtml,
@@ -37,18 +37,18 @@ export function setupSessionUi({
   const isMobileLayout = () => sidebarApi.isMobileLayout({ windowImpl });
   const closeSidebar = () => sidebarApi.setSidebarOpen(false, { documentImpl });
   const openSidebar = () => sidebarApi.setSidebarOpen(true, { documentImpl });
-  const overlayEl = documentImpl.getElementById('sidebar-overlay');
-  overlayEl?.addEventListener('click', closeSidebar);
+  const overlayEl = documentImpl.getElementById("sidebar-overlay");
+  overlayEl?.addEventListener("click", closeSidebar);
   overlayEl?.addEventListener(
-    'touchstart',
+    "touchstart",
     (e) => {
       e.preventDefault();
       closeSidebar();
     },
     { passive: false },
   );
-  documentImpl.getElementById('hamburger')?.addEventListener('click', openSidebar);
-  documentImpl.getElementById('sidebar-close')?.addEventListener('click', closeSidebar);
+  documentImpl.getElementById("hamburger")?.addEventListener("click", openSidebar);
+  documentImpl.getElementById("sidebar-close")?.addEventListener("click", closeSidebar);
 
   const toggleController = toggleStateApi.createToggleController({
     documentImpl,

@@ -60,24 +60,24 @@ import {
   Workflow,
   X,
   CircleX,
-} from 'lucide';
+} from "lucide";
 
 // Lucide's default SVG presentation attributes (24x24 grid, 2px round strokes).
 const DEFAULT_ATTRS = {
-  xmlns: 'http://www.w3.org/2000/svg',
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  'stroke-width': '2',
-  'stroke-linecap': 'round',
-  'stroke-linejoin': 'round',
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": "2",
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round",
 };
 
 const attrString = (attrs) =>
   Object.entries(attrs)
     .filter(([, v]) => v !== undefined && v !== null && v !== false)
     .map(([k, v]) => `${k}="${String(v)}"`)
-    .join(' ');
+    .join(" ");
 
 /**
  * Render a Lucide icon node to an SVG markup string.
@@ -85,35 +85,35 @@ const attrString = (attrs) =>
  * @param {{ size?: number, class?: string, strokeWidth?: number|string }} [opts]
  * @returns {string}
  */
-export function icon(node, { size = 16, class: className = '', strokeWidth } = {}) {
+export function icon(node, { size = 16, class: className = "", strokeWidth } = {}) {
   const attrs = {
     ...DEFAULT_ATTRS,
     width: size,
     height: size,
-    'aria-hidden': 'true',
+    "aria-hidden": "true",
   };
-  if (strokeWidth != null) attrs['stroke-width'] = String(strokeWidth);
+  if (strokeWidth != null) attrs["stroke-width"] = String(strokeWidth);
   if (className) attrs.class = className;
-  const children = node.map(([tag, childAttrs]) => `<${tag} ${attrString(childAttrs)} />`).join('');
+  const children = node.map(([tag, childAttrs]) => `<${tag} ${attrString(childAttrs)} />`).join("");
   return `<svg ${attrString(attrs)}>${children}</svg>`;
 }
 
 export function iconNode(
   node,
-  { size = 16, class: className = '', strokeWidth, documentImpl = document } = {},
+  { size = 16, class: className = "", strokeWidth, documentImpl = document } = {},
 ) {
-  const svg = documentImpl.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = documentImpl.createElementNS("http://www.w3.org/2000/svg", "svg");
   const attrs = {
     ...DEFAULT_ATTRS,
     width: size,
     height: size,
-    'aria-hidden': 'true',
+    "aria-hidden": "true",
   };
-  if (strokeWidth != null) attrs['stroke-width'] = String(strokeWidth);
+  if (strokeWidth != null) attrs["stroke-width"] = String(strokeWidth);
   if (className) attrs.class = className;
   for (const [k, v] of Object.entries(attrs)) svg.setAttribute(k, String(v));
   for (const [tag, childAttrs] of node) {
-    const child = documentImpl.createElementNS('http://www.w3.org/2000/svg', tag);
+    const child = documentImpl.createElementNS("http://www.w3.org/2000/svg", tag);
     for (const [k, v] of Object.entries(childAttrs || {})) child.setAttribute(k, String(v));
     svg.appendChild(child);
   }
@@ -136,16 +136,16 @@ const THEME_ICONS = {
   nord: Snowflake,
   dracula: Ghost,
   custom: Settings,
-  'catppuccin-mocha': Palette,
-  'catppuccin-latte': Palette,
-  'gruvbox-dark': Palette,
-  'tokyo-night': Palette,
-  'rose-pine': Palette,
-  'github-dark': Palette,
-  'github-light': Palette,
-  'one-dark-pro': Palette,
-  'everforest-dark': Palette,
-  'kanagawa-wave': Palette,
+  "catppuccin-mocha": Palette,
+  "catppuccin-latte": Palette,
+  "gruvbox-dark": Palette,
+  "tokyo-night": Palette,
+  "rose-pine": Palette,
+  "github-dark": Palette,
+  "github-light": Palette,
+  "one-dark-pro": Palette,
+  "everforest-dark": Palette,
+  "kanagawa-wave": Palette,
 };
 
 /** SVG markup string for a theme's indicator icon. */

@@ -1,51 +1,51 @@
-import { describe, expect, it, vi } from 'vitest';
-import { JSDOM } from 'jsdom';
-import { chatSessionId, createChatSelectorLoaders } from './selector-loaders.js';
+import { describe, expect, it, vi } from "vitest";
+import { JSDOM } from "jsdom";
+import { chatSessionId, createChatSelectorLoaders } from "./selector-loaders.js";
 
-function setupDom(url = 'http://localhost/session?id=url-session') {
+function setupDom(url = "http://localhost/session?id=url-session") {
   return new JSDOM(
     '<body><form id="pi-chat-composer" data-session-id="form-session"></form></body>',
     { url },
   );
 }
 
-describe('chat selector loaders', () => {
-  it('resolves session id from URL before form data', () => {
-    const dom = setupDom('http://localhost/session?id=url-session');
+describe("chat selector loaders", () => {
+  it("resolves session id from URL before form data", () => {
+    const dom = setupDom("http://localhost/session?id=url-session");
     expect(
       chatSessionId({
         documentImpl: dom.window.document,
         locationImpl: dom.window.location,
         URLSearchParamsImpl: dom.window.URLSearchParams,
       }),
-    ).toBe('url-session');
+    ).toBe("url-session");
   });
 
-  it('falls back to composer dataset for session id', () => {
-    const dom = setupDom('http://localhost/session');
+  it("falls back to composer dataset for session id", () => {
+    const dom = setupDom("http://localhost/session");
     expect(
       chatSessionId({
         documentImpl: dom.window.document,
         locationImpl: dom.window.location,
         URLSearchParamsImpl: dom.window.URLSearchParams,
       }),
-    ).toBe('form-session');
+    ).toBe("form-session");
   });
 
-  it('passes explicit dependencies to selector setup functions', () => {
+  it("passes explicit dependencies to selector setup functions", () => {
     const dom = setupDom();
-    const entries = [{ id: 'e1' }];
+    const entries = [{ id: "e1" }];
     const chatApi = {};
     const escapeHtml = vi.fn((text) => text);
     const setModelLabel = vi.fn();
     const setChatStatus = vi.fn();
     const setThinkingLabel = vi.fn();
     const setKnownModelLabel = vi.fn();
-    const getKnownModelLabel = vi.fn(() => 'known model');
+    const getKnownModelLabel = vi.fn(() => "known model");
     const setCurrentModelForThinking = vi.fn();
     const setWorkerModelUpdate = vi.fn();
-    const currentModel = { provider: 'openai', id: 'gpt-4o' };
-    const getKnownThinkingLevel = vi.fn(() => 'high');
+    const currentModel = { provider: "openai", id: "gpt-4o" };
+    const getKnownThinkingLevel = vi.fn(() => "high");
     const setKnownThinkingLevel = vi.fn();
 
     const modelApi = { open: vi.fn() };
@@ -84,7 +84,7 @@ describe('chat selector loaders', () => {
     expect(loaders.loadModelSelector()).toBe(modelApi);
     expect(setupModelSelector.mock.calls[0][0]).toMatchObject({
       documentImpl: dom.window.document,
-      sessionId: 'url-session',
+      sessionId: "url-session",
       entries,
       chatApi,
       escapeHtml,
@@ -101,7 +101,7 @@ describe('chat selector loaders', () => {
     expect(thinkingOpts).toMatchObject({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 'url-session',
+      sessionId: "url-session",
       entries,
       chatApi,
       setThinkingLabel,
@@ -114,7 +114,7 @@ describe('chat selector loaders', () => {
     expect(loaders.loadSlashSelector()).toBe(slashApi);
     expect(setupSlashCommands.mock.calls[0][0]).toMatchObject({
       documentImpl: dom.window.document,
-      sessionId: 'url-session',
+      sessionId: "url-session",
       chatApi,
       escapeHtml,
     });
@@ -123,13 +123,13 @@ describe('chat selector loaders', () => {
     expect(setupMentionAutocomplete.mock.calls[0][0]).toMatchObject({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 'url-session',
+      sessionId: "url-session",
       chatApi,
       escapeHtml,
     });
   });
 
-  it('returns noop key handlers when optional selector APIs are absent', () => {
+  it("returns noop key handlers when optional selector APIs are absent", () => {
     const dom = setupDom();
     const loaders = createChatSelectorLoaders({
       documentImpl: dom.window.document,

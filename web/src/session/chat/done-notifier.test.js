@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from "vitest";
 import {
   notifyDone,
   setupAppBadgeClearing,
   clearAppBadge,
   DONE_NOTIFY_STORAGE_KEY,
-} from './done-notifier.js';
+} from "./done-notifier.js";
 
 function makeStorage(enabled = true) {
   const map = { [DONE_NOTIFY_STORAGE_KEY]: String(enabled) };
@@ -34,26 +34,26 @@ function makeWindow({ badgeApi = true } = {}) {
   };
 }
 
-describe('notifyDone — app badge', () => {
-  it('sets badge when document is hidden', () => {
+describe("notifyDone — app badge", () => {
+  it("sets badge when document is hidden", () => {
     const { windowImpl, badge } = makeWindow();
     notifyDone({ windowImpl, documentImpl: { hidden: true }, storage: makeStorage(true) });
     expect(badge.set).toEqual([1]);
   });
 
-  it('does not set badge when document is visible', () => {
+  it("does not set badge when document is visible", () => {
     const { windowImpl, badge } = makeWindow();
     notifyDone({ windowImpl, documentImpl: { hidden: false }, storage: makeStorage(true) });
     expect(badge.set).toEqual([]);
   });
 
-  it('does not set badge when notifications are disabled', () => {
+  it("does not set badge when notifications are disabled", () => {
     const { windowImpl, badge } = makeWindow();
     notifyDone({ windowImpl, documentImpl: { hidden: true }, storage: makeStorage(false) });
     expect(badge.set).toEqual([]);
   });
 
-  it('does nothing when Badging API is unavailable', () => {
+  it("does nothing when Badging API is unavailable", () => {
     const { windowImpl } = makeWindow({ badgeApi: false });
     expect(() =>
       notifyDone({ windowImpl, documentImpl: { hidden: true }, storage: makeStorage(true) }),
@@ -61,21 +61,21 @@ describe('notifyDone — app badge', () => {
   });
 });
 
-describe('clearAppBadge', () => {
-  it('calls navigator.clearAppBadge', () => {
+describe("clearAppBadge", () => {
+  it("calls navigator.clearAppBadge", () => {
     const { windowImpl, badge } = makeWindow();
     clearAppBadge({ windowImpl });
     expect(badge.cleared).toBe(1);
   });
 
-  it('does nothing when Badging API is unavailable', () => {
+  it("does nothing when Badging API is unavailable", () => {
     const { windowImpl } = makeWindow({ badgeApi: false });
     expect(() => clearAppBadge({ windowImpl })).not.toThrow();
   });
 });
 
-describe('setupAppBadgeClearing', () => {
-  it('clears badge immediately if document is already visible', () => {
+describe("setupAppBadgeClearing", () => {
+  it("clears badge immediately if document is already visible", () => {
     const { windowImpl, badge } = makeWindow();
     const listeners = {};
     const documentImpl = {
@@ -93,7 +93,7 @@ describe('setupAppBadgeClearing', () => {
     expect(badge.cleared).toBe(1);
   });
 
-  it('clears badge on visibilitychange when page becomes visible', () => {
+  it("clears badge on visibilitychange when page becomes visible", () => {
     const { windowImpl, badge } = makeWindow();
     const listeners = {};
     const documentImpl = {
@@ -110,11 +110,11 @@ describe('setupAppBadgeClearing', () => {
     expect(badge.cleared).toBe(0);
 
     documentImpl.hidden = false;
-    listeners['visibilitychange']();
+    listeners["visibilitychange"]();
     expect(badge.cleared).toBe(1);
   });
 
-  it('clears badge on window focus', () => {
+  it("clears badge on window focus", () => {
     const { windowImpl, badge } = makeWindow();
     const listeners = {};
     const documentImpl = {
@@ -130,7 +130,7 @@ describe('setupAppBadgeClearing', () => {
     setupAppBadgeClearing({ documentImpl, windowImpl });
     badge.cleared = 0; // reset after the initial clear
 
-    listeners['focus']();
+    listeners["focus"]();
     expect(badge.cleared).toBe(1);
   });
 });

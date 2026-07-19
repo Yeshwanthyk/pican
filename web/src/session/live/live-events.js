@@ -1,13 +1,13 @@
 export function getSessionIdFromLocation({ locationImpl = location } = {}) {
-  return locationImpl.search.split('id=')[1]?.split('&')[0] || '';
+  return locationImpl.search.split("id=")[1]?.split("&")[0] || "";
 }
 
 export function createSessionEventSource(sessionId, { EventSourceImpl = EventSource } = {}) {
-  return new EventSourceImpl('/events?id=' + encodeURIComponent(sessionId));
+  return new EventSourceImpl("/events?id=" + encodeURIComponent(sessionId));
 }
 
 export function getReloadEntryCount(model) {
-  if (!model || model.truncated || model.header?.runtime === 'codex') return null;
+  if (!model || model.truncated || model.header?.runtime === "codex") return null;
   return model.entries.length;
 }
 
@@ -37,11 +37,11 @@ export async function handleSessionReload({
   // prepending older entries) changed the model between reloads. It should
   // return null/undefined when a from-0 count isn't meaningful (e.g. a
   // tail-windowed/paginated large session), which disables the delta request.
-  const afterCount = typeof getEntryCount === 'function' ? getEntryCount() : null;
-  const hasValidAfterCount = typeof afterCount === 'number' && afterCount >= 0;
-  let url = '/api/session?id=' + encodeURIComponent(sessionId);
+  const afterCount = typeof getEntryCount === "function" ? getEntryCount() : null;
+  const hasValidAfterCount = typeof afterCount === "number" && afterCount >= 0;
+  let url = "/api/session?id=" + encodeURIComponent(sessionId);
   if (hasValidAfterCount) {
-    url += '&afterCount=' + afterCount;
+    url += "&afterCount=" + afterCount;
   }
   const response = await fetchImpl(url);
   const data = await response.json();
@@ -54,7 +54,7 @@ export async function handleSessionReload({
   // Wait for canonical entries to reach the DOM before removing the imperative
   // preview, so the handoff has neither a blank frame nor duplicate text.
   await onReloaded({ ...data, entries, isDelta });
-  if (typeof data.name === 'string' && data.name.trim()) {
+  if (typeof data.name === "string" && data.name.trim()) {
     updateTitle(data.name);
   }
   let newCount = 0;
@@ -65,7 +65,7 @@ export async function handleSessionReload({
   //  • Reactive (no appendEntry): the Svelte <SessionContent> owns #messages and
   //    re-renders from the model that onReloaded just updated, so here we only
   //    track which ids are brand-new (for follow/scroll/highlight decisions).
-  const reactive = typeof appendEntry !== 'function';
+  const reactive = typeof appendEntry !== "function";
   const newIds = [];
 
   entries.forEach((entry) => {
@@ -80,15 +80,15 @@ export async function handleSessionReload({
     }
     if (!entryState.seen.has(entry.id)) {
       if (appendEntry(entry, entries)) newCount++;
-      if (entry.message && entry.message.role === 'toolResult') {
+      if (entry.message && entry.message.role === "toolResult") {
         refreshEntriesAffectedByToolResult(entry, entries);
       }
     } else if (entryState.liveRendered.has(entry.id)) {
       upsertEntry(entry, entries);
-      if (entry.message && entry.message.role === 'toolResult') {
+      if (entry.message && entry.message.role === "toolResult") {
         refreshEntriesAffectedByToolResult(entry, entries);
       }
-    } else if (entry.message && entry.message.role === 'toolResult') {
+    } else if (entry.message && entry.message.role === "toolResult") {
       refreshEntriesAffectedByToolResult(entry, entries);
     }
   });
@@ -114,7 +114,7 @@ export async function handleSessionReload({
 
   // Reactive mode: once Svelte has rendered the new entries, flag them so the
   // caller can apply the new-entry highlight.
-  if (newIds.length && typeof onNewEntries === 'function') {
+  if (newIds.length && typeof onNewEntries === "function") {
     onNewEntries(newIds);
   }
 
@@ -126,8 +126,8 @@ export function wireSessionEvents({
   onReload,
   onChatPreview,
   onError = () => {},
-  windowImpl = typeof window !== 'undefined' ? window : null,
-  CustomEventImpl = typeof CustomEvent !== 'undefined' ? CustomEvent : null,
+  windowImpl = typeof window !== "undefined" ? window : null,
+  CustomEventImpl = typeof CustomEvent !== "undefined" ? CustomEvent : null,
 } = {}) {
   const dispatch = (type, detail) => {
     if (!windowImpl || !CustomEventImpl) return;
@@ -136,24 +136,24 @@ export function wireSessionEvents({
     } catch (_) {}
   };
   const dispatchReloadedEvent = () => {
-    dispatch('pi-session-reload');
+    dispatch("pi-session-reload");
   };
 
   eventSource.onmessage = (event) => {
-    if (event.data !== 'reload') return;
+    if (event.data !== "reload") return;
     // `onReload` returns a Promise once handleSessionReload starts; await it so
     // the broadcast fires *after* the model has the new entries. Otherwise
     // listeners that read the model on this event (e.g. steer-queue reconciling
     // its chips against newly-arrived user messages) race the fetch and see a
     // stale snapshot.
     const result = onReload(event);
-    if (result && typeof result.then === 'function') {
+    if (result && typeof result.then === "function") {
       result.then(dispatchReloadedEvent, dispatchReloadedEvent);
     } else {
       dispatchReloadedEvent();
     }
   };
-  eventSource.addEventListener('chat-preview', (event) => {
+  eventSource.addEventListener("chat-preview", (event) => {
     try {
       const payload = JSON.parse(event.data);
       onChatPreview(payload);
@@ -164,7 +164,7 @@ export function wireSessionEvents({
       // its 'done' signal is a reliable trigger to pull the written entries.
       if (payload && payload.done) {
         const result = onReload(event);
-        if (result && typeof result.then === 'function') {
+        if (result && typeof result.then === "function") {
           result.then(dispatchReloadedEvent, dispatchReloadedEvent);
         } else {
           dispatchReloadedEvent();
@@ -177,13 +177,13 @@ export function wireSessionEvents({
   // 'queue' is fired by the backend whenever the per-session chat_queue
   // changes — autonomous drainer, another tab, etc. ChatComposer listens for
   // pi-queue-event on the window and refetches /api/chat/queue.
-  eventSource.addEventListener('queue', () => {
-    dispatch('pi-queue-event');
+  eventSource.addEventListener("queue", () => {
+    dispatch("pi-queue-event");
   });
   for (const [eventName, windowEvent] of [
-    ['extension-ui-request', 'pi-extension-ui-request'],
-    ['extension-ui-resolved', 'pi-extension-ui-resolved'],
-    ['extension-notify', 'pi-extension-notify'],
+    ["extension-ui-request", "pi-extension-ui-request"],
+    ["extension-ui-resolved", "pi-extension-ui-resolved"],
+    ["extension-notify", "pi-extension-notify"],
   ]) {
     eventSource.addEventListener(eventName, (event) => {
       try {

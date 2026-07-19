@@ -1,17 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createLiveSessionRuntime, hydrateSessionModel } from './session-page-model.js';
-import { resetSessionRuntimeContext } from '../session-runtime-context.js';
+import { describe, expect, it, vi } from "vitest";
+import { createLiveSessionRuntime, hydrateSessionModel } from "./session-page-model.js";
+import { resetSessionRuntimeContext } from "../session-runtime-context.js";
 
 function encodeJSON(value) {
   return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value))));
 }
 
-describe('session page model helpers', () => {
-  it('hydrates the reactive model from the encoded payload and creates runtime hooks', () => {
+describe("session page model helpers", () => {
+  it("hydrates the reactive model from the encoded payload and creates runtime hooks", () => {
     const payloadBase64 = encodeJSON({
-      header: { cwd: '/tmp/project' },
-      entries: [{ id: 'root' }, { id: 'leaf' }],
-      leafId: 'leaf',
+      header: { cwd: "/tmp/project" },
+      entries: [{ id: "root" }, { id: "leaf" }],
+      leafId: "leaf",
     });
     const sessionModel = {
       load: vi.fn(function load(data) {
@@ -23,14 +23,14 @@ describe('session page model helpers', () => {
     hydrateSessionModel({
       sessionModel,
       payloadBase64,
-      locationSearch: '?leafId=root&targetId=leaf',
+      locationSearch: "?leafId=root&targetId=leaf",
       windowImpl: window,
     });
 
     expect(sessionModel.load).toHaveBeenCalledOnce();
-    expect(sessionModel.header.cwd).toBe('/tmp/project');
-    expect(sessionModel.leafId).toBe('root');
-    expect(sessionModel.urlTargetId).toBe('leaf');
+    expect(sessionModel.header.cwd).toBe("/tmp/project");
+    expect(sessionModel.leafId).toBe("root");
+    expect(sessionModel.urlTargetId).toBe("leaf");
 
     const runtime = createLiveSessionRuntime({
       sessionModel,
@@ -38,21 +38,21 @@ describe('session page model helpers', () => {
       documentImpl: document,
     });
 
-    runtime.navigateTo('leaf', 'none');
-    runtime.reconcileEntries([{ id: 'next' }]);
+    runtime.navigateTo("leaf", "none");
+    runtime.reconcileEntries([{ id: "next" }]);
 
-    expect(sessionModel.currentLeafId).toBe('leaf');
-    expect(sessionModel.currentTargetId).toBe('leaf');
-    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: 'next' }], undefined);
+    expect(sessionModel.currentLeafId).toBe("leaf");
+    expect(sessionModel.currentTargetId).toBe("leaf");
+    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: "next" }], undefined);
 
     resetSessionRuntimeContext();
   });
 
-  it('passes reconcile options (e.g. isDelta) through to the model', () => {
+  it("passes reconcile options (e.g. isDelta) through to the model", () => {
     const payloadBase64 = encodeJSON({
       header: {},
-      entries: [{ id: 'root' }],
-      leafId: 'root',
+      entries: [{ id: "root" }],
+      leafId: "root",
     });
     const sessionModel = {
       load: vi.fn(function load(data) {
@@ -68,8 +68,8 @@ describe('session page model helpers', () => {
       documentImpl: document,
     });
 
-    runtime.reconcileEntries([{ id: 'next' }], { isDelta: true });
-    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: 'next' }], { isDelta: true });
+    runtime.reconcileEntries([{ id: "next" }], { isDelta: true });
+    expect(sessionModel.reconcile).toHaveBeenCalledWith([{ id: "next" }], { isDelta: true });
 
     resetSessionRuntimeContext();
   });

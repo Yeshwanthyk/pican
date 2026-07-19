@@ -8,7 +8,7 @@
 export function openAncestorDetails(element) {
   let current = element?.parentElement;
   while (current) {
-    if (current.tagName === 'DETAILS') current.open = true;
+    if (current.tagName === "DETAILS") current.open = true;
     current = current.parentElement;
   }
 }
@@ -19,7 +19,7 @@ export function createSessionNavigator({
   onNavigate = () => {},
   setTimeoutImpl = (fn, delay = 0) => setTimeout(fn, delay),
 } = {}) {
-  function navigateTo(targetId, scrollMode = 'target', scrollToEntryId = null) {
+  function navigateTo(targetId, scrollMode = "target", scrollToEntryId = null) {
     // Updating the model's active leaf/target re-derives the path; <SessionContent>
     // re-renders #messages reactively. renderTree keeps the sidebar view state in
     // sync (filter/active highlight).
@@ -29,19 +29,19 @@ export function createSessionNavigator({
     // Scroll after Svelte flushes the reactive render (microtask) so the target
     // entry element exists. A macrotask (setTimeout 0) runs after that flush.
     setTimeoutImpl(() => {
-      const content = documentImpl.getElementById('content');
+      const content = documentImpl.getElementById("content");
       if (!content) return;
-      if (scrollMode === 'bottom') {
+      if (scrollMode === "bottom") {
         content.scrollTop = content.scrollHeight;
-      } else if (scrollMode === 'target') {
+      } else if (scrollMode === "target") {
         const scrollTargetId = scrollToEntryId || targetId;
         const targetEl = documentImpl.getElementById(`entry-${scrollTargetId}`);
         if (targetEl) {
           openAncestorDetails(targetEl);
-          targetEl.scrollIntoView?.({ block: 'center' });
+          targetEl.scrollIntoView?.({ block: "center" });
           if (scrollToEntryId) {
-            targetEl.classList.add('highlight');
-            setTimeoutImpl(() => targetEl.classList.remove('highlight'), 2000);
+            targetEl.classList.add("highlight");
+            setTimeoutImpl(() => targetEl.classList.remove("highlight"), 2000);
           }
         }
       }

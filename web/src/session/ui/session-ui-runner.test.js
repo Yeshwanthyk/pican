@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { JSDOM } from 'jsdom';
-import { setupSessionUi } from './session-ui-runner.js';
-import * as searchFiltersApi from './search-filters.js';
-import * as sidebarApi from './sidebar.js';
-import * as toggleStateApi from './toggle-state.js';
-import { sessionRuntime, resetSessionRuntime } from '../session-runtime.js';
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { JSDOM } from "jsdom";
+import { setupSessionUi } from "./session-ui-runner.js";
+import * as searchFiltersApi from "./search-filters.js";
+import * as sidebarApi from "./sidebar.js";
+import * as toggleStateApi from "./toggle-state.js";
+import { sessionRuntime, resetSessionRuntime } from "../session-runtime.js";
 
 afterEach(() => resetSessionRuntime());
 
@@ -34,7 +34,7 @@ function setupUi(dom, overrides = {}) {
       searchFiltersApi,
       sidebarApi,
       toggleStateApi,
-      getLeafId: () => 'leaf',
+      getLeafId: () => "leaf",
       setSearchQuery: vi.fn(),
       setFilterMode: vi.fn(),
       forceTreeRerender: vi.fn(),
@@ -44,32 +44,32 @@ function setupUi(dom, overrides = {}) {
   };
 }
 
-describe('session UI runner', () => {
-  it('sets up markdown, sidebar helpers, and toggles', () => {
+describe("session UI runner", () => {
+  it("sets up markdown, sidebar helpers, and toggles", () => {
     const dom = baseDom();
     const { markdownApi, result } = setupUi(dom);
     expect(markdownApi.configureSessionMarkdown).toHaveBeenCalled();
-    expect(result.safeMarkedParse('x')).toBe('<p>x</p>');
+    expect(result.safeMarkedParse("x")).toBe("<p>x</p>");
     expect(sessionRuntime.toggleState).toBeTruthy();
-    expect(typeof result.attachHeaderHandlers).toBe('function');
-    expect(typeof result.isMobileLayout).toBe('function');
-    expect(typeof result.closeSidebar).toBe('function');
+    expect(typeof result.attachHeaderHandlers).toBe("function");
+    expect(typeof result.isMobileLayout).toBe("function");
+    expect(typeof result.closeSidebar).toBe("function");
   });
 
-  it('the export-only hamburger opens and overlay/close close the docked sidebar', () => {
+  it("the export-only hamburger opens and overlay/close close the docked sidebar", () => {
     const dom = baseDom();
     setupUi(dom);
     const { document: doc } = dom.window;
 
-    doc.getElementById('hamburger').click();
-    expect(doc.getElementById('sidebar').classList.contains('open')).toBe(true);
+    doc.getElementById("hamburger").click();
+    expect(doc.getElementById("sidebar").classList.contains("open")).toBe(true);
 
-    doc.getElementById('sidebar-overlay').click();
-    expect(doc.getElementById('sidebar').classList.contains('open')).toBe(false);
+    doc.getElementById("sidebar-overlay").click();
+    expect(doc.getElementById("sidebar").classList.contains("open")).toBe(false);
 
-    doc.getElementById('hamburger').click();
-    expect(doc.getElementById('sidebar').classList.contains('open')).toBe(true);
-    doc.getElementById('sidebar-close').click();
-    expect(doc.getElementById('sidebar').classList.contains('open')).toBe(false);
+    doc.getElementById("hamburger").click();
+    expect(doc.getElementById("sidebar").classList.contains("open")).toBe(true);
+    doc.getElementById("sidebar-close").click();
+    expect(doc.getElementById("sidebar").classList.contains("open")).toBe(false);
   });
 });

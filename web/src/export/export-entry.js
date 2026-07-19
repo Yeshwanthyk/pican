@@ -10,30 +10,30 @@
 // <script> tags (see internal/ui/export.go); they are marked external in the
 // export Vite build, so this bundle reads window.marked / window.hljs.
 
-import { loadSessionData } from '../session/data/session-data.js';
-import { extractContent } from '../session/tree/session-filter.js';
+import { loadSessionData } from "../session/data/session-data.js";
+import { extractContent } from "../session/tree/session-filter.js";
 import {
   escapeHtml,
   formatToolCall,
   getTreeNodeDisplayHtml as getTreeNodeDisplayHtmlForState,
   shortenPath,
   truncate,
-} from '../session/render/session-format.js';
-import { configureSessionMarkdown, safeMarkedParse } from '../session/render/markdown.js';
-import { downloadSessionJson } from '../session/render/session-entry-actions.js';
-import { mount } from 'svelte';
-import SessionTreeNodes from '../components/session/SessionTreeNodes.svelte';
-import SessionInfoHeader from '../components/session/SessionInfoHeader.svelte';
-import SessionContent from '../components/session/SessionContent.svelte';
-import ImageModal from '../components/session/ImageModal.svelte';
-import { SessionDataModel } from '../session/data/session-data.svelte.js';
-import { createSessionNavigator } from '../session/navigation/session-navigation.js';
-import * as toggleStateApi from '../session/ui/toggle-state.js';
-import * as sidebarApi from '../session/ui/sidebar.js';
-import * as searchFiltersApi from '../session/ui/search-filters.js';
-import { setupSessionUi } from '../session/ui/session-ui-runner.js';
-import { sessionRuntime } from '../session/session-runtime.js';
-import { setupKeyboardNav } from '../shared/keyboard-nav.js';
+} from "../session/render/session-format.js";
+import { configureSessionMarkdown, safeMarkedParse } from "../session/render/markdown.js";
+import { downloadSessionJson } from "../session/render/session-entry-actions.js";
+import { mount } from "svelte";
+import SessionTreeNodes from "../components/session/SessionTreeNodes.svelte";
+import SessionInfoHeader from "../components/session/SessionInfoHeader.svelte";
+import SessionContent from "../components/session/SessionContent.svelte";
+import ImageModal from "../components/session/ImageModal.svelte";
+import { SessionDataModel } from "../session/data/session-data.svelte.js";
+import { createSessionNavigator } from "../session/navigation/session-navigation.js";
+import * as toggleStateApi from "../session/ui/toggle-state.js";
+import * as sidebarApi from "../session/ui/sidebar.js";
+import * as searchFiltersApi from "../session/ui/search-filters.js";
+import { setupSessionUi } from "../session/ui/session-ui-runner.js";
+import { sessionRuntime } from "../session/session-runtime.js";
+import { setupKeyboardNav } from "../shared/keyboard-nav.js";
 
 // In a sandboxed iframe (e.g. a srcdoc preview without `allow-same-origin`),
 // even *reading* the `localStorage` property throws SecurityError — which would
@@ -79,8 +79,8 @@ export function runExportApp({ target = window } = {}) {
   // so this just computes the tree/active-path derivations a single time.
   const treeModel = new SessionDataModel(dataModel);
 
-  let filterMode = 'default';
-  let searchQuery = '';
+  let filterMode = "default";
+  let searchQuery = "";
 
   const sessionFormat = {
     shortenPath,
@@ -127,7 +127,7 @@ export function runExportApp({ target = window } = {}) {
   // place after each render (the live app uses applyLazyHighlighting instead).
   const highlightPending = (container) => {
     if (!hljs || !container) return;
-    container.querySelectorAll('code[data-highlight-pending]').forEach((el) => {
+    container.querySelectorAll("code[data-highlight-pending]").forEach((el) => {
       const lang = el.dataset.lang;
       const text = el.textContent;
       try {
@@ -138,8 +138,8 @@ export function runExportApp({ target = window } = {}) {
       } catch {
         /* keep plain text */
       }
-      el.removeAttribute('data-highlight-pending');
-      el.removeAttribute('data-lang');
+      el.removeAttribute("data-highlight-pending");
+      el.removeAttribute("data-lang");
     });
   };
 
@@ -163,10 +163,10 @@ export function runExportApp({ target = window } = {}) {
     },
     forceTreeRerender,
     navigateTo: (...args) => navigateTo(...args),
-    projectPath: dataModel.header?.cwd || '',
+    projectPath: dataModel.header?.cwd || "",
   });
 
-  const navigateTo = (targetId, scrollMode = 'target', scrollToEntryId = null) =>
+  const navigateTo = (targetId, scrollMode = "target", scrollToEntryId = null) =>
     navigatorInstance.navigateTo(targetId, scrollMode, scrollToEntryId);
 
   // Nav + scroll only; <SessionContent> (mounted below) renders the message pane
@@ -185,7 +185,7 @@ export function runExportApp({ target = window } = {}) {
   // Mount the reactive message pane into #messages (same component the live app
   // uses). The snapshot renders once; renderEntry/hljs are synchronous here, so
   // entries paint immediately. afterRender re-applies collapse/toggle state.
-  const messagesEl = documentImpl.getElementById('messages');
+  const messagesEl = documentImpl.getElementById("messages");
   if (messagesEl) {
     mount(SessionContent, {
       target: messagesEl,
@@ -201,7 +201,7 @@ export function runExportApp({ target = window } = {}) {
 
   // Mount the Svelte tree sidebar into #sidebar (the static #tree-container /
   // #tree-status were removed from share-session.html; the component renders them).
-  const sidebarEl = documentImpl.getElementById('sidebar');
+  const sidebarEl = documentImpl.getElementById("sidebar");
   if (sidebarEl) {
     mount(SessionTreeNodes, {
       target: sidebarEl,
@@ -209,7 +209,7 @@ export function runExportApp({ target = window } = {}) {
         model: treeModel,
         onNavigate: (id) => {
           const leaf = treeModel.newestLeaf(id) || id;
-          navigateTo(leaf, 'target', id);
+          navigateTo(leaf, "target", id);
           if (ui.isMobileLayout()) ui.closeSidebar();
         },
       },
@@ -219,14 +219,14 @@ export function runExportApp({ target = window } = {}) {
   // Mount the Svelte header card into #header-container (rendered once), then
   // bind its toggle buttons exactly once (the controller doesn't guard against
   // double-binding and the header no longer re-renders per navigation).
-  const headerEl = documentImpl.getElementById('header-container');
+  const headerEl = documentImpl.getElementById("header-container");
   if (headerEl) {
     mount(SessionInfoHeader, { target: headerEl, props: { model: treeModel } });
   }
   ui.attachHeaderHandlers();
 
   setupKeyboardNav({ windowImpl: target, documentImpl });
-  const imageModalHost = documentImpl.getElementById('image-modal-host');
+  const imageModalHost = documentImpl.getElementById("image-modal-host");
   if (imageModalHost) mount(ImageModal, { target: imageModalHost });
 
   // Initial render: deep-link to the target message when the URL carries one,
@@ -234,19 +234,19 @@ export function runExportApp({ target = window } = {}) {
   const leafId = dataModel.leafId;
   if (leafId) {
     if (dataModel.urlTargetId && dataModel.byId.has(dataModel.urlTargetId)) {
-      navigateTo(leafId, 'target', dataModel.urlTargetId);
+      navigateTo(leafId, "target", dataModel.urlTargetId);
     } else {
-      navigateTo(leafId, 'none');
+      navigateTo(leafId, "none");
     }
   } else if (dataModel.entries.length > 0) {
-    navigateTo(dataModel.entries[dataModel.entries.length - 1].id, 'none');
+    navigateTo(dataModel.entries[dataModel.entries.length - 1].id, "none");
   }
 }
 
 if (
-  typeof window !== 'undefined' &&
-  typeof document !== 'undefined' &&
-  document.getElementById('session-data')
+  typeof window !== "undefined" &&
+  typeof document !== "undefined" &&
+  document.getElementById("session-data")
 ) {
   runExportApp();
 }

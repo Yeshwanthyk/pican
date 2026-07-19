@@ -53,7 +53,7 @@ export function stitchOrphanRoots(entries = []) {
   let seenRoot = false;
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i];
-    if (!entry?.id || entry.type === 'session' || entry.type === 'label') continue;
+    if (!entry?.id || entry.type === "session" || entry.type === "label") continue;
     const isRoot =
       entry.parentId === null || entry.parentId === undefined || entry.parentId === entry.id;
     if (isRoot && seenRoot && prevLeafId) {
@@ -109,7 +109,7 @@ export function findNewestLeaf(nodeId, rootsOrNodeMap = []) {
       const candidate = newestNavigable(current.children[i]);
       if (candidate) return candidate;
     }
-    return current.entry.type === 'label' ? null : current.entry.id;
+    return current.entry.type === "label" ? null : current.entry.id;
   }
 
   return newestNavigable(node) || nodeId;
@@ -197,7 +197,7 @@ export function flattenTree(roots, activePathIds) {
 export function buildTreePrefix(flatNode) {
   const { indent, showConnector, isLast, gutters, isVirtualRootChild, multipleRoots } = flatNode;
   const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
-  const connector = showConnector && !isVirtualRootChild ? (isLast ? '└─ ' : '├─ ') : '';
+  const connector = showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : "";
   const connectorPosition = connector ? displayIndent - 1 : -1;
   const totalChars = displayIndent * 3;
   const prefixChars = [];
@@ -205,10 +205,10 @@ export function buildTreePrefix(flatNode) {
     const level = Math.floor(i / 3);
     const posInLevel = i % 3;
     const gutter = gutters.find((g) => g.position === level);
-    if (gutter) prefixChars.push(posInLevel === 0 ? (gutter.show ? '│' : ' ') : ' ');
+    if (gutter) prefixChars.push(posInLevel === 0 ? (gutter.show ? "│" : " ") : " ");
     else if (connector && level === connectorPosition)
-      prefixChars.push(posInLevel === 0 ? (isLast ? '└' : '├') : posInLevel === 1 ? '─' : ' ');
-    else prefixChars.push(' ');
+      prefixChars.push(posInLevel === 0 ? (isLast ? "└" : "├") : posInLevel === 1 ? "─" : " ");
+    else prefixChars.push(" ");
   }
-  return prefixChars.join('');
+  return prefixChars.join("");
 }

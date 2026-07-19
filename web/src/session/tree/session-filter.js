@@ -1,20 +1,20 @@
 export function hasTextContent(content) {
-  if (typeof content === 'string') return content.trim().length > 0;
+  if (typeof content === "string") return content.trim().length > 0;
   if (Array.isArray(content)) {
-    return content.some((c) => c.type === 'text' && c.text && c.text.trim().length > 0);
+    return content.some((c) => c.type === "text" && c.text && c.text.trim().length > 0);
   }
   return false;
 }
 
 export function extractContent(content) {
-  if (typeof content === 'string') return content;
+  if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .filter((c) => c.type === 'text' && c.text)
+      .filter((c) => c.type === "text" && c.text)
       .map((c) => c.text)
-      .join('');
+      .join("");
   }
-  return '';
+  return "";
 }
 
 export function getSearchableText(entry, label) {
@@ -22,32 +22,32 @@ export function getSearchableText(entry, label) {
   if (label) parts.push(label);
 
   switch (entry.type) {
-    case 'message': {
+    case "message": {
       const msg = entry.message;
       parts.push(msg.role);
       if (msg.content) parts.push(extractContent(msg.content));
-      if (msg.role === 'bashExecution' && msg.command) parts.push(msg.command);
+      if (msg.role === "bashExecution" && msg.command) parts.push(msg.command);
       break;
     }
-    case 'custom_message':
+    case "custom_message":
       parts.push(entry.customType);
-      parts.push(typeof entry.content === 'string' ? entry.content : extractContent(entry.content));
+      parts.push(typeof entry.content === "string" ? entry.content : extractContent(entry.content));
       break;
-    case 'compaction':
-      parts.push('compaction');
+    case "compaction":
+      parts.push("compaction");
       break;
-    case 'branch_summary':
-      parts.push('branch summary', entry.summary);
+    case "branch_summary":
+      parts.push("branch summary", entry.summary);
       break;
-    case 'model_change':
-      parts.push('model', entry.modelId);
+    case "model_change":
+      parts.push("model", entry.modelId);
       break;
-    case 'thinking_level_change':
-      parts.push('thinking', entry.thinkingLevel);
+    case "thinking_level_change":
+      parts.push("thinking", entry.thinkingLevel);
       break;
   }
 
-  return parts.join(' ').toLowerCase();
+  return parts.join(" ").toLowerCase();
 }
 
 export function recalculateVisualStructure(filteredNodes, allFlatNodes) {
@@ -140,7 +140,7 @@ export function recalculateVisualStructure(filteredNodes, allFlatNodes) {
 export function filterNodes(
   flatNodes,
   currentLeafId,
-  { filterMode = 'default', searchQuery = '' } = {},
+  { filterMode = "default", searchQuery = "" } = {},
 ) {
   const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -149,30 +149,30 @@ export function filterNodes(
     const label = flatNode.node.label;
     if (entry.id === currentLeafId) return true;
 
-    if (entry.type === 'message' && entry.message.role === 'assistant') {
+    if (entry.type === "message" && entry.message.role === "assistant") {
       const msg = entry.message;
       const hasText = hasTextContent(msg.content);
       const isErrorOrAborted =
-        msg.stopReason && msg.stopReason !== 'stop' && msg.stopReason !== 'toolUse';
+        msg.stopReason && msg.stopReason !== "stop" && msg.stopReason !== "toolUse";
       if (!hasText && !isErrorOrAborted) return false;
     }
 
-    const isSettingsEntry = ['label', 'custom', 'model_change', 'thinking_level_change'].includes(
+    const isSettingsEntry = ["label", "custom", "model_change", "thinking_level_change"].includes(
       entry.type,
     );
     let passesFilter;
     switch (filterMode) {
-      case 'user-only':
-        passesFilter = entry.type === 'message' && entry.message.role === 'user';
+      case "user-only":
+        passesFilter = entry.type === "message" && entry.message.role === "user";
         break;
-      case 'no-tools':
+      case "no-tools":
         passesFilter =
-          !isSettingsEntry && !(entry.type === 'message' && entry.message.role === 'toolResult');
+          !isSettingsEntry && !(entry.type === "message" && entry.message.role === "toolResult");
         break;
-      case 'labeled-only':
+      case "labeled-only":
         passesFilter = label !== undefined;
         break;
-      case 'all':
+      case "all":
         passesFilter = true;
         break;
       default:

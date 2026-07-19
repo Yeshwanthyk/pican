@@ -8,11 +8,11 @@ export function setupComposerHeightVar({
 
   function update() {
     const height = Math.ceil(form.getBoundingClientRect().height || 0);
-    documentImpl.documentElement.style.setProperty('--pi-chat-composer-height', `${height}px`);
+    documentImpl.documentElement.style.setProperty("--pi-chat-composer-height", `${height}px`);
   }
 
   update();
-  windowImpl.addEventListener('resize', update, { passive: true });
+  windowImpl.addEventListener("resize", update, { passive: true });
   if (ResizeObserverImpl) {
     new ResizeObserverImpl(update).observe(form);
   }

@@ -1,4 +1,4 @@
-import { configureSettingsSync, hydrateSettings, writeSetting } from '../shared/settings-store.js';
+import { configureSettingsSync, hydrateSettings, writeSetting } from "../shared/settings-store.js";
 
 export async function loadSettings({ windowImpl = window } = {}) {
   const fetchImpl = windowImpl.fetch ? windowImpl.fetch.bind(windowImpl) : undefined;
@@ -7,7 +7,7 @@ export async function loadSettings({ windowImpl = window } = {}) {
   return (await hydrateSettings({ fetchImpl, storage })) || {};
 }
 
-export function valueFor(settings, key, fallback = '', { storage = localStorage } = {}) {
+export function valueFor(settings, key, fallback = "", { storage = localStorage } = {}) {
   if (settings && key in settings) return settings[key];
   try {
     const stored = storage?.getItem(key);
@@ -17,7 +17,7 @@ export function valueFor(settings, key, fallback = '', { storage = localStorage 
 }
 
 export function boolFor(settings, key, fallback = false, opts = {}) {
-  return String(valueFor(settings, key, fallback ? 'true' : 'false', opts)) === 'true';
+  return String(valueFor(settings, key, fallback ? "true" : "false", opts)) === "true";
 }
 
 export function persistSetting(key, value, { storage = localStorage } = {}) {
@@ -27,7 +27,7 @@ export function persistSetting(key, value, { storage = localStorage } = {}) {
 export async function fetchModelGroups({ fetchImpl = fetch } = {}) {
   let models;
   try {
-    const resp = await fetchImpl('/api/models', { headers: { Accept: 'application/json' } });
+    const resp = await fetchImpl("/api/models", { headers: { Accept: "application/json" } });
     if (!resp.ok) return [];
     const data = await resp.json();
     models = Array.isArray(data?.models) ? data.models : null;
@@ -37,8 +37,8 @@ export async function fetchModelGroups({ fetchImpl = fetch } = {}) {
   if (!models?.length) return [];
   const byProvider = new Map();
   for (const m of models) {
-    const id = m.id || m.modelId || '';
-    const provider = m.provider || '';
+    const id = m.id || m.modelId || "";
+    const provider = m.provider || "";
     if (!id || !provider) continue;
     if (!byProvider.has(provider)) byProvider.set(provider, []);
     byProvider.get(provider).push({ id, name: m.name || id, value: `${provider}/${id}` });

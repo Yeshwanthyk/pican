@@ -14,13 +14,13 @@ export function reducePendingExtensionUI(requests, action, now = Date.now()) {
   const current = (Array.isArray(requests) ? requests : []).filter(
     (request) => request?.id && !isExtensionRequestExpired(request, now),
   );
-  if (action?.type === 'resolve') {
+  if (action?.type === "resolve") {
     return current.filter((request) => request.id !== action.id);
   }
-  if (action?.type === 'timeout') {
+  if (action?.type === "timeout") {
     return current.filter((request) => request.id !== action.id);
   }
-  if (action?.type !== 'add' || !action.request?.id) return current;
+  if (action?.type !== "add" || !action.request?.id) return current;
   const request = {
     ...action.request,
     _receivedAt: Number.isFinite(Number(action.request._receivedAt))

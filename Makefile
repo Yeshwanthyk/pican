@@ -1,4 +1,4 @@
-.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-setup
+.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-typecheck frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-setup
 
 BINARY ?= pican
 WEB_DIR := web
@@ -44,6 +44,9 @@ frontend-knip: frontend-setup
 frontend-lint: frontend-setup
 	cd $(WEB_DIR) && npm run lint
 
+frontend-typecheck: frontend-setup
+	cd $(WEB_DIR) && npm run typecheck
+
 frontend-format-check: frontend-setup
 	cd $(WEB_DIR) && npm run format:check
 
@@ -64,7 +67,7 @@ vet: go-setup
 
 test: frontend-test extension-test memory-test go-test install-test
 
-check: frontend-lint frontend-format-check frontend-knip frontend-test extension-test memory-test go-test install-test vet build
+check: frontend-lint frontend-typecheck frontend-format-check frontend-knip frontend-test extension-test memory-test go-test install-test vet build
 
 dev: frontend-setup go-setup
 	@echo "Starting dev mode (frontend watcher + Go hot-reloader)..."

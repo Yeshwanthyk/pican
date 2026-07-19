@@ -1,39 +1,39 @@
 const TOOL_RUN_GROUP_THRESHOLD = 1;
 const MAX_BREAKDOWN_TOOLS = 4;
 const INTERACTIVE_TOOL_NAMES = new Set([
-  'ask_user',
-  'ask_user_question',
-  'pican_ask_user_question',
+  "ask_user",
+  "ask_user_question",
+  "pican_ask_user_question",
 ]);
 
 function analyzeToolRunEntry(entry, completedCallIds) {
-  if (entry?.type === 'custom_message' && entry.customType === 'subagent-result') {
+  if (entry?.type === "custom_message" && entry.customType === "subagent-result") {
     return [];
   }
 
-  if (entry?.type !== 'message') return null;
+  if (entry?.type !== "message") return null;
 
   const message = entry.message;
-  if (message?.role === 'toolResult' || message?.role === 'bashExecution') return [];
-  if (message?.role !== 'assistant' || !Array.isArray(message.content)) return null;
+  if (message?.role === "toolResult" || message?.role === "bashExecution") return [];
+  if (message?.role !== "assistant" || !Array.isArray(message.content)) return null;
 
   const toolNames = [];
   let hasToolActivity = false;
 
   for (const block of message.content) {
-    if (block?.type === 'toolCall') {
+    if (block?.type === "toolCall") {
       if (INTERACTIVE_TOOL_NAMES.has(block.name) && !completedCallIds.has(block.id)) return null;
       hasToolActivity = true;
       toolNames.push(
-        typeof block.name === 'string' && block.name.trim() ? block.name.trim() : 'tool',
+        typeof block.name === "string" && block.name.trim() ? block.name.trim() : "tool",
       );
       continue;
     }
-    if (block?.type === 'thinking') {
+    if (block?.type === "thinking") {
       hasToolActivity = true;
       continue;
     }
-    if (block?.type === 'text' && !String(block.text ?? '').trim()) continue;
+    if (block?.type === "text" && !String(block.text ?? "").trim()) continue;
     return null;
   }
 
@@ -43,7 +43,7 @@ function analyzeToolRunEntry(entry, completedCallIds) {
 function collectCompletedCallIds(activePath) {
   return new Set(
     activePath
-      .filter((entry) => entry?.type === 'message' && entry.message?.role === 'toolResult')
+      .filter((entry) => entry?.type === "message" && entry.message?.role === "toolResult")
       .map((entry) => entry.message.toolCallId)
       .filter(Boolean),
   );
@@ -51,12 +51,12 @@ function collectCompletedCallIds(activePath) {
 
 function toolRunStatus(entries, toolCallIds, completedCallIds) {
   const failed = entries.some((entry) => {
-    if (entry?.type === 'custom_message' && entry.customType === 'subagent-result') {
-      return entry.details?.status === 'error';
+    if (entry?.type === "custom_message" && entry.customType === "subagent-result") {
+      return entry.details?.status === "error";
     }
-    if (entry?.type !== 'message') return false;
-    if (entry.message?.role === 'toolResult') return entry.message.isError === true;
-    if (entry.message?.role === 'bashExecution') {
+    if (entry?.type !== "message") return false;
+    if (entry.message?.role === "toolResult") return entry.message.isError === true;
+    if (entry.message?.role === "bashExecution") {
       return (
         entry.message.cancelled === true ||
         (entry.message.exitCode !== null &&
@@ -67,8 +67,8 @@ function toolRunStatus(entries, toolCallIds, completedCallIds) {
     return false;
   });
 
-  if (failed) return 'error';
-  return toolCallIds.some((id) => !completedCallIds.has(id)) ? 'pending' : 'success';
+  if (failed) return "error";
+  return toolCallIds.some((id) => !completedCallIds.has(id)) ? "pending" : "success";
 }
 
 function buildToolBreakdown(toolNames) {
@@ -88,19 +88,19 @@ function buildToolBreakdown(toolNames) {
   };
 }
 
-export function formatToolRunBreakdown(breakdown, moreLabel = '') {
+export function formatToolRunBreakdown(breakdown, moreLabel = "") {
   const parts = (breakdown?.tools || []).map(({ name, count }) => `${name} x${count}`);
   if (breakdown?.remaining > 0 && moreLabel) parts.push(moreLabel);
-  return parts.join(', ');
+  return parts.join(", ");
 }
 
 export function groupToolRuns(activePath = []) {
   const renderItems = [];
   const completedCallIds = collectCompletedCallIds(activePath);
 
-  for (let index = 0; index < activePath.length; ) {
+  for (let index = 0; index < activePath.length;) {
     if (analyzeToolRunEntry(activePath[index], completedCallIds) === null) {
-      renderItems.push({ kind: 'entry', entry: activePath[index] });
+      renderItems.push({ kind: "entry", entry: activePath[index] });
       index += 1;
       continue;
     }
@@ -113,9 +113,9 @@ export function groupToolRuns(activePath = []) {
       if (entryToolNames === null) break;
       entries.push(activePath[index]);
       toolNames.push(...entryToolNames);
-      if (activePath[index]?.type === 'message') {
+      if (activePath[index]?.type === "message") {
         for (const block of activePath[index].message?.content || []) {
-          if (block?.type === 'toolCall' && block.id) toolCallIds.push(block.id);
+          if (block?.type === "toolCall" && block.id) toolCallIds.push(block.id);
         }
       }
       index += 1;
@@ -123,14 +123,14 @@ export function groupToolRuns(activePath = []) {
 
     if (toolNames.length > TOOL_RUN_GROUP_THRESHOLD) {
       renderItems.push({
-        kind: 'group',
+        kind: "group",
         entries,
         toolCount: toolNames.length,
         breakdown: buildToolBreakdown(toolNames),
         status: toolRunStatus(entries, toolCallIds, completedCallIds),
       });
     } else {
-      renderItems.push(...entries.map((entry) => ({ kind: 'entry', entry })));
+      renderItems.push(...entries.map((entry) => ({ kind: "entry", entry })));
     }
   }
 

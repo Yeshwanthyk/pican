@@ -1,11 +1,11 @@
-import { createSessionDataModel, decodeBase64JSON } from '../data/session-data.js';
-import { createSessionNavigator } from '../navigation/session-navigation.js';
-import { setSessionRuntime } from '../session-runtime-context.js';
+import { createSessionDataModel, decodeBase64JSON } from "../data/session-data.js";
+import { createSessionNavigator } from "../navigation/session-navigation.js";
+import { setSessionRuntime } from "../session-runtime-context.js";
 
 export function hydrateSessionModel({
   sessionModel,
   payloadBase64,
-  locationSearch = '',
+  locationSearch = "",
   windowImpl = window,
 } = {}) {
   sessionModel.load(

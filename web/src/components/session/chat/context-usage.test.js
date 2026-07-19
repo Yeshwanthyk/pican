@@ -1,14 +1,14 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildContextWindows,
   collectContextUsage,
   createContextUsageController,
   getModelContextLimit,
   updateContextUsage,
-} from './context-usage.js';
+} from "./context-usage.js";
 
 afterEach(() => {
-  document.body.innerHTML = '';
+  document.body.innerHTML = "";
 });
 
 function renderDom() {
@@ -30,37 +30,37 @@ function renderDom() {
   `;
 }
 
-describe('context usage helpers', () => {
-  it('builds model/provider context-window lookups', () => {
+describe("context usage helpers", () => {
+  it("builds model/provider context-window lookups", () => {
     const windows = buildContextWindows([
-      { id: 'DEEPSEEK-V4-PRO', provider: 'DEEPSEEK', contextWindow: 1234567 },
+      { id: "DEEPSEEK-V4-PRO", provider: "DEEPSEEK", contextWindow: 1234567 },
     ]);
-    expect(windows['deepseek-v4-pro']).toBe(1234567);
-    expect(windows['deepseek/deepseek-v4-pro']).toBe(1234567);
-    expect(getModelContextLimit('DEEPSEEK-V4-PRO', 'DEEPSEEK', windows)).toBe(1234567);
+    expect(windows["deepseek-v4-pro"]).toBe(1234567);
+    expect(windows["deepseek/deepseek-v4-pro"]).toBe(1234567);
+    expect(getModelContextLimit("DEEPSEEK-V4-PRO", "DEEPSEEK", windows)).toBe(1234567);
   });
 
-  it('uses fallback model limits', () => {
-    expect(getModelContextLimit('gemini-1.5-flash')).toBe(1000000);
-    expect(getModelContextLimit('claude-sonnet-4')).toBe(200000);
-    expect(getModelContextLimit('llama-2-7b')).toBe(4096);
-    expect(getModelContextLimit('unknown-model')).toBe(128000);
+  it("uses fallback model limits", () => {
+    expect(getModelContextLimit("gemini-1.5-flash")).toBe(1000000);
+    expect(getModelContextLimit("claude-sonnet-4")).toBe(200000);
+    expect(getModelContextLimit("llama-2-7b")).toBe(4096);
+    expect(getModelContextLimit("unknown-model")).toBe(128000);
   });
 
-  it('collects cumulative I/O but uses the last assistant for context pressure', () => {
+  it("collects cumulative I/O but uses the last assistant for context pressure", () => {
     const usage = collectContextUsage([
       {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'assistant',
+          role: "assistant",
           usage: { input: 1000, output: 500, cacheRead: 0, cacheWrite: 1000 },
         },
       },
-      { type: 'message', message: { role: 'user', content: 'follow-up' } },
+      { type: "message", message: { role: "user", content: "follow-up" } },
       {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'assistant',
+          role: "assistant",
           usage: { input: 500, output: 300, cacheRead: 1000, cacheWrite: 0 },
         },
       },
@@ -75,79 +75,79 @@ describe('context usage helpers', () => {
   });
 });
 
-describe('updateContextUsage', () => {
-  it('updates the capsule and popover values', () => {
+describe("updateContextUsage", () => {
+  it("updates the capsule and popover values", () => {
     renderDom();
 
     updateContextUsage({
       documentImpl: document,
-      knownModelLabel: 'gpt-4o @ openai',
+      knownModelLabel: "gpt-4o @ openai",
       entries: [
         {
-          type: 'message',
+          type: "message",
           message: {
-            role: 'assistant',
+            role: "assistant",
             usage: { input: 1000, output: 500, cacheRead: 0, cacheWrite: 1000 },
           },
         },
         {
-          type: 'message',
+          type: "message",
           message: {
-            role: 'assistant',
+            role: "assistant",
             usage: { input: 500, output: 300, cacheRead: 1000, cacheWrite: 0 },
           },
         },
       ],
     });
 
-    const el = document.getElementById('pi-chat-context-usage');
-    expect(el.style.display).toBe('inline-flex');
-    expect(el.querySelector('.pi-context-text').textContent).toBe('1%');
-    expect(el.querySelector('.pi-context-fill').getAttribute('stroke-dasharray')).toBe('1, 100');
-    expect(document.getElementById('pi-popover-val-total').textContent).toBe('4.3k');
-    expect(document.querySelector('.pi-popover-used').textContent).toBe('1.8k');
-    expect(document.querySelector('.pi-popover-limit').textContent).toBe('128k');
+    const el = document.getElementById("pi-chat-context-usage");
+    expect(el.style.display).toBe("inline-flex");
+    expect(el.querySelector(".pi-context-text").textContent).toBe("1%");
+    expect(el.querySelector(".pi-context-fill").getAttribute("stroke-dasharray")).toBe("1, 100");
+    expect(document.getElementById("pi-popover-val-total").textContent).toBe("4.3k");
+    expect(document.querySelector(".pi-popover-used").textContent).toBe("1.8k");
+    expect(document.querySelector(".pi-popover-limit").textContent).toBe("128k");
   });
 
-  it('repositions the popover when visible', () => {
+  it("repositions the popover when visible", () => {
     renderDom();
-    document.getElementById('pi-chat-context-popover').style.display = 'block';
+    document.getElementById("pi-chat-context-popover").style.display = "block";
     const positionPopover = vi.fn();
 
     updateContextUsage({
       documentImpl: document,
-      entries: [{ type: 'message', message: { role: 'assistant', usage: { totalTokens: 90000 } } }],
+      entries: [{ type: "message", message: { role: "assistant", usage: { totalTokens: 90000 } } }],
       positionPopover,
     });
 
     expect(positionPopover).toHaveBeenCalledTimes(1);
   });
 
-  it('loads dynamic limits from the session-scoped model list', async () => {
+  it("loads dynamic limits from the session-scoped model list", async () => {
     renderDom();
     const listModels = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: () =>
           Promise.resolve({
-            models: [{ id: 'DEEPSEEK-V4-PRO', provider: 'DEEPSEEK', contextWindow: 1234567 }],
+            models: [{ id: "DEEPSEEK-V4-PRO", provider: "DEEPSEEK", contextWindow: 1234567 }],
           }),
       }),
     );
     const controller = createContextUsageController({
       documentImpl: document,
       entries: [
-        { type: 'message', message: { role: 'assistant', usage: { input: 1000, output: 500 } } },
+        { type: "message", message: { role: "assistant", usage: { input: 1000, output: 500 } } },
       ],
-      sessionId: 'session.jsonl',
-      getKnownModelLabel: () => 'DEEPSEEK-V4-PRO @ DEEPSEEK',
+      sessionId: "session.jsonl",
+      getKnownModelLabel: () => "DEEPSEEK-V4-PRO @ DEEPSEEK",
       chatApi: { listModels },
     });
 
     controller.update();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(listModels).toHaveBeenCalledWith('session.jsonl');
-    expect(document.querySelector('.pi-popover-limit').textContent).toBe('1.2M');
+    expect(listModels).toHaveBeenCalledWith("session.jsonl");
+    expect(document.querySelector(".pi-popover-limit").textContent).toBe("1.2M");
   });
 });

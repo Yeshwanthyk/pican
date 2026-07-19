@@ -21,8 +21,8 @@
  * artifact-registry.js.
  */
 
-const ENABLED_KEY = 'pican:v1:artifacts:enabled';
-const INCLUDE_KEY = 'pican:v1:artifacts:include';
+const ENABLED_KEY = "pican:v1:artifacts:enabled";
+const INCLUDE_KEY = "pican:v1:artifacts:include";
 
 // localStorage keys that should re-run the filter when changed in another tab.
 export const ARTIFACT_SETTING_KEYS = [ENABLED_KEY, INCLUDE_KEY];
@@ -31,16 +31,16 @@ export const ARTIFACT_SETTING_KEYS = [ENABLED_KEY, INCLUDE_KEY];
 // server-backed settings (hydrateSettings) resolve. Mirrors settingDefaults in
 // internal/server/settings.go.
 const DEFAULT_ENABLED = true;
-const DEFAULT_INCLUDE = '*.md, *.html';
+const DEFAULT_INCLUDE = "*.md, *.html";
 
 /** Split a raw include string into normalized glob patterns. */
 export function parsePatterns(str) {
-  if (typeof str !== 'string') return [];
+  if (typeof str !== "string") return [];
   return str
     .split(/[\s,]+/)
     .map((t) => t.trim())
     .filter(Boolean)
-    .map((t) => (t.startsWith('.') && !t.includes('/') ? `*${t}` : t));
+    .map((t) => (t.startsWith(".") && !t.includes("/") ? `*${t}` : t));
 }
 
 function basename(filePath) {
@@ -49,17 +49,17 @@ function basename(filePath) {
 
 /** Compile one glob pattern to a RegExp anchored over the whole string. */
 function globToRegExp(pattern) {
-  let re = '';
+  let re = "";
   for (let i = 0; i < pattern.length; i += 1) {
     const ch = pattern[i];
-    if (ch === '*') {
-      if (pattern[i + 1] === '*') {
-        re += '.*';
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        re += ".*";
         i += 1;
       } // ** → any chars
-      else re += '[^/]*'; // *  → non-slash run
+      else re += "[^/]*"; // *  → non-slash run
     } else {
-      re += ch.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+      re += ch.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
     }
   }
   return new RegExp(`^${re}$`);
@@ -67,10 +67,10 @@ function globToRegExp(pattern) {
 
 /** True if filePath matches any pattern (basename-scoped unless pattern has `/`). */
 export function matchesPath(filePath, patterns) {
-  if (typeof filePath !== 'string' || !filePath) return false;
+  if (typeof filePath !== "string" || !filePath) return false;
   const base = basename(filePath);
   for (const pattern of patterns) {
-    const target = pattern.includes('/') ? filePath : base;
+    const target = pattern.includes("/") ? filePath : base;
     if (globToRegExp(pattern).test(target)) return true;
   }
   return false;
@@ -80,7 +80,7 @@ export function matchesPath(filePath, patterns) {
  * Filter detected artifacts by the user's settings.
  * @returns {{visible: Array, hiddenCount: number}}
  */
-export function filterArtifacts(artifacts, { enabled = true, include = '' } = {}) {
+export function filterArtifacts(artifacts, { enabled = true, include = "" } = {}) {
   const list = Array.isArray(artifacts) ? artifacts : [];
   if (enabled === false) return { visible: [], hiddenCount: 0 };
 
@@ -100,7 +100,7 @@ export function readArtifactSettings(storage) {
   let include = DEFAULT_INCLUDE;
   try {
     const e = storage?.getItem(ENABLED_KEY);
-    if (e != null) enabled = String(e) === 'true';
+    if (e != null) enabled = String(e) === "true";
     const inc = storage?.getItem(INCLUDE_KEY);
     if (inc != null) include = String(inc);
   } catch {

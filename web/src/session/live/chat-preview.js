@@ -1,28 +1,28 @@
-export function getSpinnerConfig(windowImpl = typeof window !== 'undefined' ? window : null) {
-  let style = 'runcat';
+export function getSpinnerConfig(windowImpl = typeof window !== "undefined" ? window : null) {
+  let style = "runcat";
   try {
     if (windowImpl && windowImpl.localStorage) {
-      const saved = windowImpl.localStorage.getItem('pican:spinner-style');
-      if (saved === 'braille') {
-        style = 'braille';
+      const saved = windowImpl.localStorage.getItem("pican:spinner-style");
+      if (saved === "braille") {
+        style = "braille";
       }
     }
   } catch (_) {}
 
-  if (style === 'braille') {
+  if (style === "braille") {
     return {
-      frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-      fontFamily: 'monospace',
+      frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+      fontFamily: "monospace",
       interval: 80,
-      width: '12px',
+      width: "12px",
     };
   } else {
     // runcat frames mapping to unicode private use area characters in runcat.ttf font
     return {
-      frames: ['', '', '', '', ''],
+      frames: ["", "", "", "", ""],
       fontFamily: "'runcat', monospace",
       interval: 100,
-      width: '18px',
+      width: "18px",
     };
   }
 }
@@ -45,9 +45,9 @@ export function clearChatPreviewState(state, { keepAssistant = false } = {}) {
 
 export function finishChatPreviewState(state) {
   if (!state?.chatPreviewEl) return false;
-  state.chatPreviewEl.classList.remove('chat-preview-waiting');
-  state.chatPreviewEl.classList.add('done');
-  const label = state.chatPreviewEl.querySelector('.preview-label');
+  state.chatPreviewEl.classList.remove("chat-preview-waiting");
+  state.chatPreviewEl.classList.add("done");
+  const label = state.chatPreviewEl.querySelector(".preview-label");
   if (label && label.parentNode) label.parentNode.removeChild(label);
   stopWorkingAnimation(state);
   return true;
@@ -55,21 +55,21 @@ export function finishChatPreviewState(state) {
 // Test placeholder for TestSessionViteSourceShowsAnimatedWorkingPreviewLabel: working<span class="working-dots"
 
 const CREATIVE_MESSAGES = [
-  'Working...',
-  'Thinking...',
-  'Analyzing codebase...',
-  'Synthesizing answer...',
-  'Consulting model...',
-  'Formulating solution...',
-  'Checking files...',
-  'Drafting response...',
+  "Working...",
+  "Thinking...",
+  "Analyzing codebase...",
+  "Synthesizing answer...",
+  "Consulting model...",
+  "Formulating solution...",
+  "Checking files...",
+  "Drafting response...",
 ];
 
 export function startWorkingAnimation(
   state,
   {
     setIntervalImpl = setInterval,
-    windowImpl = typeof window !== 'undefined' ? window : null,
+    windowImpl = typeof window !== "undefined" ? window : null,
   } = {},
 ) {
   stopWorkingAnimation(state);
@@ -82,7 +82,7 @@ export function startWorkingAnimation(
 
   // Sync initial spinner properties if spinner element is already present
   if (state.chatPreviewEl) {
-    const spinnerEl = state.chatPreviewEl.querySelector('.preview-spinner');
+    const spinnerEl = state.chatPreviewEl.querySelector(".preview-spinner");
     if (spinnerEl) {
       spinnerEl.style.fontFamily = config.fontFamily;
       spinnerEl.style.width = config.width;
@@ -96,7 +96,7 @@ export function startWorkingAnimation(
       return;
     }
 
-    const spinnerEl = state.chatPreviewEl.querySelector('.preview-spinner');
+    const spinnerEl = state.chatPreviewEl.querySelector(".preview-spinner");
     if (spinnerEl) {
       if (spinnerEl.style.fontFamily !== config.fontFamily) {
         spinnerEl.style.fontFamily = config.fontFamily;
@@ -107,7 +107,7 @@ export function startWorkingAnimation(
     }
 
     if (!state.activePreviewMessage && Date.now() - lastMsgChange >= 2000) {
-      const textEl = state.chatPreviewEl.querySelector('.preview-text');
+      const textEl = state.chatPreviewEl.querySelector(".preview-text");
       if (textEl) {
         msgIdx = (msgIdx + 1) % CREATIVE_MESSAGES.length;
         textEl.textContent = CREATIVE_MESSAGES[msgIdx];
@@ -131,19 +131,19 @@ function getActiveMessage(content) {
   if (!content) return null;
 
   // Check if there is an active/open thinking block
-  const openThoughtIdx = content.lastIndexOf('<thought>');
-  const closeThoughtIdx = content.lastIndexOf('</thought>');
+  const openThoughtIdx = content.lastIndexOf("<thought>");
+  const closeThoughtIdx = content.lastIndexOf("</thought>");
   if (openThoughtIdx !== -1 && openThoughtIdx > closeThoughtIdx) {
-    return 'Thinking...';
+    return "Thinking...";
   }
 
   // Check if there is an active/open code block
   const codeBlockCount = (content.match(/```/g) || []).length;
   if (codeBlockCount % 2 === 1) {
-    return 'Writing code...';
+    return "Writing code...";
   }
 
-  return 'Generating response...';
+  return "Generating response...";
 }
 
 function setMarkdownContent(el, html) {
@@ -154,38 +154,38 @@ function setMarkdownContent(el, html) {
 }
 
 function createMarkdownBlock(documentImpl, className) {
-  const el = documentImpl.createElement('div');
+  const el = documentImpl.createElement("div");
   el.className = className;
   return el;
 }
 
 function createPreviewLabel(documentImpl, config) {
-  const label = documentImpl.createElement('div');
-  label.className = 'preview-label';
-  const spinner = documentImpl.createElement('span');
-  spinner.className = 'preview-spinner';
-  spinner.style.color = 'var(--accent)';
-  spinner.style.marginRight = '6px';
+  const label = documentImpl.createElement("div");
+  label.className = "preview-label";
+  const spinner = documentImpl.createElement("span");
+  spinner.className = "preview-spinner";
+  spinner.style.color = "var(--accent)";
+  spinner.style.marginRight = "6px";
   spinner.style.fontFamily = config.fontFamily;
-  spinner.style.display = 'inline-block';
+  spinner.style.display = "inline-block";
   spinner.style.width = config.width;
-  spinner.style.textAlign = 'center';
+  spinner.style.textAlign = "center";
   spinner.textContent = config.frames[0];
-  const text = documentImpl.createElement('span');
-  text.className = 'preview-text';
-  text.style.color = 'var(--muted)';
-  text.textContent = 'Working...';
+  const text = documentImpl.createElement("span");
+  text.className = "preview-text";
+  text.style.color = "var(--muted)";
+  text.textContent = "Working...";
   label.append(spinner, text);
   return label;
 }
 
 function createAssistantPreview(documentImpl, { waiting = false, windowImpl = null } = {}) {
   const config = getSpinnerConfig(windowImpl);
-  const el = documentImpl.createElement('div');
-  el.id = 'chat-preview-stream';
-  el.className = 'assistant-message chat-preview-stream' + (waiting ? ' chat-preview-waiting' : '');
+  const el = documentImpl.createElement("div");
+  el.id = "chat-preview-stream";
+  el.className = "assistant-message chat-preview-stream" + (waiting ? " chat-preview-waiting" : "");
   el.append(
-    createMarkdownBlock(documentImpl, 'message-content assistant-text markdown-content'),
+    createMarkdownBlock(documentImpl, "message-content assistant-text markdown-content"),
     createPreviewLabel(documentImpl, config),
   );
   return el;
@@ -196,7 +196,7 @@ export function renderPendingChatState(
   state,
   {
     documentImpl = document,
-    windowImpl = typeof window !== 'undefined' ? window : null,
+    windowImpl = typeof window !== "undefined" ? window : null,
     renderMarkdown,
     shouldFollow = () => false,
     forceFollowToBottom = () => {},
@@ -204,18 +204,18 @@ export function renderPendingChatState(
     setIntervalImpl = setInterval,
   } = {},
 ) {
-  const text = String(message || '').trim();
+  const text = String(message || "").trim();
   if (!text) return false;
   const container =
-    documentImpl.getElementById('messages') ||
-    documentImpl.getElementById('content') ||
+    documentImpl.getElementById("messages") ||
+    documentImpl.getElementById("content") ||
     documentImpl.body;
   clearChatPreviewState(state);
 
-  state.pendingUserEl = documentImpl.createElement('div');
-  state.pendingUserEl.id = 'chat-pending-user';
-  state.pendingUserEl.className = 'user-message chat-pending-user';
-  const userContent = createMarkdownBlock(documentImpl, 'markdown-content');
+  state.pendingUserEl = documentImpl.createElement("div");
+  state.pendingUserEl.id = "chat-pending-user";
+  state.pendingUserEl.className = "user-message chat-pending-user";
+  const userContent = createMarkdownBlock(documentImpl, "markdown-content");
   setMarkdownContent(userContent, renderMarkdown(text));
   state.pendingUserEl.appendChild(userContent);
   container.appendChild(state.pendingUserEl);
@@ -237,7 +237,7 @@ export function renderChatPreviewState(
   state,
   {
     documentImpl = document,
-    windowImpl = typeof window !== 'undefined' ? window : null,
+    windowImpl = typeof window !== "undefined" ? window : null,
     renderMarkdown,
     shouldFollow = () => false,
     forceFollowToBottom = () => {},
@@ -245,15 +245,15 @@ export function renderChatPreviewState(
     setIntervalImpl = setInterval,
   } = {},
 ) {
-  if (!payload || typeof payload.content !== 'string') return false;
-  const nextTurnId = typeof payload.turnId === 'string' ? payload.turnId : null;
-  const nextItemId = typeof payload.itemId === 'string' ? payload.itemId : null;
+  if (!payload || typeof payload.content !== "string") return false;
+  const nextTurnId = typeof payload.turnId === "string" ? payload.turnId : null;
+  const nextItemId = typeof payload.itemId === "string" ? payload.itemId : null;
   if (nextItemId && state.previewItemId && nextItemId !== state.previewItemId) {
     clearChatPreviewState(state);
   }
   const container =
-    documentImpl.getElementById('messages') ||
-    documentImpl.getElementById('content') ||
+    documentImpl.getElementById("messages") ||
+    documentImpl.getElementById("content") ||
     documentImpl.body;
   if (!state.chatPreviewEl) {
     state.chatPreviewEl = createAssistantPreview(documentImpl, { windowImpl });
@@ -266,15 +266,15 @@ export function renderChatPreviewState(
   const activeMsg = getActiveMessage(payload.content);
   if (activeMsg) {
     state.activePreviewMessage = activeMsg;
-    const textEl = state.chatPreviewEl.querySelector('.preview-text');
+    const textEl = state.chatPreviewEl.querySelector(".preview-text");
     if (textEl) textEl.textContent = activeMsg;
   }
 
-  state.chatPreviewEl.classList.remove('chat-preview-waiting');
-  const content = state.chatPreviewEl.querySelector('.message-content');
+  state.chatPreviewEl.classList.remove("chat-preview-waiting");
+  const content = state.chatPreviewEl.querySelector(".message-content");
   setMarkdownContent(content, renderMarkdown(payload.content));
   if (payload.done) finishChatPreviewState(state);
-  else state.chatPreviewEl.classList.remove('done');
+  else state.chatPreviewEl.classList.remove("done");
   if (shouldFollow()) {
     forceFollowToBottom(false);
     scrollAfterLayout(false, state.chatPreviewEl);

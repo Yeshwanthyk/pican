@@ -23,42 +23,42 @@
  */
 
 const EXT_TO_LANG = {
-  ts: 'typescript',
-  tsx: 'typescript',
-  js: 'javascript',
-  jsx: 'javascript',
-  py: 'python',
-  rb: 'ruby',
-  rs: 'rust',
-  go: 'go',
-  java: 'java',
-  c: 'c',
-  cpp: 'cpp',
-  h: 'c',
-  hpp: 'cpp',
-  cs: 'csharp',
-  php: 'php',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  sql: 'sql',
-  html: 'html',
-  htm: 'html',
-  css: 'css',
-  scss: 'scss',
-  json: 'json',
-  yaml: 'yaml',
-  yml: 'yaml',
-  xml: 'xml',
-  md: 'markdown',
-  svg: 'svg',
-  dockerfile: 'dockerfile',
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  go: "go",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  h: "c",
+  hpp: "cpp",
+  cs: "csharp",
+  php: "php",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  sql: "sql",
+  html: "html",
+  htm: "html",
+  css: "css",
+  scss: "scss",
+  json: "json",
+  yaml: "yaml",
+  yml: "yaml",
+  xml: "xml",
+  md: "markdown",
+  svg: "svg",
+  dockerfile: "dockerfile",
 };
 
 function extOf(filePath) {
-  const base = filePath.split(/[\\/]/).pop() || '';
-  const dot = base.lastIndexOf('.');
-  if (dot <= 0) return '';
+  const base = filePath.split(/[\\/]/).pop() || "";
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return "";
   return base.slice(dot + 1).toLowerCase();
 }
 
@@ -67,28 +67,28 @@ function basename(filePath) {
 }
 
 function langFromPath(filePath) {
-  return EXT_TO_LANG[extOf(filePath)] || '';
+  return EXT_TO_LANG[extOf(filePath)] || "";
 }
 
 /** How a previewable artifact should render, or '' for non-previewable. */
 function previewTypeFor(lang) {
   switch (lang) {
-    case 'html':
-    case 'xml':
-      return 'html';
-    case 'svg':
-      return 'svg';
-    case 'markdown':
-    case 'md':
-      return 'markdown';
+    case "html":
+    case "xml":
+      return "html";
+    case "svg":
+      return "svg";
+    case "markdown":
+    case "md":
+      return "markdown";
     default:
-      return '';
+      return "";
   }
 }
 
 /** Coerce a tool-call path argument to a non-empty string, else null. */
 function strPath(value) {
-  return typeof value === 'string' && value.trim() ? value : null;
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function makeFileArtifact(id, path, content, entry) {
@@ -96,7 +96,7 @@ function makeFileArtifact(id, path, content, entry) {
   const previewType = previewTypeFor(lang);
   return {
     id,
-    kind: previewType ? 'preview' : 'code',
+    kind: previewType ? "preview" : "code",
     previewType,
     title: basename(path),
     lang,
@@ -104,7 +104,7 @@ function makeFileArtifact(id, path, content, entry) {
     filePath: path,
     entryId: entry.id,
     anchorId: `entry-${entry.id}`,
-    source: 'write',
+    source: "write",
   };
 }
 
@@ -114,17 +114,17 @@ function applyEdits(content, edits) {
   let out = content;
   for (const e of edits) {
     if (!e) continue;
-    const oldText = typeof e.oldText === 'string' ? e.oldText : e.old_string;
+    const oldText = typeof e.oldText === "string" ? e.oldText : e.old_string;
     const newText =
-      typeof e.newText === 'string'
+      typeof e.newText === "string"
         ? e.newText
-        : typeof e.new_string === 'string'
+        : typeof e.new_string === "string"
           ? e.new_string
-          : '';
-    if (typeof oldText !== 'string' || oldText === '') continue;
+          : "";
+    if (typeof oldText !== "string" || oldText === "") continue;
     const i = out.indexOf(oldText);
     if (i === -1) continue; // mismatch (e.g. file changed via untracked means) — skip
-    out = out.slice(0, i) + (newText || '') + out.slice(i + oldText.length);
+    out = out.slice(0, i) + (newText || "") + out.slice(i + oldText.length);
   }
   return out;
 }
@@ -136,21 +136,21 @@ const UNSAFE_SHELL = /[|&;<>$`*?(){}\n]/;
 /** Split a simple command into tokens honoring '…' and "…". null if unbalanced. */
 function tokenizeShell(s) {
   const tokens = [];
-  let cur = '';
-  let quote = '';
+  let cur = "";
+  let quote = "";
   let started = false;
   for (let i = 0; i < s.length; i += 1) {
     const ch = s[i];
     if (quote) {
-      if (ch === quote) quote = '';
+      if (ch === quote) quote = "";
       else cur += ch;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       started = true;
-    } else if (ch === ' ' || ch === '\t') {
+    } else if (ch === " " || ch === "\t") {
       if (started) {
         tokens.push(cur);
-        cur = '';
+        cur = "";
         started = false;
       }
     } else {
@@ -168,7 +168,7 @@ function tokenizeShell(s) {
  * Returns [] for anything with shell features, redirection, or ambiguous forms.
  */
 export function parseFileOps(command) {
-  if (typeof command !== 'string') return [];
+  if (typeof command !== "string") return [];
   const trimmed = command.trim();
   if (!trimmed || UNSAFE_SHELL.test(trimmed)) return [];
   const tokens = tokenizeShell(trimmed);
@@ -176,35 +176,35 @@ export function parseFileOps(command) {
 
   let verb = tokens[0];
   let rest = tokens.slice(1);
-  if (verb === 'git' && rest[0] === 'mv') {
-    verb = 'mv';
+  if (verb === "git" && rest[0] === "mv") {
+    verb = "mv";
     rest = rest.slice(1);
   }
-  if (verb !== 'mv' && verb !== 'rm') return [];
+  if (verb !== "mv" && verb !== "rm") return [];
 
-  const args = rest.filter((t) => !t.startsWith('-'));
-  if (verb === 'rm') {
-    return args.map((p) => ({ op: 'rm', path: p }));
+  const args = rest.filter((t) => !t.startsWith("-"));
+  if (verb === "rm") {
+    return args.map((p) => ({ op: "rm", path: p }));
   }
   if (args.length < 2) return [];
   const dst = args[args.length - 1];
   const srcs = args.slice(0, -1);
-  if (dst.endsWith('/')) {
-    return srcs.map((s) => ({ op: 'mv', from: s, to: dst + basename(s) }));
+  if (dst.endsWith("/")) {
+    return srcs.map((s) => ({ op: "mv", from: s, to: dst + basename(s) }));
   }
-  if (srcs.length === 1) return [{ op: 'mv', from: srcs[0], to: dst }];
+  if (srcs.length === 1) return [{ op: "mv", from: srcs[0], to: dst }];
   return []; // multiple sources without a directory dst — ambiguous, skip
 }
 
 function applyBashOps(command, byPath) {
   for (const op of parseFileOps(command)) {
-    if (op.op === 'rm') {
+    if (op.op === "rm") {
       const art = byPath.get(op.path);
       if (art) {
         art._removed = true;
         byPath.delete(op.path);
       }
-    } else if (op.op === 'mv' && op.from !== op.to) {
+    } else if (op.op === "mv" && op.from !== op.to) {
       const art = byPath.get(op.from);
       if (!art) continue;
       byPath.delete(op.from);
@@ -212,7 +212,7 @@ function applyBashOps(command, byPath) {
       art.title = basename(op.to);
       art.lang = langFromPath(op.to);
       art.previewType = previewTypeFor(art.lang);
-      art.kind = art.previewType ? 'preview' : 'code';
+      art.kind = art.previewType ? "preview" : "code";
       byPath.set(op.to, art);
     }
   }
@@ -221,7 +221,7 @@ function applyBashOps(command, byPath) {
 function indexToolResults(entries) {
   const map = new Map();
   for (const entry of entries) {
-    if (entry && entry.type === 'message' && entry.message && entry.message.role === 'toolResult') {
+    if (entry && entry.type === "message" && entry.message && entry.message.role === "toolResult") {
       map.set(entry.message.toolCallId, entry.message);
     }
   }
@@ -236,9 +236,9 @@ function toolSucceeded(callId, results) {
 
 function applyFileToolCall(call, entry, order, byPath, results) {
   const args = call.arguments || {};
-  if (call.name === 'write') {
+  if (call.name === "write") {
     const path = strPath(args.file_path ?? args.path);
-    const content = typeof args.content === 'string' ? args.content : null;
+    const content = typeof args.content === "string" ? args.content : null;
     if (path === null || content === null) return;
     const existing = byPath.get(path);
     if (existing) {
@@ -250,7 +250,7 @@ function applyFileToolCall(call, entry, order, byPath, results) {
       order.push(art);
       byPath.set(path, art);
     }
-  } else if (call.name === 'edit') {
+  } else if (call.name === "edit") {
     const path = strPath(args.file_path ?? args.path);
     if (path === null) return;
     const art = byPath.get(path);
@@ -258,7 +258,7 @@ function applyFileToolCall(call, entry, order, byPath, results) {
     art.content = applyEdits(art.content, args.edits);
     art.entryId = entry.id;
     art.anchorId = `entry-${entry.id}`;
-  } else if (call.name === 'bash') {
+  } else if (call.name === "bash") {
     if (toolSucceeded(call.id, results)) applyBashOps(args.command, byPath);
   }
 }
@@ -268,10 +268,10 @@ function applyFileToolCall(call, entry, order, byPath, results) {
  * length >= 3; a closing fence is a line of the same char with no info string.
  */
 function* fencedBlocks(text) {
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   let open = false;
-  let fenceChar = '';
-  let info = '';
+  let fenceChar = "";
+  let info = "";
   let buf = [];
 
   for (const line of lines) {
@@ -281,10 +281,10 @@ function* fencedBlocks(text) {
       fenceChar = m[2][0];
       info = m[3].trim();
       buf = [];
-    } else if (open && m && m[2][0] === fenceChar && m[3].trim() === '') {
-      yield { lang: (info.split(/\s+/)[0] || '').toLowerCase(), content: buf.join('\n') };
+    } else if (open && m && m[2][0] === fenceChar && m[3].trim() === "") {
+      yield { lang: (info.split(/\s+/)[0] || "").toLowerCase(), content: buf.join("\n") };
       open = false;
-      info = '';
+      info = "";
     } else if (open) {
       buf.push(line);
     }
@@ -297,21 +297,21 @@ function* artifactsFromText(text, entry, blockIndex, minCodeBlockLines) {
     const idx = fenceIndex++;
     if (!content.trim()) continue;
     const previewType = previewTypeFor(lang);
-    const previewable = previewType !== '';
-    const lineCount = content.split('\n').length;
+    const previewable = previewType !== "";
+    const lineCount = content.split("\n").length;
     if (!previewable && lineCount < minCodeBlockLines) continue;
 
     yield {
       id: `art-${entry.id}-${blockIndex}-${idx}`,
-      kind: previewable ? 'preview' : 'code',
+      kind: previewable ? "preview" : "code",
       previewType,
-      title: lang ? `${lang} snippet` : 'snippet',
+      title: lang ? `${lang} snippet` : "snippet",
       lang,
       content,
       filePath: null,
       entryId: entry.id,
       anchorId: `entry-${entry.id}`,
-      source: 'fenced',
+      source: "fenced",
     };
   }
 }
@@ -334,25 +334,25 @@ export function collectArtifacts(entries, { minCodeBlockLines = 6 } = {}) {
   const results = indexToolResults(entries);
 
   for (const entry of entries) {
-    if (!entry || entry.type !== 'message') continue;
+    if (!entry || entry.type !== "message") continue;
     const msg = entry.message;
     if (!msg) continue;
 
     // A bash command the user ran directly in the composer can also rename/remove.
-    if (msg.role === 'bashExecution') {
+    if (msg.role === "bashExecution") {
       if (!msg.cancelled && msg.exitCode === 0) applyBashOps(msg.command, byPath);
       continue;
     }
 
-    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
 
     let blockIndex = 0;
     for (const block of msg.content) {
       const idx = blockIndex++;
       if (!block) continue;
-      if (block.type === 'toolCall') {
+      if (block.type === "toolCall") {
         applyFileToolCall(block, entry, order, byPath, results);
-      } else if (block.type === 'text' && typeof block.text === 'string') {
+      } else if (block.type === "text" && typeof block.text === "string") {
         for (const a of artifactsFromText(block.text, entry, idx, minCodeBlockLines)) {
           order.push(a);
         }

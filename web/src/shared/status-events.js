@@ -10,7 +10,7 @@ function normalizeRunning(payload) {
   if (!Array.isArray(payload?.running)) return null;
   return {
     ids: payload.running,
-    statuses: payload.statuses && typeof payload.statuses === 'object' ? payload.statuses : {},
+    statuses: payload.statuses && typeof payload.statuses === "object" ? payload.statuses : {},
   };
 }
 
@@ -20,25 +20,25 @@ function normalizeRunning(payload) {
 // as an unknown id so callers fall back to their safest behavior (e.g. an
 // unconditional refresh) instead of silently doing nothing.
 function parseReload(message) {
-  if (typeof message !== 'string') return null;
-  if (message === 'reload') return { id: '' };
-  if (message.startsWith('reload:')) return { id: message.slice('reload:'.length) };
+  if (typeof message !== "string") return null;
+  if (message === "reload") return { id: "" };
+  if (message.startsWith("reload:")) return { id: message.slice("reload:".length) };
   return null;
 }
 
 function normalizeDelta(payload) {
-  if (!payload || typeof payload.id !== 'string') return null;
+  if (!payload || typeof payload.id !== "string") return null;
   return {
     id: payload.id,
     running: !!payload.running,
-    model: typeof payload.model === 'string' ? payload.model : '',
-    modelName: typeof payload.modelName === 'string' ? payload.modelName : '',
-    modelProvider: typeof payload.modelProvider === 'string' ? payload.modelProvider : '',
+    model: typeof payload.model === "string" ? payload.model : "",
+    modelName: typeof payload.modelName === "string" ? payload.modelName : "",
+    modelProvider: typeof payload.modelProvider === "string" ? payload.modelProvider : "",
   };
 }
 
 export function createStatusEvents({
-  topic = '__all__',
+  topic = "__all__",
   EventSourceImpl = globalThis.EventSource,
   windowImpl = globalThis.window,
   onSnapshot = () => {},
@@ -69,11 +69,11 @@ export function createStatusEvents({
   function cleanup() {
     closeStream();
     if (pagehideHandler && windowImpl?.removeEventListener) {
-      windowImpl.removeEventListener('pagehide', pagehideHandler);
+      windowImpl.removeEventListener("pagehide", pagehideHandler);
       pagehideHandler = null;
     }
     if (pageshowHandler && windowImpl?.removeEventListener) {
-      windowImpl.removeEventListener('pageshow', pageshowHandler);
+      windowImpl.removeEventListener("pageshow", pageshowHandler);
       pageshowHandler = null;
     }
   }
@@ -84,7 +84,7 @@ export function createStatusEvents({
     const es = new EventSourceImpl(`/events?id=${encodeURIComponent(topic)}`);
     stream = es;
 
-    es.addEventListener('open', () => {
+    es.addEventListener("open", () => {
       if (everConnected) onReconnect();
       everConnected = true;
     });
@@ -93,21 +93,21 @@ export function createStatusEvents({
       const reload = parseReload(event.data);
       if (reload) onReload(reload);
     };
-    es.addEventListener('status-snapshot', (event) => {
+    es.addEventListener("status-snapshot", (event) => {
       const snapshot = normalizeRunning(parseJSON(event.data));
       if (snapshot) onSnapshot(snapshot);
     });
-    es.addEventListener('status-delta', (event) => {
+    es.addEventListener("status-delta", (event) => {
       const delta = normalizeDelta(parseJSON(event.data));
       if (delta) onDelta(delta);
     });
-    es.addEventListener('workflows-updated', (event) => {
+    es.addEventListener("workflows-updated", (event) => {
       const payload = parseJSON(event.data);
-      if (payload && typeof payload.runId === 'string') onWorkflowUpdate(payload);
+      if (payload && typeof payload.runId === "string") onWorkflowUpdate(payload);
     });
-    es.addEventListener('tasks-updated', (event) => {
+    es.addEventListener("tasks-updated", (event) => {
       const payload = parseJSON(event.data);
-      if (payload && typeof payload.project === 'string') onTasksUpdate(payload);
+      if (payload && typeof payload.project === "string") onTasksUpdate(payload);
     });
 
     if (windowImpl?.addEventListener) {
@@ -118,8 +118,8 @@ export function createStatusEvents({
       pageshowHandler = () => {
         if (!stream) connect();
       };
-      windowImpl.addEventListener('pagehide', pagehideHandler);
-      windowImpl.addEventListener('pageshow', pageshowHandler);
+      windowImpl.addEventListener("pagehide", pagehideHandler);
+      windowImpl.addEventListener("pageshow", pageshowHandler);
     }
   }
 

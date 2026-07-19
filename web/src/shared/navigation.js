@@ -6,13 +6,13 @@
 
 function resolveWindow(windowImpl) {
   if (windowImpl) return windowImpl;
-  return typeof window !== 'undefined' ? window : undefined;
+  return typeof window !== "undefined" ? window : undefined;
 }
 
 export function navigate(url, { windowImpl } = {}) {
   const win = resolveWindow(windowImpl);
   if (!url || !win) return;
-  win.history.pushState({}, '', url);
+  win.history.pushState({}, "", url);
 }
 
 // Click handler for <a> elements that point at an internal SPA route. Defers to
@@ -22,7 +22,7 @@ export function navigate(url, { windowImpl } = {}) {
 export function handleNavClick(event, url, { windowImpl } = {}) {
   if (!url || !event) return;
   if (event.defaultPrevented) return;
-  if (typeof event.button === 'number' && event.button !== 0) return;
+  if (typeof event.button === "number" && event.button !== 0) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   navigate(url, { windowImpl });

@@ -1,9 +1,9 @@
-import { getJSON } from '../shared/api.js';
+import { getJSON } from "../shared/api.js";
 
-const statuses = new Set(['running', 'done', 'error', 'unknown']);
+const statuses = new Set(["running", "done", "error", "unknown"]);
 
 function stringValue(value) {
-  return typeof value === 'string' ? value : '';
+  return typeof value === "string" ? value : "";
 }
 
 export function normalizeSubagent(subagent = {}) {
@@ -12,7 +12,7 @@ export function normalizeSubagent(subagent = {}) {
     id: stringValue(subagent.id),
     title: stringValue(subagent.title),
     harness: stringValue(subagent.harness),
-    status: statuses.has(status) ? status : 'unknown',
+    status: statuses.has(status) ? status : "unknown",
     spawnedAt: stringValue(subagent.spawnedAt),
     parentSession: stringValue(subagent.parentSession),
     parentProject: stringValue(subagent.parentProject),
@@ -23,13 +23,13 @@ export function normalizeSubagent(subagent = {}) {
 }
 
 export function subagentActivityTime(subagent = {}) {
-  return subagent.lastActivity || subagent.spawnedAt || '';
+  return subagent.lastActivity || subagent.spawnedAt || "";
 }
 
 export function subagentProject(subagent = {}) {
-  return subagent.childProject || subagent.parentProject || '';
+  return subagent.childProject || subagent.parentProject || "";
 }
 
-export function defaultFetchSubagents(session = '') {
-  return getJSON('/api/subagents' + (session ? '?session=' + encodeURIComponent(session) : ''));
+export function defaultFetchSubagents(session = "") {
+  return getJSON("/api/subagents" + (session ? "?session=" + encodeURIComponent(session) : ""));
 }

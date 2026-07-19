@@ -4,12 +4,12 @@
 // anchors the trigger, debounces requests, and inserts the chosen path.
 
 export function parseAtTrigger(text, caret) {
-  if (typeof text !== 'string') return null;
+  if (typeof text !== "string") return null;
   if (caret == null) caret = text.length;
   let at = -1;
   for (let i = caret - 1; i >= 0; i -= 1) {
     const ch = text[i];
-    if (ch === '@') {
+    if (ch === "@") {
       at = i;
       break;
     }
@@ -24,12 +24,12 @@ export function renderFileList(files, { escapeHtml = String, loading = false } =
   if (loading) return '<div class="slash-empty">Searching files...</div>';
   const list = Array.isArray(files) ? files : [];
   if (list.length === 0) return '<div class="slash-empty">No files match</div>';
-  let html = '';
+  let html = "";
   list.forEach((f) => {
-    const path = f.path || '';
-    const display = f.isDir ? path + '/' : path;
+    const path = f.path || "";
+    const display = f.isDir ? path + "/" : path;
     html +=
-      `<button type="button" class="slash-item" data-insert="${escapeHtml(path)}" data-isdir="${f.isDir ? '1' : ''}">` +
+      `<button type="button" class="slash-item" data-insert="${escapeHtml(path)}" data-isdir="${f.isDir ? "1" : ""}">` +
       `<span class="slash-item-name">${escapeHtml(display)}</span></button>`;
   });
   return html;
@@ -46,9 +46,9 @@ export function setupMentionAutocomplete({
   clearTimeoutImpl = (windowImpl || globalThis).clearTimeout.bind(windowImpl || globalThis),
   AbortControllerImpl = (windowImpl || globalThis).AbortController,
 } = {}) {
-  const textarea = documentImpl.getElementById('pi-chat-message');
-  const popup = documentImpl.getElementById('pi-chat-mention-popup');
-  const list = documentImpl.getElementById('pi-chat-mention-list');
+  const textarea = documentImpl.getElementById("pi-chat-message");
+  const popup = documentImpl.getElementById("pi-chat-mention-popup");
+  const list = documentImpl.getElementById("pi-chat-mention-list");
   if (!textarea || !popup || !list) return { handleKeydown: () => false };
 
   let trigger = null;
@@ -57,19 +57,19 @@ export function setupMentionAutocomplete({
   let reqSeq = 0;
 
   function isOpen() {
-    return popup.style.display !== 'none' && popup.style.display !== '';
+    return popup.style.display !== "none" && popup.style.display !== "";
   }
 
   function items() {
-    return list.querySelectorAll('.slash-item');
+    return list.querySelectorAll(".slash-item");
   }
 
   function setActive(index) {
     const all = items();
     const clamped = Math.max(0, Math.min(index, all.length - 1));
     list.dataset.activeIndex = String(all.length ? clamped : -1);
-    all.forEach((el, i) => el.classList.toggle('active', i === clamped));
-    all[clamped]?.scrollIntoView?.({ block: 'nearest' });
+    all.forEach((el, i) => el.classList.toggle("active", i === clamped));
+    all[clamped]?.scrollIntoView?.({ block: "nearest" });
   }
 
   function renderFiles(files, loading) {
@@ -78,11 +78,11 @@ export function setupMentionAutocomplete({
   }
 
   function open() {
-    popup.style.display = 'block';
+    popup.style.display = "block";
   }
 
   function close() {
-    popup.style.display = 'none';
+    popup.style.display = "none";
     trigger = null;
     if (debounceTimer != null) {
       clearTimeoutImpl(debounceTimer);
@@ -103,13 +103,13 @@ export function setupMentionAutocomplete({
     const signal = inflight ? inflight.signal : undefined;
     chatApi
       .getFiles(sessionId, query, { signal })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('files error'))))
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("files error"))))
       .then((data) => {
         if (seq !== reqSeq || !isOpen()) return;
         renderFiles(data.files || [], false);
       })
       .catch((err) => {
-        if (err && err.name === 'AbortError') return;
+        if (err && err.name === "AbortError") return;
         if (seq !== reqSeq || !isOpen()) return;
         renderFiles([], false);
       });
@@ -142,7 +142,7 @@ export function setupMentionAutocomplete({
     textarea.selectionStart = textarea.selectionEnd = caret;
     if (!isDir) close();
     textarea.focus();
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   // Called by the composer's keydown handler before its Enter-to-submit logic so
@@ -150,25 +150,25 @@ export function setupMentionAutocomplete({
   function handleKeydown(event) {
     if (!isOpen()) return false;
     const all = items();
-    let active = parseInt(list.dataset.activeIndex || '-1', 10);
+    let active = parseInt(list.dataset.activeIndex || "-1", 10);
     switch (event.key) {
-      case 'ArrowDown':
+      case "ArrowDown":
         event.preventDefault();
         setActive(active + 1);
         return true;
-      case 'ArrowUp':
+      case "ArrowUp":
         event.preventDefault();
         setActive(active - 1);
         return true;
-      case 'Enter':
-      case 'Tab':
+      case "Enter":
+      case "Tab":
         if (active >= 0 && all[active]) {
           event.preventDefault();
           all[active].click();
           return true;
         }
         return false;
-      case 'Escape':
+      case "Escape":
         event.preventDefault();
         close();
         return true;
@@ -177,15 +177,15 @@ export function setupMentionAutocomplete({
     }
   }
 
-  textarea.addEventListener('input', refresh);
+  textarea.addEventListener("input", refresh);
 
-  list.addEventListener('click', (event) => {
-    const item = event.target.closest('.slash-item');
+  list.addEventListener("click", (event) => {
+    const item = event.target.closest(".slash-item");
     if (!item) return;
-    insert(item.dataset.insert || '', item.dataset.isdir === '1');
+    insert(item.dataset.insert || "", item.dataset.isdir === "1");
   });
 
-  documentImpl.addEventListener('click', (event) => {
+  documentImpl.addEventListener("click", (event) => {
     if (isOpen() && !popup.contains(event.target) && event.target !== textarea) close();
   });
 

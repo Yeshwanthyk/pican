@@ -4,29 +4,29 @@ import {
   groupModelsByProvider,
   isScopedModel,
   modelDisplayLabel,
-} from '../../../session/chat/chat-selectors.js';
+} from "../../../session/chat/chat-selectors.js";
 
 export function renderModelList(
   models,
-  { filter = '', selectedModel = null, escapeHtml = String } = {},
+  { filter = "", selectedModel = null, escapeHtml = String } = {},
 ) {
   const byProvider = groupModelsByProvider(models, filter);
   const providers = Object.keys(byProvider).sort();
   if (providers.length === 0) return '<div class="model-empty">No models match</div>';
 
-  let html = '';
+  let html = "";
   providers.forEach((provider) => {
     html += `<div class="model-provider">${escapeHtml(provider)}</div>`;
     byProvider[provider].forEach((model) => {
-      const id = model.id || model.modelId || '';
+      const id = model.id || model.modelId || "";
       const name = model.name || id;
-      const scoped = isScopedModel(model) ? '<span class="model-scope-badge">scoped</span>' : '';
+      const scoped = isScopedModel(model) ? '<span class="model-scope-badge">scoped</span>' : "";
       const active =
         selectedModel &&
         selectedModel.provider === provider &&
         (selectedModel.id === id || selectedModel.modelId === id)
-          ? ' selected'
-          : '';
+          ? " selected"
+          : "";
       html += `<button type="button" class="model-item${active}" data-provider="${escapeHtml(provider)}" data-model-id="${escapeHtml(id)}">${escapeHtml(name)}${scoped}</button>`;
     });
   });
@@ -42,7 +42,7 @@ export function setupModelSelector({
   setModelLabel = () => {},
   setChatStatus = () => {},
   setKnownModelLabel = () => {},
-  getKnownModelLabel = () => '',
+  getKnownModelLabel = () => "",
   setCurrentModelForThinking = () => {},
   setWorkerModelUpdate = () => {},
 } = {}) {
@@ -54,35 +54,35 @@ export function setupModelSelector({
     setCurrentModelForThinking(model || null);
   }
 
-  const popup = documentImpl.getElementById('pi-chat-model-popup');
-  const popupSearch = documentImpl.getElementById('pi-chat-model-search');
-  const popupList = documentImpl.getElementById('pi-chat-model-list');
-  const modelLabelBtn = documentImpl.getElementById('pi-chat-model-label');
+  const popup = documentImpl.getElementById("pi-chat-model-popup");
+  const popupSearch = documentImpl.getElementById("pi-chat-model-search");
+  const popupList = documentImpl.getElementById("pi-chat-model-list");
+  const modelLabelBtn = documentImpl.getElementById("pi-chat-model-label");
 
   // Always show the label button so the user can open the model picker.
   // Server may have hidden it when no model was detected at page load.
-  if (modelLabelBtn) modelLabelBtn.style.display = '';
+  if (modelLabelBtn) modelLabelBtn.style.display = "";
 
   function renderPopupList(filter) {
     if (!popupList) return;
     popupList.innerHTML = renderModelList(allModels, { filter, selectedModel, escapeHtml });
-    popupList.dataset.activeIndex = '-1';
+    popupList.dataset.activeIndex = "-1";
   }
 
   function openPopup() {
     if (!popup) return;
-    popup.style.display = 'flex';
+    popup.style.display = "flex";
     if (popupSearch) {
-      popupSearch.value = '';
+      popupSearch.value = "";
       popupSearch.focus();
     }
-    renderPopupList('');
+    renderPopupList("");
   }
 
   function closePopup(focusTextarea = false) {
-    if (popup) popup.style.display = 'none';
+    if (popup) popup.style.display = "none";
     if (focusTextarea) {
-      const textarea = documentImpl.getElementById('pi-chat-message');
+      const textarea = documentImpl.getElementById("pi-chat-message");
       if (textarea) textarea.focus();
     }
   }
@@ -94,27 +94,27 @@ export function setupModelSelector({
 
   // Attach click handlers immediately so the button is responsive
   // even before the model list finishes loading.
-  modelLabelBtn?.addEventListener('click', (e) => {
+  modelLabelBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (popup && popup.style.display !== 'none') closePopup();
+    if (popup && popup.style.display !== "none") closePopup();
     else openPopup();
   });
 
-  popupSearch?.addEventListener('input', () => renderPopupList(popupSearch.value));
-  popupSearch?.addEventListener('keydown', (e) => {
-    const items = popupList ? popupList.querySelectorAll('.model-item') : [];
-    let popupActive = parseInt((popupList && popupList.dataset.activeIndex) || '-1', 10);
-    if (e.key === 'ArrowDown') {
+  popupSearch?.addEventListener("input", () => renderPopupList(popupSearch.value));
+  popupSearch?.addEventListener("keydown", (e) => {
+    const items = popupList ? popupList.querySelectorAll(".model-item") : [];
+    let popupActive = parseInt((popupList && popupList.dataset.activeIndex) || "-1", 10);
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       popupActive = Math.min(popupActive + 1, items.length - 1);
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       popupActive = Math.max(popupActive - 1, 0);
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (popupActive >= 0 && items[popupActive]) items[popupActive].click();
       return;
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
       closePopup();
@@ -122,12 +122,12 @@ export function setupModelSelector({
       return;
     }
     if (popupList) popupList.dataset.activeIndex = popupActive;
-    items.forEach((item, i) => item.classList.toggle('active', i === popupActive));
-    items[popupActive]?.scrollIntoView?.({ block: 'nearest' });
+    items.forEach((item, i) => item.classList.toggle("active", i === popupActive));
+    items[popupActive]?.scrollIntoView?.({ block: "nearest" });
   });
 
-  popupList?.addEventListener('click', async (e) => {
-    const item = e.target.closest('.model-item');
+  popupList?.addEventListener("click", async (e) => {
+    const item = e.target.closest(".model-item");
     if (!item) return;
     const provider = item.dataset.provider;
     const modelId = item.dataset.modelId;
@@ -136,20 +136,20 @@ export function setupModelSelector({
     try {
       const setRes = await chatApi.setModel(sessionId, { provider, modelId });
       const setData = await setRes.json();
-      if (!setRes.ok) throw new Error(setData.error || 'set model failed');
+      if (!setRes.ok) throw new Error(setData.error || "set model failed");
       const model = findModel(allModels, provider, modelId);
       setSelected(model || { provider, id: modelId, name: modelId });
       const newLabel = modelDisplayLabel(model || { provider, id: modelId, name: modelId });
       setKnownModelLabel(newLabel);
       setModelLabel(newLabel);
     } catch (err) {
-      setChatStatus(err.message || String(err), 'error');
+      setChatStatus(err.message || String(err), "error");
     }
   });
 
-  documentImpl.addEventListener('click', (e) => {
-    if (popup && popup.style.display !== 'none') {
-      const modelLabelBtnEl = documentImpl.getElementById('pi-chat-model-label');
+  documentImpl.addEventListener("click", (e) => {
+    if (popup && popup.style.display !== "none") {
+      const modelLabelBtnEl = documentImpl.getElementById("pi-chat-model-label");
       if (!popup.contains(e.target) && e.target !== modelLabelBtnEl) closePopup();
     }
   });
@@ -160,7 +160,7 @@ export function setupModelSelector({
   chatApi
     .listModels(sessionId)
     .then((res) => {
-      if (!res.ok) throw new Error('api error');
+      if (!res.ok) throw new Error("api error");
       return res.json();
     })
     .then((data) => {
@@ -173,8 +173,8 @@ export function setupModelSelector({
         return;
       }
       allModels = data.models;
-      if (popup && popup.style.display !== 'none') {
-        renderPopupList(popupSearch ? popupSearch.value : '');
+      if (popup && popup.style.display !== "none") {
+        renderPopupList(popupSearch ? popupSearch.value : "");
       }
       function updateToggleFromStatus(provider, modelId) {
         if (!provider || !modelId) return;

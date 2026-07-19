@@ -6,16 +6,16 @@ export function setupSessionSearchAndFilters({
   forceTreeRerender,
   navigateTo,
 } = {}) {
-  const searchInput = documentImpl.getElementById('tree-search');
-  searchInput?.addEventListener('input', (e) => {
+  const searchInput = documentImpl.getElementById("tree-search");
+  searchInput?.addEventListener("input", (e) => {
     setSearchQuery(e.target.value);
     forceTreeRerender();
   });
 
-  documentImpl.querySelectorAll('.filter-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      documentImpl.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
+  documentImpl.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      documentImpl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
       setFilterMode(btn.dataset.filter);
       forceTreeRerender();
     });
@@ -24,10 +24,10 @@ export function setupSessionSearchAndFilters({
   return {
     clearAndNavigateBottom() {
       const hasQuery = searchInput && searchInput.value;
-      if (searchInput) searchInput.value = '';
-      setSearchQuery('');
+      if (searchInput) searchInput.value = "";
+      setSearchQuery("");
       if (hasQuery) {
-        navigateTo(getLeafId(), 'bottom');
+        navigateTo(getLeafId(), "bottom");
       }
     },
   };
@@ -37,10 +37,10 @@ export function isEditableTarget(element) {
   if (!element) return false;
   const tagName = element.tagName;
   if (
-    tagName === 'INPUT' ||
-    tagName === 'TEXTAREA' ||
-    tagName === 'SELECT' ||
-    tagName === 'BUTTON'
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT" ||
+    tagName === "BUTTON"
   ) {
     return true;
   }
@@ -55,10 +55,10 @@ export function setupSessionKeyboardShortcuts({
   toggleToolOutputs,
   isEditableTargetImpl = isEditableTarget,
 } = {}) {
-  documentImpl.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+  documentImpl.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
       const active = documentImpl.activeElement;
-      if (isEditableTargetImpl(active) && active !== documentImpl.getElementById('tree-search')) {
+      if (isEditableTargetImpl(active) && active !== documentImpl.getElementById("tree-search")) {
         return;
       }
       clearSearch();
@@ -69,13 +69,13 @@ export function setupSessionKeyboardShortcuts({
     }
 
     const key = e.key.toLowerCase();
-    if (key === 't') {
+    if (key === "t") {
       e.preventDefault();
       toggleThinking();
-    } else if (key === 'o') {
+    } else if (key === "o") {
       e.preventDefault();
       toggleToolsVisibility();
-    } else if (key === 'p') {
+    } else if (key === "p") {
       e.preventDefault();
       toggleToolOutputs();
     }

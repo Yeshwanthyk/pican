@@ -1,4 +1,4 @@
-import { createSessionEventSource, wireSessionEvents } from './live-events.js';
+import { createSessionEventSource, wireSessionEvents } from "./live-events.js";
 
 const EVENT_SOURCE_CLOSED = 2;
 
@@ -85,8 +85,8 @@ export function setupSessionLiveConnection({
     reconnectAndReload();
   };
 
-  documentImpl.addEventListener('visibilitychange', onVisibilityChange);
-  windowImpl.addEventListener('online', onOnline);
+  documentImpl.addEventListener("visibilitychange", onVisibilityChange);
+  windowImpl.addEventListener("online", onOnline);
 
   return {
     connect,
@@ -95,8 +95,8 @@ export function setupSessionLiveConnection({
     dispose: () => {
       clearReconnectTimer();
       closeEventSource();
-      documentImpl.removeEventListener('visibilitychange', onVisibilityChange);
-      windowImpl.removeEventListener('online', onOnline);
+      documentImpl.removeEventListener("visibilitychange", onVisibilityChange);
+      windowImpl.removeEventListener("online", onOnline);
     },
   };
 }

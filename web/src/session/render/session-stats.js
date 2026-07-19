@@ -5,9 +5,9 @@
 
 export function formatTokens(count) {
   if (count < 1000) return count.toString();
-  if (count < 10000) return (count / 1000).toFixed(1) + 'k';
-  if (count < 1000000) return Math.round(count / 1000) + 'k';
-  return (count / 1000000).toFixed(1) + 'M';
+  if (count < 10000) return (count / 1000).toFixed(1) + "k";
+  if (count < 1000000) return Math.round(count / 1000) + "k";
+  return (count / 1000000).toFixed(1) + "M";
 }
 
 export function computeSessionStats(entryList = []) {
@@ -23,10 +23,10 @@ export function computeSessionStats(entryList = []) {
   const models = new Set();
 
   for (const entry of entryList) {
-    if (entry.type === 'message') {
+    if (entry.type === "message") {
       const msg = entry.message;
-      if (msg.role === 'user') userMessages++;
-      if (msg.role === 'assistant') {
+      if (msg.role === "user") userMessages++;
+      if (msg.role === "assistant") {
         assistantMessages++;
         if (msg.model) models.add(msg.provider ? `${msg.provider}/${msg.model}` : msg.model);
         if (msg.usage) {
@@ -41,17 +41,17 @@ export function computeSessionStats(entryList = []) {
             cost.cacheWrite += msg.usage.cost.cacheWrite || 0;
           }
         }
-        toolCalls += (msg.content || []).filter((c) => c.type === 'toolCall').length;
+        toolCalls += (msg.content || []).filter((c) => c.type === "toolCall").length;
       }
-      if (msg.role === 'toolResult') toolResults++;
-    } else if (entry.type === 'model_change') {
+      if (msg.role === "toolResult") toolResults++;
+    } else if (entry.type === "model_change") {
       if (entry.modelId)
         models.add(entry.provider ? `${entry.provider}/${entry.modelId}` : entry.modelId);
-    } else if (entry.type === 'compaction') {
+    } else if (entry.type === "compaction") {
       compactions++;
-    } else if (entry.type === 'branch_summary') {
+    } else if (entry.type === "branch_summary") {
       branchSummaries++;
-    } else if (entry.type === 'custom_message') {
+    } else if (entry.type === "custom_message") {
       customMessages++;
     }
   }
@@ -91,9 +91,9 @@ export function summarizeSessionStats(stats) {
   if (stats.branchSummaries) msgParts.push(`${stats.branchSummaries} branch summaries`);
 
   return {
-    tokensText: tokenParts.join(' ') || '0',
-    messagesText: msgParts.join(', ') || '0',
-    modelsText: stats.models.join(', ') || 'unknown',
+    tokensText: tokenParts.join(" ") || "0",
+    messagesText: msgParts.join(", ") || "0",
+    modelsText: stats.models.join(", ") || "unknown",
     costText: `$${totalCost.toFixed(3)}`,
     toolCalls: stats.toolCalls,
   };

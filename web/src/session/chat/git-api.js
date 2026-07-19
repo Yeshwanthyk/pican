@@ -1,4 +1,4 @@
-import { getJSON, postJSON } from '../../shared/api.js';
+import { getJSON, postJSON } from "../../shared/api.js";
 
 export function getGitInfo(sessionId, { getImpl = getJSON } = {}) {
   return getImpl(`/api/git/info?id=${encodeURIComponent(sessionId)}`);

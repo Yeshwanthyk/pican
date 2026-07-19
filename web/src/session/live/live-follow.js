@@ -5,7 +5,7 @@ import {
   scrollElementAboveComposer,
   scrollToBottom,
   setFollowButtonText,
-} from './live-scroll.js';
+} from "./live-scroll.js";
 
 // Owns the follow-scroll decision state for the live session viewer: whether we
 // auto-stick to the bottom as new entries stream in, the floating "scroll to
@@ -25,7 +25,7 @@ export function createFollowScrollController({
   let pendingCount = 0;
   let forcePreviewFollowUntil = 0;
   let lastScrollTop = 0;
-  const contentEl = documentImpl.getElementById('content');
+  const contentEl = documentImpl.getElementById("content");
   const cleanups = [];
   const on = (host, type, handler, opts) => {
     host.addEventListener(type, handler, opts);
@@ -66,8 +66,8 @@ export function createFollowScrollController({
   lastScrollTop = getScrollPosition();
 
   function disableFollowOnUserInteraction(e) {
-    if (e.type === 'keydown') {
-      const scrollingKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+    if (e.type === "keydown") {
+      const scrollingKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "];
       if (scrollingKeys.indexOf(e.key) === -1) return;
     }
     forcePreviewFollowUntil = 0;
@@ -119,11 +119,11 @@ export function createFollowScrollController({
     scrollAfterLayout(!!smooth);
   }
 
-  on(windowImpl, 'scroll', onScroll, { passive: true });
-  if (contentEl) on(contentEl, 'scroll', onScroll, { passive: true });
-  on(windowImpl, 'wheel', disableFollowOnUserInteraction, { passive: true });
-  on(windowImpl, 'touchmove', disableFollowOnUserInteraction, { passive: true });
-  on(windowImpl, 'keydown', disableFollowOnUserInteraction, { passive: true });
+  on(windowImpl, "scroll", onScroll, { passive: true });
+  if (contentEl) on(contentEl, "scroll", onScroll, { passive: true });
+  on(windowImpl, "wheel", disableFollowOnUserInteraction, { passive: true });
+  on(windowImpl, "touchmove", disableFollowOnUserInteraction, { passive: true });
+  on(windowImpl, "keydown", disableFollowOnUserInteraction, { passive: true });
 
   scrollToBottom(false, scrollImpls);
 

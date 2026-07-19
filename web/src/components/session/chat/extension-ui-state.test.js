@@ -1,35 +1,35 @@
-import { describe, expect, it } from 'vitest';
-import { reducePendingExtensionUI } from './extension-ui-state.js';
+import { describe, expect, it } from "vitest";
+import { reducePendingExtensionUI } from "./extension-ui-state.js";
 
-describe('reducePendingExtensionUI', () => {
-  it('adds, dedupes, and resolves requests', () => {
+describe("reducePendingExtensionUI", () => {
+  it("adds, dedupes, and resolves requests", () => {
     let state = reducePendingExtensionUI(
       [],
-      { type: 'add', request: { id: 'a', title: 'First' } },
+      { type: "add", request: { id: "a", title: "First" } },
       100,
     );
-    state = reducePendingExtensionUI(state, { type: 'add', request: { id: 'b' } }, 110);
+    state = reducePendingExtensionUI(state, { type: "add", request: { id: "b" } }, 110);
     state = reducePendingExtensionUI(
       state,
-      { type: 'add', request: { id: 'a', title: 'Updated' } },
+      { type: "add", request: { id: "a", title: "Updated" } },
       120,
     );
-    expect(state.map((request) => request.id)).toEqual(['a', 'b']);
-    expect(state[0].title).toBe('Updated');
+    expect(state.map((request) => request.id)).toEqual(["a", "b"]);
+    expect(state[0].title).toBe("Updated");
     expect(
-      reducePendingExtensionUI(state, { type: 'resolve', id: 'a' }, 130).map(
+      reducePendingExtensionUI(state, { type: "resolve", id: "a" }, 130).map(
         (request) => request.id,
       ),
-    ).toEqual(['b']);
+    ).toEqual(["b"]);
   });
 
-  it('drops timed-out requests', () => {
+  it("drops timed-out requests", () => {
     const state = reducePendingExtensionUI(
       [],
-      { type: 'add', request: { id: 'a', timeout: 50 } },
+      { type: "add", request: { id: "a", timeout: 50 } },
       100,
     );
-    expect(reducePendingExtensionUI(state, { type: 'prune' }, 149)).toHaveLength(1);
-    expect(reducePendingExtensionUI(state, { type: 'prune' }, 150)).toHaveLength(0);
+    expect(reducePendingExtensionUI(state, { type: "prune" }, 149)).toHaveLength(1);
+    expect(reducePendingExtensionUI(state, { type: "prune" }, 150)).toHaveLength(0);
   });
 });

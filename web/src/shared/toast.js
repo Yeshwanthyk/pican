@@ -5,13 +5,13 @@
 const timers = new Map();
 
 export function showToast(message, options = {}) {
-  const { id = 'app-toast', duration = 1500, title = '', documentImpl = document } = options;
+  const { id = "app-toast", duration = 1500, title = "", documentImpl = document } = options;
 
   let notice = documentImpl.getElementById(id);
   if (!notice) {
-    notice = documentImpl.createElement('div');
+    notice = documentImpl.createElement("div");
     notice.id = id;
-    notice.className = 'toast-notice';
+    notice.className = "toast-notice";
     documentImpl.body.appendChild(notice);
   }
 
@@ -19,10 +19,10 @@ export function showToast(message, options = {}) {
   if (title) notice.title = title;
 
   clearTimeout(timers.get(id));
-  notice.classList.add('visible');
+  notice.classList.add("visible");
   timers.set(
     id,
-    setTimeout(() => notice.classList.remove('visible'), duration),
+    setTimeout(() => notice.classList.remove("visible"), duration),
   );
 
   return notice;

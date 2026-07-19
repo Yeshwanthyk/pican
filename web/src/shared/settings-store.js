@@ -15,23 +15,23 @@
 // The localStorage keys that are server-backed. Mirrors settingDefaults in
 // internal/server/settings.go.
 export const SERVER_SETTING_KEYS = [
-  'pican-theme',
-  'pican:v1:font-ui',
-  'pican:v1:font-content',
-  'pican:v1:font-ui-size',
-  'pican:v1:font-content-size',
-  'pican:spinner-style',
-  'pican:v1:notify-on-done',
-  'pican:v1:done-sound',
-  'pican:view-layout',
-  'pican:v1:auto-title:enabled',
-  'pican:v1:auto-title:mode',
-  'pican:v1:auto-title:model',
-  'pican:v1:artifacts:enabled',
-  'pican:v1:artifacts:include',
-  'pican:v1:toggle:thinking',
-  'pican:v1:toggle:tools',
-  'pican:v1:toggle:tool-outputs',
+  "pican-theme",
+  "pican:v1:font-ui",
+  "pican:v1:font-content",
+  "pican:v1:font-ui-size",
+  "pican:v1:font-content-size",
+  "pican:spinner-style",
+  "pican:v1:notify-on-done",
+  "pican:v1:done-sound",
+  "pican:view-layout",
+  "pican:v1:auto-title:enabled",
+  "pican:v1:auto-title:mode",
+  "pican:v1:auto-title:model",
+  "pican:v1:artifacts:enabled",
+  "pican:v1:artifacts:include",
+  "pican:v1:toggle:thinking",
+  "pican:v1:toggle:tools",
+  "pican:v1:toggle:tool-outputs",
 ];
 
 // Network sync is disabled until a page entrypoint configures it. This keeps
@@ -40,7 +40,7 @@ export const SERVER_SETTING_KEYS = [
 let syncFetch = null;
 
 export function configureSettingsSync({ fetchImpl } = {}) {
-  syncFetch = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
+  syncFetch = fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
 }
 
 export function resetSettingsSyncForTests() {
@@ -58,12 +58,12 @@ function defaultStorage() {
 function postSettings(settings) {
   if (!syncFetch) return;
   try {
-    const p = syncFetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    const p = syncFetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ settings }),
     });
-    if (p && typeof p.catch === 'function') p.catch(() => {});
+    if (p && typeof p.catch === "function") p.catch(() => {});
   } catch {
     // best-effort; localStorage already holds the value
   }
@@ -111,7 +111,7 @@ export function writeSettings(values, { storage = defaultStorage() } = {}) {
 export async function hydrateSettings({ fetchImpl = syncFetch, storage = defaultStorage() } = {}) {
   if (!fetchImpl) return null;
   try {
-    const resp = await fetchImpl('/api/settings', { headers: { Accept: 'application/json' } });
+    const resp = await fetchImpl("/api/settings", { headers: { Accept: "application/json" } });
     if (!resp.ok) return null;
     const data = await resp.json();
     const settings = data && data.settings ? data.settings : null;

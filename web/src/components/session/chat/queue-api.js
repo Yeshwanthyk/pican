@@ -8,15 +8,15 @@
 // usable).
 
 export function createQueueApi({ sessionId, fetchImpl = fetch } = {}) {
-  if (!sessionId) throw new Error('createQueueApi: sessionId is required');
+  if (!sessionId) throw new Error("createQueueApi: sessionId is required");
   const base = `/api/chat/queue?id=${encodeURIComponent(sessionId)}`;
 
   async function readJSON(resp) {
     if (!resp.ok) {
-      let detail = '';
+      let detail = "";
       try {
         const body = await resp.json();
-        detail = body?.error || '';
+        detail = body?.error || "";
       } catch {
         /* ignore */
       }
@@ -27,26 +27,26 @@ export function createQueueApi({ sessionId, fetchImpl = fetch } = {}) {
 
   return {
     async list() {
-      return readJSON(await fetchImpl(base, { headers: { Accept: 'application/json' } }));
+      return readJSON(await fetchImpl(base, { headers: { Accept: "application/json" } }));
     },
     async add(message, displayText) {
       return readJSON(
         await fetchImpl(base, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({ message, displayText }),
         }),
       );
     },
     async remove(position) {
       const url = `${base}&position=${encodeURIComponent(position)}`;
-      return readJSON(await fetchImpl(url, { method: 'DELETE' }));
+      return readJSON(await fetchImpl(url, { method: "DELETE" }));
     },
     async setPaused(paused) {
       return readJSON(
         await fetchImpl(base, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({ paused: !!paused }),
         }),
       );

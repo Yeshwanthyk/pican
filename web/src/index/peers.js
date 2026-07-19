@@ -1,17 +1,17 @@
-import { getJSON, postJSON } from '../shared/api.js';
-import { normalizeSession } from './sessions.js';
+import { getJSON, postJSON } from "../shared/api.js";
+import { normalizeSession } from "./sessions.js";
 
 export function defaultFetchPeers() {
-  return getJSON('/api/peers');
+  return getJSON("/api/peers");
 }
 export function defaultUpsertPeer(name, baseUrl, token) {
-  return postJSON('/api/peers', { name, baseUrl, token });
+  return postJSON("/api/peers", { name, baseUrl, token });
 }
 export function defaultRemovePeer(name) {
-  return postJSON('/api/peers', { name, action: 'remove' });
+  return postJSON("/api/peers", { name, action: "remove" });
 }
 export function defaultFetchPeerSessions() {
-  return getJSON('/api/peers/sessions');
+  return getJSON("/api/peers/sessions");
 }
 
 // normalizePeerSession extends normalizeSession with the host/hostUrl fields
@@ -20,8 +20,8 @@ export function defaultFetchPeerSessions() {
 export function normalizePeerSession(raw = {}) {
   return {
     ...normalizeSession(raw),
-    host: raw.host || '',
-    hostUrl: raw.hostUrl || '',
+    host: raw.host || "",
+    hostUrl: raw.hostUrl || "",
   };
 }
 
@@ -29,10 +29,10 @@ export function normalizePeerSession(raw = {}) {
 // array for the homepage Machines section.
 export function normalizePeerHost(raw = {}) {
   return {
-    name: raw.name || '',
-    baseUrl: raw.baseUrl || '',
+    name: raw.name || "",
+    baseUrl: raw.baseUrl || "",
     online: !!raw.online,
-    error: raw.error || '',
+    error: raw.error || "",
     sessions: Array.isArray(raw.sessions) ? raw.sessions.map(normalizePeerSession) : [],
   };
 }

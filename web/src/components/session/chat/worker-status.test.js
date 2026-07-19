@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { setupWorkerStatusPolling } from './worker-status.js';
+import { describe, expect, it, vi } from "vitest";
+import { setupWorkerStatusPolling } from "./worker-status.js";
 
 const response = (data) => ({
   ok: true,
@@ -8,10 +8,10 @@ const response = (data) => ({
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-describe('setupWorkerStatusPolling', () => {
-  it('updates status, labels, context usage, and model selector state', async () => {
-    let knownModelLabel = '';
-    let knownThinkingLevel = '';
+describe("setupWorkerStatusPolling", () => {
+  it("updates status, labels, context usage, and model selector state", async () => {
+    let knownModelLabel = "";
+    let knownThinkingLevel = "";
     const setStatus = vi.fn();
     const setModelLabel = vi.fn();
     const setThinkingLabel = vi.fn();
@@ -20,15 +20,15 @@ describe('setupWorkerStatusPolling', () => {
 
     setupWorkerStatusPolling({
       windowImpl: new EventTarget(),
-      sessionId: 's',
+      sessionId: "s",
       chatApi: {
         getWorkerStatus: vi.fn(() =>
           Promise.resolve(
             response({
-              state: 'running',
-              model: 'gpt-4o',
-              modelProvider: 'openai',
-              thinkingLevel: 'high',
+              state: "running",
+              model: "gpt-4o",
+              modelProvider: "openai",
+              thinkingLevel: "high",
             }),
           ),
         ),
@@ -51,21 +51,21 @@ describe('setupWorkerStatusPolling', () => {
     });
     await tick();
 
-    expect(setStatus).toHaveBeenCalledWith('running', 'running');
-    expect(setModelLabel).toHaveBeenCalledWith('gpt-4o @ openai');
-    expect(setThinkingLabel).toHaveBeenCalledWith('high');
+    expect(setStatus).toHaveBeenCalledWith("running", "running");
+    expect(setModelLabel).toHaveBeenCalledWith("gpt-4o @ openai");
+    expect(setThinkingLabel).toHaveBeenCalledWith("high");
     expect(updateContextUsage).toHaveBeenCalled();
-    expect(onWorkerModelUpdate).toHaveBeenCalledWith('openai', 'gpt-4o');
+    expect(onWorkerModelUpdate).toHaveBeenCalledWith("openai", "gpt-4o");
   });
 
-  it('dispatches pi-worker-done on running to idle transition', async () => {
+  it("dispatches pi-worker-done on running to idle transition", async () => {
     const events = [];
     const windowImpl = new EventTarget();
-    windowImpl.addEventListener('pi-worker-done', (event) => events.push(event.type));
+    windowImpl.addEventListener("pi-worker-done", (event) => events.push(event.type));
     const getWorkerStatus = vi
       .fn()
-      .mockResolvedValueOnce(response({ state: 'running' }))
-      .mockResolvedValueOnce(response({ state: 'idle' }));
+      .mockResolvedValueOnce(response({ state: "running" }))
+      .mockResolvedValueOnce(response({ state: "idle" }));
 
     const controller = setupWorkerStatusPolling({
       windowImpl,
@@ -76,12 +76,12 @@ describe('setupWorkerStatusPolling', () => {
     await tick();
     await controller.refresh();
 
-    expect(events).toEqual(['pi-worker-done']);
+    expect(events).toEqual(["pi-worker-done"]);
   });
 
-  it('refreshes immediately on session reload', async () => {
+  it("refreshes immediately on session reload", async () => {
     const windowImpl = new EventTarget();
-    const getWorkerStatus = vi.fn(() => Promise.resolve(response({ state: 'idle' })));
+    const getWorkerStatus = vi.fn(() => Promise.resolve(response({ state: "idle" })));
 
     setupWorkerStatusPolling({
       windowImpl,
@@ -92,13 +92,13 @@ describe('setupWorkerStatusPolling', () => {
     await tick();
     const initialCalls = getWorkerStatus.mock.calls.length;
 
-    windowImpl.dispatchEvent(new Event('pi-session-reload'));
+    windowImpl.dispatchEvent(new Event("pi-session-reload"));
     await tick();
 
     expect(getWorkerStatus.mock.calls.length).toBe(initialCalls + 1);
   });
 
-  it('coalesces refreshes while a request is in flight', async () => {
+  it("coalesces refreshes while a request is in flight", async () => {
     let resolveFirst;
     const first = new Promise((resolve) => {
       resolveFirst = resolve;
@@ -106,7 +106,7 @@ describe('setupWorkerStatusPolling', () => {
     const getWorkerStatus = vi
       .fn()
       .mockImplementationOnce(() => first)
-      .mockResolvedValue(response({ state: 'idle' }));
+      .mockResolvedValue(response({ state: "idle" }));
 
     const controller = setupWorkerStatusPolling({
       windowImpl: new EventTarget(),
@@ -119,19 +119,19 @@ describe('setupWorkerStatusPolling', () => {
     void controller.refresh();
     expect(getWorkerStatus).toHaveBeenCalledTimes(1);
 
-    resolveFirst(response({ state: 'running' }));
+    resolveFirst(response({ state: "running" }));
     await tick();
     await tick();
     expect(getWorkerStatus).toHaveBeenCalledTimes(2);
   });
 
-  it('clears the polling interval on dispose', () => {
+  it("clears the polling interval on dispose", () => {
     const setIntervalImpl = vi.fn(() => 42);
     const clearIntervalImpl = vi.fn();
 
     const controller = setupWorkerStatusPolling({
       windowImpl: new EventTarget(),
-      chatApi: { getWorkerStatus: vi.fn(() => Promise.resolve(response({ state: 'idle' }))) },
+      chatApi: { getWorkerStatus: vi.fn(() => Promise.resolve(response({ state: "idle" }))) },
       setIntervalImpl,
       clearIntervalImpl,
       CustomEventImpl: Event,

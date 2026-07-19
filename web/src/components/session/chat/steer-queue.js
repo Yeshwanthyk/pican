@@ -30,12 +30,12 @@ export function setupSteerQueue({
   queueApi = null,
   getLiveEntries = null,
 } = {}) {
-  if (!store) throw new Error('setupSteerQueue: store is required');
+  if (!store) throw new Error("setupSteerQueue: store is required");
 
   let activeRun = false;
 
   function hasContent() {
-    const typed = textarea ? textarea.value.trim() : '';
+    const typed = textarea ? textarea.value.trim() : "";
     return typed.length > 0 || !!attachments.files?.().length;
   }
 
@@ -44,19 +44,19 @@ export function setupSteerQueue({
   }
 
   function enqueueFromComposer() {
-    const typed = textarea ? textarea.value.trim() : '';
+    const typed = textarea ? textarea.value.trim() : "";
     const message = attachments.composeMessage(typed);
     const files = (attachments.files?.() || []).slice();
     if (!message && files.length === 0) return false;
     // Clear the composer synchronously so a rapid second queue click can read
     // fresh content from the textarea before our POST round-trips. The store
     // mutation lands later when api.add resolves.
-    if (textarea) textarea.value = '';
+    if (textarea) textarea.value = "";
     attachments.clear?.();
     autoResizeTextarea();
     updateSendEnabled();
     updateQueueEnabled();
-    if (textarea && typeof textarea.focus === 'function') textarea.focus();
+    if (textarea && typeof textarea.focus === "function") textarea.focus();
     void store.enqueueQueued({ message, displayText: typed, files });
     return true;
   }
@@ -85,7 +85,7 @@ export function setupSteerQueue({
 
   async function sendNow(id) {
     const focused = store.items.find((it) => it.id === id);
-    if (!focused || focused.kind !== 'queued') return;
+    if (!focused || focused.kind !== "queued") return;
     // Pull from the server first so the drainer doesn't race us.
     if (!(await claimQueuedRow(focused))) return;
     store.takeLocalById(id);
@@ -94,15 +94,15 @@ export function setupSteerQueue({
 
   async function edit(id) {
     const focused = store.items.find((it) => it.id === id);
-    if (!focused || focused.kind !== 'queued') return;
+    if (!focused || focused.kind !== "queued") return;
     if (!(await claimQueuedRow(focused))) return;
     store.takeLocalById(id);
     if (textarea) {
-      textarea.value = focused.displayText || focused.text || '';
+      textarea.value = focused.displayText || focused.text || "";
       autoResizeTextarea();
       updateSendEnabled();
       updateQueueEnabled();
-      if (typeof textarea.focus === 'function') textarea.focus();
+      if (typeof textarea.focus === "function") textarea.focus();
     }
   }
 
@@ -139,17 +139,17 @@ export function setupSteerQueue({
   // only ever added while `activeRun` is true; the next run begins via
   // pi-worker-done's clearSteers().
   function extractUserText(content) {
-    if (typeof content === 'string') return content;
+    if (typeof content === "string") return content;
     if (Array.isArray(content)) {
-      return content.map((part) => (typeof part === 'string' ? part : part?.text || '')).join('');
+      return content.map((part) => (typeof part === "string" ? part : part?.text || "")).join("");
     }
-    return '';
+    return "";
   }
 
   function countUserMessages(entries) {
     let n = 0;
     for (const entry of entries) {
-      if (entry?.type === 'message' && entry.message?.role === 'user') n += 1;
+      if (entry?.type === "message" && entry.message?.role === "user") n += 1;
     }
     return n;
   }
@@ -175,14 +175,14 @@ export function setupSteerQueue({
       let scanned = 0;
       for (let i = entries.length - 1; i >= 0 && scanned < 25; i -= 1) {
         const entry = entries[i];
-        if (!entry || entry.type !== 'message') continue;
-        if (entry.message?.role !== 'user') continue;
+        if (!entry || entry.type !== "message") continue;
+        if (entry.message?.role !== "user") continue;
         const text = extractUserText(entry.message.content).trim();
         if (text) recent.add(text);
         scanned += 1;
       }
       const matched = store.items.filter(
-        (item) => item.kind === 'steer' && recent.has(String(item.text || '').trim()),
+        (item) => item.kind === "steer" && recent.has(String(item.text || "").trim()),
       );
       for (const item of matched) {
         store.removeById(item.id);
@@ -195,7 +195,7 @@ export function setupSteerQueue({
     // text exactly (decorated user entries, etc.) we still pop one steer chip
     // per newly arrived user message, oldest first.
     while (newUserMessages > 0 && store.steerCount > 0) {
-      const head = store.items.find((item) => item.kind === 'steer');
+      const head = store.items.find((item) => item.kind === "steer");
       if (!head) break;
       store.removeById(head.id);
       newUserMessages -= 1;
@@ -206,11 +206,11 @@ export function setupSteerQueue({
   store.actions.edit = edit;
   store.actions.resume = resume;
 
-  queueButton?.addEventListener('click', enqueueFromComposer);
-  textarea?.addEventListener('input', updateQueueEnabled);
-  windowImpl.addEventListener('pi-chat-message-sent', onMessageSent);
-  windowImpl.addEventListener('pi-worker-done', onWorkerDone);
-  windowImpl.addEventListener('pi-session-reload', reconcileSteersAgainstEntries);
+  queueButton?.addEventListener("click", enqueueFromComposer);
+  textarea?.addEventListener("input", updateQueueEnabled);
+  windowImpl.addEventListener("pi-chat-message-sent", onMessageSent);
+  windowImpl.addEventListener("pi-worker-done", onWorkerDone);
+  windowImpl.addEventListener("pi-session-reload", reconcileSteersAgainstEntries);
 
   updateQueueEnabled();
 
@@ -222,9 +222,9 @@ export function setupSteerQueue({
     queuedCount: () => store.queuedCount,
     steerCount: () => store.steerCount,
     dispose: () => {
-      windowImpl.removeEventListener('pi-chat-message-sent', onMessageSent);
-      windowImpl.removeEventListener('pi-worker-done', onWorkerDone);
-      windowImpl.removeEventListener('pi-session-reload', reconcileSteersAgainstEntries);
+      windowImpl.removeEventListener("pi-chat-message-sent", onMessageSent);
+      windowImpl.removeEventListener("pi-worker-done", onWorkerDone);
+      windowImpl.removeEventListener("pi-session-reload", reconcileSteersAgainstEntries);
     },
   };
 }

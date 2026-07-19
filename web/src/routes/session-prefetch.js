@@ -16,12 +16,12 @@ export function prefetchSession(id, { fetchImpl = fetch } = {}) {
     if (oldest) inflight.delete(oldest);
   }
   const promise = fetchImpl(`/api/session?id=${encodeURIComponent(id)}&paginate=1`, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: "application/json" },
   })
     .then((resp) => {
       if (!resp.ok) {
         inflight.delete(id);
-        throw new Error(resp.status === 404 ? 'not found' : 'load failed');
+        throw new Error(resp.status === 404 ? "not found" : "load failed");
       }
       return resp.json();
     })

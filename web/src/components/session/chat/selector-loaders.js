@@ -4,9 +4,9 @@ export function chatSessionId({
   URLSearchParamsImpl = URLSearchParams,
 } = {}) {
   return (
-    new URLSearchParamsImpl(locationImpl.search).get('id') ||
-    (documentImpl.getElementById('pi-chat-composer') || {}).dataset?.sessionId ||
-    ''
+    new URLSearchParamsImpl(locationImpl.search).get("id") ||
+    (documentImpl.getElementById("pi-chat-composer") || {}).dataset?.sessionId ||
+    ""
   );
 }
 
@@ -28,11 +28,11 @@ export function createChatSelectorLoaders({
   setChatStatus = () => {},
   setThinkingLabel = () => {},
   setKnownModelLabel = () => {},
-  getKnownModelLabel = () => '',
+  getKnownModelLabel = () => "",
   setCurrentModelForThinking = () => {},
   setWorkerModelUpdate = () => {},
   getCurrentModelForThinking = () => null,
-  getKnownThinkingLevel = () => '',
+  getKnownThinkingLevel = () => "",
   setKnownThinkingLevel = () => {},
 } = {}) {
   const getSessionId = () => chatSessionId({ documentImpl, locationImpl, URLSearchParamsImpl });
@@ -54,7 +54,7 @@ export function createChatSelectorLoaders({
   }
 
   function loadSlashSelector() {
-    if (!slashSelector || typeof slashSelector.setupSlashCommands !== 'function') {
+    if (!slashSelector || typeof slashSelector.setupSlashCommands !== "function") {
       return noopKeydownSelector;
     }
     return slashSelector.setupSlashCommands({
@@ -66,7 +66,7 @@ export function createChatSelectorLoaders({
   }
 
   function loadMentionSelector() {
-    if (!mentionSelector || typeof mentionSelector.setupMentionAutocomplete !== 'function') {
+    if (!mentionSelector || typeof mentionSelector.setupMentionAutocomplete !== "function") {
       return noopKeydownSelector;
     }
     return mentionSelector.setupMentionAutocomplete({

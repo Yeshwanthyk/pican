@@ -1,8 +1,8 @@
 export function formatTokens(n) {
   if (n < 1000) return n.toString();
-  if (n < 10000) return (n / 1000).toFixed(1) + 'k';
-  if (n < 1000000) return Math.round(n / 1000) + 'k';
-  return (n / 1000000).toFixed(1) + 'M';
+  if (n < 10000) return (n / 1000).toFixed(1) + "k";
+  if (n < 1000000) return Math.round(n / 1000) + "k";
+  return (n / 1000000).toFixed(1) + "M";
 }
 
 export function computeLiveStats(entries = []) {
@@ -15,13 +15,13 @@ export function computeLiveStats(entries = []) {
     models: new Set(),
   };
   entries.forEach((entry) => {
-    if (entry.type !== 'message' || !entry.message) return;
+    if (entry.type !== "message" || !entry.message) return;
     const message = entry.message;
-    if (message.role === 'user') stats.user++;
-    if (message.role === 'assistant') {
+    if (message.role === "user") stats.user++;
+    if (message.role === "assistant") {
       stats.assistant++;
       if (message.model)
-        stats.models.add(message.provider ? message.provider + '/' + message.model : message.model);
+        stats.models.add(message.provider ? message.provider + "/" + message.model : message.model);
       if (message.usage) {
         stats.tokens.input += message.usage.input || 0;
         stats.tokens.output += message.usage.output || 0;
@@ -35,7 +35,7 @@ export function computeLiveStats(entries = []) {
         }
       }
       stats.toolCalls += (message.content || []).filter(
-        (block) => block.type === 'toolCall',
+        (block) => block.type === "toolCall",
       ).length;
     }
   });
@@ -46,31 +46,31 @@ export function updateStatsDom(entries, { documentImpl = document } = {}) {
   const stats = computeLiveStats(entries);
   const totalCost =
     stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite;
-  const headerInfo = documentImpl.querySelector('.header-info');
+  const headerInfo = documentImpl.querySelector(".header-info");
   if (!headerInfo) return false;
 
   const messageParts = [];
-  if (stats.user) messageParts.push(stats.user + ' user');
-  if (stats.assistant) messageParts.push(stats.assistant + ' assistant');
+  if (stats.user) messageParts.push(stats.user + " user");
+  if (stats.assistant) messageParts.push(stats.assistant + " assistant");
 
-  headerInfo.querySelectorAll('.info-item').forEach((row) => {
-    const label = row.querySelector('.info-label');
-    const value = row.querySelector('.info-value');
+  headerInfo.querySelectorAll(".info-item").forEach((row) => {
+    const label = row.querySelector(".info-label");
+    const value = row.querySelector(".info-value");
     if (!label || !value) return;
     const text = label.textContent;
-    if (text.includes('Messages:')) value.textContent = messageParts.join(', ') || '0';
-    if (text.includes('Tool Calls:')) value.textContent = stats.toolCalls;
-    if (text.includes('Models:'))
-      value.textContent = Array.from(stats.models).join(', ') || 'unknown';
-    if (text.includes('Tokens:')) {
+    if (text.includes("Messages:")) value.textContent = messageParts.join(", ") || "0";
+    if (text.includes("Tool Calls:")) value.textContent = stats.toolCalls;
+    if (text.includes("Models:"))
+      value.textContent = Array.from(stats.models).join(", ") || "unknown";
+    if (text.includes("Tokens:")) {
       const tokenParts = [];
-      if (stats.tokens.input) tokenParts.push('↑' + formatTokens(stats.tokens.input));
-      if (stats.tokens.output) tokenParts.push('↓' + formatTokens(stats.tokens.output));
-      if (stats.tokens.cacheRead) tokenParts.push('R' + formatTokens(stats.tokens.cacheRead));
-      if (stats.tokens.cacheWrite) tokenParts.push('W' + formatTokens(stats.tokens.cacheWrite));
-      value.textContent = tokenParts.join(' ') || '0';
+      if (stats.tokens.input) tokenParts.push("↑" + formatTokens(stats.tokens.input));
+      if (stats.tokens.output) tokenParts.push("↓" + formatTokens(stats.tokens.output));
+      if (stats.tokens.cacheRead) tokenParts.push("R" + formatTokens(stats.tokens.cacheRead));
+      if (stats.tokens.cacheWrite) tokenParts.push("W" + formatTokens(stats.tokens.cacheWrite));
+      value.textContent = tokenParts.join(" ") || "0";
     }
-    if (text.includes('Cost:')) value.textContent = '$' + totalCost.toFixed(3);
+    if (text.includes("Cost:")) value.textContent = "$" + totalCost.toFixed(3);
   });
   return true;
 }

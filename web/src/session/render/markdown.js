@@ -16,7 +16,7 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
         const match = strictStrikethroughRegex.exec(src);
         if (!match) return undefined;
         return {
-          type: 'del',
+          type: "del",
           raw: match[0],
           text: match[2],
           tokens: this.lexer.inlineTokens(match[2]),
@@ -25,7 +25,7 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
     },
     renderer: {
       link(token) {
-        const href = (token.href || '').trim();
+        const href = (token.href || "").trim();
         if (/^\s*(javascript|vbscript|data):/i.test(href)) {
           return this.parser.parseInline(token.tokens);
         }
@@ -33,19 +33,19 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
         if (token.title) {
           out += ' title="' + escapeHtml(token.title) + '"';
         }
-        out += '>' + this.parser.parseInline(token.tokens) + '</a>';
+        out += ">" + this.parser.parseInline(token.tokens) + "</a>";
         return out;
       },
       image(token) {
-        const href = (token.href || '').trim();
+        const href = (token.href || "").trim();
         if (/^\s*(javascript|vbscript|data):/i.test(href)) {
-          return escapeHtml(token.text || '');
+          return escapeHtml(token.text || "");
         }
-        let out = '<img src="' + escapeHtml(href) + '" alt="' + escapeHtml(token.text || '') + '"';
+        let out = '<img src="' + escapeHtml(href) + '" alt="' + escapeHtml(token.text || "") + '"';
         if (token.title) {
           out += ' title="' + escapeHtml(token.title) + '"';
         }
-        out += '>';
+        out += ">";
         return out;
       },
       code(token) {
@@ -69,7 +69,7 @@ export function configureSessionMarkdown({ marked, hljs, escapeHtml }) {
           return `<pre><code class="hljs">${highlighted}</code></pre>`;
         }
         // hljs not yet loaded: plain text, marked for lazy highlighting
-        const dataLang = lang ? ` data-lang="${escapeHtml(lang)}"` : '';
+        const dataLang = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
         return `<pre><code class="hljs" data-highlight-pending${dataLang}>${escapeHtml(code)}</code></pre>`;
       },
       codespan(token) {

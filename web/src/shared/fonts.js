@@ -10,11 +10,11 @@
  * with the chosen fonts/sizes before any JS runs).
  */
 
-export const FONT_UI_KEY = 'pican:v1:font-ui';
-export const FONT_CONTENT_KEY = 'pican:v1:font-content';
-export const FONT_CODE_KEY = 'pican:v1:font-code';
-export const FONT_UI_SIZE_KEY = 'pican:v1:font-ui-size';
-export const FONT_CONTENT_SIZE_KEY = 'pican:v1:font-content-size';
+export const FONT_UI_KEY = "pican:v1:font-ui";
+export const FONT_CONTENT_KEY = "pican:v1:font-content";
+export const FONT_CODE_KEY = "pican:v1:font-code";
+export const FONT_UI_SIZE_KEY = "pican:v1:font-ui-size";
+export const FONT_CONTENT_SIZE_KEY = "pican:v1:font-content-size";
 
 export const FONT_MIN_SIZE = 8;
 export const FONT_MAX_SIZE = 32;
@@ -28,8 +28,8 @@ export const FONT_KEYWORDS = {
 
 // Strip a raw family name to a safe subset (letters, digits, spaces, hyphens).
 export function sanitizeFontFamily(value) {
-  return String(value || '')
-    .replace(/[^A-Za-z0-9 -]/g, '')
+  return String(value || "")
+    .replace(/[^A-Za-z0-9 -]/g, "")
     .trim()
     .slice(0, 64);
 }
@@ -55,11 +55,11 @@ export function clampSize(value, fallback = 12) {
 export function applyFonts(documentImpl, { ui, content, code, uiSize, contentSize } = {}) {
   const root = documentImpl?.documentElement;
   if (!root || !root.style) return;
-  if (ui) root.style.setProperty('--font-sans', resolveFontStack(ui));
-  if (content) root.style.setProperty('--font-content', resolveFontStack(content));
-  if (code) root.style.setProperty('--font-code', resolveFontStack(code));
-  if (uiSize != null && uiSize !== '')
-    root.style.setProperty('--font-size-ui', `${clampSize(uiSize)}px`);
-  if (contentSize != null && contentSize !== '')
-    root.style.setProperty('--font-content-size', `${clampSize(contentSize)}px`);
+  if (ui) root.style.setProperty("--font-sans", resolveFontStack(ui));
+  if (content) root.style.setProperty("--font-content", resolveFontStack(content));
+  if (code) root.style.setProperty("--font-code", resolveFontStack(code));
+  if (uiSize != null && uiSize !== "")
+    root.style.setProperty("--font-size-ui", `${clampSize(uiSize)}px`);
+  if (contentSize != null && contentSize !== "")
+    root.style.setProperty("--font-content-size", `${clampSize(contentSize)}px`);
 }

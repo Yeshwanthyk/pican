@@ -1,4 +1,4 @@
-import { navigate } from './navigation.js';
+import { navigate } from "./navigation.js";
 
 const SCROLL_AMOUNT = 300;
 const GG_TIMEOUT = 500; // ms window for double-tap 'gg'
@@ -10,7 +10,7 @@ const GG_TIMEOUT = 500; // ms window for double-tap 'gg'
 export function isEditableTarget(element) {
   if (!element) return false;
   const tagName = element.tagName;
-  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+  if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") {
     return true;
   }
   return element.isContentEditable || Boolean(element.closest?.('[contenteditable="true"]'));
@@ -22,11 +22,11 @@ export function isEditableTarget(element) {
  * the composer keydown listener, so document-level nav must not intercept it.
  */
 export function isComposerPopupOpen(documentImpl = document) {
-  const popups = documentImpl.querySelectorAll?.('#pi-chat-slash-popup, #pi-chat-mention-popup');
+  const popups = documentImpl.querySelectorAll?.("#pi-chat-slash-popup, #pi-chat-mention-popup");
   if (!popups) return false;
   for (const popup of popups) {
     const display = popup.style?.display;
-    if (display && display !== 'none') return true;
+    if (display && display !== "none") return true;
   }
   return false;
 }
@@ -48,7 +48,7 @@ export function setupKeyboardNav({
   documentImpl = document,
   setTimeoutImpl = setTimeout,
   clearTimeoutImpl = clearTimeout,
-  focusSelector = '#pi-chat-message',
+  focusSelector = "#pi-chat-message",
 } = {}) {
   let ggTimer = null;
 
@@ -56,9 +56,9 @@ export function setupKeyboardNav({
   // handlers see the event — but only when the user isn't inside a popup
   // or modal that has its own Escape handling (model popup, palette, etc.).
   documentImpl.addEventListener(
-    'keydown',
+    "keydown",
     (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         const active = documentImpl.activeElement;
         if (!isEditableTarget(active)) return;
         // Don't steal Escape from popups / modals / overlays.
@@ -83,53 +83,53 @@ export function setupKeyboardNav({
 
   // Cmd/Ctrl+, opens the global settings page (standard macOS preferences
   // shortcut). Works regardless of focus, like a native app.
-  documentImpl.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ',') {
+  documentImpl.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ",") {
       e.preventDefault();
-      navigate('/settings', { windowImpl });
+      navigate("/settings", { windowImpl });
     }
   });
 
-  documentImpl.addEventListener('keydown', (e) => {
+  documentImpl.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (isEditableTarget(documentImpl.activeElement)) return;
 
-    if (e.key === 'j') {
+    if (e.key === "j") {
       e.preventDefault();
       const content =
-        typeof documentImpl.getElementById === 'function'
-          ? documentImpl.getElementById('content')
+        typeof documentImpl.getElementById === "function"
+          ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollBy({ top: SCROLL_AMOUNT, behavior: 'instant' });
+        content.scrollBy({ top: SCROLL_AMOUNT, behavior: "instant" });
       } else {
-        windowImpl.scrollBy({ top: SCROLL_AMOUNT, behavior: 'instant' });
+        windowImpl.scrollBy({ top: SCROLL_AMOUNT, behavior: "instant" });
       }
-    } else if (e.key === 'k') {
+    } else if (e.key === "k") {
       e.preventDefault();
       const content =
-        typeof documentImpl.getElementById === 'function'
-          ? documentImpl.getElementById('content')
+        typeof documentImpl.getElementById === "function"
+          ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollBy({ top: -SCROLL_AMOUNT, behavior: 'instant' });
+        content.scrollBy({ top: -SCROLL_AMOUNT, behavior: "instant" });
       } else {
-        windowImpl.scrollBy({ top: -SCROLL_AMOUNT, behavior: 'instant' });
+        windowImpl.scrollBy({ top: -SCROLL_AMOUNT, behavior: "instant" });
       }
-    } else if (e.key === 'g') {
+    } else if (e.key === "g") {
       e.preventDefault();
       if (ggTimer) {
         // Second 'g' within timeout — scroll to top
         clearTimeoutImpl(ggTimer);
         ggTimer = null;
         const content =
-          typeof documentImpl.getElementById === 'function'
-            ? documentImpl.getElementById('content')
+          typeof documentImpl.getElementById === "function"
+            ? documentImpl.getElementById("content")
             : null;
         if (content) {
-          content.scrollTo({ top: 0, behavior: 'instant' });
+          content.scrollTo({ top: 0, behavior: "instant" });
         } else {
-          windowImpl.scrollTo({ top: 0, behavior: 'instant' });
+          windowImpl.scrollTo({ top: 0, behavior: "instant" });
         }
       } else {
         // First 'g' — start the double-tap window
@@ -137,21 +137,21 @@ export function setupKeyboardNav({
           ggTimer = null;
         }, GG_TIMEOUT);
       }
-    } else if (e.key === 'G') {
+    } else if (e.key === "G") {
       e.preventDefault();
       const content =
-        typeof documentImpl.getElementById === 'function'
-          ? documentImpl.getElementById('content')
+        typeof documentImpl.getElementById === "function"
+          ? documentImpl.getElementById("content")
           : null;
       if (content) {
-        content.scrollTo({ top: content.scrollHeight, behavior: 'instant' });
+        content.scrollTo({ top: content.scrollHeight, behavior: "instant" });
       } else {
         windowImpl.scrollTo({
           top: documentImpl.documentElement.scrollHeight,
-          behavior: 'instant',
+          behavior: "instant",
         });
       }
-    } else if (e.key === 'I') {
+    } else if (e.key === "I") {
       e.preventDefault();
       const el = documentImpl.querySelector(focusSelector);
       if (el) el.focus();

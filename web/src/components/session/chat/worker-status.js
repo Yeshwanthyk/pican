@@ -1,14 +1,14 @@
 export function setupWorkerStatusPolling({
   windowImpl = window,
   chatApi,
-  sessionId = '',
+  sessionId = "",
   setStatus = () => {},
   setModelLabel = () => {},
   setThinkingLabel = () => {},
   updateContextUsage = () => {},
-  getKnownModelLabel = () => '',
+  getKnownModelLabel = () => "",
   setKnownModelLabel = () => {},
-  getKnownThinkingLevel = () => '',
+  getKnownThinkingLevel = () => "",
   setKnownThinkingLevel = () => {},
   getWorkerModelUpdate = () => null,
   setIntervalImpl = windowImpl.setInterval?.bind(windowImpl),
@@ -34,16 +34,16 @@ export function setupWorkerStatusPolling({
       if (!response?.ok) return;
       const data = await response.json();
       const apiModelLabel = data.model
-        ? data.model + (data.modelProvider ? ' @ ' + data.modelProvider : '')
-        : '';
+        ? data.model + (data.modelProvider ? " @ " + data.modelProvider : "")
+        : "";
       if (apiModelLabel) setKnownModelLabel(apiModelLabel);
       if (data.thinkingLevel) setKnownThinkingLevel(data.thinkingLevel);
-      if (data.state === 'running') setStatus('running', 'running');
-      if (data.state === 'idle') setStatus('idle', '');
-      if (data.state === 'error') setStatus(data.error || 'worker error', 'error');
-      if (lastWorkerState === 'running' && data.state === 'idle') {
+      if (data.state === "running") setStatus("running", "running");
+      if (data.state === "idle") setStatus("idle", "");
+      if (data.state === "error") setStatus(data.error || "worker error", "error");
+      if (lastWorkerState === "running" && data.state === "idle") {
         try {
-          windowImpl.dispatchEvent(new CustomEventImpl('pi-worker-done'));
+          windowImpl.dispatchEvent(new CustomEventImpl("pi-worker-done"));
         } catch {
           // Some tests/environments may not support constructing events.
         }
@@ -57,7 +57,7 @@ export function setupWorkerStatusPolling({
         onWorkerModelUpdate(data.modelProvider, data.model);
       }
     } catch {
-      setStatus('status unavailable', 'error');
+      setStatus("status unavailable", "error");
     } finally {
       inflight = false;
       if (pending) {
@@ -75,7 +75,7 @@ export function setupWorkerStatusPolling({
     void refresh();
     updateContextUsage();
   };
-  windowImpl.addEventListener?.('pi-session-reload', onSessionReload);
+  windowImpl.addEventListener?.("pi-session-reload", onSessionReload);
 
   return {
     refresh,
@@ -84,7 +84,7 @@ export function setupWorkerStatusPolling({
       // previously-visited sessions keep writing #pi-chat-context-usage (a
       // global-id lookup), making the context gauge flicker between sessions.
       if (timer !== null) clearIntervalImpl?.(timer);
-      windowImpl.removeEventListener?.('pi-session-reload', onSessionReload);
+      windowImpl.removeEventListener?.("pi-session-reload", onSessionReload);
     },
   };
 }

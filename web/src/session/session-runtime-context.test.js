@@ -1,16 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getSessionRuntime,
   resetSessionRuntimeContext,
   setSessionRuntime,
-} from './session-runtime-context.js';
+} from "./session-runtime-context.js";
 
-describe('session runtime context', () => {
+describe("session runtime context", () => {
   afterEach(() => {
     resetSessionRuntimeContext();
   });
 
-  it('stores an explicit runtime and derives navigateTo from the navigator', () => {
+  it("stores an explicit runtime and derives navigateTo from the navigator", () => {
     const navigateTo = vi.fn();
     const model = { entries: [] };
     const runtime = setSessionRuntime({ model, navigator: { navigateTo } });
@@ -19,7 +19,7 @@ describe('session runtime context', () => {
     expect(getSessionRuntime().model).toBe(model);
   });
 
-  it('resets the runtime without installing window compatibility shims', () => {
+  it("resets the runtime without installing window compatibility shims", () => {
     const model = { entries: [] };
     const navigateTo = vi.fn();
     const reconcileEntries = vi.fn();

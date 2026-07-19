@@ -1,39 +1,39 @@
 // Live-only DOM/runtime glue for the chat composer, extracted from
 // ChatComposer.svelte so the component stays declarative. Kept DI-friendly so
 // tests can drive it directly and inject selector implementations.
-import { THINKING_LEVELS } from '../../../session/chat/chat-selectors.js';
-import { setupModelSelector } from './model-selector.js';
-import { setupThinkingLevelSelector } from './thinking-selector.js';
-import { setupSlashCommands } from './slash-command.js';
-import { setupMentionAutocomplete } from './mention-autocomplete.js';
-import { createContextUsageController } from './context-usage.js';
-import { setupComposerExpansion } from './composer-expand.js';
-import { setupWorkerStatusPolling } from './worker-status.js';
-import { setupAskQuestionHandlers } from './ask-question-handler.js';
-import { readComposerConfig } from './composer-config.js';
-import { getComposerElements } from './composer-elements.js';
-import { setupContextPopover } from './context-popover.js';
-import { setupTextareaControls } from './textarea-controls.js';
-import { setupAttachmentManager } from './attachment-manager.js';
-import { setupCwdCopy } from './cwd-copy.js';
-import { setupComposerHeightVar } from './composer-height.js';
-import { createComposerSendState } from './composer-send-state.js';
-import { getComposerStorage } from './composer-storage.js';
-import { navigateInitialChatLeaf } from './initial-navigation.js';
-import { ChatToolbarState } from './chat-toolbar-state.svelte.js';
-import { setupChatSubmission } from './chat-submit.js';
-import { setupSteerQueue } from './steer-queue.js';
-import { QueueStore } from './queue-store.svelte.js';
-import { createChatSelectorLoaders } from './selector-loaders.js';
+import { THINKING_LEVELS } from "../../../session/chat/chat-selectors.js";
+import { setupModelSelector } from "./model-selector.js";
+import { setupThinkingLevelSelector } from "./thinking-selector.js";
+import { setupSlashCommands } from "./slash-command.js";
+import { setupMentionAutocomplete } from "./mention-autocomplete.js";
+import { createContextUsageController } from "./context-usage.js";
+import { setupComposerExpansion } from "./composer-expand.js";
+import { setupWorkerStatusPolling } from "./worker-status.js";
+import { setupAskQuestionHandlers } from "./ask-question-handler.js";
+import { readComposerConfig } from "./composer-config.js";
+import { getComposerElements } from "./composer-elements.js";
+import { setupContextPopover } from "./context-popover.js";
+import { setupTextareaControls } from "./textarea-controls.js";
+import { setupAttachmentManager } from "./attachment-manager.js";
+import { setupCwdCopy } from "./cwd-copy.js";
+import { setupComposerHeightVar } from "./composer-height.js";
+import { createComposerSendState } from "./composer-send-state.js";
+import { getComposerStorage } from "./composer-storage.js";
+import { navigateInitialChatLeaf } from "./initial-navigation.js";
+import { ChatToolbarState } from "./chat-toolbar-state.svelte.js";
+import { setupChatSubmission } from "./chat-submit.js";
+import { setupSteerQueue } from "./steer-queue.js";
+import { QueueStore } from "./queue-store.svelte.js";
+import { createChatSelectorLoaders } from "./selector-loaders.js";
 
 export function runChatComposer({
   documentImpl = document,
   windowImpl = window,
   locationImpl = windowImpl.location,
   localEntries = [],
-  sessionId = '',
-  leafId = '',
-  urlTargetId = '',
+  sessionId = "",
+  leafId = "",
+  urlTargetId = "",
   byId = new Map(),
   navigateTo = () => {},
   escapeHtml = (text) => String(text),
@@ -83,7 +83,7 @@ export function runChatComposer({
 
   function isMobileTextInputMode() {
     return !!(
-      window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches
+      window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches
     );
   }
 
@@ -119,7 +119,7 @@ export function runChatComposer({
   });
 
   function setupPiChatComposer() {
-    const form = document.getElementById('pi-chat-composer');
+    const form = document.getElementById("pi-chat-composer");
     const composerConfig = readComposerConfig({ form, setChatStatus });
     if (!composerConfig.ready) return false;
     const { sessionId } = composerConfig;
@@ -244,8 +244,8 @@ export function runChatComposer({
 
     // Keep phones compact until the user taps the input; desktop retains its
     // existing ready-to-type autofocus behavior.
-    const isMobileLayout = !!window.matchMedia?.('(max-width: 900px)').matches;
-    if (!isMobileLayout && textarea && typeof textarea.focus === 'function') {
+    const isMobileLayout = !!window.matchMedia?.("(max-width: 900px)").matches;
+    if (!isMobileLayout && textarea && typeof textarea.focus === "function") {
       textarea.focus();
     }
 
@@ -274,8 +274,8 @@ export function runChatComposer({
     _mentionSelectorApi = selectorLoaders.loadMentionSelector();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPiChatControls);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initPiChatControls);
   } else {
     initPiChatControls();
   }

@@ -1,24 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
-import { JSDOM } from 'jsdom';
-import { reconnectDelay, setupSessionLiveConnection } from './live-connection.js';
+import { describe, expect, it, vi } from "vitest";
+import { JSDOM } from "jsdom";
+import { reconnectDelay, setupSessionLiveConnection } from "./live-connection.js";
 
 function setupDom() {
-  const dom = new JSDOM('<body></body>', { url: 'http://localhost/session?id=s1' });
-  Object.defineProperty(dom.window.document, 'hidden', {
+  const dom = new JSDOM("<body></body>", { url: "http://localhost/session?id=s1" });
+  Object.defineProperty(dom.window.document, "hidden", {
     configurable: true,
     value: false,
   });
   return dom;
 }
 
-describe('live connection', () => {
-  it('computes capped reconnect delays with jitter', () => {
+describe("live connection", () => {
+  it("computes capped reconnect delays with jitter", () => {
     expect(reconnectDelay(0, { randomImpl: () => 0 })).toBe(1000);
     expect(reconnectDelay(1, { randomImpl: () => 0.25 })).toBe(2125);
     expect(reconnectDelay(10, { randomImpl: () => 0.998 })).toBe(30499);
   });
 
-  it('connects, wires events, and closes the previous EventSource on reconnect', () => {
+  it("connects, wires events, and closes the previous EventSource on reconnect", () => {
     const dom = setupDom();
     const first = { close: vi.fn(), readyState: 1 };
     const second = { close: vi.fn(), readyState: 1 };
@@ -28,7 +28,7 @@ describe('live connection', () => {
     const connection = setupSessionLiveConnection({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 's1',
+      sessionId: "s1",
       createEventSource,
       wireEvents,
     });
@@ -36,7 +36,7 @@ describe('live connection', () => {
     expect(connection.connect()).toBe(first);
     expect(connection.connect()).toBe(second);
     expect(first.close).toHaveBeenCalled();
-    expect(createEventSource).toHaveBeenCalledWith('s1', {
+    expect(createEventSource).toHaveBeenCalledWith("s1", {
       EventSourceImpl: dom.window.EventSource,
     });
     expect(wireEvents).toHaveBeenCalledTimes(2);
@@ -45,7 +45,7 @@ describe('live connection', () => {
     expect(second.close).toHaveBeenCalled();
   });
 
-  it('schedules manual reconnect only when EventSource is closed', () => {
+  it("schedules manual reconnect only when EventSource is closed", () => {
     const dom = setupDom();
     const timers = [];
     const eventSource = { close: vi.fn(), readyState: 2 };
@@ -62,7 +62,7 @@ describe('live connection', () => {
     const connection = setupSessionLiveConnection({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 's1',
+      sessionId: "s1",
       createEventSource,
       wireEvents,
       onReload,
@@ -74,7 +74,7 @@ describe('live connection', () => {
       randomImpl: () => 0,
     });
     connection.connect();
-    eventSource.onError(new Error('closed'));
+    eventSource.onError(new Error("closed"));
 
     expect(timers).toHaveLength(1);
     expect(timers[0].delay).toBe(1000);
@@ -85,7 +85,7 @@ describe('live connection', () => {
     connection.dispose();
   });
 
-  it('reloads on visibilitychange and reconnects when the source is closed', () => {
+  it("reloads on visibilitychange and reconnects when the source is closed", () => {
     const dom = setupDom();
     const active = { close: vi.fn(), readyState: 1 };
     const closed = { close: vi.fn(), readyState: 2 };
@@ -100,18 +100,18 @@ describe('live connection', () => {
     const connection = setupSessionLiveConnection({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 's1',
+      sessionId: "s1",
       createEventSource,
       wireEvents: vi.fn(),
       onReload,
     });
     connection.connect();
-    dom.window.document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    dom.window.document.dispatchEvent(new dom.window.Event("visibilitychange"));
     expect(onReload).toHaveBeenCalledTimes(1);
     expect(createEventSource).toHaveBeenCalledTimes(1);
 
     connection.connect();
-    dom.window.document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    dom.window.document.dispatchEvent(new dom.window.Event("visibilitychange"));
     expect(onReload).toHaveBeenCalledTimes(2);
     expect(createEventSource).toHaveBeenCalledTimes(3);
     expect(closed.close).toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('live connection', () => {
     connection.dispose();
   });
 
-  it('reconnects and reloads when the browser comes online', () => {
+  it("reconnects and reloads when the browser comes online", () => {
     const dom = setupDom();
     const first = { close: vi.fn(), readyState: 1 };
     const second = { close: vi.fn(), readyState: 1 };
@@ -129,13 +129,13 @@ describe('live connection', () => {
     const connection = setupSessionLiveConnection({
       documentImpl: dom.window.document,
       windowImpl: dom.window,
-      sessionId: 's1',
+      sessionId: "s1",
       createEventSource,
       wireEvents: vi.fn(),
       onReload,
     });
     connection.connect();
-    dom.window.dispatchEvent(new dom.window.Event('online'));
+    dom.window.dispatchEvent(new dom.window.Event("online"));
 
     expect(createEventSource).toHaveBeenCalledTimes(2);
     expect(first.close).toHaveBeenCalled();

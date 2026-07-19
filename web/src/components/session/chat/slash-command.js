@@ -7,21 +7,21 @@
 // trigger is deliberately anchored to position 0. A slash mid-message, such as
 // in a file path, never opens the palette.
 
-const SOURCE_ORDER = ['prompt', 'skill', 'extension'];
+const SOURCE_ORDER = ["prompt", "skill", "extension"];
 const SOURCE_LABELS = {
-  prompt: 'Prompts',
-  skill: 'Skills',
-  extension: 'Extensions',
+  prompt: "Prompts",
+  skill: "Skills",
+  extension: "Extensions",
 };
 
-const PALETTE_SOURCES = new Set(['prompt', 'skill', 'extension']);
+const PALETTE_SOURCES = new Set(["prompt", "skill", "extension"]);
 
 export function isPaletteCommand(cmd) {
   return !!cmd && PALETTE_SOURCES.has(cmd.source);
 }
 
 export function parseSlashTrigger(text, caret) {
-  if (typeof text !== 'string' || !text.startsWith('/')) return null;
+  if (typeof text !== "string" || !text.startsWith("/")) return null;
   const wsMatch = text.match(/\s/);
   const tokenEnd = wsMatch ? wsMatch.index : text.length;
   if (caret > tokenEnd) return null;
@@ -30,15 +30,15 @@ export function parseSlashTrigger(text, caret) {
 
 export function filterCommands(commands, query) {
   const list = Array.isArray(commands) ? commands : [];
-  const q = (query || '').toLowerCase();
+  const q = (query || "").toLowerCase();
   if (!q) return list.slice();
-  return list.filter((c) => (c.name || '').toLowerCase().includes(q));
+  return list.filter((c) => (c.name || "").toLowerCase().includes(q));
 }
 
 export function groupCommands(commands) {
   const buckets = new Map();
   (commands || []).forEach((c) => {
-    const source = c.source || 'other';
+    const source = c.source || "other";
     if (!buckets.has(source)) buckets.set(source, []);
     buckets.get(source).push(c);
   });
@@ -54,26 +54,26 @@ export function groupCommands(commands) {
     }
   });
   for (const [source, items] of buckets) {
-    groups.push({ source, label: 'Other', items, _source: source });
+    groups.push({ source, label: "Other", items, _source: source });
   }
   return groups;
 }
 
 export function renderCommandList(
   commands,
-  { query = '', escapeHtml = String, loading = false } = {},
+  { query = "", escapeHtml = String, loading = false } = {},
 ) {
   if (loading) return '<div class="slash-empty">Loading commands...</div>';
   const filtered = filterCommands(commands, query);
   if (filtered.length === 0) return '<div class="slash-empty">No commands match</div>';
 
-  let html = '';
+  let html = "";
   groupCommands(filtered).forEach((group) => {
     html += `<div class="slash-group">${escapeHtml(group.label)}</div>`;
     group.items.forEach((cmd) => {
-      const name = cmd.name || '';
-      const desc = cmd.description || '';
-      const descHtml = desc ? `<span class="slash-item-desc">${escapeHtml(desc)}</span>` : '';
+      const name = cmd.name || "";
+      const desc = cmd.description || "";
+      const descHtml = desc ? `<span class="slash-item-desc">${escapeHtml(desc)}</span>` : "";
       html +=
         `<button type="button" class="slash-item" data-insert="${escapeHtml(name)}">` +
         `<span class="slash-item-name">/${escapeHtml(name)}</span>${descHtml}</button>`;
@@ -88,9 +88,9 @@ export function setupSlashCommands({
   chatApi,
   escapeHtml = String,
 } = {}) {
-  const textarea = documentImpl.getElementById('pi-chat-message');
-  const popup = documentImpl.getElementById('pi-chat-slash-popup');
-  const list = documentImpl.getElementById('pi-chat-slash-list');
+  const textarea = documentImpl.getElementById("pi-chat-message");
+  const popup = documentImpl.getElementById("pi-chat-slash-popup");
+  const list = documentImpl.getElementById("pi-chat-slash-list");
   if (!textarea || !popup || !list) return { handleKeydown: () => false };
 
   let allCommands = [];
@@ -99,24 +99,24 @@ export function setupSlashCommands({
   let trigger = null;
 
   function isOpen() {
-    return popup.style.display !== 'none' && popup.style.display !== '';
+    return popup.style.display !== "none" && popup.style.display !== "";
   }
 
   function items() {
-    return list.querySelectorAll('.slash-item');
+    return list.querySelectorAll(".slash-item");
   }
 
   function setActive(index) {
     const all = items();
     const clamped = Math.max(0, Math.min(index, all.length - 1));
     list.dataset.activeIndex = String(all.length ? clamped : -1);
-    all.forEach((el, i) => el.classList.toggle('active', i === clamped));
-    all[clamped]?.scrollIntoView?.({ block: 'nearest' });
+    all.forEach((el, i) => el.classList.toggle("active", i === clamped));
+    all[clamped]?.scrollIntoView?.({ block: "nearest" });
   }
 
   function render() {
     list.innerHTML = renderCommandList(allCommands, {
-      query: trigger ? trigger.query : '',
+      query: trigger ? trigger.query : "",
       escapeHtml,
       loading: loading && !loaded,
     });
@@ -124,14 +124,14 @@ export function setupSlashCommands({
   }
 
   function open() {
-    popup.style.display = 'block';
+    popup.style.display = "block";
     render();
     if (!loaded && !loading) {
       loading = true;
       render();
       chatApi
         .getCommands(sessionId, { load: true })
-        .then((res) => (res.ok ? res.json() : Promise.reject(new Error('commands error'))))
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error("commands error"))))
         .then((data) => {
           allCommands = (data.commands || []).filter(isPaletteCommand);
         })
@@ -147,7 +147,7 @@ export function setupSlashCommands({
   }
 
   function close() {
-    popup.style.display = 'none';
+    popup.style.display = "none";
     trigger = null;
   }
 
@@ -175,7 +175,7 @@ export function setupSlashCommands({
     textarea.selectionStart = textarea.selectionEnd = caret;
     close();
     textarea.focus();
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   // Called by the composer's own keydown handler before its Enter-to-submit
@@ -183,25 +183,25 @@ export function setupSlashCommands({
   function handleKeydown(event) {
     if (!isOpen()) return false;
     const all = items();
-    let active = parseInt(list.dataset.activeIndex || '-1', 10);
+    let active = parseInt(list.dataset.activeIndex || "-1", 10);
     switch (event.key) {
-      case 'ArrowDown':
+      case "ArrowDown":
         event.preventDefault();
         setActive(active + 1);
         return true;
-      case 'ArrowUp':
+      case "ArrowUp":
         event.preventDefault();
         setActive(active - 1);
         return true;
-      case 'Enter':
-      case 'Tab':
+      case "Enter":
+      case "Tab":
         if (active >= 0 && all[active]) {
           event.preventDefault();
           all[active].click();
           return true;
         }
         return false;
-      case 'Escape':
+      case "Escape":
         event.preventDefault();
         close();
         return true;
@@ -210,15 +210,15 @@ export function setupSlashCommands({
     }
   }
 
-  textarea.addEventListener('input', refresh);
+  textarea.addEventListener("input", refresh);
 
-  list.addEventListener('click', (event) => {
-    const item = event.target.closest('.slash-item');
+  list.addEventListener("click", (event) => {
+    const item = event.target.closest(".slash-item");
     if (!item) return;
-    insert(item.dataset.insert || '');
+    insert(item.dataset.insert || "");
   });
 
-  documentImpl.addEventListener('click', (event) => {
+  documentImpl.addEventListener("click", (event) => {
     if (isOpen() && !popup.contains(event.target) && event.target !== textarea) close();
   });
 

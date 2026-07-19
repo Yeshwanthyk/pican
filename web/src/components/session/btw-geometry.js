@@ -1,4 +1,4 @@
-export const BTW_GEOM_KEY = 'pican:btw:window';
+export const BTW_GEOM_KEY = "pican:btw:window";
 
 export function loadBtwGeometry({ storage = window.localStorage, key = BTW_GEOM_KEY } = {}) {
   try {
@@ -23,7 +23,7 @@ export function placeBtwInitial(
   { windowImpl = window, loadGeometry = loadBtwGeometry, saveGeometry = saveBtwGeometry } = {},
 ) {
   const geom = loadGeometry();
-  if (geom && typeof geom.left === 'number' && typeof geom.top === 'number') {
+  if (geom && typeof geom.left === "number" && typeof geom.top === "number") {
     root.style.left = `${geom.left}px`;
     root.style.top = `${geom.top}px`;
     return;
@@ -63,20 +63,20 @@ export function enableBtwDrag(
 
   function onUp() {
     dragging = false;
-    documentImpl.removeEventListener('pointermove', onMove);
-    documentImpl.removeEventListener('pointerup', onUp);
+    documentImpl.removeEventListener("pointermove", onMove);
+    documentImpl.removeEventListener("pointerup", onUp);
   }
 
-  handle.addEventListener('pointerdown', (event) => {
-    if (event.target && event.target.closest && event.target.closest('.pi-btw-actions')) return;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.target && event.target.closest && event.target.closest(".pi-btw-actions")) return;
     dragging = true;
     const rect = root.getBoundingClientRect();
     originLeft = rect.left;
     originTop = rect.top;
     startX = event.clientX;
     startY = event.clientY;
-    documentImpl.addEventListener('pointermove', onMove);
-    documentImpl.addEventListener('pointerup', onUp);
+    documentImpl.addEventListener("pointermove", onMove);
+    documentImpl.addEventListener("pointerup", onUp);
   });
 }
 

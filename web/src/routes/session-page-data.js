@@ -1,14 +1,14 @@
-import { decodeBase64JSON } from '../session/data/session-data.js';
-import { t } from '../shared/strings.js';
-import { consumeSessionPrefetch } from './session-prefetch.js';
+import { decodeBase64JSON } from "../session/data/session-data.js";
+import { t } from "../shared/strings.js";
+import { consumeSessionPrefetch } from "./session-prefetch.js";
 
 // The session route's HTML shell embeds the session payload (and scratchpad) in
 // a <script id="pican-session-bootstrap"> so the first paint needs no round-trip to
 // /api/session or /api/scratchpad. Returns { id, data, scratchpad } or null.
 export function readSessionBootstrap({ documentImpl, atobImpl, TextDecoderImpl } = {}) {
-  const doc = documentImpl || (typeof document !== 'undefined' ? document : null);
-  const el = doc?.getElementById?.('pican-session-bootstrap');
-  const raw = el && el.textContent ? el.textContent.trim() : '';
+  const doc = documentImpl || (typeof document !== "undefined" ? document : null);
+  const el = doc?.getElementById?.("pican-session-bootstrap");
+  const raw = el && el.textContent ? el.textContent.trim() : "";
   if (!raw) return null;
   try {
     return decodeBase64JSON(raw, { atobImpl, TextDecoderImpl });
@@ -23,7 +23,7 @@ export function encodePayload(
 ) {
   const json = JSON.stringify(payload);
   const bytes = new TextEncoderImpl().encode(json);
-  let binary = '';
+  let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoaImpl(binary);
 }
@@ -31,53 +31,53 @@ export function encodePayload(
 export function newestLeaf(entries = []) {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i];
-    if (entry?.id && entry.type !== 'session' && entry.type !== 'label') return entry.id;
+    if (entry?.id && entry.type !== "session" && entry.type !== "label") return entry.id;
   }
-  return '';
+  return "";
 }
 
 export function firstMessageStub(entries = []) {
-  const entry = entries.find((item) => item?.type === 'message' && item.message?.role === 'user');
+  const entry = entries.find((item) => item?.type === "message" && item.message?.role === "user");
   let content = entry?.message?.content;
   if (Array.isArray(content)) {
-    content = content.map((part) => (typeof part === 'string' ? part : part?.text || '')).join('');
+    content = content.map((part) => (typeof part === "string" ? part : part?.text || "")).join("");
   }
-  if (!content) return '';
+  if (!content) return "";
   const text = String(content)
     .slice(0, 500)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
   return `<div class="user-message" aria-hidden="true"><div class="markdown-content"><p>${text}</p></div></div>`;
 }
 
 export async function loadScratchpad(projectPath, { fetchImpl = fetch } = {}) {
-  if (!projectPath) return '';
+  if (!projectPath) return "";
   try {
     const resp = await fetchImpl(`/api/scratchpad?project=${encodeURIComponent(projectPath)}`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" },
     });
-    if (!resp.ok) return '';
+    if (!resp.ok) return "";
     const data = await resp.json();
-    return data?.content || '';
+    return data?.content || "";
   } catch {
-    return '';
+    return "";
   }
 }
 
 export function normalizeSessionRuntime(data = {}, header = data?.header || {}) {
-  const runtime = String(data?.runtime || data?.Runtime || header?.runtime || 'pi').toLowerCase();
+  const runtime = String(data?.runtime || data?.Runtime || header?.runtime || "pi").toLowerCase();
   return {
     runtime,
-    nativeId: data?.nativeId || data?.NativeID || header?.nativeId || '',
-    sessionUUID: data?.sessionUUID || data?.SessionUUID || header?.sessionUUID || header?.id || '',
+    nativeId: data?.nativeId || data?.NativeID || header?.nativeId || "",
+    sessionUUID: data?.sessionUUID || data?.SessionUUID || header?.sessionUUID || header?.id || "",
   };
 }
 
 export function buildSessionPageState({
   sessionId,
   data,
-  scratchpad = '',
+  scratchpad = "",
   btoaImpl,
   TextEncoderImpl,
 } = {}) {
@@ -86,19 +86,19 @@ export function buildSessionPageState({
   const { runtime, nativeId, sessionUUID } = normalizeSessionRuntime(data, header);
   const normalizedHeader = { ...header, runtime };
   if (nativeId) normalizedHeader.nativeId = nativeId;
-  const cwd = header.cwd || '';
+  const cwd = header.cwd || "";
   const title = data?.name || sessionId;
   const leafId = newestLeaf(entries);
   const total = Number.isInteger(data?.total) ? data.total : entries.length;
   const from = Number.isInteger(data?.from) ? data.from : 0;
   const chatAvailable = data?.chatAvailable ?? data?.ChatAvailable ?? true;
-  let chatDisabledReason = data?.chatDisabledReason || data?.ChatDisabledReason || '';
+  let chatDisabledReason = data?.chatDisabledReason || data?.ChatDisabledReason || "";
   if (!chatAvailable && !chatDisabledReason) {
     chatDisabledReason =
-      'This session can be viewed, but chat is disabled because its working directory no longer exists.';
+      "This session can be viewed, but chat is disabled because its working directory no longer exists.";
   }
-  const model = data?.model || data?.Model || '';
-  const provider = data?.modelProvider || data?.ModelProvider || '';
+  const model = data?.model || data?.Model || "";
+  const provider = data?.modelProvider || data?.ModelProvider || "";
   return {
     sessionId,
     title,
@@ -130,7 +130,7 @@ export function buildSessionPageState({
 }
 
 export async function loadSessionPageState({
-  locationSearch = '',
+  locationSearch = "",
   fetchImpl = fetch,
   btoaImpl,
   TextEncoderImpl,
@@ -139,8 +139,8 @@ export async function loadSessionPageState({
   TextDecoderImpl,
 } = {}) {
   const params = new URLSearchParams(locationSearch);
-  const sessionId = params.get('id') || '';
-  if (!sessionId) throw new Error(t('session.missingId'));
+  const sessionId = params.get("id") || "";
+  if (!sessionId) throw new Error(t("session.missingId"));
 
   // Prefer the payload embedded in the page shell — no fetch on first paint.
   const boot = readSessionBootstrap({ documentImpl, atobImpl, TextDecoderImpl });
@@ -148,7 +148,7 @@ export async function loadSessionPageState({
     return buildSessionPageState({
       sessionId,
       data: boot.data,
-      scratchpad: boot.scratchpad || '',
+      scratchpad: boot.scratchpad || "",
       btoaImpl,
       TextEncoderImpl,
     });
@@ -168,14 +168,14 @@ export async function loadSessionPageState({
   }
   if (!data) {
     const resp = await fetchImpl(`/api/session?id=${encodeURIComponent(sessionId)}&paginate=1`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" },
     });
     if (!resp.ok)
-      throw new Error(resp.status === 404 ? t('session.notFound') : t('session.loadFailed'));
+      throw new Error(resp.status === 404 ? t("session.notFound") : t("session.loadFailed"));
     data = await resp.json();
   }
   // Scratchpad is sidebar content, not on the first-paint path: returning ''
   // here lets the session render as soon as /api/session resolves, and
   // RightSidebar fetches the scratchpad itself when the prop is empty.
-  return buildSessionPageState({ sessionId, data, scratchpad: '', btoaImpl, TextEncoderImpl });
+  return buildSessionPageState({ sessionId, data, scratchpad: "", btoaImpl, TextEncoderImpl });
 }

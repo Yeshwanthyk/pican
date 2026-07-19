@@ -4,14 +4,14 @@ export function createComposerSendState({
   getAttachments = () => ({ hasAttachments: () => false }),
 } = {}) {
   function hasComposerContent() {
-    const value = textarea ? textarea.value : '';
+    const value = textarea ? textarea.value : "";
     return (value && value.trim().length > 0) || !!getAttachments()?.hasAttachments?.();
   }
 
   function updateSendEnabled() {
     if (!sendButton) return;
     // Don't fight transient sending/disabled state set by sendChatMessage.
-    if (sendButton.dataset.sending === '1') return;
+    if (sendButton.dataset.sending === "1") return;
     sendButton.disabled = !hasComposerContent();
   }
 

@@ -23,8 +23,8 @@
 // It deliberately holds no rendering/DOM/SSE/fetch logic, so it is safe to
 // import from both the live app and the static export bundle.
 
-import { SvelteMap } from 'svelte/reactivity';
-import { buildSessionLookups } from './session-data.js';
+import { SvelteMap } from "svelte/reactivity";
+import { buildSessionLookups } from "./session-data.js";
 import {
   buildTree,
   buildTreeNodeMap,
@@ -33,8 +33,8 @@ import {
   findNewestLeaf,
   getPath,
   stitchOrphanRoots,
-} from '../tree/session-tree.js';
-import { filterNodes } from '../tree/session-filter.js';
+} from "../tree/session-tree.js";
+import { filterNodes } from "../tree/session-filter.js";
 
 function refillMap(target, source) {
   target.clear();
@@ -48,7 +48,7 @@ export class SessionDataModel {
   systemPrompt = $state(null);
   tools = $state(null);
   renderedTools = $state(null);
-  leafId = $state('');
+  leafId = $state("");
   urlLeafId = $state(null);
   urlTargetId = $state(null);
   total = $state(0);
@@ -62,10 +62,10 @@ export class SessionDataModel {
   labelMap = new SvelteMap();
 
   // ── view state ──────────────────────────────────────────────────────────
-  currentLeafId = $state('');
-  currentTargetId = $state('');
-  filterMode = $state('default');
-  searchQuery = $state('');
+  currentLeafId = $state("");
+  currentTargetId = $state("");
+  filterMode = $state("default");
+  searchQuery = $state("");
 
   // ── derived tree (recompute on entries / labelMap / view changes) ────────
   tree = $derived(buildTree(this.entries, this.labelMap));
@@ -96,13 +96,13 @@ export class SessionDataModel {
     // there; build the shape inline instead.
     const header = payload?.header || {};
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-    const defaultLeafId = payload?.leafId || '';
+    const defaultLeafId = payload?.leafId || "";
     return new SessionDataModel({
       header,
       entries,
-      leafId: params.get('leafId') || defaultLeafId,
-      urlLeafId: params.get('leafId'),
-      urlTargetId: params.get('targetId'),
+      leafId: params.get("leafId") || defaultLeafId,
+      urlLeafId: params.get("leafId"),
+      urlTargetId: params.get("targetId"),
       systemPrompt: payload?.systemPrompt ?? null,
       tools: payload?.tools ?? null,
       renderedTools: payload?.renderedTools ?? null,
@@ -143,7 +143,7 @@ export class SessionDataModel {
     refillMap(this.toolCallMap, lk.toolCallMap);
     refillMap(this.labelMap, lk.labelMap);
 
-    this.leafId = data.leafId ?? data.defaultLeafId ?? '';
+    this.leafId = data.leafId ?? data.defaultLeafId ?? "";
 
     if (!preserveView) {
       this.currentLeafId = this.leafId;
@@ -213,7 +213,7 @@ export class SessionDataModel {
     let nextLeafId =
       this.currentLeafId && nodeMap.has(this.currentLeafId)
         ? findNewestLeaf(this.currentLeafId, nodeMap)
-        : '';
+        : "";
     // The session-header line ({type:'session'}) has its own id but is metadata,
     // not a conversation entry. When a brand-new session is first opened it is the
     // only entry, so hydration parks currentLeafId on it; after the user sends a
@@ -221,10 +221,10 @@ export class SessionDataModel {
     // root with parentId:null, so findNewestLeaf has no children to walk and returns
     // the session id, leaving activePath rendering nothing. Fall back to the last
     // real entry in that case.
-    if (!nextLeafId || this.byId.get(nextLeafId)?.type === 'session') {
+    if (!nextLeafId || this.byId.get(nextLeafId)?.type === "session") {
       for (let i = this.entries.length - 1; i >= 0; i -= 1) {
         const entry = this.entries[i];
-        if (entry?.id && entry.type !== 'label' && entry.type !== 'session') {
+        if (entry?.id && entry.type !== "label" && entry.type !== "session") {
           nextLeafId = entry.id;
           break;
         }

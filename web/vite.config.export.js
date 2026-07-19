@@ -1,6 +1,6 @@
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vite';
-import { resolve } from 'node:path';
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 // Builds the static export snapshot bundle as a single self-contained IIFE.
 // The output (dist-export/export.js) is inlined verbatim into a <script> tag by
@@ -17,13 +17,13 @@ import { resolve } from 'node:path';
 export default defineConfig({
   plugins: [svelte({ emitCss: false })],
   build: {
-    outDir: 'dist-export',
+    outDir: "dist-export",
     emptyOutDir: true,
     lib: {
-      entry: resolve(__dirname, 'src/export/export-entry.js'),
-      formats: ['iife'],
-      name: 'PiExport',
-      fileName: () => 'export.js',
+      entry: resolve(__dirname, "src/export/export-entry.js"),
+      formats: ["iife"],
+      name: "PiExport",
+      fileName: () => "export.js",
     },
     minify: true,
   },

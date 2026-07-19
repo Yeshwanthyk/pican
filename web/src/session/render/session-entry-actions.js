@@ -4,8 +4,8 @@
 // rendering — the live content runtime + export wire them to the delegated
 // copy/download controls.
 
-import { setIconElement, Check } from '../../shared/icons.js';
-import { copyToClipboard as writeClipboard } from '../../shared/clipboard.js';
+import { setIconElement, Check } from "../../shared/icons.js";
+import { copyToClipboard as writeClipboard } from "../../shared/clipboard.js";
 
 // Download the session as JSONL: header line + entry lines.
 export function downloadSessionJson({
@@ -16,13 +16,13 @@ export function downloadSessionJson({
   BlobImpl = Blob,
 } = {}) {
   const lines = [];
-  if (header) lines.push(JSON.stringify({ type: 'header', ...header }));
+  if (header) lines.push(JSON.stringify({ type: "header", ...header }));
   for (const entry of entries) lines.push(JSON.stringify(entry));
-  const blob = new BlobImpl([lines.join('\n')], { type: 'application/x-ndjson' });
+  const blob = new BlobImpl([lines.join("\n")], { type: "application/x-ndjson" });
   const url = URLImpl.createObjectURL(blob);
-  const a = documentImpl.createElement('a');
+  const a = documentImpl.createElement("a");
   a.href = url;
-  a.download = `${header?.id || 'session'}.jsonl`;
+  a.download = `${header?.id || "session"}.jsonl`;
   documentImpl.body.appendChild(a);
   a.click();
   documentImpl.body.removeChild(a);
@@ -32,20 +32,20 @@ export function downloadSessionJson({
 // Build a shareable URL for a message: base?gistId&leafId=<leaf>&targetId=<entry>.
 export function buildShareUrl(
   entryId,
-  { documentImpl = document, windowImpl = window, getCurrentLeafId = () => '', URLImpl = URL } = {},
+  { documentImpl = document, windowImpl = window, getCurrentLeafId = () => "", URLImpl = URL } = {},
 ) {
   const baseUrlMeta = documentImpl.querySelector('meta[name="pican-share-base-url"]');
-  const baseUrl = baseUrlMeta ? baseUrlMeta.content : windowImpl.location.href.split('?')[0];
+  const baseUrl = baseUrlMeta ? baseUrlMeta.content : windowImpl.location.href.split("?")[0];
 
   const url = new URLImpl(windowImpl.location.href);
   // The gist id is the first query param without a value (e.g. ?abc123).
   const gistId = Array.from(url.searchParams.keys()).find((k) => !url.searchParams.get(k));
 
   const params = new URLSearchParams();
-  const sessionId = url.searchParams.get('id');
-  if (sessionId) params.set('id', sessionId);
-  params.set('leafId', getCurrentLeafId());
-  params.set('targetId', entryId);
+  const sessionId = url.searchParams.get("id");
+  if (sessionId) params.set("id", sessionId);
+  params.set("leafId", getCurrentLeafId());
+  params.set("targetId", entryId);
 
   if (baseUrlMeta) return `${baseUrl}&${params.toString()}`;
   url.search = gistId ? `?${gistId}&${params.toString()}` : `?${params.toString()}`;
@@ -64,10 +64,10 @@ export async function copyToClipboard(
   if (success && button) {
     const originalChildren = Array.from(button.childNodes).map((node) => node.cloneNode(true));
     setIconElement(button, Check, { size: 13, documentImpl });
-    button.classList.add('copied');
+    button.classList.add("copied");
     setTimeout(() => {
       button.replaceChildren(...originalChildren.map((node) => node.cloneNode(true)));
-      button.classList.remove('copied');
+      button.classList.remove("copied");
     }, 1500);
   }
 }

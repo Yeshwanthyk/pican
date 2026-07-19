@@ -5,9 +5,9 @@
 //
 // Kept in a plain .js module (not a component) so it can be imported from both
 // the live and export graphs without pulling in anything live-only.
-import { getContext, setContext } from 'svelte';
+import { getContext, setContext } from "svelte";
 
-const SESSION_MODEL = Symbol('pican:session-model');
+const SESSION_MODEL = Symbol("pican:session-model");
 
 export function setSessionModel(model) {
   setContext(SESSION_MODEL, model);

@@ -2,33 +2,33 @@ export function decodeBase64JSON(
   base64,
   { atobImpl = globalThis.atob, TextDecoderImpl = globalThis.TextDecoder } = {},
 ) {
-  if (typeof base64 !== 'string') {
-    throw new TypeError('base64 payload must be a string');
+  if (typeof base64 !== "string") {
+    throw new TypeError("base64 payload must be a string");
   }
-  if (typeof atobImpl !== 'function') {
-    throw new Error('atob is unavailable');
+  if (typeof atobImpl !== "function") {
+    throw new Error("atob is unavailable");
   }
   const binary = atobImpl(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return JSON.parse(new TextDecoderImpl('utf-8').decode(bytes));
+  return JSON.parse(new TextDecoderImpl("utf-8").decode(bytes));
 }
 
 export function readSessionPayload({ documentImpl = document, atobImpl = globalThis.atob } = {}) {
-  const el = documentImpl.getElementById('session-data');
+  const el = documentImpl.getElementById("session-data");
   if (!el) {
-    throw new Error('missing #session-data element');
+    throw new Error("missing #session-data element");
   }
-  return decodeBase64JSON(el.textContent || '', { atobImpl });
+  return decodeBase64JSON(el.textContent || "", { atobImpl });
 }
 
 export function getSessionSearchParams({ documentImpl = document, windowImpl = window } = {}) {
   const injectedParams = documentImpl.querySelector('meta[name="pican-url-params"]');
   const searchString = injectedParams
     ? injectedParams.content
-    : (windowImpl.location?.search || '').replace(/^\?/, '');
+    : (windowImpl.location?.search || "").replace(/^\?/, "");
   return new URLSearchParams(searchString);
 }
 
@@ -41,18 +41,18 @@ export function buildSessionLookups(entries = []) {
     if (entry?.id) byId.set(entry.id, entry);
 
     if (
-      entry?.type === 'message' &&
-      entry.message?.role === 'assistant' &&
+      entry?.type === "message" &&
+      entry.message?.role === "assistant" &&
       Array.isArray(entry.message.content)
     ) {
       for (const block of entry.message.content) {
-        if (block?.type === 'toolCall') {
+        if (block?.type === "toolCall") {
           toolCallMap.set(block.id, { name: block.name, arguments: block.arguments });
         }
       }
     }
 
-    if (entry?.type === 'label' && entry.targetId) {
+    if (entry?.type === "label" && entry.targetId) {
       if (entry.label) labelMap.set(entry.targetId, entry.label);
       else labelMap.delete(entry.targetId);
     }
@@ -64,9 +64,9 @@ export function buildSessionLookups(entries = []) {
 export function createSessionDataModel(payload, params = new URLSearchParams()) {
   const header = payload?.header || {};
   const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-  const defaultLeafId = payload?.leafId || '';
-  const urlLeafId = params.get('leafId');
-  const urlTargetId = params.get('targetId');
+  const defaultLeafId = payload?.leafId || "";
+  const urlLeafId = params.get("leafId");
+  const urlTargetId = params.get("targetId");
 
   // Pagination metadata for huge sessions. When the server embeds only a
   // tail window, `total` is the full entry count, `from` is the index in the

@@ -1,17 +1,17 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { tick } from 'svelte';
-import { render, cleanup } from '@testing-library/svelte';
-import ModelUsageModal from './ModelUsageModal.svelte';
+import { afterEach, describe, expect, it } from "vitest";
+import { tick } from "svelte";
+import { render, cleanup } from "@testing-library/svelte";
+import ModelUsageModal from "./ModelUsageModal.svelte";
 
 afterEach(cleanup);
 
 const mockEntries = [
   {
-    type: 'message',
+    type: "message",
     message: {
-      role: 'assistant',
-      model: 'claude-sonnet-4-20250514',
-      provider: 'anthropic',
+      role: "assistant",
+      model: "claude-sonnet-4-20250514",
+      provider: "anthropic",
       usage: {
         input: 5000,
         output: 2000,
@@ -19,15 +19,15 @@ const mockEntries = [
         cacheWrite: 500,
         cost: { input: 0.015, output: 0.006, cacheRead: 0.001, cacheWrite: 0.001 },
       },
-      content: [{ type: 'toolCall' }, { type: 'toolCall' }],
+      content: [{ type: "toolCall" }, { type: "toolCall" }],
     },
   },
   {
-    type: 'message',
+    type: "message",
     message: {
-      role: 'assistant',
-      model: 'claude-sonnet-4-20250514',
-      provider: 'anthropic',
+      role: "assistant",
+      model: "claude-sonnet-4-20250514",
+      provider: "anthropic",
       usage: {
         input: 3000,
         output: 1000,
@@ -39,13 +39,13 @@ const mockEntries = [
     },
   },
   {
-    type: 'message',
+    type: "message",
     message: {
-      role: 'assistant',
-      model: 'deepseek-v4-pro',
-      provider: 'deepseek',
+      role: "assistant",
+      model: "deepseek-v4-pro",
+      provider: "deepseek",
       usage: { input: 1000, output: 500, cost: { input: 0.001, output: 0.0005 } },
-      content: [{ type: 'toolCall' }],
+      content: [{ type: "toolCall" }],
     },
   },
 ];
@@ -56,76 +56,76 @@ async function open(entries) {
   return r;
 }
 
-describe('ModelUsageModal', () => {
-  it('renders computed cost, token, model, and tool-call stats', async () => {
+describe("ModelUsageModal", () => {
+  it("renders computed cost, token, model, and tool-call stats", async () => {
     await open(mockEntries);
-    const text = document.querySelector('.pi-sheet-body').textContent;
-    expect(text).toContain('Total cost');
-    expect(text).toContain('$0.037');
-    expect(text).toContain('Input');
-    expect(text).toContain('Output');
-    expect(text).toContain('9.0k');
-    expect(text).toContain('3.5k');
-    expect(text).toContain('Claude Sonnet 4');
-    expect(text).toContain('Deepseek V4 Pro');
-    expect(text).toContain('Tool calls');
+    const text = document.querySelector(".pi-sheet-body").textContent;
+    expect(text).toContain("Total cost");
+    expect(text).toContain("$0.037");
+    expect(text).toContain("Input");
+    expect(text).toContain("Output");
+    expect(text).toContain("9.0k");
+    expect(text).toContain("3.5k");
+    expect(text).toContain("Claude Sonnet 4");
+    expect(text).toContain("Deepseek V4 Pro");
+    expect(text).toContain("Tool calls");
   });
 
-  it('uses the raw model name as the title attribute', async () => {
+  it("uses the raw model name as the title attribute", async () => {
     await open(mockEntries);
-    const titles = [...document.querySelectorAll('.mu-model-name')].map((el) =>
-      el.getAttribute('title'),
+    const titles = [...document.querySelectorAll(".mu-model-name")].map((el) =>
+      el.getAttribute("title"),
     );
-    expect(titles).toContain('anthropic/claude-sonnet-4-20250514');
-    expect(titles).toContain('deepseek/deepseek-v4-pro');
+    expect(titles).toContain("anthropic/claude-sonnet-4-20250514");
+    expect(titles).toContain("deepseek/deepseek-v4-pro");
   });
 
-  it('filters out zero-value token rows', async () => {
+  it("filters out zero-value token rows", async () => {
     await open([
       {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'assistant',
-          model: 'm',
-          provider: 'p',
+          role: "assistant",
+          model: "m",
+          provider: "p",
           usage: { input: 1000 },
           content: [],
         },
       },
     ]);
-    const text = document.querySelector('.pi-sheet-body').textContent;
-    expect(text).toContain('Input');
-    expect(text).not.toContain('Output');
-    expect(text).not.toContain('Cache read');
+    const text = document.querySelector(".pi-sheet-body").textContent;
+    expect(text).toContain("Input");
+    expect(text).not.toContain("Output");
+    expect(text).not.toContain("Cache read");
   });
 
-  it('escapes model names (no raw script element)', async () => {
+  it("escapes model names (no raw script element)", async () => {
     await open([
       {
-        type: 'message',
+        type: "message",
         message: {
-          role: 'assistant',
-          model: 'evil/<script>alert(1)</script>',
+          role: "assistant",
+          model: "evil/<script>alert(1)</script>",
           usage: { input: 100 },
           content: [],
         },
       },
     ]);
-    const body = document.querySelector('.pi-sheet-body');
+    const body = document.querySelector(".pi-sheet-body");
     // The model name is rendered as text (Svelte auto-escapes), so no real
     // <script> element is created; the payload survives only as inert text.
-    expect(body.querySelector('script')).toBeNull();
-    const name = body.querySelector('.mu-model-name');
-    expect(name.textContent).toContain('Alert(1)');
-    expect(name.querySelector('script')).toBeNull();
+    expect(body.querySelector("script")).toBeNull();
+    const name = body.querySelector(".mu-model-name");
+    expect(name.textContent).toContain("Alert(1)");
+    expect(name.querySelector("script")).toBeNull();
   });
 
-  it('does not throw on malformed entries', async () => {
+  it("does not throw on malformed entries", async () => {
     await expect(
       open([
-        { type: 'message' },
-        { type: 'message', message: {} },
-        { type: 'message', message: { role: 'assistant', model: 'x', content: 'not-array' } },
+        { type: "message" },
+        { type: "message", message: {} },
+        { type: "message", message: { role: "assistant", model: "x", content: "not-array" } },
       ]),
     ).resolves.toBeTruthy();
   });

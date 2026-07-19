@@ -2,10 +2,10 @@
 // document.title sync; CommandMenu (manual rename) and LiveReload (auto-title
 // SSE) update it through setSessionTitle instead of poking the
 // #session-header-title element in the DOM directly.
-export const sessionTitle = $state({ name: '' });
+export const sessionTitle = $state({ name: "" });
 
 export function setSessionTitle(name) {
-  const trimmed = String(name ?? '').trim();
+  const trimmed = String(name ?? "").trim();
   if (!trimmed) return;
   sessionTitle.name = trimmed;
 }

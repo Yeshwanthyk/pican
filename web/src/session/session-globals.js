@@ -6,12 +6,12 @@
 // Covers: done-notifier, keyboard navigation, global keyboard shortcuts, and
 // the mobile visual-viewport / scroll-lock handlers.
 
-import * as doneNotifier from './chat/done-notifier.js';
-import { openSessionPalette } from '../shared/command-palette-runtime.js';
-import { setupKeyboardNav } from '../shared/keyboard-nav.js';
-import { openShortcuts, toggleTree } from './session-modals.svelte.js';
-import { sessionRuntime } from './session-runtime.js';
-import { toggleTheme, syncThemeIcons } from '../shared/theme.js';
+import * as doneNotifier from "./chat/done-notifier.js";
+import { openSessionPalette } from "../shared/command-palette-runtime.js";
+import { setupKeyboardNav } from "../shared/keyboard-nav.js";
+import { openShortcuts, toggleTree } from "./session-modals.svelte.js";
+import { sessionRuntime } from "./session-runtime.js";
+import { toggleTheme, syncThemeIcons } from "../shared/theme.js";
 
 export function setupSessionGlobals({ windowImpl, documentImpl }) {
   const target = windowImpl;
@@ -28,7 +28,7 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
   // Done-notifier (desktop notification + app badge when a worker finishes).
   doneNotifier.setupDoneNotifyToggle({ documentImpl, windowImpl: target });
   doneNotifier.setupAppBadgeClearing({ documentImpl, windowImpl: target });
-  on(target, 'pi-worker-done', () => {
+  on(target, "pi-worker-done", () => {
     doneNotifier.notifyDone({ documentImpl, windowImpl: target });
   });
 
@@ -40,26 +40,26 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────────
   // Cmd+K — session list palette
-  on(target, 'keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+  on(target, "keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       openSessionPalette();
     }
   });
 
   // Cmd+B — toggle the session tree overlay
-  on(target, 'keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+  on(target, "keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
       e.preventDefault();
       toggleTree();
     }
   });
 
   // Cmd+T — new session
-  on(target, 'keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 't') {
+  on(target, "keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "t") {
       e.preventDefault();
-      const newBtn = documentImpl.getElementById('new-btn');
+      const newBtn = documentImpl.getElementById("new-btn");
       if (newBtn) newBtn.click();
     }
   });
@@ -68,9 +68,9 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
   // swallow it before we see it.
   on(
     target,
-    'keydown',
+    "keydown",
     (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "l") {
         e.preventDefault();
         e.stopPropagation();
         toggleTheme(target, documentImpl);
@@ -81,8 +81,8 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
   );
 
   // Cmd+Shift+N — toggle scratchpad (right sidebar)
-  on(target, 'keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
+  on(target, "keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault();
       sessionRuntime.rightSidebar?.toggle();
     }
@@ -90,26 +90,26 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
 
   // Cmd+/ — keyboard shortcuts help modal (the <ShortcutsModal> Svelte
   // component, opened via the shared sessionModals store).
-  on(target, 'keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+  on(target, "keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "/") {
       e.preventDefault();
       openShortcuts();
     }
   });
 
-  const shortcutsBtn = documentImpl.getElementById('shortcuts-help-btn');
+  const shortcutsBtn = documentImpl.getElementById("shortcuts-help-btn");
   if (shortcutsBtn) {
-    on(shortcutsBtn, 'click', (e) => {
+    on(shortcutsBtn, "click", (e) => {
       e.stopPropagation();
       openShortcuts();
     });
   }
 
-  const newSessionHeaderBtn = documentImpl.getElementById('new-session-header-btn');
+  const newSessionHeaderBtn = documentImpl.getElementById("new-session-header-btn");
   if (newSessionHeaderBtn) {
-    on(newSessionHeaderBtn, 'click', (e) => {
+    on(newSessionHeaderBtn, "click", (e) => {
       e.stopPropagation();
-      documentImpl.getElementById('new-btn')?.click();
+      documentImpl.getElementById("new-btn")?.click();
     });
   }
 
@@ -118,22 +118,22 @@ export function setupSessionGlobals({ windowImpl, documentImpl }) {
   if (target.visualViewport) {
     const handleVisualViewportChange = () => {
       const height = target.visualViewport.height;
-      documentImpl.documentElement.style.setProperty('--viewport-height', `${height}px`);
+      documentImpl.documentElement.style.setProperty("--viewport-height", `${height}px`);
       const offsetTop = Math.max(0, target.visualViewport.offsetTop);
-      const header = documentImpl.querySelector('.session-header-bar');
+      const header = documentImpl.querySelector(".session-header-bar");
       if (header) header.style.transform = `translateY(${offsetTop}px)`;
     };
-    on(target.visualViewport, 'resize', handleVisualViewportChange);
-    on(target.visualViewport, 'scroll', handleVisualViewportChange);
+    on(target.visualViewport, "resize", handleVisualViewportChange);
+    on(target.visualViewport, "scroll", handleVisualViewportChange);
     handleVisualViewportChange();
   }
 
   // Prevent the mobile browser from auto-scrolling the layout viewport when the
   // keyboard opens.
-  on(target, 'scroll', () => {
+  on(target, "scroll", () => {
     if (target.scrollY !== 0 || target.scrollX !== 0) target.scrollTo(0, 0);
   });
-  on(documentImpl, 'scroll', () => {
+  on(documentImpl, "scroll", () => {
     if (
       documentImpl.documentElement.scrollTop !== 0 ||
       documentImpl.documentElement.scrollLeft !== 0

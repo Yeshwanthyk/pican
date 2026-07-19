@@ -1,5 +1,5 @@
 export function createScratchpadController({
-  projectPath = '',
+  projectPath = "",
   textarea,
   statusEl,
   fetchImpl = fetch,
@@ -8,12 +8,12 @@ export function createScratchpadController({
   saveDelayMs = 1000,
 } = {}) {
   let saveTimer = null;
-  let lastSaved = textarea ? textarea.value : '';
+  let lastSaved = textarea ? textarea.value : "";
 
   function setStatus(text, cls) {
     if (!statusEl) return;
     statusEl.textContent = text;
-    statusEl.className = `scratchpad-status ${cls || ''}`.trim();
+    statusEl.className = `scratchpad-status ${cls || ""}`.trim();
   }
 
   async function load() {
@@ -22,12 +22,12 @@ export function createScratchpadController({
       const res = await fetchImpl(`/api/scratchpad?project=${encodeURIComponent(projectPath)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const content = data.content ?? '';
+      const content = data.content ?? "";
       textarea.value = content;
       lastSaved = content;
-      setStatus('Saved', 'saved');
+      setStatus("Saved", "saved");
     } catch {
-      setStatus('Load failed', '');
+      setStatus("Load failed", "");
     }
   }
 
@@ -35,23 +35,23 @@ export function createScratchpadController({
     if (!projectPath || !textarea) return;
     const content = textarea.value;
     if (content === lastSaved) return;
-    setStatus('Saving…', 'saving');
+    setStatus("Saving…", "saving");
     try {
-      const res = await fetchImpl('/api/scratchpad', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetchImpl("/api/scratchpad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project: projectPath, content }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       lastSaved = content;
-      setStatus('Saved', 'saved');
+      setStatus("Saved", "saved");
     } catch {
-      setStatus('Save failed', '');
+      setStatus("Save failed", "");
     }
   }
 
   function onInput() {
-    setStatus('Saving…', 'saving');
+    setStatus("Saving…", "saving");
     clearTimeoutImpl(saveTimer);
     saveTimer = setTimeoutImpl(save, saveDelayMs);
   }
@@ -61,9 +61,9 @@ export function createScratchpadController({
   }
 
   function bind() {
-    textarea?.addEventListener('input', onInput);
+    textarea?.addEventListener("input", onInput);
     return () => {
-      textarea?.removeEventListener('input', onInput);
+      textarea?.removeEventListener("input", onInput);
       clearTimeoutImpl(saveTimer);
     };
   }

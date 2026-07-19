@@ -1,13 +1,13 @@
-import { marked } from 'marked';
-import { wireSessionContentRuntime } from '../session-content-runtime.js';
-import { setupSessionGlobals } from '../session-globals.js';
-import { configureSessionMarkdown, safeMarkedParse } from '../render/markdown.js';
-import { setupSessionUi } from '../ui/session-ui-runner.js';
-import * as sidebarApi from '../ui/sidebar.js';
-import * as searchFiltersApi from '../ui/search-filters.js';
-import * as toggleStateApi from '../ui/toggle-state.js';
-import { configureSettingsSync, hydrateSettings } from '../../shared/settings-store.js';
-import { getSessionRuntime } from '../session-runtime-context.js';
+import { marked } from "marked";
+import { wireSessionContentRuntime } from "../session-content-runtime.js";
+import { setupSessionGlobals } from "../session-globals.js";
+import { configureSessionMarkdown, safeMarkedParse } from "../render/markdown.js";
+import { setupSessionUi } from "../ui/session-ui-runner.js";
+import * as sidebarApi from "../ui/sidebar.js";
+import * as searchFiltersApi from "../ui/search-filters.js";
+import * as toggleStateApi from "../ui/toggle-state.js";
+import { configureSettingsSync, hydrateSettings } from "../../shared/settings-store.js";
+import { getSessionRuntime } from "../session-runtime-context.js";
 
 export function startSessionPageRuntime({
   sessionId,
@@ -71,7 +71,7 @@ export function startSessionPageRuntime({
   });
   navigateTo(
     model.currentLeafId,
-    model.urlTargetId ? 'target' : 'bottom',
+    model.urlTargetId ? "target" : "bottom",
     model.urlTargetId || null,
   );
 

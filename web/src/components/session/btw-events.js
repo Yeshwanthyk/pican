@@ -1,19 +1,19 @@
 export function createBtwEventSource(topic, { EventSourceImpl = EventSource } = {}) {
-  return new EventSourceImpl('/events?id=' + encodeURIComponent(topic));
+  return new EventSourceImpl("/events?id=" + encodeURIComponent(topic));
 }
 
 export function setupBtwSessionEvents({
-  sessionId = '',
-  EventSourceImpl = typeof EventSource !== 'undefined' ? EventSource : null,
+  sessionId = "",
+  EventSourceImpl = typeof EventSource !== "undefined" ? EventSource : null,
   onReload = () => {},
   onChatPreview = () => {},
 } = {}) {
   if (!sessionId || !EventSourceImpl) return null;
   const source = createBtwEventSource(sessionId, { EventSourceImpl });
   source.onmessage = (event) => {
-    if (event.data === 'reload') onReload();
+    if (event.data === "reload") onReload();
   };
-  source.addEventListener('chat-preview', (event) => {
+  source.addEventListener("chat-preview", (event) => {
     try {
       onChatPreview(JSON.parse(event.data));
     } catch {
@@ -25,16 +25,16 @@ export function setupBtwSessionEvents({
 }
 
 export function setupBtwParentEvents({
-  parentTopic = '',
-  EventSourceImpl = typeof EventSource !== 'undefined' ? EventSource : null,
+  parentTopic = "",
+  EventSourceImpl = typeof EventSource !== "undefined" ? EventSource : null,
   onChanged = () => {},
 } = {}) {
   if (!parentTopic || !EventSourceImpl) return null;
   const source = createBtwEventSource(parentTopic, { EventSourceImpl });
-  source.addEventListener('btw-changed', (event) => {
+  source.addEventListener("btw-changed", (event) => {
     try {
       const payload = JSON.parse(event.data);
-      onChanged(payload.sessionId || '');
+      onChanged(payload.sessionId || "");
     } catch {
       // Ignore malformed registry events.
     }
