@@ -1782,21 +1782,6 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   padding: 0 var(--line-height);
 }
 
-.streaming-live,
-.streaming-caret {
-  color: var(--accent);
-}
-
-.worker-down .streaming-live,
-.worker-down .streaming-caret {
-  color: var(--danger);
-}
-
-.worker-down .streaming-caret {
-  background: var(--danger);
-  animation: none;
-}
-
 .plain-state--worker-down {
   padding: 24px var(--line-height) 8px;
   text-align: center;
@@ -1817,22 +1802,6 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   opacity: 0.72;
 }
 
-.streaming-caret {
-  display: inline-block;
-  width: 1px;
-  height: 10px;
-  margin-left: 5px;
-  background: var(--accent);
-  vertical-align: -1px;
-  animation: streaming-caret-blink 1s steps(2, end) infinite;
-}
-
-@keyframes streaming-caret-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 .chat-pending-user {
   opacity: 0.88;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
@@ -1851,6 +1820,121 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   color: var(--muted);
   font-size: 11px;
   padding: calc(var(--line-height) / 2) var(--line-height) 0;
+}
+
+.activity-indicator {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 12px;
+  color: var(--accent);
+  line-height: 12px;
+  vertical-align: -2px;
+}
+
+.activity-indicator--pacman,
+.activity-indicator--comet {
+  overflow: hidden;
+  font-size: 0;
+}
+
+.activity-indicator--pacman::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  clip-path: polygon(0 0, 100% 0, 100% 28%, 55% 50%, 100% 72%, 100% 100%, 0 100%);
+  animation: activity-pacman-chomp 320ms ease-in-out infinite;
+}
+
+.activity-indicator--pacman::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 15px;
+  width: 2px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow:
+    7px 0 0 currentColor,
+    14px 0 0 currentColor;
+  animation: activity-pacman-dots 720ms linear infinite;
+  will-change: transform;
+}
+
+@keyframes activity-pacman-chomp {
+  50% {
+    clip-path: polygon(0 0, 100% 0, 100% 47%, 58% 50%, 100% 53%, 100% 100%, 0 100%);
+  }
+}
+
+@keyframes activity-pacman-dots {
+  to {
+    transform: translateX(-7px);
+  }
+}
+
+.activity-indicator--comet::before,
+.activity-indicator--comet::after {
+  content: "";
+  position: absolute;
+  animation: activity-comet-flight 1150ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.activity-indicator--comet::before {
+  top: 5px;
+  left: -18px;
+  width: 14px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 70%, transparent));
+  border-radius: 999px;
+}
+
+.activity-indicator--comet::after {
+  top: 3.5px;
+  left: -5px;
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 55%, transparent));
+}
+
+@keyframes activity-comet-flight {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  14%,
+  76% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(57px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-indicator--pacman::before,
+  .activity-indicator--pacman::after,
+  .activity-indicator--comet::before,
+  .activity-indicator--comet::after {
+    animation: none;
+    will-change: auto;
+  }
+
+  .activity-indicator--comet::before,
+  .activity-indicator--comet::after {
+    transform: translateX(22px);
+    opacity: 1;
+  }
 }
 
 .chat-preview-stream.done .preview-label {
@@ -2641,12 +2725,6 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     max-width: none;
     margin-left: calc(var(--line-height) * -2);
     border-radius: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .streaming-caret {
-    animation: none;
   }
 }
 
@@ -3799,7 +3877,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   margin-top: 2px;
 }
 
-/* Working / streaming indicator (cat runner). */
+/* Working / streaming activity indicator. */
 .pi-btw-working {
   display: inline-flex;
   align-items: center;

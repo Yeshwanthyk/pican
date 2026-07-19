@@ -371,7 +371,6 @@ export default {
   // ── Session transcript ──
   "session.you": "YOU",
   "session.assistant": "ASSISTANT",
-  "session.live": "LIVE",
   "session.forkFromMessage": "Fork session from this message",
   "session.copyMessageLink": "Copy link to this message",
   "session.activitySummary": "{seconds}s thinking · {count} {runs}",
@@ -499,6 +498,10 @@ export default {
   "settings.sessionsList": "Sessions List",
   "settings.spinnerStyle": "Spinner style",
   "settings.spinnerStyleHint": "Animation shown next to running sessions.",
+  "settings.spinnerRuncat": "Runcat",
+  "settings.spinnerBraille": "Braille",
+  "settings.spinnerPacman": "Pac-Man",
+  "settings.spinnerComet": "Comet",
   "settings.defaultLayout": "Default layout",
   "settings.defaultLayoutHint": "How the sessions list is grouped on load.",
   "settings.showBtw": "Show btw chats in list",

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Match } from "effect";
 import { runSync } from "../../lib/runtime.js";
 import { isUnknownRecord } from "../data/session-types.js";
 import { t } from "../../shared/strings.js";
@@ -18,7 +18,10 @@ export interface ChatPreviewState {
   activePreviewMessage?: string | null;
 }
 
+export type SpinnerStyle = "runcat" | "braille" | "pacman" | "comet";
+
 interface SpinnerConfig {
+  readonly style: SpinnerStyle;
   readonly frames: string[];
   readonly fontFamily: string;
   readonly interval: number;
@@ -38,31 +41,40 @@ interface PreviewRenderOptions {
 export function getSpinnerConfig(
   windowImpl: PreviewWindow | null = typeof window !== "undefined" ? window : null,
 ): SpinnerConfig {
-  let style = "runcat";
   const saved = runSync(
     Effect.try({
       try: () => windowImpl?.localStorage?.getItem("pican:spinner-style") ?? null,
       catch: () => null,
     }),
   );
-  if (saved === "braille") style = "braille";
+  const style: SpinnerStyle =
+    saved === "braille" || saved === "pacman" || saved === "comet" ? saved : "runcat";
 
-  if (style === "braille") {
-    return {
+  return Match.value(style).pipe(
+    Match.when("braille", () => ({
+      style,
       frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
       fontFamily: "monospace",
       interval: 80,
       width: "12px",
-    };
-  } else {
-    // runcat frames mapping to unicode private use area characters in runcat.ttf font
-    return {
+    })),
+    Match.whenOr("pacman", "comet", (cssStyle) => ({
+      style: cssStyle,
+      frames: [],
+      fontFamily: "inherit",
+      interval: 100,
+      width: "34px",
+    })),
+    Match.when("runcat", () => ({
+      // runcat frames map to private-use glyphs in runcat.ttf.
+      style,
       frames: ["", "", "", "", ""],
       fontFamily: "'runcat', monospace",
       interval: 100,
       width: "18px",
-    };
-  }
+    })),
+    Match.exhaustive,
+  );
 }
 
 export function clearChatPreviewState(
@@ -90,8 +102,6 @@ export function finishChatPreviewState(state: ChatPreviewState): boolean {
   state.chatPreviewEl.classList.add("done");
   const label = state.chatPreviewEl.querySelector(".preview-label");
   if (label && label.parentNode) label.parentNode.removeChild(label);
-  state.chatPreviewEl.querySelector(".streaming-live")?.remove();
-  state.chatPreviewEl.querySelector(".streaming-caret")?.remove();
   stopWorkingAnimation(state);
   return true;
 }
@@ -130,6 +140,7 @@ export function startWorkingAnimation(
   if (state.chatPreviewEl) {
     const spinnerEl = state.chatPreviewEl.querySelector<HTMLElement>(".preview-spinner");
     if (spinnerEl) {
+      spinnerEl.className = `preview-spinner activity-indicator activity-indicator--${config.style}`;
       spinnerEl.style.fontFamily = config.fontFamily;
       spinnerEl.style.width = config.width;
       spinnerEl.textContent = config.frames[0] ?? "";
@@ -143,7 +154,7 @@ export function startWorkingAnimation(
     }
 
     const spinnerEl = state.chatPreviewEl.querySelector<HTMLElement>(".preview-spinner");
-    if (spinnerEl) {
+    if (spinnerEl && config.frames.length > 0) {
       if (spinnerEl.style.fontFamily !== config.fontFamily) {
         spinnerEl.style.fontFamily = config.fontFamily;
         spinnerEl.style.width = config.width;
@@ -214,7 +225,7 @@ function createPreviewLabel(documentImpl: Document, config: SpinnerConfig): HTML
   const label = documentImpl.createElement("div");
   label.className = "preview-label";
   const spinner = documentImpl.createElement("span");
-  spinner.className = "preview-spinner";
+  spinner.className = `preview-spinner activity-indicator activity-indicator--${config.style}`;
   spinner.style.color = "var(--accent)";
   spinner.style.marginRight = "6px";
   spinner.style.fontFamily = config.fontFamily;
@@ -242,15 +253,8 @@ function createAssistantPreview(
   el.id = "chat-preview-stream";
   el.className = "assistant-message chat-preview-stream" + (waiting ? " chat-preview-waiting" : "");
   const who = documentImpl.createElement("div");
-  who.className = "message-who assistant-who streaming-who";
-  who.append(documentImpl.createTextNode(t("session.assistant")));
-  const liveLabel = documentImpl.createElement("span");
-  liveLabel.className = "streaming-live";
-  liveLabel.textContent = ` · ${t("session.live")}`;
-  const caret = documentImpl.createElement("span");
-  caret.className = "streaming-caret";
-  caret.setAttribute("aria-hidden", "true");
-  who.append(liveLabel, caret);
+  who.className = "message-who assistant-who";
+  who.textContent = t("session.assistant");
   el.append(
     who,
     createMarkdownBlock(documentImpl, "message-content assistant-text markdown-content"),

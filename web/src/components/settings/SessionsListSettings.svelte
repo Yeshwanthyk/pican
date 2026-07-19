@@ -29,7 +29,11 @@
         value={spinner}
         onchange={(e) => onSave(spinnerKey, e.currentTarget.value)}
       >
-        <option value="runcat">Runcat</option><option value="braille">Braille</option>
+        <option value="runcat">{t('settings.spinnerRuncat')}</option><option value="braille"
+          >{t('settings.spinnerBraille')}</option
+        ><option value="pacman">{t('settings.spinnerPacman')}</option><option value="comet"
+          >{t('settings.spinnerComet')}</option
+        >
       </select>
     </div>
   </div>

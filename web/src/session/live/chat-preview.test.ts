@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom";
 import {
   clearChatPreviewState as clearChatPreview,
   finishChatPreviewState as finishChatPreview,
+  getSpinnerConfig,
   renderChatPreviewState as renderChatPreview,
   renderPendingChatState as renderPendingChat,
   type ChatPreviewState,
@@ -26,6 +27,9 @@ describe("chat preview", () => {
     ).toBe(true);
 
     expect(dom.window.document.getElementById("chat-preview-stream")).toBeTruthy();
+    expect(state.chatPreviewEl?.querySelector(".message-who")?.textContent).toBe("ASSISTANT");
+    expect(state.chatPreviewEl?.querySelector(".streaming-live")).toBeNull();
+    expect(state.chatPreviewEl?.querySelector(".preview-spinner")).toBeTruthy();
     expect(state.chatPreviewEl?.querySelector(".message-content")?.innerHTML).toBe("<p>hello</p>");
     // Must include markdown-content so the streaming preview picks up the
     // same heading/hr/list/code styles as the settled assistant message.
@@ -76,6 +80,22 @@ describe("chat preview", () => {
     clearChatPreview(state);
     expect(dom.window.document.getElementById("chat-pending-user")).toBe(null);
     expect(dom.window.document.getElementById("chat-preview-stream")).toBe(null);
+  });
+
+  it.each(["pacman", "comet"] as const)("renders the %s activity indicator", (style) => {
+    const dom = new JSDOM('<body><div id="messages"></div></body>');
+    const state: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
+    const windowImpl = { localStorage: { getItem: () => style } };
+
+    expect(getSpinnerConfig(windowImpl)).toMatchObject({ style, frames: [], width: "34px" });
+    renderPendingChat("hello", state, {
+      documentImpl: dom.window.document,
+      windowImpl,
+      renderMarkdown: (text) => text,
+    });
+
+    expect(state.chatPreviewEl?.querySelector(`.activity-indicator--${style}`)).toBeTruthy();
+    clearChatPreview(state);
   });
 
   it("can finish a pending preview without removing assistant text", () => {

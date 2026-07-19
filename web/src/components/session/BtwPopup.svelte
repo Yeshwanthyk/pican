@@ -54,6 +54,7 @@
   let sessionId = $state('');
   let spinnerChar = $state('');
   let spinnerStyle = $state('');
+  let spinnerClass = $state('pi-btw-spinner activity-indicator');
 
   let winEl = $state<HTMLDivElement | null>(null);
   let headerEl = $state<HTMLDivElement | null>(null);
@@ -163,8 +164,11 @@
     if (spinnerTimer) return;
     spinnerConfig = getSpinnerConfig(window);
     const config = spinnerConfig;
+    spinnerClass = `pi-btw-spinner activity-indicator activity-indicator--${config.style}`;
     spinnerStyle = `font-family:${config.fontFamily};width:${config.width}`;
-    spinnerChar = config.frames[spinnerFrame % config.frames.length] || '';
+    spinnerChar =
+      config.frames.length > 0 ? config.frames[spinnerFrame % config.frames.length] || '' : '';
+    if (config.frames.length < 2) return;
     spinnerTimer = window.setInterval(() => {
       spinnerFrame += 1;
       spinnerChar = config.frames[spinnerFrame % config.frames.length] || '';
@@ -453,7 +457,7 @@
         <div class="pi-btw-msg assistant working">
           {#if streamingText}<div class="pi-btw-md">{@html toHtml(streamingText)}</div>{:else}<span
               class="pi-btw-working"
-              ><span class="pi-btw-spinner" style={spinnerStyle}>{spinnerChar}</span><span
+              ><span class={spinnerClass} style={spinnerStyle}>{spinnerChar}</span><span
                 class="pi-btw-working-label">{t('btw.working')}</span
               ></span
             >{/if}

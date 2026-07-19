@@ -348,6 +348,21 @@ describe("BtwPopup", () => {
     );
   });
 
+  it.each(["pacman", "comet"])("uses the %s activity indicator while working", async (style) => {
+    localStorage.setItem("pican:spinner-style", style);
+    const fetchImpl = router({ btw: { sessionId: "sess-1.jsonl" } });
+    setupEnv({ fetchImpl });
+    render(BtwPopup);
+
+    byId("pi-btw-button").click();
+    await settle();
+    query<HTMLInputElement>("#pi-btw-input").value = "go";
+    byId("pi-btw-form").dispatchEvent(new Event("submit"));
+    await settle();
+
+    expect(document.querySelector(`.pi-btw-spinner.activity-indicator--${style}`)).not.toBeNull();
+  });
+
   it("renders streaming assistant text from chat-preview events", async () => {
     const fetchImpl = router({ btw: { sessionId: "sess-1.jsonl" } });
     setupEnv({ fetchImpl });
