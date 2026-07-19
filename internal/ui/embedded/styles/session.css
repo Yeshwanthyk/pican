@@ -3670,6 +3670,14 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   display: none;
 }
 
+@media (max-width: 900px) {
+  /* Keep the compact branch context and btw affordance on phones; PR workflow
+         actions belong in the roomier desktop footer. */
+  .pi-git-pr {
+    display: none;
+  }
+}
+
 /* ── btw floating window ── */
 .pi-btw-window {
   position: fixed;
