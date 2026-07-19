@@ -8,9 +8,9 @@ import {
 
 // The slash-command palette opens when "/" begins the composer message and
 // lists the commands pi loaded for the session (served by the get_commands rpc;
-// the stub pi returns one extension + one prompt + one skill command). Only
-// prompt and skill commands run an agent turn over the headless worker, so
-// extension commands are filtered out of the palette.
+// the stub pi returns one extension + one prompt + one skill command). All
+// three sources are available because extension commands can render their UI
+// through pican's extension bridge.
 
 test.describe("slash-command palette (stubbed pi)", () => {
   async function openSessionWithChat(page, sessionsDir, testInfo) {
@@ -27,7 +27,7 @@ test.describe("slash-command palette (stubbed pi)", () => {
     return page.locator("#pi-chat-message");
   }
 
-  test("opens on '/', lists prompt + skill commands, hides extensions", async ({
+  test("opens on '/', lists prompt, skill, and extension commands", async ({
     page,
     sessionsDir,
   }, testInfo) => {
@@ -38,15 +38,15 @@ test.describe("slash-command palette (stubbed pi)", () => {
     const popup = page.locator("#pi-chat-slash-popup");
     await expect(popup).toBeVisible();
 
-    // Two of the three stub commands reach the palette: the extension command
-    // (btw) is excluded.
     const items = page.locator(".slash-item");
-    await expect(items).toHaveCount(2);
-    await expect(page.locator('.slash-item[data-insert="workon"]')).toBeVisible();
+    await expect(items).toHaveCount(3);
+    await expect(
+      page.locator('.slash-item[data-insert="workon"]'),
+    ).toBeVisible();
     await expect(
       page.locator('.slash-item[data-insert="skill:memory"]'),
     ).toBeVisible();
-    await expect(page.locator('.slash-item[data-insert="btw"]')).toHaveCount(0);
+    await expect(page.locator('.slash-item[data-insert="btw"]')).toBeVisible();
   });
 
   test("filters as the query narrows", async ({
@@ -56,7 +56,7 @@ test.describe("slash-command palette (stubbed pi)", () => {
     const textarea = await openSessionWithChat(page, sessionsDir, testInfo);
 
     await textarea.fill("/");
-    await expect(page.locator(".slash-item")).toHaveCount(2);
+    await expect(page.locator(".slash-item")).toHaveCount(3);
 
     await textarea.fill("/sk");
     const items = page.locator(".slash-item");
@@ -87,7 +87,7 @@ test.describe("slash-command palette (stubbed pi)", () => {
     const textarea = await openSessionWithChat(page, sessionsDir, testInfo);
 
     await textarea.fill("/");
-    await expect(page.locator(".slash-item")).toHaveCount(2);
+    await expect(page.locator(".slash-item")).toHaveCount(3);
 
     await page.locator('.slash-item[data-insert="workon"]').click();
 

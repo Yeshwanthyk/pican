@@ -177,6 +177,7 @@
           <button
             type="button"
             class="pi-queue-toggle pi-queue-toggle--resume"
+            onmousedown={(event) => event.preventDefault()}
             onclick={onResume}
             title={t('composer.queueResumeHint')}
           >
@@ -186,6 +187,7 @@
           <button
             type="button"
             class="pi-queue-toggle"
+            onmousedown={(event) => event.preventDefault()}
             onclick={onPause}
             title={t('composer.queuePauseHint')}
           >

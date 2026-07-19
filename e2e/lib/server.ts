@@ -27,7 +27,7 @@ export async function findFreePort(): Promise<number> {
 /** Build the binary only if it is missing. CI is expected to `make build` beforehand. */
 export function ensureBinary(): void {
   if (existsSync(BINARY)) return;
-  console.log("[e2e] pi-web binary missing — running `make build` (CI should prebuild)...");
+  console.log("[e2e] pican binary missing — running `make build` (CI should prebuild)...");
   const res = spawnSync("make", ["build"], { cwd: REPO_ROOT, stdio: "inherit" });
   if (res.status !== 0) {
     throw new Error("`make build` failed; build the binary before running e2e tests");
@@ -80,19 +80,19 @@ export async function startServer(): Promise<StartedServer> {
       // Prepend stub `pi` so chat workers spawn the fake, never the real pi.
       PATH: `${STUB_PI_DIR}:${process.env.PATH ?? ""}`,
       // Ensure auth is off for tests regardless of the dev's shell env.
-      PI_WEB_TOKEN: "",
+      PICAN_TOKEN: "",
       // Lower the large-session truncation thresholds so the load-earlier spec
       // can exercise pagination with a ~150-entry session instead of rendering
       // thousands of messages (which flaked under parallel CPU contention).
       // Comfortably above every other spec's session size (max ~34 entries).
       // Keep in sync with tests/load-earlier.spec.ts.
-      PI_WEB_LARGE_SESSION_THRESHOLD: "100",
-      PI_WEB_LARGE_SESSION_TAIL_ENTRIES: "50",
+      PICAN_LARGE_SESSION_THRESHOLD: "100",
+      PICAN_LARGE_SESSION_TAIL_ENTRIES: "50",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stdout?.on("data", (d) => process.stdout.write(`[pi-web] ${d}`));
-  child.stderr?.on("data", (d) => process.stderr.write(`[pi-web] ${d}`));
+  child.stdout?.on("data", (d) => process.stdout.write(`[pican] ${d}`));
+  child.stderr?.on("data", (d) => process.stderr.write(`[pican] ${d}`));
 
   await waitForReady(baseURL);
   return { baseURL, agentDir, sessionsDir, child };

@@ -11,7 +11,7 @@ import { buildSession, uniqueSessionName, writeSession } from "../lib/sessions";
 
 // seedCwd creates a temp dir with a fixed file/folder layout and returns it.
 function seedCwd(): string {
-  const dir = mkdtempSync(join(tmpdir(), "pi-web-e2e-mention-"));
+  const dir = mkdtempSync(join(tmpdir(), "pican-e2e-mention-"));
   writeFileSync(join(dir, "app.js"), "x");
   writeFileSync(join(dir, "app.test.js"), "x");
   writeFileSync(join(dir, "README.md"), "x");

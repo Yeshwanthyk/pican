@@ -3,7 +3,7 @@ import { uniqueSessionName, writeSession } from "../lib/sessions";
 
 // Build a session large enough to cross the server-side truncation threshold.
 // The e2e server lowers that threshold via env vars (lib/server.ts:
-// PI_WEB_LARGE_SESSION_THRESHOLD=100, PI_WEB_LARGE_SESSION_TAIL_ENTRIES=50) so
+// PICAN_LARGE_SESSION_THRESHOLD=100, PICAN_LARGE_SESSION_TAIL_ENTRIES=50) so
 // this spec exercises the exact pagination path with a small session that
 // renders instantly — earlier it used 1600 messages and flaked under parallel
 // CPU contention because each load re-renders the whole conversation. Keep
@@ -41,7 +41,7 @@ function buildLargeSession(): unknown[] {
 test.describe("load-earlier banner (large session pagination)", () => {
   // This test does a user-triggered mid-flight fetch + re-render, so it's the
   // canary for transient resource starvation during the full parallel matrix:
-  // 8+ browsers, the Node runner, and one shared pi-web server all competing for
+  // 8+ browsers, the Node runner, and one shared pican server all competing for
   // CPU can delay even the poll's own execution past a fixed timeout, despite the
   // session being tiny. Two mitigations, both needed:
   //   1. A small session (env-lowered thresholds) so the work itself is cheap.

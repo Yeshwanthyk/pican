@@ -1,6 +1,6 @@
-# pi-web E2E (Playwright)
+# pican E2E (Playwright)
 
-End-to-end browser tests that run against the built `pi-web` binary across
+End-to-end browser tests that run against the built `pican` binary across
 desktop, mobile, and iPad viewports.
 
 ```bash

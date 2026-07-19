@@ -9,7 +9,7 @@ import type { TestInfo } from "@playwright/test";
  * (internal/sessions/session.go), so chat specs must point at a real path.
  */
 export function realWorkingDir(): string {
-  return mkdtempSync(join(tmpdir(), "pi-web-e2e-cwd-"));
+  return mkdtempSync(join(tmpdir(), "pican-e2e-cwd-"));
 }
 
 /**

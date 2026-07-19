@@ -1,8 +1,8 @@
 {
-  "name": "pi-web-e2e",
+  "name": "pican-e2e",
   "private": true,
   "version": "0.0.0",
-  "description": "Playwright end-to-end tests for pi-web (runs against the built binary).",
+  "description": "Playwright end-to-end tests for pican (runs against the built binary).",
   "type": "module",
   "scripts": {
     "test": "playwright test",

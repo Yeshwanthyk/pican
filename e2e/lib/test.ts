@@ -25,7 +25,7 @@ export const test = base.extend<Fixtures>({
     await page.addInitScript(() => {
       try {
         // Filter tests override this with their own init script.
-        localStorage.setItem("pi-web:v1:artifacts:include", "");
+        localStorage.setItem("pican:v1:artifacts:include", "");
       } catch {
         /* ignore */
       }
@@ -56,7 +56,7 @@ export async function collapseScratchpad(
 ): Promise<void> {
   await page.addInitScript(() => {
     try {
-      localStorage.setItem("pi-web:v1:right-sidebar-collapsed", "true");
+      localStorage.setItem("pican:v1:right-sidebar-collapsed", "true");
     } catch {
       /* ignore */
     }

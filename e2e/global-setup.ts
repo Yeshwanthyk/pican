@@ -19,8 +19,8 @@ export default async function globalSetup() {
     // filter explicitly; everything else runs unfiltered for determinism.
     body: JSON.stringify({
       settings: {
-        "pi-web:v1:auto-title:enabled": "false",
-        "pi-web:v1:artifacts:include": "",
+        "pican:v1:auto-title:enabled": "false",
+        "pican:v1:artifacts:include": "",
       },
     }),
   });
@@ -30,7 +30,7 @@ export default async function globalSetup() {
 
   const state: ServerState = { baseURL, agentDir, sessionsDir, pid: child.pid! };
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-  console.log(`[e2e] pi-web ready at ${baseURL} (pid ${child.pid})`);
+  console.log(`[e2e] pican ready at ${baseURL} (pid ${child.pid})`);
 
   // Detach so the spawned server outlives this setup process; teardown kills by pid.
   child.unref();

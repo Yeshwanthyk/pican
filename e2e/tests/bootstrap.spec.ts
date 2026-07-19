@@ -6,7 +6,7 @@ import {
   writeSession,
 } from "../lib/sessions";
 
-// The /session shell embeds the session payload in <script id="pi-session-bootstrap">
+// The /session shell embeds the session payload in <script id="pican-session-bootstrap">
 // so the SPA paints the first frame without a round-trip to /api/session.
 test.describe("session bootstrap (embedded payload)", () => {
   test("renders from the embedded payload without an /api/session fetch", async ({
@@ -28,7 +28,7 @@ test.describe("session bootstrap (embedded payload)", () => {
     await expect(page.locator("#tree-container .tree-node").first()).toBeVisible();
 
     const hasBootstrap = await page.evaluate(
-      () => !!document.getElementById("pi-session-bootstrap")?.textContent,
+      () => !!document.getElementById("pican-session-bootstrap")?.textContent,
     );
     expect(hasBootstrap).toBe(true);
     // Initial paint comes from the embed — no /api/session GET on load.

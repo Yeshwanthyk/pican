@@ -5,7 +5,7 @@ import { STATE_FILE, type ServerState } from "../lib/paths";
 
 function writeCustomThemeFixture() {
   const state = JSON.parse(readFileSync(STATE_FILE, "utf8")) as ServerState;
-  const webDir = join(state.agentDir, "pi-web");
+  const webDir = join(state.agentDir, "pican");
   mkdirSync(webDir, { recursive: true });
   const css = [
     `[data-theme="custom"] {`,
@@ -17,10 +17,10 @@ function writeCustomThemeFixture() {
   writeFileSync(join(webDir, "custom-themes.css"), css);
 }
 
-const LAYOUT = '[data-setting="pi-sessions:view-layout"]';
+const LAYOUT = '[data-setting="pican:view-layout"]';
 // Isolated setting that nothing else asserts on, so the round-trip can mutate
 // shared server-side state without affecting other specs.
-const SPINNER = '[data-setting="pi-sessions:spinner-style"]';
+const SPINNER = '[data-setting="pican:spinner-style"]';
 
 // The sidebar nav replaces the old single-stack layout: each section is hidden
 // until its sidebar entry is clicked. On mobile the click also drills into the
@@ -47,7 +47,7 @@ test.describe("settings page", () => {
 
     await page.goto("/settings");
     await openSection(page, "appearance");
-    const select = page.locator('[data-setting="pi-web-theme"]');
+    const select = page.locator('[data-setting="pican-theme"]');
     await expect(select).toBeVisible();
 
     if ((await select.inputValue()) === "custom") {
@@ -86,7 +86,7 @@ test.describe("settings page", () => {
 
     await page.goto("/settings");
     await openSection(page, "appearance");
-    const select = page.locator('[data-setting="pi-web-theme"]');
+    const select = page.locator('[data-setting="pican-theme"]');
     const previous = await select.inputValue();
 
     const themes = {
@@ -272,7 +272,7 @@ test.describe("settings page", () => {
     await page.route("**/api/settings", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
-          json: { settings: { "pi-web:v1:font-ui": "Comic Sans MS" } },
+          json: { settings: { "pican:v1:font-ui": "Comic Sans MS" } },
         });
       } else {
         await route.fulfill({ json: { ok: true } });
@@ -303,12 +303,12 @@ test.describe("settings page", () => {
 
     await page.goto("/settings");
     // Appearance is the default pane; the theme control proves it.
-    await expect(page.locator('[data-setting="pi-web-theme"]')).toBeVisible();
+    await expect(page.locator('[data-setting="pican-theme"]')).toBeVisible();
     await expect(page.locator(LAYOUT)).toHaveCount(0);
 
     await page.locator('[data-settings-nav="sessionsList"]').click();
     await expect(page.locator(LAYOUT)).toBeVisible();
-    await expect(page.locator('[data-setting="pi-web-theme"]')).toHaveCount(0);
+    await expect(page.locator('[data-setting="pican-theme"]')).toHaveCount(0);
   });
 
   // Session Display defaults (issue #48). Three tests cover the feature end
@@ -329,9 +329,9 @@ test.describe("settings page", () => {
       const r = await page.request.post("/api/settings", {
         data: {
           settings: {
-            "pi-web:v1:toggle:thinking": "true",
-            "pi-web:v1:toggle:tools": "true",
-            "pi-web:v1:toggle:tool-outputs": "false",
+            "pican:v1:toggle:thinking": "true",
+            "pican:v1:toggle:tools": "true",
+            "pican:v1:toggle:tool-outputs": "false",
           },
         },
       });
@@ -347,7 +347,7 @@ test.describe("settings page", () => {
     test("defaults persist and apply to new session loads", async ({
       page,
     }) => {
-      const thinkingInput = '[data-setting="pi-web:v1:toggle:thinking"]';
+      const thinkingInput = '[data-setting="pican:v1:toggle:thinking"]';
       // The <input> is visually hidden by .settings-toggle CSS; the wrapping
       // <label> is what the user actually clicks. Target the label for
       // interactions and the input for state assertions.
@@ -401,7 +401,7 @@ test.describe("settings page", () => {
       // browser context. The beforeEach has reset server-side defaults.
       await page.goto("/");
       await page.evaluate(() =>
-        window.localStorage.removeItem("pi.sessionDetail.toggleState"),
+        window.localStorage.removeItem("pican:session-detail:toggle-state"),
       );
 
       // Open the demo session and toggle thinking off via the header button —
@@ -451,7 +451,7 @@ test.describe("settings page", () => {
       await page.goto("/");
       await page.evaluate(() => {
         window.localStorage.setItem(
-          "pi.sessionDetail.toggleState",
+          "pican:session-detail:toggle-state",
           JSON.stringify({
             thinkingExpanded: false,
             toolsVisible: false,
@@ -489,7 +489,7 @@ test.describe("settings page", () => {
       // Configure the server-side default to a non-hardcoded value so we can
       // distinguish "hydrate worked and reload() ran" from "hardcoded fallback".
       const seeded = await page.request.post("/api/settings", {
-        data: { settings: { "pi-web:v1:toggle:thinking": "false" } },
+        data: { settings: { "pican:v1:toggle:thinking": "false" } },
       });
       expect(seeded.ok()).toBeTruthy();
 
@@ -536,12 +536,12 @@ test.describe("settings page", () => {
       await page.goto("/settings");
       await openSection(page, "sessionDisplay");
       const toolsInput = page.locator(
-        '[data-setting="pi-web:v1:toggle:tools"]',
+        '[data-setting="pican:v1:toggle:tools"]',
       );
       const toolOutputsInput = page.locator(
-        '[data-setting="pi-web:v1:toggle:tool-outputs"]',
+        '[data-setting="pican:v1:toggle:tool-outputs"]',
       );
-      const toolsLabel = `label.settings-toggle:has([data-setting="pi-web:v1:toggle:tools"])`;
+      const toolsLabel = `label.settings-toggle:has([data-setting="pican:v1:toggle:tools"])`;
       await expect(toolsInput).toBeChecked();
       await expect(toolOutputsInput).toBeEnabled();
       const offSaved = page.waitForResponse(
@@ -607,7 +607,7 @@ test.describe("settings page", () => {
 
     // Drill into Appearance: pane content shows, sidebar hides, header swaps.
     await page.locator('[data-settings-nav="appearance"]').click();
-    await expect(page.locator('[data-setting="pi-web-theme"]')).toBeVisible();
+    await expect(page.locator('[data-setting="pican-theme"]')).toBeVisible();
     await expect(page.locator(".settings-sidebar")).toBeHidden();
     await expect(page.locator(".session-header-title")).toHaveText(
       "Appearance",
