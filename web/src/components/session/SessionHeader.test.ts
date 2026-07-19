@@ -19,6 +19,10 @@ describe("SessionHeader runtime commands", () => {
     expect(trigger?.tagName).toBe("BUTTON");
     expect(trigger).toHaveAttribute("popovertarget", "pinned-session-switcher");
     expect(trigger).toHaveAccessibleName("Switch pinned session");
+    expect(trigger?.querySelector(".session-header-runtime-mark")).toHaveAttribute(
+      "src",
+      "/pi-icon.svg",
+    );
   });
 
   it("copies the legacy Pi resume command from the session UUID", async () => {

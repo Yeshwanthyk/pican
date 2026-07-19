@@ -1562,6 +1562,14 @@ body.modal-sheet-open { overflow: hidden; }
     font-size: 12px;
 }
 .session-ticker-markers:empty { display: none; }
+.session-ticker-runtime-mark {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    align-self: center;
+    border-radius: 3px;
+    opacity: 0.86;
+}
 .session-ticker-title {
     min-width: 0;
     overflow: hidden;

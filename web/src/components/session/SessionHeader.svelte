@@ -53,6 +53,11 @@
       sessionUUID: sessionUUID || bodySessionUUID(),
     }),
   );
+  const runtimeMark = $derived(
+    runtime === 'codex'
+      ? { src: '/codex-icon.svg', label: t('runtime.codex') }
+      : { src: '/pi-icon.svg', label: t('runtime.pi') },
+  );
 
   // The title prop seeds the shared store (and re-seeds it on session switch);
   // renames/auto-titling update the store, which this component renders and
@@ -180,17 +185,15 @@
     aria-label={t('session.openPinnedSessions')}
     title={t('session.openPinnedSessions')}
   >
+    <span
+      class="session-header-runtime"
+      title={runtime === 'codex' && nativeId
+        ? t('session.nativeIdTitle', { id: nativeId })
+        : runtimeMark.label}
+    >
+      <img class="session-header-runtime-mark" src={runtimeMark.src} alt="" aria-hidden="true" />
+    </span>
     <span class="session-header-title-text">{sessionTitle.name || title}</span>
-    {#if runtime === 'codex'}
-      <span
-        class="session-header-runtime"
-        title={nativeId ? t('session.nativeIdTitle', { id: nativeId }) : t('runtime.codex')}
-        aria-label={nativeId ? t('session.nativeIdTitle', { id: nativeId }) : t('runtime.codex')}
-      >
-        <img class="session-header-runtime-mark" src="/codex-icon.svg" alt="" aria-hidden="true" />
-        {t('runtime.codex')}
-      </span>
-    {/if}
     {#if workerStatus.state === 'error'}
       <span class="session-header-state session-header-state--danger"
         >{t('session.workerDown')}</span

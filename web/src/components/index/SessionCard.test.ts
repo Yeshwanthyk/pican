@@ -42,7 +42,19 @@ describe("SessionCard ticker row", () => {
     expect(screen.getByText("~")).toBeInTheDocument();
     expect(screen.getByText("/repo")).toBeInTheDocument();
     expect(screen.getByText("provider/model")).toBeInTheDocument();
+    expect(container.querySelector(".session-ticker-runtime-mark")).toHaveAttribute(
+      "src",
+      "/codex-icon.svg",
+    );
     expect(screen.getByText("1.2k tok · $0.25")).toBeInTheDocument();
+  });
+
+  it("renders the Pi runtime mark", () => {
+    const { container } = render(SessionCard, { props: { session: session() } });
+    expect(container.querySelector(".session-ticker-runtime-mark")).toHaveAttribute(
+      "src",
+      "/pi-icon.svg",
+    );
   });
 
   it("renders running and waiting status lines with distinct semantics", () => {

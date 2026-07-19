@@ -15,8 +15,20 @@ describe("PinnedSessionSwitcher", () => {
         return new Response(
           JSON.stringify({
             sessions: [
-              { id: "first.jsonl", name: "First", project: "/repo/one", pinned: true },
-              { id: "second.jsonl", name: "Second", project: "/repo/two", pinned: true },
+              {
+                id: "first.jsonl",
+                name: "First",
+                project: "/repo/one",
+                pinned: true,
+                runtime: "pi",
+              },
+              {
+                id: "second.jsonl",
+                name: "Second",
+                project: "/repo/two",
+                pinned: true,
+                runtime: "codex",
+              },
             ],
           }),
         );
@@ -41,6 +53,12 @@ describe("PinnedSessionSwitcher", () => {
       (node) => node.textContent,
     );
     expect(titles).toEqual(["Second", "First"]);
+    expect(
+      Array.from(
+        container.querySelectorAll<HTMLImageElement>(".pinned-session-switcher-runtime-mark"),
+        (mark) => mark.getAttribute("src"),
+      ),
+    ).toEqual(["/codex-icon.svg", "/pi-icon.svg"]);
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("First");
   });
 });

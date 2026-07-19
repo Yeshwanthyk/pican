@@ -30,6 +30,13 @@
   const href = $derived(`/session?id=${encodeURIComponent(session.id || '')}`);
   const title = $derived(session.name || session.id || '');
   const modelLabel = $derived(formatRunningModel(runningStatus) || sessionModelLabel(session));
+  const runtimeMark = $derived(
+    session.runtime === 'codex'
+      ? { src: '/codex-icon.svg', label: t('runtime.codex') }
+      : session.runtime === 'pi'
+        ? { src: '/pi-icon.svg', label: t('runtime.pi') }
+        : null,
+  );
   const search = $derived(sessionSearchText(session));
   const metrics = $derived(formatSessionMetrics(session));
   const waiting = $derived(Boolean(session.waitingQuestion));
@@ -84,6 +91,15 @@
     ontouchstart={startPrefetch}
   >
     <div class="session-ticker-title-line">
+      {#if runtimeMark}
+        <img
+          class="session-ticker-runtime-mark"
+          src={runtimeMark.src}
+          alt=""
+          aria-hidden="true"
+          title={runtimeMark.label}
+        />
+      {/if}
       <span class="session-ticker-markers" aria-hidden="true">
         {#if session.pinned}<span>⌖</span>{/if}
         {#if session.btw}<span>~</span>{/if}
