@@ -3,6 +3,8 @@ package rpc
 type StreamPreview struct {
 	Content string `json:"content"`
 	Done    bool   `json:"done"`
+	TurnID  string `json:"turnId,omitempty"`
+	ItemID  string `json:"itemId,omitempty"`
 }
 
 type StreamEventSink func(StreamPreview)

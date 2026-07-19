@@ -263,6 +263,11 @@ func Materialize(sessionsDir string, thread Thread) (Projection, error) {
 	if err != nil {
 		return Projection{}, fmt.Errorf("preserve local Codex projection entries: %w", err)
 	}
+	capturedTurns, err := readCapturedToolTurns(paths)
+	if err != nil {
+		return Projection{}, fmt.Errorf("preserve captured Codex tool activity: %w", err)
+	}
+	thread = mergeCapturedToolTurns(thread, capturedTurns)
 	entries := projectThread(thread)
 	entries = append(entries, preserved...)
 	if err := writeJSONLAtomic(path, entries); err != nil {
@@ -303,6 +308,140 @@ func projectionPaths(sessionsDir, target, nativeID string) ([]string, error) {
 		}
 	}
 	return paths, nil
+}
+
+type capturedToolTurn struct {
+	turn    Turn
+	hasTool bool
+	seen    map[string]struct{}
+}
+
+func isToolItemType(itemType string) bool {
+	switch itemType {
+	case "commandExecution", "fileChange", "mcpToolCall", "dynamicToolCall", "collabAgentToolCall", "subAgentActivity", "webSearch", "imageView", "sleep", "imageGeneration":
+		return true
+	default:
+		return false
+	}
+}
+
+func readCapturedToolTurns(paths []string) (map[string]Turn, error) {
+	best := map[string]capturedToolTurn{}
+	for _, path := range paths {
+		f, err := os.Open(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, err
+		}
+		turns := map[string]*capturedToolTurn{}
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 64<<10), maxLineBytes)
+		for scanner.Scan() {
+			var entry struct {
+				TurnID   string                     `json:"codexTurnId"`
+				ItemID   string                     `json:"codexItemId"`
+				ItemType string                     `json:"codexItemType"`
+				Raw      map[string]json.RawMessage `json:"codexRaw"`
+			}
+			if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+				_ = f.Close()
+				return nil, err
+			}
+			if entry.TurnID == "" || entry.ItemID == "" || entry.ItemType == "" {
+				continue
+			}
+			captured := turns[entry.TurnID]
+			if captured == nil {
+				captured = &capturedToolTurn{turn: Turn{ID: entry.TurnID}, seen: map[string]struct{}{}}
+				turns[entry.TurnID] = captured
+			}
+			if _, duplicate := captured.seen[entry.ItemID]; duplicate {
+				continue
+			}
+			captured.seen[entry.ItemID] = struct{}{}
+			captured.hasTool = captured.hasTool || isToolItemType(entry.ItemType)
+			captured.turn.Items = append(captured.turn.Items, ThreadItem{ID: entry.ItemID, Type: entry.ItemType, Raw: cloneRawMap(entry.Raw)})
+		}
+		scanErr := scanner.Err()
+		closeErr := f.Close()
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+		for turnID, captured := range turns {
+			if !captured.hasTool {
+				continue
+			}
+			if previous, ok := best[turnID]; !ok || len(captured.turn.Items) > len(previous.turn.Items) {
+				best[turnID] = *captured
+			}
+		}
+	}
+	out := make(map[string]Turn, len(best))
+	for turnID, captured := range best {
+		out[turnID] = captured.turn
+	}
+	return out, nil
+}
+
+func semanticItemKey(item ThreadItem) string {
+	switch item.Type {
+	case "userMessage":
+		return item.Type + "\x00" + userContent(item.Raw["content"])
+	case "agentMessage":
+		if phase := rawString(item.Raw["phase"]); phase != "" {
+			return item.Type + "\x00phase\x00" + phase
+		}
+		return item.Type + "\x00text\x00" + rawString(item.Raw["text"])
+	default:
+		return item.Type + "\x00" + item.ID
+	}
+}
+
+func mergeCapturedToolTurns(thread Thread, captured map[string]Turn) Thread {
+	seenTurns := make(map[string]struct{}, len(thread.Turns))
+	for turnIndex := range thread.Turns {
+		turn := &thread.Turns[turnIndex]
+		seenTurns[turn.ID] = struct{}{}
+		preserved, ok := captured[turn.ID]
+		if !ok {
+			continue
+		}
+		hasNativeTool := false
+		for _, item := range turn.Items {
+			hasNativeTool = hasNativeTool || isToolItemType(item.Type)
+		}
+		if hasNativeTool {
+			continue
+		}
+		merged := append([]ThreadItem(nil), preserved.Items...)
+		semantic := make(map[string]int, len(merged))
+		for index, item := range merged {
+			semantic[semanticItemKey(item)] = index
+		}
+		for _, item := range turn.Items {
+			key := semanticItemKey(item)
+			if index, duplicate := semantic[key]; duplicate {
+				if !isToolItemType(item.Type) {
+					merged[index] = item
+				}
+				continue
+			}
+			semantic[key] = len(merged)
+			merged = append(merged, item)
+		}
+		turn.Items = merged
+	}
+	for turnID, preserved := range captured {
+		if _, ok := seenTurns[turnID]; !ok {
+			thread.Turns = append(thread.Turns, preserved)
+		}
+	}
+	return thread
 }
 
 func projectThread(thread Thread) []map[string]any {
@@ -388,12 +527,14 @@ func projectItem(threadID, turnID, model string, item ThreadItem, timestamp stri
 			"model":    model,
 		}
 		result := entry("message", "-result")
+		status := rawString(item.Raw["status"])
 		result["message"] = map[string]any{
 			"role":       "toolResult",
 			"toolCallId": baseID,
 			"toolName":   name,
 			"content":    []any{},
 			"isError":    false,
+			"isRunning":  status == "inProgress" || status == "running",
 		}
 		return call, result
 	}

@@ -25,6 +25,64 @@ describe('live events', () => {
     ).toBeNull();
   });
 
+  it('waits for reactive rendering before clearing the streaming preview', async () => {
+    const order = [];
+    await handleSessionReload({
+      sessionId: 's',
+      fetchImpl: vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ entries: [] }), { status: 200 })),
+      ),
+      entryState: { seen: new Set(), liveRendered: new Set() },
+      onReloaded: async () => {
+        order.push('reconcile');
+        await Promise.resolve();
+        order.push('rendered');
+      },
+      clearChatPreview: () => order.push('clear'),
+    });
+    expect(order).toEqual(['reconcile', 'rendered', 'clear']);
+  });
+
+  it('discards an older reload response that resolves after a newer generation', async () => {
+    let resolveOld;
+    let resolveNew;
+    const oldResponse = new Promise((resolve) => {
+      resolveOld = resolve;
+    });
+    const newResponse = new Promise((resolve) => {
+      resolveNew = resolve;
+    });
+    let latestGeneration = 1;
+    const applied = [];
+    const cleared = [];
+    const base = {
+      sessionId: 's',
+      entryState: { seen: new Set(), liveRendered: new Set() },
+      onReloaded: (data) => applied.push(data.name),
+      clearChatPreview: () => cleared.push(true),
+    };
+    const oldReload = handleSessionReload({
+      ...base,
+      fetchImpl: () => oldResponse,
+      shouldApply: () => latestGeneration === 1,
+    });
+    latestGeneration = 2;
+    const newReload = handleSessionReload({
+      ...base,
+      fetchImpl: () => newResponse,
+      shouldApply: () => latestGeneration === 2,
+    });
+
+    resolveNew(new Response(JSON.stringify({ name: 'new', entries: [] }), { status: 200 }));
+    await newReload;
+    resolveOld(new Response(JSON.stringify({ name: 'old', entries: [] }), { status: 200 }));
+    const oldResult = await oldReload;
+
+    expect(applied).toEqual(['new']);
+    expect(cleared).toHaveLength(1);
+    expect(oldResult.stale).toBe(true);
+  });
+
   it('handles reload entries, title, and follow behavior', async () => {
     const entries = [{ id: 'a' }, { id: 'r', message: { role: 'toolResult' } }];
     const fetchImpl = vi.fn(() =>

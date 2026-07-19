@@ -27,7 +27,9 @@
     return null;
   });
   const result = $derived(resultEntry?.message || null);
-  const statusClass = $derived(result ? (result.isError ? 'error' : 'success') : 'pending');
+  const statusClass = $derived(
+    result ? (result.isRunning ? 'pending' : result.isError ? 'error' : 'success') : 'pending',
+  );
   const args = $derived(call.arguments || {});
 
   const resultText = $derived(

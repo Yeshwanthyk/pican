@@ -105,6 +105,124 @@ func TestWorkerResumePromptSteerInterruptSettingsStatusAndPreview(t *testing.T) 
 	}
 }
 
+func TestWorkerSeparatesAgentPreviewFromProjectionAndToolOutput(t *testing.T) {
+	root := t.TempDir()
+	thread := testThread()
+	thread.CWD = "/tmp/project"
+	projection, err := Materialize(root, thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var previews []Preview
+	var callbackOrder []string
+	projectionCount := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	w, err := NewWorker(ctx, projection.Path, helperCommand("normal"), Callbacks{
+		Preview: func(p Preview) {
+			mu.Lock()
+			previews = append(previews, p)
+			if p.Done {
+				callbackOrder = append(callbackOrder, "done")
+			}
+			mu.Unlock()
+		},
+		Projection: func(Projection) {
+			mu.Lock()
+			projectionCount++
+			callbackOrder = append(callbackOrder, "projection")
+			mu.Unlock()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	mu.Lock()
+	projectionCount = 0 // Ignore NewWorker's initial authoritative materialization.
+	callbackOrder = nil
+	mu.Unlock()
+
+	w.handleNotification(Notification{Method: "item/started", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","item":{"id":"agent-live","type":"agentMessage","text":""}}`)})
+	w.handleNotification(Notification{Method: "item/agentMessage/delta", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","itemId":"agent-live","delta":"partial"}`)})
+	time.Sleep(150 * time.Millisecond)
+
+	mu.Lock()
+	gotPreviews := append([]Preview(nil), previews...)
+	gotProjectionCount := projectionCount
+	mu.Unlock()
+	if len(gotPreviews) != 1 || gotPreviews[0].Text != "partial" || gotPreviews[0].Done {
+		t.Fatalf("agent preview callbacks = %+v", gotPreviews)
+	}
+	if gotProjectionCount != 0 {
+		t.Fatalf("agent delta materialized %d projections; preview must be the sole partial-text owner", gotProjectionCount)
+	}
+	data, err := os.ReadFile(projection.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "partial") {
+		t.Fatal("partial agent text leaked into the canonical projection")
+	}
+
+	w.handleNotification(Notification{Method: "item/completed", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","item":{"id":"agent-live","type":"agentMessage","text":"complete"}}`)})
+	data, err = os.ReadFile(projection.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "complete") {
+		t.Fatal("completed agent item was not materialized")
+	}
+	mu.Lock()
+	if len(previews) != 2 || !previews[1].Done || previews[1].Text != "complete" {
+		t.Fatalf("completed agent preview callbacks = %+v", previews)
+	}
+	if strings.Join(callbackOrder, ",") != "projection,done" {
+		t.Fatalf("completion callback order = %v, want canonical projection before done", callbackOrder)
+	}
+	previewCount := len(previews)
+	mu.Unlock()
+
+	w.handleNotification(Notification{Method: "item/started", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","item":{"id":"cmd-live","type":"commandExecution","command":"pwd","status":"inProgress"}}`)})
+	w.handleNotification(Notification{Method: "item/commandExecution/outputDelta", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","itemId":"cmd-live","delta":"/tmp/project\\n"}`)})
+	w.handleNotification(Notification{Method: "item/completed", Params: []byte(`{"threadId":"thread-1","turnId":"turn-live","item":{"id":"cmd-live","type":"commandExecution","command":"pwd","status":"completed","aggregatedOutput":"/tmp/project\\n"}}`)})
+	mu.Lock()
+	defer mu.Unlock()
+	if len(previews) != previewCount {
+		t.Fatalf("tool output leaked into assistant previews: %+v", previews[previewCount:])
+	}
+}
+
+func TestPreserveLocalTurnsRejectsLaggingTemporaryItemIdentities(t *testing.T) {
+	local := Thread{Turns: []Turn{{ID: "turn-live", Status: "completed", Items: []ThreadItem{
+		item("user", "userMessage", map[string]any{"content": []any{}}),
+		item("commentary", "agentMessage", map[string]any{"text": "checking"}),
+		item("command", "commandExecution", map[string]any{"status": "completed", "aggregatedOutput": "ok"}),
+		item("final", "agentMessage", map[string]any{"text": "local final"}),
+	}}}}
+	staleRead := Thread{Turns: []Turn{{ID: "turn-live", Status: "completed", Items: []ThreadItem{
+		item("item-1", "userMessage", map[string]any{"content": []any{}}),
+		item("item-2", "agentMessage", map[string]any{"text": "checking"}),
+		item("item-3", "agentMessage", map[string]any{"text": "stale final"}),
+	}}}}
+
+	merged := preserveLocalTurns(staleRead, local, "turn-live")
+	if len(merged.Turns) != 1 || len(merged.Turns[0].Items) != 4 {
+		t.Fatalf("merged turns = %+v", merged.Turns)
+	}
+	var ids []string
+	for _, item := range merged.Turns[0].Items {
+		ids = append(ids, item.ID)
+	}
+	if strings.Join(ids, ",") != "user,commentary,command,final" {
+		t.Fatalf("merged item order = %v", ids)
+	}
+	if got := rawString(merged.Turns[0].Items[3].Raw["text"]); got != "local final" {
+		t.Fatalf("live completed turn was not preserved: %q", got)
+	}
+}
+
 func TestWorkerRoutesOnlyItsThreadNotifications(t *testing.T) {
 	w := &Worker{
 		nativeID:       "thread-own",

@@ -84,6 +84,79 @@ func TestProjectionStableKnownUnknownAndPreservation(t *testing.T) {
 	}
 }
 
+func TestProjectRunningToolKeepsResultPending(t *testing.T) {
+	running := item("cmd", "commandExecution", map[string]any{
+		"command":          "printf ok",
+		"status":           "inProgress",
+		"aggregatedOutput": "ok",
+	})
+	entries := projectItem("thread", "turn", "gpt", running, "2026-01-01T00:00:00Z")
+	if len(entries) != 2 {
+		t.Fatalf("projected entries = %d, want call and result", len(entries))
+	}
+	result := entries[1]["message"].(map[string]any)
+	if result["isRunning"] != true {
+		t.Fatalf("running result metadata = %#v", result)
+	}
+
+	completed := item("cmd", "commandExecution", map[string]any{
+		"command":          "printf ok",
+		"status":           "completed",
+		"aggregatedOutput": "ok",
+	})
+	entries = projectItem("thread", "turn", "gpt", completed, "2026-01-01T00:00:00Z")
+	result = entries[1]["message"].(map[string]any)
+	if result["isRunning"] != false {
+		t.Fatalf("completed result metadata = %#v", result)
+	}
+}
+
+func TestMaterializePreservesCapturedToolsAcrossSparseNativeRead(t *testing.T) {
+	root := t.TempDir()
+	live := Thread{ID: "native", CWD: t.TempDir(), Model: "gpt", Turns: []Turn{{ID: "turn", Status: "completed", Items: []ThreadItem{
+		item("user-live", "userMessage", map[string]any{"content": []any{map[string]any{"type": "text", "text": "run it"}}}),
+		item("commentary-live", "agentMessage", map[string]any{"text": "checking", "phase": "commentary"}),
+		item("command-live", "commandExecution", map[string]any{"command": "printf ok", "status": "completed", "aggregatedOutput": "ok"}),
+		item("final-live", "agentMessage", map[string]any{"text": "local final", "phase": "final_answer"}),
+	}}}}
+	projection, err := Materialize(root, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Persisted thread reads can expose normalized message IDs while omitting
+	// command activity that was available only through live notifications.
+	sparse := live
+	sparse.Turns = []Turn{{ID: "turn", Status: "completed", Items: []ThreadItem{
+		item("item-1", "userMessage", map[string]any{"content": []any{map[string]any{"type": "text", "text": "run it"}}}),
+		item("item-2", "agentMessage", map[string]any{"text": "checking", "phase": "commentary"}),
+		item("item-3", "agentMessage", map[string]any{"text": "authoritative final", "phase": "final_answer"}),
+	}}}
+	if _, err := Materialize(root, sparse); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := sessions.ParseFile(projection.Path, sessions.EncodeProjectName(live.CWD), projection.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, entry := range parsed.Entries {
+		if itemType, _ := entry["codexItemType"].(string); itemType != "" {
+			counts[itemType]++
+		}
+	}
+	if counts["userMessage"] != 1 || counts["agentMessage"] != 2 || counts["commandExecution"] != 2 {
+		t.Fatalf("captured turn counts = %v", counts)
+	}
+	data, err := os.ReadFile(projection.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "authoritative final") || !strings.Contains(string(data), "printf ok") {
+		t.Fatalf("sparse merge lost authoritative text or captured command: %s", data)
+	}
+}
+
 func TestMaterializeCanonicalizesProjectPathAndPrunesDuplicate(t *testing.T) {
 	root := t.TempDir()
 	realProject := filepath.Join(t.TempDir(), "project")

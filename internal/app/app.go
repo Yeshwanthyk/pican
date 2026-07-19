@@ -118,7 +118,7 @@ func Main(version string) {
 			return codex.NewWorker(workerCtx, sessionPath, codexArgv, codex.Callbacks{
 				Preview: func(preview codex.Preview) {
 					if srv != nil {
-						srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{Content: preview.Text, Done: preview.Done})
+						srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{Content: preview.Text, Done: preview.Done, TurnID: preview.TurnID, ItemID: preview.ItemID})
 					}
 				},
 				Status: func(workers.WorkerStatus) {

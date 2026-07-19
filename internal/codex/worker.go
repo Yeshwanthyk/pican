@@ -375,7 +375,11 @@ func (w *Worker) handleNotification(n Notification) {
 			Item     ThreadItem `json:"item"`
 		}
 		if json.Unmarshal(n.Params, &p) == nil && w.acceptsThread(p.ThreadID) {
-			w.applyLiveItem(p.TurnID, p.Item)
+			// Agent text is owned by chat-preview until item/completed. Writing the
+			// same partial item into the projection renders two competing streams.
+			if p.Item.Type != "agentMessage" {
+				w.applyLiveItem(p.TurnID, p.Item)
+			}
 		}
 	case "item/agentMessage/delta", "item/plan/delta", "item/reasoning/summaryTextDelta", "item/reasoning/summaryPartAdded", "item/reasoning/textDelta", "command/exec/outputDelta", "process/outputDelta", "item/commandExecution/outputDelta", "item/fileChange/outputDelta", "item/fileChange/patchUpdated", "item/mcpToolCall/progress":
 		if !w.acceptsThread(identity.ThreadID) {
@@ -413,17 +417,14 @@ func (w *Worker) handleNotification(n Notification) {
 		if identity.ItemID == "" {
 			identity.ItemID = n.Method + "-" + identity.TurnID
 		}
-		w.applyDelta(identity.TurnID, identity.ItemID, itemType, field, text)
-		if n.Method == "item/agentMessage/delta" && w.callbacks.Preview != nil {
-			w.mu.Lock()
-			b := w.preview[identity.TurnID+"\x00"+identity.ItemID]
-			visible := ""
-			if b != nil {
-				visible = b.String()
+		if n.Method == "item/agentMessage/delta" {
+			visible := w.appendPreviewDelta(identity.TurnID, identity.ItemID, text)
+			if w.callbacks.Preview != nil {
+				w.callbacks.Preview(Preview{Text: visible, TurnID: identity.TurnID, ItemID: identity.ItemID})
 			}
-			w.mu.Unlock()
-			w.callbacks.Preview(Preview{Text: visible, TurnID: identity.TurnID, ItemID: identity.ItemID})
+			break
 		}
+		w.applyDelta(identity.TurnID, identity.ItemID, itemType, field, text)
 	case "item/completed":
 		var p struct {
 			ThreadID string     `json:"threadId"`
@@ -588,6 +589,89 @@ func (w *Worker) upsertTurnLocked(turn Turn) {
 	w.thread.Turns = append(w.thread.Turns, turn)
 }
 
+func mergeItemSnapshots(preferred, fallback []ThreadItem) []ThreadItem {
+	preferredByID := make(map[string]ThreadItem, len(preferred))
+	for _, item := range preferred {
+		preferredByID[item.ID] = item
+	}
+	merged := make([]ThreadItem, 0, len(preferred)+len(fallback))
+	seen := make(map[string]struct{}, len(preferred)+len(fallback))
+	// Live notification order is the freshest ordering boundary. Replace items
+	// present in the authoritative snapshot, but retain live items that the
+	// immediate post-completion read has not exposed yet.
+	for _, item := range fallback {
+		if replacement, ok := preferredByID[item.ID]; ok {
+			item = replacement
+		}
+		merged = append(merged, item)
+		seen[item.ID] = struct{}{}
+	}
+	for _, item := range preferred {
+		if _, ok := seen[item.ID]; ok {
+			continue
+		}
+		merged = append(merged, item)
+	}
+	return merged
+}
+
+func preserveLocalTurns(remote, local Thread, turnIDs ...string) Thread {
+	protected := make(map[string]struct{}, len(turnIDs))
+	for _, turnID := range turnIDs {
+		if turnID != "" {
+			protected[turnID] = struct{}{}
+		}
+	}
+	localTurns := make(map[string]Turn, len(local.Turns))
+	for _, turn := range local.Turns {
+		localTurns[turn.ID] = turn
+	}
+	seen := make(map[string]struct{}, len(remote.Turns))
+	for index := range remote.Turns {
+		turn := &remote.Turns[index]
+		seen[turn.ID] = struct{}{}
+		if _, ok := protected[turn.ID]; !ok {
+			continue
+		}
+		if localTurn, ok := localTurns[turn.ID]; ok {
+			// Immediate thread/read can lag notifications and even expose temporary
+			// item identities. Keep the just-completed live turn wholesale rather
+			// than combining two semantic copies under different IDs.
+			*turn = localTurn
+		}
+	}
+	for turnID := range protected {
+		if _, ok := seen[turnID]; ok {
+			continue
+		}
+		if localTurn, ok := localTurns[turnID]; ok {
+			remote.Turns = append(remote.Turns, localTurn)
+		}
+	}
+	return remote
+}
+
+func (w *Worker) mergeCompletedTurnLocked(completed Turn) {
+	for index := range w.thread.Turns {
+		turn := &w.thread.Turns[index]
+		if turn.ID != completed.ID {
+			continue
+		}
+		turn.Items = mergeItemSnapshots(completed.Items, turn.Items)
+		if completed.Status != "" {
+			turn.Status = completed.Status
+		}
+		if completed.StartedAt != 0 {
+			turn.StartedAt = completed.StartedAt
+		}
+		if completed.CompletedAt != 0 {
+			turn.CompletedAt = completed.CompletedAt
+		}
+		return
+	}
+	w.thread.Turns = append(w.thread.Turns, completed)
+}
+
 func (w *Worker) upsertItemLocked(turnID string, item ThreadItem) {
 	for ti := range w.thread.Turns {
 		if w.thread.Turns[ti].ID != turnID {
@@ -634,6 +718,19 @@ func (w *Worker) applyNotice(turnID, text string) {
 	w.applySynthetic(turnID, "notice-"+stableHash(turnID, text), "agentMessage", "[Codex] "+text)
 }
 
+func (w *Worker) appendPreviewDelta(turnID, itemID, delta string) string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	key := turnID + "\x00" + itemID
+	b := w.preview[key]
+	if b == nil {
+		b = &strings.Builder{}
+		w.preview[key] = b
+	}
+	b.WriteString(delta)
+	return b.String()
+}
+
 func (w *Worker) applyDelta(turnID, itemID, itemType, field, delta string) {
 	w.mu.Lock()
 	var item *ThreadItem
@@ -669,13 +766,6 @@ func (w *Worker) applyDelta(turnID, itemID, itemType, field, delta string) {
 	if itemType == "commandExecution" {
 		item.Raw["status"] = json.RawMessage(`"inProgress"`)
 	}
-	key := turnID + "\x00" + itemID
-	b := w.preview[key]
-	if b == nil {
-		b = &strings.Builder{}
-		w.preview[key] = b
-	}
-	b.WriteString(delta)
 	w.revision++
 	w.mu.Unlock()
 	w.scheduleMaterialize()
@@ -783,16 +873,23 @@ func (w *Worker) applyCompletedItem(turnID string, item ThreadItem) {
 	var finalPreview *Preview
 	for key, b := range w.preview {
 		if key == turnID+"\x00"+item.ID {
-			preview := Preview{Text: b.String(), Done: true, TurnID: turnID, ItemID: item.ID}
+			text := b.String()
+			if completedText := rawString(item.Raw["text"]); completedText != "" {
+				text = completedText
+			}
+			preview := Preview{Text: text, Done: true, TurnID: turnID, ItemID: item.ID}
 			finalPreview = &preview
 			delete(w.preview, key)
 		}
 	}
 	w.mu.Unlock()
+	// Commit the authoritative item before announcing preview completion. The
+	// browser's done handler immediately reloads, so the canonical entry must
+	// already exist for an atomic preview-to-transcript handoff.
+	w.materializeRevision(thread, revision)
 	if finalPreview != nil && w.callbacks.Preview != nil {
 		w.callbacks.Preview(*finalPreview)
 	}
-	w.materializeRevision(thread, revision)
 }
 func (w *Worker) completeTurn(threadID string, turn Turn) {
 	w.mu.Lock()
@@ -801,6 +898,8 @@ func (w *Worker) completeTurn(threadID string, turn Turn) {
 		return
 	}
 	w.completedTurns[turn.ID] = struct{}{}
+	w.mergeCompletedTurnLocked(turn)
+	localSnapshot := cloneThread(w.thread)
 	w.revision++
 	revision := w.revision
 	if w.activeTurn == turn.ID {
@@ -808,6 +907,7 @@ func (w *Worker) completeTurn(threadID string, turn Turn) {
 		w.setStatusLocked(workers.WorkerStateIdle, "")
 		w.lastActive = time.Now()
 	}
+	newerActiveTurn := w.activeTurn
 	w.background.Add(1)
 	w.mu.Unlock()
 	go func() {
@@ -827,19 +927,7 @@ func (w *Worker) completeTurn(threadID string, turn Turn) {
 		thread.Model = w.model
 		thread.Effort = w.effort
 		if threadID == w.nativeID {
-			if w.activeTurn != "" && w.activeTurn != turn.ID {
-				for _, localTurn := range w.thread.Turns {
-					if localTurn.ID == w.activeTurn {
-						found := false
-						for _, remoteTurn := range thread.Turns {
-							found = found || remoteTurn.ID == localTurn.ID
-						}
-						if !found {
-							thread.Turns = append(thread.Turns, localTurn)
-						}
-					}
-				}
-			}
+			thread = preserveLocalTurns(thread, localSnapshot, turn.ID, newerActiveTurn)
 			w.thread = thread
 		} else {
 			for _, reviewTurn := range thread.Turns {

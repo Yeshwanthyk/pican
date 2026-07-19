@@ -235,6 +235,23 @@ describe('SessionDataModel', () => {
     expect(m.byId.get('leaf2').message.content).toBe('more');
   });
 
+  it('replaces known objects when stable ids belong to a mutable projection', () => {
+    const m = model();
+    const originalLeaf = m.byId.get('leaf');
+    const replacement = {
+      ...entries.find((entry) => entry.id === 'leaf'),
+      message: { role: 'assistant', content: 'completed canonical output' },
+    };
+
+    m.reconcile(
+      entries.map((entry) => (entry.id === 'leaf' ? replacement : { ...entry })),
+      { replaceExisting: true },
+    );
+
+    expect(m.byId.get('leaf')).not.toBe(originalLeaf);
+    expect(m.byId.get('leaf').message.content).toBe('completed canonical output');
+  });
+
   it('derives the ordered active path (root→leaf)', () => {
     const m = model();
     expect(m.activePath.map((e) => e.id)).toEqual(['root', 'mid', 'leaf']);

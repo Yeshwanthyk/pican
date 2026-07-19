@@ -29,6 +29,7 @@ export async function handleSessionReload({
   onReloaded = () => {},
   onNewEntries = null,
   getEntryCount = null,
+  shouldApply = () => true,
 } = {}) {
   // getEntryCount is a live getter into the canonical entry count (typically
   // model.entries.length), not a value snapshotted once — reading it fresh
@@ -44,9 +45,15 @@ export async function handleSessionReload({
   }
   const response = await fetchImpl(url);
   const data = await response.json();
+  if (!shouldApply()) {
+    return { entries: [], newCount: 0, stale: true };
+  }
   const entries = data.entries || [];
   const isDelta = hasValidAfterCount && data.deltaOk === true;
-  onReloaded({ ...data, entries, isDelta });
+  // Reactive callers may return a render barrier (for example Svelte's tick).
+  // Wait for canonical entries to reach the DOM before removing the imperative
+  // preview, so the handoff has neither a blank frame nor duplicate text.
+  await onReloaded({ ...data, entries, isDelta });
   if (typeof data.name === 'string' && data.name.trim()) {
     updateTitle(data.name);
   }
