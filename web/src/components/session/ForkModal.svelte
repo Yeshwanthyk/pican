@@ -1,4 +1,6 @@
 <script module lang="ts">
+  import { Schema } from 'effect';
+
   interface ForkEntry {
     readonly id?: string;
     readonly type?: string;
@@ -10,6 +12,18 @@
     readonly text: string;
     readonly number: number;
   }
+
+  const UserMessageSchema = Schema.Struct({
+    role: Schema.Literal('user'),
+    content: Schema.Union([Schema.String, Schema.Array(Schema.Unknown)]),
+  });
+  const TextBlockSchema = Schema.Struct({
+    type: Schema.Literal('text'),
+    text: Schema.optionalKey(Schema.Unknown),
+  });
+  const isUserMessage = Schema.is(UserMessageSchema);
+  const isTextBlock = Schema.is(TextBlockSchema);
+
   // Pure helpers shared with SessionPage's open-bridge (for the empty check).
   export function normalizeText(text: unknown): string {
     return String(text || '')
@@ -26,15 +40,12 @@
   function extractUserMessageText(entry: ForkEntry): string {
     if (entry?.type !== 'message') return '';
     const msg = entry.message;
-    if (typeof msg !== 'object' || msg === null || Reflect.get(msg, 'role') !== 'user') return '';
-    const content = Reflect.get(msg, 'content');
+    if (!isUserMessage(msg)) return '';
+    const content = msg.content;
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content
-        .filter(
-          (b): b is { readonly type: 'text'; readonly text?: unknown } =>
-            typeof b === 'object' && b !== null && 'type' in b && b.type === 'text',
-        )
+        .filter(isTextBlock)
         .map((b) => String(b.text ?? ''))
         .join(' ');
     }

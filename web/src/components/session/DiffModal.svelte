@@ -91,7 +91,9 @@
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        // oxlint-disable-next-line pican/no-error-constructor -- Promise.race timeout adapter must reject with the sentinel Error consumed below.
         const err = new Error(`__diff_timeout__:${stage}`);
+        // oxlint-disable-next-line pican/no-promise-reject -- Promise.race timeout adapter boundary; rejection preserves the existing caller contract.
         reject(err);
       }, ms);
     });
@@ -107,6 +109,7 @@
           `[diff] ${stage}: failed after ${Math.round(performance.now() - started)}ms`,
           err,
         );
+        // oxlint-disable-next-line pican/no-try-catch-or-throw -- Third-party Promise adapter must rethrow the renderer rejection unchanged.
         throw err;
       },
     );
@@ -145,6 +148,7 @@
         buildCodeView(files);
       },
       (error: unknown) => {
+        // oxlint-disable-next-line pican/no-instanceof-error, pican/no-unknown-error-message, pican/no-unknown-error-message -- UI boundary preserves third-party and timeout error text.
         const msg = error instanceof Error ? error.message : String(error);
         errorMsg = msg.startsWith('__diff_timeout__')
           ? `${t('diff.timeout')} (${msg.split(':')[1] || ''})`

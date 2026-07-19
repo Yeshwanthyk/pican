@@ -3,6 +3,7 @@
   import { icon, ChevronDown, ExternalLink } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import * as Http from '../../lib/http.js';
+  import { describeError } from '../../lib/errors.js';
   import { GitInfoSchema, GitRenameResponseSchema, type GitInfo } from '../../lib/schema.js';
   import { runPromise } from '../../lib/runtime.js';
 
@@ -209,7 +210,7 @@
         },
         (error: unknown) => {
           if (input) {
-            input.title = error instanceof Error ? error.message : t('git.renameFailed');
+            input.title = describeError(error);
             input.focus();
             input.select();
           }

@@ -76,6 +76,16 @@
   const hasMore = $derived(sessions.length < total);
   const runningCount = $derived(runningSessionIds.size);
 
+  function normalizeRunningStatus(value: unknown): RunningStatus | undefined {
+    if (typeof value !== 'object' || value === null) return undefined;
+    const status = value as Partial<Record<keyof RunningStatus, unknown>>;
+    return {
+      modelName: typeof status.modelName === 'string' ? status.modelName : undefined,
+      model: typeof status.model === 'string' ? status.model : undefined,
+      modelProvider: typeof status.modelProvider === 'string' ? status.modelProvider : undefined,
+    };
+  }
+
   function setRunningSessions(snapshot: {
     readonly ids: ReadonlyArray<string>;
     readonly statuses: Readonly<Record<string, unknown>>;
@@ -84,15 +94,8 @@
     for (const id of snapshot.ids) runningSessionIds.add(id);
     runningStatuses.clear();
     for (const [key, value] of Object.entries(snapshot.statuses)) {
-      if (typeof value !== 'object' || value === null) continue;
-      const modelName = Reflect.get(value, 'modelName');
-      const model = Reflect.get(value, 'model');
-      const modelProvider = Reflect.get(value, 'modelProvider');
-      runningStatuses.set(key, {
-        modelName: typeof modelName === 'string' ? modelName : undefined,
-        model: typeof model === 'string' ? model : undefined,
-        modelProvider: typeof modelProvider === 'string' ? modelProvider : undefined,
-      });
+      const status = normalizeRunningStatus(value);
+      if (status) runningStatuses.set(key, status);
     }
   }
 

@@ -62,7 +62,23 @@
   const PendingExtensionResponse = Schema.Struct({
     requests: Schema.optionalKey(Schema.Array(ExtensionRequestSchema)),
   });
+  const SessionRuntimeModelSchema = Schema.Struct({
+    entries: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+    leafId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    urlTargetId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  });
   const isExtensionRequest = Schema.is(ExtensionRequestSchema);
+  const isSessionRuntimeModel = Schema.is(SessionRuntimeModelSchema);
+  const TestHookHostSchema = Schema.Struct({
+    __PI_TEST_CHAT_COMPOSER_HOOK__: Schema.optionalKey(Schema.Unknown),
+  });
+  const isTestHookHost = Schema.is(TestHookHostSchema);
+
+  const getTestHook = (host: unknown): (() => void) | undefined => {
+    if (!isTestHookHost(host)) return undefined;
+    const hook = host.__PI_TEST_CHAT_COMPOSER_HOOK__;
+    return typeof hook === 'function' ? (hook as () => void) : undefined;
+  };
 
   // Reactive toolbar state owned here so the live runtime can mutate it while
   // <ChatToolbar> renders from it.
@@ -95,15 +111,14 @@
   onMount(() => {
     const target = window;
     const runtime = getSessionRuntime();
-    const model = isUnknownRecord(runtime.model) ? runtime.model : null;
+    const model = isSessionRuntimeModel(runtime.model) ? runtime.model : null;
     const entries: SessionEntry[] = Array.isArray(model?.entries)
       ? model.entries.flatMap((entry) => {
           const parsed = sessionEntryFromUnknown(entry);
           return parsed ? [parsed] : [];
         })
       : [];
-    const testHook = Reflect.get(globalThis, '__PI_TEST_CHAT_COMPOSER_HOOK__');
-    if (typeof testHook === 'function') testHook();
+    getTestHook(globalThis)?.();
     const composerRuntime = runChatComposer({
       documentImpl: document,
       windowImpl: target,

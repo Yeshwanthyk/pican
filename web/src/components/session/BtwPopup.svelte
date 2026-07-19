@@ -4,9 +4,10 @@
   // persisted server-side and synced over SSE. The transcript renders reactively;
   // drag/resize/SSE/status-polling/submit stay imperative. Live-only — never in
   // the export bundle. See docs/sequence-flows/btw.md.
-  import { Effect, Schema } from 'effect';
+  import { Effect, Predicate, Schema } from 'effect';
   import { onMount } from 'svelte';
   import * as Http from '../../lib/http.js';
+  import { HttpError } from '../../lib/errors.js';
   import { runPromise } from '../../lib/runtime.js';
   import { sessionEntryFromUnknown, type SessionEntry } from '../../session/data/session-types.js';
   import { sendChat as sendChatApi } from '../../session/chat/chat-api.js';
@@ -75,11 +76,7 @@
   const toHtml = createBtwMarkdownRenderer({ documentImpl: document });
   const renderEntryParts = (entry: SessionEntry) => renderBtwEntryParts(entry, { toHtml });
 
-  const renderedEntries = $derived(
-    entries
-      .map(renderEntryParts)
-      .filter((entry): entry is NonNullable<ReturnType<typeof renderEntryParts>> => entry !== null),
-  );
+  const renderedEntries = $derived(entries.map(renderEntryParts).filter(Predicate.isNotNull));
   const isEmpty = $derived(
     renderedEntries.length === 0 && !pendingUser && !(running || streamingText),
   );
@@ -112,12 +109,12 @@
         });
         if (pendingUser) {
           const arrived = entries.some(
-            (e) =>
-              e &&
-              e.type === 'message' &&
-              e.message &&
-              e.message.role === 'user' &&
-              btwContentText(e.message.content).trim() === pendingUser,
+            (entry) =>
+              entry &&
+              entry.type === 'message' &&
+              entry.message &&
+              entry.message.role === 'user' &&
+              btwContentText(entry.message.content).trim() === pendingUser,
           );
           if (arrived) pendingUser = null;
         }
@@ -265,7 +262,11 @@
       });
       const data = yield* decodeChatResponse(responseText);
       if (!response.ok) {
-        return yield* Effect.fail(new Error(data.error ?? 'chat request failed'));
+        return yield* new HttpError({
+          status: response.status,
+          url: response.url,
+          body: data.error ?? 'chat request failed',
+        });
       }
     });
   }

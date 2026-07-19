@@ -105,6 +105,7 @@ export function containsPromiseType(node) {
   if (!node || typeof node !== "object") return false;
   if (isPromiseType(node)) return true;
 
+  // oxlint-disable-next-line pican/no-switch-statement -- This utility helps implement the lint rules themselves; importing Effect Match here would make plugin bootstrapping circular.
   switch (node.type) {
     case "TSTypeAnnotation":
       return containsPromiseType(node.typeAnnotation);

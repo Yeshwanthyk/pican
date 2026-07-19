@@ -4,6 +4,7 @@
   // onMount, wires open/close + the action dispatch. Several actions delegate to
   // shared live runtime helpers or click hidden relay buttons (share/new/terminal).
   import { onMount } from 'svelte';
+  import { Match, Schema } from 'effect';
   import type { IconNode } from 'lucide';
   import CommandPalette from '../shared/CommandPalette.svelte';
   import { t } from '../../shared/strings.js';
@@ -68,6 +69,25 @@
         readonly action: string;
         readonly desktopOnly?: boolean;
       });
+
+  const MenuActionSchema = Schema.Literals([
+    'share',
+    'list-sessions',
+    'new-session',
+    'terminal',
+    'tree',
+    'model-usage',
+    'rename',
+    'fork',
+    'clone',
+    'version',
+    'diff',
+    'workflows',
+    'tasks',
+    'subagents',
+  ]);
+  type MenuAction = typeof MenuActionSchema.Type;
+  const isMenuAction = Schema.is(MenuActionSchema);
 
   // Close animations must outlast the matching CSS transitions before the panel
   // is display:none'd (see command-menu styles).
@@ -159,38 +179,38 @@
       closeDesktopPopover();
     };
 
-    function handleAction(action: string): void {
-      switch (action) {
-        case 'share':
+    function handleAction(action: MenuAction): void {
+      Match.value(action).pipe(
+        Match.when('share', () => {
           clickHidden('share-btn');
           closeMenu();
-          break;
-        case 'list-sessions':
+        }),
+        Match.when('list-sessions', () => {
           closeMenu();
           openSessionPalette();
-          break;
-        case 'new-session':
+        }),
+        Match.when('new-session', () => {
           clickHidden('new-btn');
           closeMenu();
-          break;
-        case 'terminal':
+        }),
+        Match.when('terminal', () => {
           clickHidden('resume-btn');
           closeMenu();
-          break;
-        case 'tree':
+        }),
+        Match.when('tree', () => {
           openTree();
           closeMenu();
-          break;
-        case 'model-usage':
+        }),
+        Match.when('model-usage', () => {
           openModelUsage();
           closeMenu();
-          break;
-        case 'rename': {
+        }),
+        Match.when('rename', () => {
           const current = sessionTitle.name;
           const next = window.prompt(t('menu.renamePrompt'), current);
           const trimmed = next ? next.trim() : '';
           closeMenu();
-          if (!trimmed || trimmed === current) break;
+          if (!trimmed || trimmed === current) return;
           void renameSession(sessionId, trimmed).then(
             (data) => {
               setSessionTitle(typeof data.name === 'string' ? data.name : trimmed);
@@ -198,9 +218,8 @@
             },
             () => toast(t('git.renameFailed')),
           );
-          break;
-        }
-        case 'fork': {
+        }),
+        Match.when('fork', () => {
           closeMenu();
           void loadForkEntries(sessionId).then(
             (entries) => {
@@ -221,9 +240,8 @@
             },
             () => toast(t('menu.loadMessagesFailed')),
           );
-          break;
-        }
-        case 'clone': {
+        }),
+        Match.when('clone', () => {
           closeMenu();
           void cloneSession(sessionId).then(
             (data) => {
@@ -235,21 +253,20 @@
             },
             () => toast(t('menu.cloneFailed')),
           );
-          break;
-        }
-        case 'version':
+        }),
+        Match.when('version', () => {
           closeMenu();
           openVersionModal();
-          break;
-        case 'diff':
+        }),
+        Match.when('diff', () => {
           closeMenu();
           openDiff({ sessionId });
-          break;
-        case 'workflows':
+        }),
+        Match.when('workflows', () => {
           closeMenu();
           navigate('/workflows?session=' + encodeURIComponent(sessionId));
-          break;
-        case 'tasks':
+        }),
+        Match.when('tasks', () => {
           closeMenu();
           navigate(
             '/tasks?session=' +
@@ -257,14 +274,13 @@
               '&project=' +
               encodeURIComponent(cwd),
           );
-          break;
-        case 'subagents':
+        }),
+        Match.when('subagents', () => {
           closeMenu();
           navigate('/subagents?session=' + encodeURIComponent(sessionId));
-          break;
-        default:
-          break;
-      }
+        }),
+        Match.exhaustive,
+      );
     }
 
     const onMenuBtnClick = (e: MouseEvent): void => {
@@ -289,7 +305,9 @@
       if (!(e.target instanceof Element)) return;
       const item =
         e.target.closest('.mobile-command-item') || e.target.closest('.command-menu-item');
-      if (item instanceof HTMLElement && item.dataset.action) handleAction(item.dataset.action);
+      if (item instanceof HTMLElement && isMenuAction(item.dataset.action)) {
+        handleAction(item.dataset.action);
+      }
     };
     const containers = [mobilePanel, desktopPopover].filter(
       (container): container is HTMLElement => container instanceof HTMLElement,
