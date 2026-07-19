@@ -10,17 +10,13 @@
 // <script> tags (see internal/ui/export.go); they are marked external in the
 // export Vite build, so this bundle reads window.marked / window.hljs.
 
-import { loadSessionData } from "../session/data/session-data.js";
-import { extractContent } from "../session/tree/session-filter.js";
-import {
-  escapeHtml,
-  formatToolCall,
-  getTreeNodeDisplayHtml as getTreeNodeDisplayHtmlForState,
-  shortenPath,
-  truncate,
-} from "../session/render/session-format.js";
-import { configureSessionMarkdown, safeMarkedParse } from "../session/render/markdown.js";
-import { downloadSessionJson } from "../session/render/session-entry-actions.js";
+import type { HLJSApi } from "highlight.js";
+import type { marked } from "marked";
+import { loadExportSessionData } from "./export-session-data.js";
+import { sessionEntryFromUnknown, type SessionEntry } from "../session/data/session-types.js";
+import { escapeHtml } from "../session/render/session-format.js";
+import { configureSessionMarkdown, safeMarkedParse } from "./export-markdown.js";
+import { downloadExportSessionJson } from "./export-session-download.js";
 import { mount } from "svelte";
 import SessionTreeNodes from "../components/session/SessionTreeNodes.svelte";
 import SessionInfoHeader from "../components/session/SessionInfoHeader.svelte";
@@ -28,7 +24,7 @@ import SessionContent from "../components/session/SessionContent.svelte";
 import ImageModal from "../components/session/ImageModal.svelte";
 import { SessionDataModel } from "../session/data/session-data.svelte.js";
 import { createSessionNavigator } from "../session/navigation/session-navigation.js";
-import * as toggleStateApi from "../session/ui/toggle-state.js";
+import * as toggleStateApi from "./export-toggle-state.js";
 import * as sidebarApi from "../session/ui/sidebar.js";
 import * as searchFiltersApi from "../session/ui/search-filters.js";
 import { setupSessionUi } from "../session/ui/session-ui-runner.js";
@@ -41,18 +37,35 @@ import { setupKeyboardNav } from "../shared/keyboard-nav.js";
 // nothing meaningful to persist, so fall back to an in-memory shim. Returning a
 // shim (never undefined) also keeps the shared modules off their
 // `globalThis.localStorage` default, which would throw the same way.
-function safeLocalStorage(target) {
-  try {
-    const ls = target.localStorage;
-    if (ls) return ls;
-  } catch {
-    /* sandboxed: fall through to the in-memory shim */
-  }
-  const mem = new Map();
+type ExportWindow = Window & {
+  readonly marked: typeof marked;
+  readonly hljs?: HLJSApi;
+  downloadSessionJson?: () => void;
+};
+
+interface ExportAppOptions {
+  readonly target?: Window;
+}
+
+interface ExportStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+}
+
+type ExportFilterMode = SessionDataModel["filterMode"];
+
+function isExportFilterMode(value: string): value is ExportFilterMode {
+  return ["all", "default", "user-only", "no-tools", "labeled-only"].includes(value);
+}
+
+function createExportStorage(): ExportStorage {
+  const mem = new Map<string, string>();
   return {
-    getItem: (key) => (mem.has(key) ? mem.get(key) : null),
+    getItem: (key) => mem.get(key) ?? null,
     setItem: (key, value) => {
-      mem.set(key, String(value));
+      mem.set(key, value);
     },
     removeItem: (key) => {
       mem.delete(key);
@@ -63,13 +76,18 @@ function safeLocalStorage(target) {
   };
 }
 
-export function runExportApp({ target = window } = {}) {
+function hasExportGlobals(target: Window): target is ExportWindow {
+  return target.marked !== undefined;
+}
+
+export function runExportApp({ target = window }: ExportAppOptions = {}): void {
+  if (!hasExportGlobals(target)) return;
   const documentImpl = target.document;
   const marked = target.marked;
   const hljs = target.hljs || null;
-  const storage = safeLocalStorage(target);
+  const storage = createExportStorage();
 
-  const dataModel = loadSessionData({
+  const dataModel = loadExportSessionData({
     documentImpl,
     windowImpl: target,
     atobImpl: target.atob?.bind(target),
@@ -78,26 +96,25 @@ export function runExportApp({ target = window } = {}) {
   // component the live app uses). The snapshot renders once — no live updates —
   // so this just computes the tree/active-path derivations a single time.
   const treeModel = new SessionDataModel(dataModel);
+  const contentModel = {
+    get activePath(): ReadonlyArray<SessionEntry> {
+      return treeModel.activePath.flatMap((candidate) => {
+        const entry = sessionEntryFromUnknown(candidate);
+        return entry ? [entry] : [];
+      });
+    },
+    entries: dataModel.entries,
+    renderedTools: dataModel.renderedTools,
+  };
 
-  let filterMode = "default";
+  let filterMode: ExportFilterMode = "default";
   let searchQuery = "";
 
-  const sessionFormat = {
-    shortenPath,
-    formatToolCall,
-    escapeHtml: (text) => escapeHtml(text, { documentImpl }),
-    truncate,
-    getTreeNodeDisplayHtml: (entry, label) =>
-      getTreeNodeDisplayHtmlForState(entry, label, {
-        extractContent,
-        toolCallMap: dataModel.toolCallMap,
-        escapeHtmlImpl: (text) => escapeHtml(text, { documentImpl }),
-      }),
-  };
+  const escapeSessionHtml = (text: unknown): string => escapeHtml(text, { documentImpl });
 
   let currentLeafId = dataModel.leafId;
   let currentTargetId = dataModel.urlTargetId || dataModel.leafId;
-  let navigatorInstance;
+  let navigatorInstance: ReturnType<typeof createSessionNavigator>;
 
   // Push view state into the reactive model; <SessionTreeNodes> recomputes.
   const syncTreeRendererState = () => {
@@ -114,30 +131,27 @@ export function runExportApp({ target = window } = {}) {
   };
 
   target.downloadSessionJson = () =>
-    downloadSessionJson({
+    downloadExportSessionJson({
       entries: dataModel.entries,
       header: dataModel.header,
       documentImpl,
-      URLImpl: target.URL,
-      BlobImpl: target.Blob,
+      URLImpl: globalThis.URL,
+      BlobImpl: globalThis.Blob,
     });
 
   // hljs is available synchronously (inlined vendor script). <SessionEntry>/
   // <ToolOutput> emit code with `data-highlight-pending`; this colours them in
   // place after each render (the live app uses applyLazyHighlighting instead).
-  const highlightPending = (container) => {
+  const highlightPending = (container: ParentNode | null): void => {
     if (!hljs || !container) return;
     container.querySelectorAll("code[data-highlight-pending]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
       const lang = el.dataset.lang;
-      const text = el.textContent;
-      try {
-        el.innerHTML =
-          lang && hljs.getLanguage(lang)
-            ? hljs.highlight(text, { language: lang }).value
-            : hljs.highlightAuto(text).value;
-      } catch {
-        /* keep plain text */
-      }
+      const text = el.textContent ?? "";
+      el.innerHTML =
+        lang && hljs.getLanguage(lang)
+          ? hljs.highlight(text, { language: lang }).value
+          : hljs.highlightAuto(text).value;
       el.removeAttribute("data-highlight-pending");
       el.removeAttribute("data-lang");
     });
@@ -149,8 +163,12 @@ export function runExportApp({ target = window } = {}) {
     storage,
     marked,
     hljs,
-    escapeHtml: sessionFormat.escapeHtml,
-    markdownApi: { configureSessionMarkdown, safeMarkedParse },
+    escapeHtml: escapeSessionHtml,
+    markdownApi: {
+      configureSessionMarkdown: () =>
+        configureSessionMarkdown({ marked, hljs, escapeHtml: escapeSessionHtml }),
+      safeMarkedParse: (text) => safeMarkedParse(text, { marked }),
+    },
     searchFiltersApi,
     sidebarApi,
     toggleStateApi,
@@ -159,15 +177,17 @@ export function runExportApp({ target = window } = {}) {
       searchQuery = value;
     },
     setFilterMode: (value) => {
-      filterMode = value;
+      if (isExportFilterMode(value)) filterMode = value;
     },
     forceTreeRerender,
     navigateTo: (...args) => navigateTo(...args),
-    projectPath: dataModel.header?.cwd || "",
   });
 
-  const navigateTo = (targetId, scrollMode = "target", scrollToEntryId = null) =>
-    navigatorInstance.navigateTo(targetId, scrollMode, scrollToEntryId);
+  const navigateTo = (
+    targetId: string,
+    scrollMode: "target" | "bottom" | "none" = "target",
+    scrollToEntryId: string | null = null,
+  ): void => navigatorInstance.navigateTo(targetId, scrollMode, scrollToEntryId);
 
   // Nav + scroll only; <SessionContent> (mounted below) renders the message pane
   // reactively from treeModel.activePath, which onNavigate updates.
@@ -190,8 +210,8 @@ export function runExportApp({ target = window } = {}) {
     mount(SessionContent, {
       target: messagesEl,
       props: {
-        model: treeModel,
-        afterRender: (container) => {
+        model: contentModel,
+        afterRender: (container: HTMLElement) => {
           sessionRuntime.toggleState?.applyToNode(container);
           highlightPending(container);
         },
@@ -207,7 +227,7 @@ export function runExportApp({ target = window } = {}) {
       target: sidebarEl,
       props: {
         model: treeModel,
-        onNavigate: (id) => {
+        onNavigate: (id: string) => {
           const leaf = treeModel.newestLeaf(id) || id;
           navigateTo(leaf, "target", id);
           if (ui.isMobileLayout()) ui.closeSidebar();
@@ -238,8 +258,9 @@ export function runExportApp({ target = window } = {}) {
     } else {
       navigateTo(leafId, "none");
     }
-  } else if (dataModel.entries.length > 0) {
-    navigateTo(dataModel.entries[dataModel.entries.length - 1].id, "none");
+  } else {
+    const lastEntry = dataModel.entries.at(-1);
+    if (lastEntry) navigateTo(lastEntry.id, "none");
   }
 }
 

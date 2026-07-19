@@ -67,7 +67,7 @@ The index + settings Phase 4 migration is complete: those routes are Svelte-orch
 
 ## Static / Share Export
 
-Export/share remains separate and self-contained. `web/src/export/export-entry.js` builds `internal/ui/embedded/export/export.js`, which is inlined by `internal/ui/export.go` with vendored `marked` and `highlight.js` assets.
+Export/share remains separate and self-contained. `web/src/export/export-entry.ts` builds `internal/ui/embedded/export/export.js`, which is inlined by `internal/ui/export.go` with vendored `marked` and `highlight.js` assets. Export-only static adapters keep the bundle off live SSE/chat/network modules and the application Effect runtime bridge.
 
 Export rules:
 
@@ -95,22 +95,22 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 
 ## Shared Frontend Modules
 
-- `web/src/shared/api.js` — JSON fetch helpers
-- `web/src/shared/status-events.js` — shared status SSE lifecycle
-- `web/src/shared/storage.js` — localStorage helpers
-- `web/src/shared/escape.js` — HTML escaping
-- `web/src/shared/theme.js` — authoritative live theme registry, switching, and browser-chrome synchronization for built-in, community, and custom themes
-- `web/src/shared/version.js` — pure version formatting/changelog/fetch helpers; `VersionController.svelte` owns the update modal/status UI
-- `web/src/shared/keyboard-nav.js` — vim-style j/k/gg/G navigation
+- `web/src/shared/api.ts` — JSON fetch helpers
+- `web/src/shared/status-events.ts` — shared status SSE lifecycle
+- `web/src/shared/storage.ts` — localStorage helpers
+- `web/src/shared/escape.ts` — HTML escaping
+- `web/src/shared/theme.ts` — authoritative live theme registry, switching, and browser-chrome synchronization for built-in, community, and custom themes
+- `web/src/shared/version.ts` — pure version formatting/changelog/fetch helpers; `VersionController.svelte` owns the update modal/status UI
+- `web/src/shared/keyboard-nav.ts` — vim-style j/k/gg/G navigation
 - `web/src/components/shared/CommandPalette.svelte` — shared ⌘K session search palette
 
 ## Automated Frontend Boundaries
 
 `make check` enforces the frontend rules that can be expressed mechanically:
 
-- ESLint allows `lucide` imports only in `web/src/shared/icons.js`, rejects inline SVG in Svelte components, and rejects Unicode back/chevron glyphs used as span icons. `ContextUsage.svelte` has the sole inline-SVG exception because its ring is data visualization rather than an icon.
-- `web/src/export/export-boundary.test.js` walks the export dependency graph and rejects live chat, SSE, and live-only session modules.
-- `web/src/shared/strings.test.js` verifies the English string lookup and parameter interpolation used by Svelte, vanilla-JS runtime code, and static exports.
+- Oxlint allows `lucide` imports only in `web/src/shared/icons.ts`, rejects inline SVG in Svelte components, and rejects Unicode back/chevron glyphs used as span icons. `ContextUsage.svelte` has the sole inline-SVG exception because its ring is data visualization rather than an icon.
+- `web/src/export/export-boundary.test.ts` walks the export dependency graph and rejects live chat, SSE, browser networking, and the application Effect runtime bridge.
+- `web/src/shared/strings.test.ts` verifies the English string lookup and parameter interpolation used by Svelte, TypeScript runtime code, and static exports.
 - Knip, Prettier, the frontend build, Vitest, Go tests, installer tests, and `go vet` run through the same `make check` gate.
 
 ## Static Assets
@@ -140,4 +140,4 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 
 The live SPA shell uses `theme.css`, `index.css`, `settings.css`, `schedules.css`, `workflows.css`, `tasks.css`, `subagents.css`, `session.css`, `menu.css`, and `palette.css` from `internal/ui/embedded/styles/`. The shell still injects the server-backed theme and font variables before the app starts so first paint matches the installed PWA theme without a flash.
 
-`internal/ui/embedded/styles/theme.css` is the sole owner of named-theme palette variables. Route styles consume those variables but must not redeclare `[data-theme]` palettes. The inline first-paint boot code and the live JavaScript switcher both resolve `--body-bg` / `--chrome-bg` from the active CSS theme, so adding a named theme does not require another hardcoded color map. `web/src/shared/theme.js` owns the ordered browser theme registry; the Go boot registry must stay aligned because static exports use it without loading the SPA bundle.
+`internal/ui/embedded/styles/theme.css` is the sole owner of named-theme palette variables. Route styles consume those variables but must not redeclare `[data-theme]` palettes. The inline first-paint boot code and the live TypeScript switcher both resolve `--body-bg` / `--chrome-bg` from the active CSS theme, so adding a named theme does not require another hardcoded color map. `web/src/shared/theme.ts` owns the ordered browser theme registry; the Go boot registry must stay aligned because static exports use it without loading the SPA bundle.

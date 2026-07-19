@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// Toggle-state behavior is owned by the shared modules (toggle-state.js,
-// session-ui-runner.js) plus the header markup (SessionInfoHeader.svelte) and
+// Toggle-state behavior is owned by the shared modules (toggle-state.ts,
+// session-ui-runner.ts) plus the header markup (SessionInfoHeader.svelte) and
 // session CSS. Live and static export both reuse these, so assert against the
 // source rather than the minified export bundle.
 func readSrc(t *testing.T, rel string) string {
@@ -20,8 +20,8 @@ func readSrc(t *testing.T, rel string) string {
 }
 
 func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
-	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.js")
-	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.js")
+	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.ts")
+	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.ts")
 	// The header toggle-button markup now lives in the Svelte header card.
 	headerSrc := readSrc(t, "web/src/components/session/SessionInfoHeader.svelte")
 
@@ -30,11 +30,11 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 			`export const TOGGLE_STATE_STORAGE_KEY = "pican:session-detail:toggle-state";`,
 			"toolsVisible: true",
 			"toolOutputsExpanded: false",
-			"storage?.getItem(TOGGLE_STATE_STORAGE_KEY)",
+			"getJson(key, schema, storage ?? undefined)",
 			// Toggle state persists under TOGGLE_STATE_STORAGE_KEY, but as a
 			// { [sessionId]: state } map so changing the configured default in
 			// /settings affects every session the user hasn't explicitly toggled.
-			"storage?.setItem(TOGGLE_STATE_STORAGE_KEY, JSON.stringify(map));",
+			"saveStored(TOGGLE_STATE_STORAGE_KEY, map, storage);",
 			`btn.classList.toggle("active", isActive);`,
 			`btn.setAttribute("aria-pressed", isActive ? "true" : "false");`,
 		},
@@ -54,9 +54,9 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 }
 
 func TestToolsVisibilityAndOutputExpansionAreSeparateStates(t *testing.T) {
-	src := readSrc(t, "web/src/session/ui/toggle-state.js")
+	src := readSrc(t, "web/src/session/ui/toggle-state.ts")
 	checks := []string{
-		`node.querySelectorAll(".tool-execution, .compaction").forEach((el) => {`,
+		`node.querySelectorAll<HTMLElement>(".tool-execution, .compaction").forEach((el) => {`,
 		`el.style.display = state.toolsVisible ? "" : "none";`,
 		`node.querySelectorAll(".tool-output.expandable").forEach((el) => {`,
 		`el.classList.toggle("expanded", state.toolOutputsExpanded);`,
@@ -80,7 +80,7 @@ func TestNavigationReappliesCurrentToggleStateAfterRenderingMessages(t *testing.
 	// runtime wires that hook to re-apply persisted toggle state via
 	// applyToggleStateToNode.
 	contentSrc := readSrc(t, "web/src/components/session/SessionContent.svelte")
-	runtimeSrc := readSrc(t, "web/src/session/session-content-runtime.js")
+	runtimeSrc := readSrc(t, "web/src/session/session-content-runtime.ts")
 	srcChecks := map[string][]string{
 		contentSrc: {"afterRender(containerEl)"},
 		runtimeSrc: {
@@ -103,12 +103,12 @@ func TestLiveReloadEntriesInheritCurrentToggleState(t *testing.T) {
 	// <SessionContent>'s afterRender re-apply toggle state — see
 	// TestNavigationReappliesCurrentToggleStateAfterRenderingMessages), so only
 	// the shared hook's existence is asserted here.
-	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.js")
-	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.js")
+	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.ts")
+	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.ts")
 	hookChecks := map[string][]string{
 		toggleSrc: {
-			"export function applyToggleStateToNode(node, state) {",
-			"const applyToNode = (node) => applyToggleStateToNode(node, state);",
+			"export function applyToggleStateToNode(",
+			"const applyToNode = (node: ParentNode) => applyToggleStateToNode(node, state);",
 		},
 		runnerSrc: {"sessionRuntime.toggleState = toggleController;"},
 	}

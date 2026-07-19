@@ -53,7 +53,7 @@ func assertCSSCustomPropertiesDefined(t *testing.T, name, html string) {
 }
 
 // TestExportBundleIsSelfContained guards the static export runtime built by
-// Vite (web/src/export/export-entry.js). The snapshot must run from a single
+// Vite (web/src/export/export-entry.ts). The snapshot must run from a single
 // inlined <script> with no server, so the bundle may not pull in any live-only
 // machinery. If the export entry accidentally imports a module that reaches
 // SSE/chat/live-reload, that symbol leaks into this bundle and fails here.
@@ -66,11 +66,8 @@ func TestExportBundleIsSelfContained(t *testing.T) {
 	// (tier-2) component imported a live-only module — fix the import, do not
 	// loosen this list. See docs/dev/svelte-migration-plan.md §6.
 	//
-	// NOTE: "fetch(" and "/api/" are NOT yet forbidden — a pre-existing dead
-	// (host-less) path still pulls them into the bundle. Add them here once the
-	// live-only modules are gone (migration Phase 3 cleanup).
 	forbidden := []string{
-		"EventSource", "WebSocket",
+		"EventSource", "WebSocket", "XMLHttpRequest", "fetch(",
 		"runLiveReload", "live-reload-runner", "live-reload",
 		"chatComposerRunner", "ChatComposer",
 		"ArtifactPanel",

@@ -11,13 +11,13 @@ import (
 )
 
 func TestSessionViteSourceIncludesChatPreviewSSEHandling(t *testing.T) {
-	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.js"))
+	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/chat-preview.js: %v", err)
+		t.Fatalf("read web/src/session/live/chat-preview.ts: %v", err)
 	}
-	events, err := os.ReadFile(repoPath("web/src/session/live/live-events.js"))
+	events, err := os.ReadFile(repoPath("web/src/session/live/live-events.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-events.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-events.ts: %v", err)
 	}
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
@@ -36,20 +36,20 @@ func TestSessionViteSourceIncludesChatPreviewSSEHandling(t *testing.T) {
 }
 
 func TestSessionViteSourceForcesFollowOnChatSendAndScrollsNewEntries(t *testing.T) {
-	// Low-level scroll primitives live in session/live/live-scroll.js; the
-	// follow-mode decision state lives in session/live/live-follow.js; the SSE
+	// Low-level scroll primitives live in session/live/live-scroll.ts; the
+	// follow-mode decision state lives in session/live/live-follow.ts; the SSE
 	// wiring that calls them remains in <LiveReload>.
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
 		t.Fatalf("read web/src/components/session/LiveReload.svelte: %v", err)
 	}
-	scroll, err := os.ReadFile(repoPath("web/src/session/live/live-scroll.js"))
+	scroll, err := os.ReadFile(repoPath("web/src/session/live/live-scroll.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-scroll.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-scroll.ts: %v", err)
 	}
-	follow, err := os.ReadFile(repoPath("web/src/session/live/live-follow.js"))
+	follow, err := os.ReadFile(repoPath("web/src/session/live/live-follow.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-follow.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-follow.ts: %v", err)
 	}
 	combined := string(runner) + string(scroll) + string(follow)
 	for _, want := range []string{
@@ -69,9 +69,9 @@ func TestSessionViteSourceForcesFollowOnChatSendAndScrollsNewEntries(t *testing.
 }
 
 func TestSessionViteSourceShowsAnimatedWorkingPreviewLabel(t *testing.T) {
-	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.js"))
+	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/chat-preview.js: %v", err)
+		t.Fatalf("read web/src/session/live/chat-preview.ts: %v", err)
 	}
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
