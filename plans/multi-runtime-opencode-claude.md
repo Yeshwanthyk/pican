@@ -238,6 +238,8 @@ Research/prototype narrowly inside tests or disposable fixtures before productio
 
 Gate: a short evidence note in this plan or `docs/architecture/` records exact installed versions, commands, observed event ordering, chosen OpenCode topology, Claude cancellation behavior, and unresolved gaps. No production adapter work begins without this proof.
 
+Wave 0 evidence: [`docs/architecture/multi-runtime-wave-0-evidence.md`](../docs/architecture/multi-runtime-wave-0-evidence.md).
+
 Verification: targeted tests for any checked-in fixture/parser scaffolding, then `make test`.
 
 ### Wave 1 — Runtime registry prefactor
