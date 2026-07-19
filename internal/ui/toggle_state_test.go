@@ -27,7 +27,7 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 
 	srcChecks := map[string][]string{
 		toggleSrc: {
-			"const TOGGLE_STATE_STORAGE_KEY = 'pican:session-detail:toggle-state';",
+			`export const TOGGLE_STATE_STORAGE_KEY = "pican:session-detail:toggle-state";`,
 			"toolsVisible: true",
 			"toolOutputsExpanded: false",
 			"storage?.getItem(TOGGLE_STATE_STORAGE_KEY)",
@@ -35,8 +35,8 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 			// { [sessionId]: state } map so changing the configured default in
 			// /settings affects every session the user hasn't explicitly toggled.
 			"storage?.setItem(TOGGLE_STATE_STORAGE_KEY, JSON.stringify(map));",
-			"btn.classList.toggle('active', isActive);",
-			"btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');",
+			`btn.classList.toggle("active", isActive);`,
+			`btn.setAttribute("aria-pressed", isActive ? "true" : "false");`,
 		},
 		runnerSrc: {"sessionRuntime.toggleState = toggleController;"},
 		headerSrc: {`data-action="toggle-tool-output"`, "show/hide thinking"},
@@ -56,16 +56,16 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 func TestToolsVisibilityAndOutputExpansionAreSeparateStates(t *testing.T) {
 	src := readSrc(t, "web/src/session/ui/toggle-state.js")
 	checks := []string{
-		"node.querySelectorAll('.tool-execution, .compaction').forEach((el) => {",
-		"el.style.display = state.toolsVisible ? '' : 'none';",
-		"node.querySelectorAll('.tool-output.expandable').forEach((el) => {",
-		"el.classList.toggle('expanded', state.toolOutputsExpanded);",
-		"toggleToolsVisibility: () => toggle('toolsVisible'),",
+		`node.querySelectorAll(".tool-execution, .compaction").forEach((el) => {`,
+		`el.style.display = state.toolsVisible ? "" : "none";`,
+		`node.querySelectorAll(".tool-output.expandable").forEach((el) => {`,
+		`el.classList.toggle("expanded", state.toolOutputsExpanded);`,
+		`toggleToolsVisibility: () => toggle("toolsVisible"),`,
 		// toggleToolOutputs no-ops when tools are hidden so the P shortcut and a
 		// disabled-button click stay quiet (output blocks are inside the hidden
 		// .tool-execution wrapper, so there's nothing to expand or collapse).
 		"if (!state.toolsVisible) return;",
-		"toggle('toolOutputsExpanded');",
+		`toggle("toolOutputsExpanded");`,
 	}
 	for _, check := range checks {
 		if !strings.Contains(src, check) {

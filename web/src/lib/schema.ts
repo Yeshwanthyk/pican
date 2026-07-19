@@ -300,6 +300,14 @@ export const ProjectMutationResponseSchema = Schema.Struct({
   ok: Schema.Boolean,
   filterEnabled: Schema.optionalKey(Schema.Boolean),
 });
+export const PinMutationResponseSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  pinned: Schema.Boolean,
+});
+export const PeerMutationResponseSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  name: Schema.String,
+});
 export const ScheduleMutationResponseSchema = Schema.Struct({
   ok: Schema.optionalKey(Schema.Boolean),
   schedule: Schema.optionalKey(ScheduleSchema),
@@ -314,6 +322,14 @@ export const QueueMutationResponseSchema = Schema.Struct({
   removed: Schema.optionalKey(Schema.Boolean),
   paused: Schema.optionalKey(Schema.Boolean),
   item: Schema.optionalKey(QueueItemSchema),
+});
+export const QueueRemoveResponseSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  removed: Schema.Boolean,
+});
+export const QueuePauseResponseSchema = Schema.Struct({
+  ok: Schema.Literal(true),
+  paused: Schema.Boolean,
 });
 export const GitRenameResponseSchema = Schema.Struct({ ok: Schema.Boolean, branch: Schema.String });
 export const SettingsResponseSchema = Schema.Struct({

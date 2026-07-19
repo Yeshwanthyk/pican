@@ -130,7 +130,7 @@ func TestClipboardHelperGuardsAndFallsBack(t *testing.T) {
 	for _, want := range []string{
 		"export async function copyToClipboard(",
 		"navigatorImpl.clipboard && navigatorImpl.clipboard.writeText",
-		"documentImpl.execCommand('copy')",
+		`documentImpl.execCommand("copy")`,
 	} {
 		if !strings.Contains(string(source), want) {
 			t.Fatalf("shared clipboard helper missing %q", want)

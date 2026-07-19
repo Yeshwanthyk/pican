@@ -1,26 +1,27 @@
+import { Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SERVER_SETTING_KEYS,
   configureSettingsSync,
+  hydrateSettings,
   resetSettingsSyncForTests,
   writeSetting,
   writeSettings,
-  hydrateSettings,
 } from "./settings-store.js";
 
+const decodeJson = Schema.decodeUnknownSync(Schema.UnknownFromJsonString);
+
 function fakeStorage() {
-  const map = new Map();
+  const map = new Map<string, string>();
   return {
-    getItem: (k) => (map.has(k) ? map.get(k) : null),
-    setItem: (k, v) => map.set(k, String(v)),
-    removeItem: (k) => map.delete(k),
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, String(value)),
+    removeItem: (key: string) => void map.delete(key),
     _map: map,
   };
 }
 
-afterEach(() => {
-  resetSettingsSyncForTests();
-});
+afterEach(() => resetSettingsSyncForTests());
 
 describe("writeSetting", () => {
   it("writes to localStorage without posting when sync is not configured", () => {
@@ -31,26 +32,26 @@ describe("writeSetting", () => {
 
   it("posts a server-backed key through to /api/settings when sync is configured", () => {
     const storage = fakeStorage();
-    const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve({ ok: true }),
+    );
     configureSettingsSync({ fetchImpl });
-
     writeSetting("pican-theme", "light", { storage });
-
     expect(storage.getItem("pican-theme")).toBe("light");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, opts] = fetchImpl.mock.calls[0];
+    const [url, options] = fetchImpl.mock.calls[0] ?? [];
     expect(url).toBe("/api/settings");
-    expect(opts.method).toBe("POST");
-    expect(JSON.parse(opts.body)).toEqual({ settings: { "pican-theme": "light" } });
+    expect(options?.method).toBe("POST");
+    expect(decodeJson(String(options?.body))).toEqual({ settings: { "pican-theme": "light" } });
   });
 
-  it("does not post unknown (non-server-backed) keys", () => {
+  it("does not post unknown keys", () => {
     const storage = fakeStorage();
-    const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve({ ok: true }),
+    );
     configureSettingsSync({ fetchImpl });
-
     writeSetting("pican:v1:right-sidebar-width", "320", { storage });
-
     expect(storage.getItem("pican:v1:right-sidebar-width")).toBe("320");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -59,13 +60,13 @@ describe("writeSetting", () => {
 describe("writeSettings", () => {
   it("batches server-backed keys into a single POST", () => {
     const storage = fakeStorage();
-    const fetchImpl = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve({ ok: true }),
+    );
     configureSettingsSync({ fetchImpl });
-
     writeSettings({ "pican-theme": "dracula", "pican:spinner-style": "braille" }, { storage });
-
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({
+    expect(decodeJson(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
       settings: { "pican-theme": "dracula", "pican:spinner-style": "braille" },
     });
   });
@@ -74,16 +75,14 @@ describe("writeSettings", () => {
 describe("hydrateSettings", () => {
   it("seeds localStorage from the server response", async () => {
     const storage = fakeStorage();
-    const settings = {};
-    for (const k of SERVER_SETTING_KEYS) settings[k] = "x";
+    const settings: Record<string, string> = {};
+    SERVER_SETTING_KEYS.forEach((key) => (settings[key] = "x"));
     settings["pican-theme"] = "nord";
     const fetchImpl = vi.fn(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ settings }) }),
     );
-
     const result = await hydrateSettings({ fetchImpl, storage });
-
-    expect(result["pican-theme"]).toBe("nord");
+    expect(result?.["pican-theme"]).toBe("nord");
     expect(storage.getItem("pican-theme")).toBe("nord");
     expect(storage.getItem("pican:spinner-style")).toBe("x");
   });
@@ -91,14 +90,12 @@ describe("hydrateSettings", () => {
   it("returns null and leaves storage untouched on failure", async () => {
     const storage = fakeStorage();
     const fetchImpl = vi.fn(() => Promise.resolve({ ok: false }));
-    const result = await hydrateSettings({ fetchImpl, storage });
-    expect(result).toBeNull();
+    await expect(hydrateSettings({ fetchImpl, storage })).resolves.toBeNull();
     expect(storage._map.size).toBe(0);
   });
 
   it("no-ops without a fetch impl", async () => {
     const storage = fakeStorage();
-    const result = await hydrateSettings({ fetchImpl: null, storage });
-    expect(result).toBeNull();
+    await expect(hydrateSettings({ fetchImpl: null, storage })).resolves.toBeNull();
   });
 });

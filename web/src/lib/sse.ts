@@ -1,4 +1,4 @@
-import { Cause, Effect, Queue, Schedule, Schema, Stream } from "effect";
+import { Effect, Queue, Schedule, Schema, Stream } from "effect";
 import { SseError } from "./errors";
 import {
   StatusDeltaSchema,
@@ -70,9 +70,8 @@ export const statusEvents = (
             const data = (event as MessageEvent<string>).data;
             Effect.runFork(
               parseStatusEvent(type, data).pipe(
-                Effect.match({
-                  onFailure: (error) =>
-                    Effect.sync(() => Queue.failCauseUnsafe(queue, Cause.fail(error))),
+                Effect.matchEffect({
+                  onFailure: () => Effect.void,
                   onSuccess: (value) => Effect.sync(() => Queue.offerUnsafe(queue, value)),
                 }),
               ),
@@ -86,17 +85,7 @@ export const statusEvents = (
             if (everConnected) Queue.offerUnsafe(queue, { type: "reconnect" });
             everConnected = true;
           });
-          eventSource.addEventListener("error", () =>
-            Queue.failCauseUnsafe(
-              queue,
-              Cause.fail(
-                new SseError({
-                  phase: everConnected ? "stream" : "connect",
-                  cause: "EventSource error",
-                }),
-              ),
-            ),
-          );
+          eventSource.addEventListener("error", () => undefined);
           return eventSource;
         },
         catch: (cause) => new SseError({ phase: "connect", cause }),

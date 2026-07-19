@@ -26,7 +26,7 @@ func TestMobileSidebarClosesWhenNavigatingTree(t *testing.T) {
 	}
 	sidebarChecks := []string{
 		"export function setSidebarOpen(open, { documentImpl = document } = {}) {",
-		"documentImpl.body?.classList.toggle('sidebar-open', open);",
+		`documentImpl.body?.classList.toggle("sidebar-open", open);`,
 	}
 	for _, check := range sidebarChecks {
 		if !strings.Contains(string(sidebarSrc), check) {

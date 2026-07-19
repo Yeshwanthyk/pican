@@ -62,7 +62,7 @@ CSS is NOT in `web/` — it lives as Go-embedded files in `internal/ui/embedded/
 
 ## Wave 1a — Tooling: oxlint, oxfmt, TypeScript, deps
 
-**STATUS: DONE (verified 2026-07-18, uncommitted).** Actual installed versions: `effect@4.0.0-beta.98` + `@effect/platform-browser@4.0.0-beta.98` (exists, exact-pinned), `oxlint@1.74.0`, `oxfmt@0.59.0`, `typescript@5.9.3`, `svelte-check@4.7.3`, `@effect/language-service@0.87.0`. Deviations from the spec below: `skipLibCheck: true` added to tsconfig (third-party `.d.ts` noise from `@pierre/diffs`/shiki); `.svelte` files included in the JS-override glob (they are pre-migration code too — remove them from the override as Wave 3 partitions land); ~220 files reformatted by oxfmt (quote style only). All four gate commands observed green. The section below is kept as the spec of record.
+**STATUS: DONE (verified 2026-07-18).** Actual installed versions: `effect@4.0.0-beta.98`, `oxlint@1.74.0`, `oxfmt@0.59.0`, `typescript@5.9.3`, `svelte-check@4.7.3`, `@effect/language-service@0.87.0`. `@effect/platform-browser@4.0.0-beta.98` was initially installed as specified, then removed in Wave 2 because the exact compatibility/error-mapping contract required the narrow beta.98 callback adapter and Knip correctly reported the browser package unused. Other deviations: `skipLibCheck: true` added to tsconfig (third-party `.d.ts` noise from `@pierre/diffs`/shiki); `.svelte` files included in the JS-override glob (they are pre-migration code too — remove them from the override as Wave 3 partitions land); ~220 files reformatted by oxfmt (quote style only). All four gate commands observed green. The section below is kept as the spec of record.
 
 **Scope: `web/` config + root `Makefile`. No source migration yet.**
 

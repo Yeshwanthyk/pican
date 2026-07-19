@@ -14,7 +14,6 @@
     "dev": "npm run build:export && vite build --watch"
   },
   "dependencies": {
-    "@effect/platform-browser": "4.0.0-beta.98",
     "@pierre/diffs": "^1.2.10",
     "effect": "4.0.0-beta.98",
     "highlight.js": "latest",

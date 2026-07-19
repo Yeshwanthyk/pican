@@ -8,7 +8,7 @@ describe("storage helpers", () => {
     expect(loadJSON("missing", { collapsed: true })).toEqual({ collapsed: true });
   });
 
-  it("saves and loads JSON values", () => {
+  it("saves and loads JSON values synchronously", () => {
     saveJSON("state", { a: 1 });
     expect(loadJSON("state", {})).toEqual({ a: 1 });
   });
@@ -19,7 +19,7 @@ describe("storage helpers", () => {
   });
 
   it("does not throw when saveJSON fails", () => {
-    const circular = {};
+    const circular: { self?: unknown } = {};
     circular.self = circular;
     expect(() => saveJSON("bad", circular)).not.toThrow();
   });
