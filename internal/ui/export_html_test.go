@@ -11,13 +11,13 @@ import (
 )
 
 func TestSessionViteSourceIncludesChatPreviewSSEHandling(t *testing.T) {
-	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.js"))
+	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/chat-preview.js: %v", err)
+		t.Fatalf("read web/src/session/live/chat-preview.ts: %v", err)
 	}
-	events, err := os.ReadFile(repoPath("web/src/session/live/live-events.js"))
+	events, err := os.ReadFile(repoPath("web/src/session/live/live-events.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-events.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-events.ts: %v", err)
 	}
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
@@ -36,20 +36,20 @@ func TestSessionViteSourceIncludesChatPreviewSSEHandling(t *testing.T) {
 }
 
 func TestSessionViteSourceForcesFollowOnChatSendAndScrollsNewEntries(t *testing.T) {
-	// Low-level scroll primitives live in session/live/live-scroll.js; the
-	// follow-mode decision state lives in session/live/live-follow.js; the SSE
+	// Low-level scroll primitives live in session/live/live-scroll.ts; the
+	// follow-mode decision state lives in session/live/live-follow.ts; the SSE
 	// wiring that calls them remains in <LiveReload>.
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
 		t.Fatalf("read web/src/components/session/LiveReload.svelte: %v", err)
 	}
-	scroll, err := os.ReadFile(repoPath("web/src/session/live/live-scroll.js"))
+	scroll, err := os.ReadFile(repoPath("web/src/session/live/live-scroll.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-scroll.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-scroll.ts: %v", err)
 	}
-	follow, err := os.ReadFile(repoPath("web/src/session/live/live-follow.js"))
+	follow, err := os.ReadFile(repoPath("web/src/session/live/live-follow.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/live-follow.js: %v", err)
+		t.Fatalf("read web/src/session/live/live-follow.ts: %v", err)
 	}
 	combined := string(runner) + string(scroll) + string(follow)
 	for _, want := range []string{
@@ -69,9 +69,9 @@ func TestSessionViteSourceForcesFollowOnChatSendAndScrollsNewEntries(t *testing.
 }
 
 func TestSessionViteSourceShowsAnimatedWorkingPreviewLabel(t *testing.T) {
-	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.js"))
+	preview, err := os.ReadFile(repoPath("web/src/session/live/chat-preview.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/session/live/chat-preview.js: %v", err)
+		t.Fatalf("read web/src/session/live/chat-preview.ts: %v", err)
 	}
 	runner, err := os.ReadFile(repoPath("web/src/components/session/LiveReload.svelte"))
 	if err != nil {
@@ -122,15 +122,15 @@ func TestPrepareSessionPageDataUsesLastNonLabelEntryWithIDAsLeaf(t *testing.T) {
 
 func TestClipboardHelperGuardsAndFallsBack(t *testing.T) {
 	// The clipboard guard + insecure-context execCommand fallback live in one
-	// shared helper (web/src/shared/clipboard.js); the copy sites delegate to it.
-	source, err := os.ReadFile(repoPath("web/src/shared/clipboard.js"))
+	// shared helper (web/src/shared/clipboard.ts); the copy sites delegate to it.
+	source, err := os.ReadFile(repoPath("web/src/shared/clipboard.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/shared/clipboard.js: %v", err)
+		t.Fatalf("read web/src/shared/clipboard.ts: %v", err)
 	}
 	for _, want := range []string{
-		"export async function copyToClipboard(",
-		"navigatorImpl.clipboard && navigatorImpl.clipboard.writeText",
-		"documentImpl.execCommand('copy')",
+		"export function copyToClipboard(",
+		"navigatorImpl.clipboard?.writeText",
+		`documentImpl.execCommand("copy")`,
 	} {
 		if !strings.Contains(string(source), want) {
 			t.Fatalf("shared clipboard helper missing %q", want)

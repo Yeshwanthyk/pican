@@ -155,7 +155,7 @@ func Main(version string) {
 		if !runtimeMode.enables("pi") {
 			return nil, fmt.Errorf("Pi runtime is not enabled")
 		}
-		return rpc.NewPiWorkerWithEvents(
+		return rpc.NewPiWorkerWithStatusEvents(
 			sessionPath,
 			func(preview rpc.StreamPreview) {
 				if srv != nil {
@@ -165,6 +165,11 @@ func Main(version string) {
 			func(event string, payload json.RawMessage) {
 				if srv != nil {
 					srv.BroadcastExtensionUI(sessionID, event, payload)
+				}
+			},
+			func(status workers.WorkerStatus) {
+				if srv != nil {
+					srv.BroadcastWorkerStatus(sessionID, status)
 				}
 			},
 		)

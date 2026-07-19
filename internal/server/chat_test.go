@@ -243,6 +243,25 @@ func TestHandleWorkerStatusDefaultsIdle(t *testing.T) {
 	}
 }
 
+func TestHandleWorkerStatusPropagatesExitCode(t *testing.T) {
+	exitCode := 23
+	sender := &fakeSender{status: workers.WorkerStatus{
+		State: workers.WorkerStateError, Error: "exit status 23", ExitCode: &exitCode,
+	}}
+	s := &Server{sessionsDir: t.TempDir(), chatSender: sender, now: time.Now}
+	req := httptest.NewRequest(http.MethodGet, "/api/worker-status?id=session.jsonl", nil)
+	w := httptest.NewRecorder()
+
+	s.handleWorkerStatus(w, req)
+
+	if got := w.Body.String(); !strings.Contains(got, `"state":"error"`) || !strings.Contains(got, `"exitCode":23`) {
+		t.Fatalf("body = %q", got)
+	}
+	if calls := sender.stateCalls(); calls != 0 {
+		t.Fatalf("GetState calls = %d, want cached crash state", calls)
+	}
+}
+
 func TestHandleWorkerStatusUsesRecentSessionFileActivity(t *testing.T) {
 	root := t.TempDir()
 	writeSessionFile(t, root, "test-project", "session.jsonl")

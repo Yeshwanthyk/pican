@@ -9,35 +9,36 @@ import (
 // Navigating from the tree must never leave it stuck over the chat. In the
 // live app the tree is a FullScreenSheet overlay that closes via closeTree()
 // on every viewport; the static export keeps the docked drawer, whose mobile
-// close-on-navigate lives in sidebar.js + export-entry.js. Assert against the
+// close-on-navigate lives in sidebar.ts + export-entry.ts. Assert against the
 // source.
 func TestMobileSidebarClosesWhenNavigatingTree(t *testing.T) {
-	sidebarSrc, err := os.ReadFile(repoPath("web/src/session/ui/sidebar.js"))
+	sidebarSrc, err := os.ReadFile(repoPath("web/src/session/ui/sidebar.ts"))
 	if err != nil {
-		t.Fatalf("read sidebar.js: %v", err)
+		t.Fatalf("read sidebar.ts: %v", err)
 	}
 	liveTreeSrc, err := os.ReadFile(repoPath("web/src/components/session/SessionTree.svelte"))
 	if err != nil {
 		t.Fatalf("read SessionTree.svelte: %v", err)
 	}
-	exportSrc, err := os.ReadFile(repoPath("web/src/export/export-entry.js"))
+	exportSrc, err := os.ReadFile(repoPath("web/src/export/export-entry.ts"))
 	if err != nil {
-		t.Fatalf("read export-entry.js: %v", err)
+		t.Fatalf("read export-entry.ts: %v", err)
 	}
 	sidebarChecks := []string{
-		"export function setSidebarOpen(open, { documentImpl = document } = {}) {",
-		"documentImpl.body?.classList.toggle('sidebar-open', open);",
+		"export function setSidebarOpen(",
+		"open: boolean,",
+		`documentImpl.body?.classList.toggle("sidebar-open", open);`,
 	}
 	for _, check := range sidebarChecks {
 		if !strings.Contains(string(sidebarSrc), check) {
-			t.Fatalf("sidebar.js missing %q; mobile sidebar can remain stuck over chat", check)
+			t.Fatalf("sidebar.ts missing %q; mobile sidebar can remain stuck over chat", check)
 		}
 	}
 	if !strings.Contains(string(liveTreeSrc), "closeTree()") {
 		t.Fatal("SessionTree.svelte missing close-on-navigate; tree overlay can remain stuck over chat")
 	}
 	if !strings.Contains(string(exportSrc), "ui.closeSidebar()") {
-		t.Fatal("export-entry.js missing mobile close-on-navigate; sidebar can remain stuck over chat")
+		t.Fatal("export-entry.ts missing mobile close-on-navigate; sidebar can remain stuck over chat")
 	}
 }
 
@@ -83,5 +84,19 @@ func TestMobileSessionActionsDoNotCoverHeaderToggleButtons(t *testing.T) {
 		if !strings.Contains(combined, check) {
 			t.Fatalf("mobile session header controls missing %q; fixed session actions can cover toggle buttons", check)
 		}
+	}
+}
+
+func TestMobileGitFooterKeepsBtwButHidesPullRequestActions(t *testing.T) {
+	mobileRule := "@media (max-width: 900px) {\n  /* Keep the compact branch context and btw affordance on phones; PR workflow\n         actions belong in the roomier desktop footer. */\n  .pi-git-pr {\n    display: none;\n  }\n}"
+	if !strings.Contains(liveSessionCss, mobileRule) {
+		t.Fatal("mobile session footer must hide PR actions")
+	}
+	footerSource, err := os.ReadFile(repoPath("web/src/components/session/GitFooter.svelte"))
+	if err != nil {
+		t.Fatalf("read GitFooter.svelte: %v", err)
+	}
+	if !strings.Contains(string(footerSource), "pi-btw-button") {
+		t.Fatal("mobile session footer must retain the btw action")
 	}
 }

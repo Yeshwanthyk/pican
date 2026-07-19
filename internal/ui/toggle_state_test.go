@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// Toggle-state behavior is owned by the shared modules (toggle-state.js,
-// session-ui-runner.js) plus the header markup (SessionInfoHeader.svelte) and
+// Toggle-state behavior is owned by the shared modules (toggle-state.ts,
+// session-ui-runner.ts) plus the header markup (SessionInfoHeader.svelte) and
 // session CSS. Live and static export both reuse these, so assert against the
 // source rather than the minified export bundle.
 func readSrc(t *testing.T, rel string) string {
@@ -20,23 +20,23 @@ func readSrc(t *testing.T, rel string) string {
 }
 
 func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
-	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.js")
-	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.js")
+	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.ts")
+	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.ts")
 	// The header toggle-button markup now lives in the Svelte header card.
 	headerSrc := readSrc(t, "web/src/components/session/SessionInfoHeader.svelte")
 
 	srcChecks := map[string][]string{
 		toggleSrc: {
-			"const TOGGLE_STATE_STORAGE_KEY = 'pican:session-detail:toggle-state';",
+			`export const TOGGLE_STATE_STORAGE_KEY = "pican:session-detail:toggle-state";`,
 			"toolsVisible: true",
 			"toolOutputsExpanded: false",
-			"storage?.getItem(TOGGLE_STATE_STORAGE_KEY)",
+			"getJson(key, schema, storage ?? undefined)",
 			// Toggle state persists under TOGGLE_STATE_STORAGE_KEY, but as a
 			// { [sessionId]: state } map so changing the configured default in
 			// /settings affects every session the user hasn't explicitly toggled.
-			"storage?.setItem(TOGGLE_STATE_STORAGE_KEY, JSON.stringify(map));",
-			"btn.classList.toggle('active', isActive);",
-			"btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');",
+			"saveStored(TOGGLE_STATE_STORAGE_KEY, map, storage);",
+			`btn.classList.toggle("active", isActive);`,
+			`btn.setAttribute("aria-pressed", isActive ? "true" : "false");`,
 		},
 		runnerSrc: {"sessionRuntime.toggleState = toggleController;"},
 		headerSrc: {`data-action="toggle-tool-output"`, "show/hide thinking"},
@@ -54,18 +54,18 @@ func TestSessionToggleButtonsReflectPersistedActiveState(t *testing.T) {
 }
 
 func TestToolsVisibilityAndOutputExpansionAreSeparateStates(t *testing.T) {
-	src := readSrc(t, "web/src/session/ui/toggle-state.js")
+	src := readSrc(t, "web/src/session/ui/toggle-state.ts")
 	checks := []string{
-		"node.querySelectorAll('.tool-execution, .compaction').forEach((el) => {",
-		"el.style.display = state.toolsVisible ? '' : 'none';",
-		"node.querySelectorAll('.tool-output.expandable').forEach((el) => {",
-		"el.classList.toggle('expanded', state.toolOutputsExpanded);",
-		"toggleToolsVisibility: () => toggle('toolsVisible'),",
+		`querySelectorAll<HTMLElement>(".tool-execution, .activity-tool, .compaction")`,
+		`el.style.display = state.toolsVisible ? "" : "none";`,
+		`node.querySelectorAll(".tool-output.expandable").forEach((el) => {`,
+		`el.classList.toggle("expanded", state.toolOutputsExpanded);`,
+		`toggleToolsVisibility: () => toggle("toolsVisible"),`,
 		// toggleToolOutputs no-ops when tools are hidden so the P shortcut and a
 		// disabled-button click stay quiet (output blocks are inside the hidden
 		// .tool-execution wrapper, so there's nothing to expand or collapse).
 		"if (!state.toolsVisible) return;",
-		"toggle('toolOutputsExpanded');",
+		`toggle("toolOutputsExpanded");`,
 	}
 	for _, check := range checks {
 		if !strings.Contains(src, check) {
@@ -80,7 +80,7 @@ func TestNavigationReappliesCurrentToggleStateAfterRenderingMessages(t *testing.
 	// runtime wires that hook to re-apply persisted toggle state via
 	// applyToggleStateToNode.
 	contentSrc := readSrc(t, "web/src/components/session/SessionContent.svelte")
-	runtimeSrc := readSrc(t, "web/src/session/session-content-runtime.js")
+	runtimeSrc := readSrc(t, "web/src/session/session-content-runtime.ts")
 	srcChecks := map[string][]string{
 		contentSrc: {"afterRender(containerEl)"},
 		runtimeSrc: {
@@ -103,12 +103,12 @@ func TestLiveReloadEntriesInheritCurrentToggleState(t *testing.T) {
 	// <SessionContent>'s afterRender re-apply toggle state — see
 	// TestNavigationReappliesCurrentToggleStateAfterRenderingMessages), so only
 	// the shared hook's existence is asserted here.
-	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.js")
-	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.js")
+	toggleSrc := readSrc(t, "web/src/session/ui/toggle-state.ts")
+	runnerSrc := readSrc(t, "web/src/session/ui/session-ui-runner.ts")
 	hookChecks := map[string][]string{
 		toggleSrc: {
-			"export function applyToggleStateToNode(node, state) {",
-			"const applyToNode = (node) => applyToggleStateToNode(node, state);",
+			"export function applyToggleStateToNode(",
+			"const applyToNode = (node: ParentNode) => applyToggleStateToNode(node, state);",
 		},
 		runnerSrc: {"sessionRuntime.toggleState = toggleController;"},
 	}
@@ -122,14 +122,14 @@ func TestLiveReloadEntriesInheritCurrentToggleState(t *testing.T) {
 }
 
 func TestLiveReloadRendererUsesToggleableThinkingAndToolMarkup(t *testing.T) {
-	// The message pane is rendered by <SessionEntry> (thinking blocks) + its
-	// <ToolOutput> child (expandable tool output) for both live reload and export;
-	// assert the toggle-compatible markup classes survive the decomposition.
-	entrySrc := readSrc(t, "web/src/components/session/SessionEntry.svelte")
+	// Thinking and tool calls are now grouped by <ActivityFold>, while
+	// <ToolOutput> still owns expandable output. Live reload and export share
+	// both components, so assert the toggle-compatible classes there.
+	activitySrc := readSrc(t, "web/src/components/session/ActivityFold.svelte")
 	outputSrc := readSrc(t, "web/src/components/session/ToolOutput.svelte")
 	srcChecks := map[string][]string{
-		entrySrc:  {`thinking-block`, `Thinking ...`},
-		outputSrc: {`tool-output expandable`, `output-preview`, `output-full`},
+		activitySrc: {`activity-thinking`, `activity-thinking-text`},
+		outputSrc:   {`tool-output expandable`, `output-preview`, `output-full`},
 	}
 	for src, checks := range srcChecks {
 		for _, check := range checks {

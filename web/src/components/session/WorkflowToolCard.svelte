@@ -1,23 +1,32 @@
-<script>
+<script lang="ts">
   import { marked } from 'marked';
   import { icon, ListTree } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { navigate } from '../../shared/navigation.js';
-  import { safeMarkedParse } from '../../session/render/markdown.js';
   import ToolOutput from './ToolOutput.svelte';
 
-  let { result = null, resultText = '' } = $props();
+  type Detail = Record<string, unknown>;
+  interface ToolResult {
+    readonly details?: Detail;
+  }
+  const isDetail = (value: unknown): value is Detail => typeof value === 'object' && value !== null;
 
-  const details = $derived(
-    result?.details && typeof result.details === 'object' ? result.details : null,
-  );
-  const phases = $derived(Array.isArray(details?.phases) ? details.phases.filter(Boolean) : []);
+  let {
+    result = null,
+    resultText = '',
+  }: {
+    result?: ToolResult | null;
+    resultText?: string;
+  } = $props();
+
+  const details = $derived(isDetail(result?.details) ? result.details : null);
+  const phases = $derived(Array.isArray(details?.phases) ? details.phases.filter(isDetail) : []);
   const agents = $derived(
     Array.isArray(details?.agents)
       ? details.agents.filter(
           (agent) =>
             agent &&
-            typeof agent === 'object' &&
+            isDetail(agent) &&
             ['label', 'phase', 'status', 'state', 'model'].some((key) => agent[key] != null),
         )
       : [],
@@ -32,14 +41,14 @@
     );
   });
 
-  const md = (text) => safeMarkedParse(text, { marked });
-  const statusLabel = (status) => {
+  const md = (text: string): string => marked.parse(text, { async: false });
+  const statusLabel = (status: string): string => {
     const key = `session.${status}`;
     const label = t(key);
     return label === key ? status.replaceAll('_', ' ') : label;
   };
 
-  function phaseState(index) {
+  function phaseState(index: number): 'done' | 'current' | 'pending' {
     if (details?.status === 'completed') return 'done';
     if (details?.status === 'running') {
       if (index < currentPhaseIndex) return 'done';
@@ -112,7 +121,7 @@
     <button
       type="button"
       class="extension-dashboard-link"
-      onclick={() => navigate('/workflows?runId=' + encodeURIComponent(details.runId))}
+      onclick={() => navigate('/workflows?runId=' + encodeURIComponent(String(details.runId)))}
       >{t('session.openDashboard')}</button
     >
   {/if}

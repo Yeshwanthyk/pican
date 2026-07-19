@@ -39,12 +39,15 @@ type piRPCWorker struct {
 	streamSink           StreamEventSink
 	streamPreview        *streamPreviewAccumulator
 	lastPreviewEmit      atomic.Int64 // unix nanos; throttles non-final preview emission
+	closing              atomic.Bool
 	previewClock         func() time.Time
 	extensionUISink      ExtensionUIEventSink
+	statusSink           WorkerStatusSink
 	pendingExtensionUI   map[string]pendingExtensionUIRequest
 }
 
 type ExtensionUIEventSink func(event string, payload json.RawMessage)
+type WorkerStatusSink func(status workers.WorkerStatus)
 
 type pendingExtensionUIRequest struct {
 	payload   json.RawMessage
@@ -83,6 +86,10 @@ func NewPiWorkerWithStream(sessionPath string, streamSink StreamEventSink) (work
 }
 
 func NewPiWorkerWithEvents(sessionPath string, streamSink StreamEventSink, extensionUISink ExtensionUIEventSink) (workers.ChatWorker, error) {
+	return NewPiWorkerWithStatusEvents(sessionPath, streamSink, extensionUISink, nil)
+}
+
+func NewPiWorkerWithStatusEvents(sessionPath string, streamSink StreamEventSink, extensionUISink ExtensionUIEventSink, statusSink WorkerStatusSink) (workers.ChatWorker, error) {
 	if _, err := exec.LookPath("pi"); err != nil {
 		return nil, fmt.Errorf("pi executable not found: %w", err)
 	}
@@ -109,6 +116,7 @@ func NewPiWorkerWithEvents(sessionPath string, streamSink StreamEventSink, exten
 		streamSink:         streamSink,
 		streamPreview:      &streamPreviewAccumulator{},
 		extensionUISink:    extensionUISink,
+		statusSink:         statusSink,
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -410,6 +418,7 @@ func (w *piRPCWorker) Status() workers.WorkerStatus {
 }
 
 func (w *piRPCWorker) Close() error {
+	w.closing.Store(true)
 	w.mu.Lock()
 	clear(w.pendingExtensionUI)
 	w.mu.Unlock()
@@ -480,10 +489,10 @@ func (w *piRPCWorker) consume(r io.Reader) {
 		w.handleRPCLine(line)
 	}
 	if err := scanner.Err(); err != nil {
-		w.setError(err)
+		w.setError(err, nil)
 		return
 	}
-	w.setError(io.ErrUnexpectedEOF)
+	w.setError(io.ErrUnexpectedEOF, nil)
 }
 
 func (w *piRPCWorker) handleRPCLine(line string) {
@@ -630,23 +639,35 @@ func (w *piRPCWorker) hasRecentStreamActivityLocked(now time.Time) bool {
 }
 
 func (w *piRPCWorker) wait() {
-	if err := w.cmd.Wait(); err != nil {
-		w.setError(err)
+	err := w.cmd.Wait()
+	exitCode := w.cmd.ProcessState.ExitCode()
+	if err == nil {
+		err = fmt.Errorf("worker exited")
 	}
+	w.setError(err, &exitCode)
 }
 
-func (w *piRPCWorker) setError(err error) {
+func (w *piRPCWorker) setError(err error, exitCode *int) {
 	err = w.withStderr(err)
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	if w.status.State != workers.WorkerStateError {
-		w.status = workers.WorkerStatus{State: workers.WorkerStateError, Error: err.Error()}
+		w.status = workers.WorkerStatus{State: workers.WorkerStateError, Error: err.Error(), ExitCode: exitCode}
+	} else if exitCode != nil {
+		// stdout may close before Cmd.Wait returns. Preserve the first useful
+		// error text, then enrich the same cached crash state with the process
+		// exit code once the operating system makes it available.
+		w.status.ExitCode = exitCode
 	}
+	status := w.status
 	for id, ch := range w.pending {
 		delete(w.pending, id)
 		ch <- response{ID: id, Type: "response", Success: false, Error: err.Error()}
 	}
 	clear(w.pendingExtensionUI)
+	w.mu.Unlock()
+	if w.statusSink != nil && !w.closing.Load() {
+		w.statusSink(status)
+	}
 }
 
 func (w *piRPCWorker) withStderr(err error) error {

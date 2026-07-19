@@ -1,14 +1,39 @@
-<script>
+<script lang="ts">
   // The ask_user_question tool card. Renders the structure declaratively; the
   // option/submit buttons carry data-question/data-answer + classes that the chat
   // composer's delegated click handler turns into a chat reply. Mirrors the former
   // renderAskUserQuestionTool().
   import { icon, Check } from '../../shared/icons.js';
 
-  let { args = {}, result = null } = $props();
+  interface QuestionOption {
+    readonly label?: string;
+    readonly description?: string;
+  }
+  interface Question {
+    readonly header?: string;
+    readonly question?: string;
+    readonly multiSelect?: boolean;
+    readonly options?: readonly QuestionOption[];
+  }
+  interface QuestionResult {
+    readonly isError?: boolean;
+    readonly details?: {
+      readonly answers?: Readonly<Record<string, string>>;
+      readonly cancelled?: boolean;
+      readonly awaitingChatReply?: boolean;
+    };
+  }
+
+  let {
+    args = {},
+    result = null,
+  }: {
+    args?: { readonly questions?: readonly Question[] };
+    result?: QuestionResult | null;
+  } = $props();
 
   const questions = $derived(Array.isArray(args.questions) ? args.questions : []);
-  const answers = $derived(result?.details?.answers || {});
+  const answers = $derived(result?.details?.answers ?? {});
   const cancelled = $derived(result?.details?.cancelled === true);
   const awaitingChatReply = $derived(result?.details?.awaitingChatReply === true);
   const questionToolFailed = $derived(result?.isError === true);
@@ -18,16 +43,16 @@
   const anyMultiSelect = $derived(questions.some((q) => q && q.multiSelect === true));
   const needsSubmit = $derived(isMulti || anyMultiSelect);
 
-  function optionLabel(option) {
-    return typeof option?.label === 'string' ? option.label : String(option || '');
+  function optionLabel(option: QuestionOption): string {
+    return typeof option.label === 'string' ? option.label : String(option);
   }
-  function optionDesc(option) {
-    return typeof option?.description === 'string' ? option.description : '';
+  function optionDesc(option: QuestionOption): string {
+    return typeof option.description === 'string' ? option.description : '';
   }
-  function isSelected(answer, label) {
+  function isSelected(answer: string | undefined, label: string): boolean {
     return answer === label || (typeof answer === 'string' && answer.split(', ').includes(label));
   }
-  function questionTextOf(q, i) {
+  function questionTextOf(q: Question, i: number): string {
     return typeof q.question === 'string' ? q.question : `Question ${i + 1}`;
   }
 </script>

@@ -1,19 +1,27 @@
-<script module>
+<script module lang="ts">
   // Click-to-expand tool output. Mirrors the former formatExpandableOutput():
   // a preview of the first `maxLines`, click to reveal the full text. Code output
   // (with a `lang`) renders <code class="hljs" data-highlight-pending> so the
   // post-render highlight pass (live: applyLazyHighlighting; export: afterRender)
   // colours it. Plain output renders one <div> per line.
-  export function toggleExpanded(e) {
-    if (window.getSelection && window.getSelection().toString()) return;
+  export function toggleExpanded(e: MouseEvent & { currentTarget: HTMLElement }) {
+    if (window.getSelection?.()?.toString()) return;
     e.currentTarget.classList.toggle('expanded');
   }
 </script>
 
-<script>
+<script lang="ts">
   import { splitOutputLines } from '../../session/render/entry-format.js';
 
-  let { text = '', maxLines = 10, lang = null } = $props();
+  let {
+    text = '',
+    maxLines = 10,
+    lang = null,
+  }: {
+    text?: string;
+    maxLines?: number;
+    lang?: string | null;
+  } = $props();
 
   const split = $derived(splitOutputLines(text, maxLines));
   const expandable = $derived(split.remaining > 0);

@@ -1,18 +1,28 @@
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { icon, ExternalLink, X } from '../../shared/icons.js';
-  import { t } from '../../shared/strings.js';
+  import { icon, ExternalLink, X } from '../../shared/icons';
+  import { t } from '../../shared/strings';
   import {
     cleanVersion,
     fetchVersionInfo,
     registerVersionController,
     renderChangelog,
     versionLabel,
-  } from '../../shared/version.js';
+  } from '../../shared/version';
+  import type { VersionInfo } from '../../lib/schema';
+  import { MutationResponseSchema } from '../../lib/schema';
+  import type { FetchLike } from '../../lib/http';
+  import * as Http from '../../lib/http';
+  import { runPromise } from '../../lib/runtime';
+  import { describeError } from '../../lib/errors';
+  import { ignoreFailure, settle } from './ui-effect';
 
-  let { fetchImpl = null, minCheckMs = 450 } = $props();
+  let {
+    fetchImpl = null,
+    minCheckMs = 450,
+  }: { fetchImpl?: FetchLike | null; minCheckMs?: number } = $props();
 
-  let info = $state(null);
+  let info = $state<VersionInfo | null>(null);
   let open = $state(false);
   let busy = $state(false);
   let checking = $state(false);
@@ -36,16 +46,17 @@
   }
 
   $effect(() => {
-    label;
-    hasUpdate;
+    void label;
+    void hasUpdate;
     tick().then(applyStatus);
   });
 
-  async function refresh(force = false) {
-    try {
-      info = await fetchVersionInfo({ fetchImpl: effectiveFetch, force });
+  async function refresh(force = false): Promise<VersionInfo | null> {
+    const result = await settle(() => fetchVersionInfo({ fetchImpl: effectiveFetch, force }));
+    if (result.ok) {
+      info = result.value;
       error = '';
-    } catch {
+    } else {
       // Leave current info intact for the row. The modal surfaces check errors.
       if (force) error = t('version.couldNotCheck');
     }
@@ -67,12 +78,12 @@
     document.body?.classList.remove('version-modal-open');
   }
 
-  function setStatus(message, kind = '') {
+  function setStatus(message: string, kind = '') {
     status = message;
     statusKind = kind;
   }
 
-  function delay(ms) {
+  function delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
@@ -80,36 +91,37 @@
     checking = true;
     error = '';
     const startedAt = Date.now();
-    try {
-      await refresh(true);
+    const result = await settle(() => refresh(true));
+    if (result.ok) {
       const elapsed = Date.now() - startedAt;
       if (elapsed < minCheckMs) await delay(minCheckMs - elapsed);
-    } catch {
+    } else {
       error = t('version.couldNotCheck');
-    } finally {
-      checking = false;
     }
+    checking = false;
   }
 
   async function runUpdate() {
     if (busy) return;
     busy = true;
     setStatus(t('version.installing'), 'info');
-    try {
-      const res = await effectiveFetch('/api/update', {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const update = await settle(() =>
+      runPromise(
+        Http.post('/api/update', undefined, MutationResponseSchema, { fetchImpl: effectiveFetch }),
+      ),
+    );
+    if (update.ok) {
       setStatus(t('version.restarting'), 'info');
-      effectiveFetch('/api/restart', {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-      }).catch(() => {});
+      ignoreFailure(() =>
+        runPromise(
+          Http.post('/api/restart', undefined, MutationResponseSchema, {
+            fetchImpl: effectiveFetch,
+          }),
+        ),
+      );
       awaitReconnect();
-    } catch (err) {
-      setStatus(t('version.updateFailed', { error: err?.message || String(err) }), 'error');
+    } else {
+      setStatus(t('version.updateFailed', { error: describeError(update.error) }), 'error');
       busy = false;
     }
   }
@@ -124,24 +136,19 @@
         busy = false;
         return;
       }
-      try {
-        const res = await effectiveFetch('/api/version', {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-          cache: 'no-store',
-        });
-        if (res.ok) {
-          window.location.reload();
-          return;
-        }
-      } catch {}
+      const result = await settle(() => fetchVersionInfo({ fetchImpl: effectiveFetch }));
+      if (result.ok) {
+        window.location.reload();
+        return;
+      }
       setTimeout(tickReconnect, 1500);
     };
     setTimeout(tickReconnect, 2500);
   }
 
-  function handleRowClick(e) {
-    const row = e.target?.closest?.('[data-version-row]');
+  function handleRowClick(e: MouseEvent) {
+    const row =
+      e.target instanceof Element ? e.target.closest<HTMLElement>('[data-version-row]') : null;
     if (!row || row.dataset.action === 'version') return;
     e.preventDefault();
     openModal();

@@ -1,9 +1,17 @@
-<script>
+<script lang="ts">
   import { icon, ListChecks } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { parseTaskLines } from '../../session/render/task-tool.js';
 
-  let { name, args = {}, resultText = '' } = $props();
+  let {
+    name,
+    args = {},
+    resultText = '',
+  }: {
+    name: string;
+    args?: Readonly<Record<string, unknown>>;
+    resultText?: string;
+  } = $props();
 
   const parsed = $derived(parseTaskLines(resultText));
   const passthrough = $derived(parsed.passthroughLines.join('\n'));
@@ -17,13 +25,13 @@
     return null;
   });
 
-  function displayValue(value) {
+  function displayValue(value: unknown): string {
     if (Array.isArray(value)) return value.join(', ');
     if (value === undefined || value === null) return '';
     return String(value);
   }
 
-  function statusLabel(status) {
+  function statusLabel(status: string): string {
     if (status === 'in_progress') return t('session.inProgress');
     return t(`session.${status}`);
   }

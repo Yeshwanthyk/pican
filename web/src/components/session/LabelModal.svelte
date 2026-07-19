@@ -1,25 +1,35 @@
-<script>
+<script lang="ts">
   // Label modal — Svelte port of ui/label-modal.js. Small dialog to set/clear a
   // tree label for an entry. Opened via the bindable `open` prop; `onSave({
   // entryId, label })` persists (the caller handles the API + tree refresh).
   import { tick } from 'svelte';
   import { t } from '../../shared/strings.js';
 
-  let { open = $bindable(false), entryId = '', currentLabel = '', onSave = null } = $props();
+  let {
+    open = $bindable(false),
+    entryId = '',
+    currentLabel = '',
+    onSave = null,
+  }: {
+    open?: boolean;
+    entryId?: string;
+    currentLabel?: string;
+    onSave?: ((value: { entryId: string; label: string }) => void) | null;
+  } = $props();
 
   let value = $state('');
-  let inputEl = $state(null);
-  let backdropEl = $state(null);
+  let inputEl = $state<HTMLInputElement | null>(null);
+  let backdropEl = $state<HTMLDivElement | null>(null);
 
   function close() {
     open = false;
   }
-  function submit(label) {
+  function submit(label: string): void {
     onSave?.({ entryId, label });
     close();
   }
 
-  function onKey(e) {
+  function onKey(e: KeyboardEvent): void {
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -38,7 +48,7 @@
       inputEl?.focus();
       inputEl?.select();
     });
-    const onBackdropClick = (e) => {
+    const onBackdropClick = (e: MouseEvent) => {
       if (e.target === backdropEl) close();
     };
     backdropEl?.addEventListener('click', onBackdropClick);

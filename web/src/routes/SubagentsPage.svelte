@@ -1,52 +1,54 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { formatRelativeTime } from '../index/sessions.js';
-  import { handleNavClick, navigate } from '../shared/navigation.js';
-  import { shortenPath } from '../session/render/session-format.js';
-  import { createStatusEvents } from '../shared/status-events.js';
-  import { icon, ChevronLeft, Layers } from '../shared/icons.js';
-  import { t } from '../shared/strings.js';
+  import { formatRelativeTime } from '../index/sessions';
+  import { handleNavClick, navigate } from '../shared/navigation';
+  import { shortenPath } from '../session/render/session-format';
+  import { createStatusEvents } from '../shared/status-events';
+  import { icon, ChevronLeft, Layers } from '../shared/icons';
+  import { t } from '../shared/strings';
   import {
     defaultFetchSubagents,
     normalizeSubagent,
     subagentActivityTime,
     subagentProject,
-  } from '../subagents/subagents.js';
+  } from '../subagents/subagents';
+  import type { Subagent } from '../subagents/subagents';
+  import { describeError } from '../lib/errors';
+  import { recoverSync, settle } from '../components/shared/ui-effect';
 
-  let { session = '' } = $props();
+  let { session = '' }: { session?: string } = $props();
 
-  let subagents = $state([]);
+  let subagents = $state<ReadonlyArray<Subagent>>([]);
   let loading = $state(true);
   let loadError = $state('');
   let generation = 0;
-  let updateTimer = null;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function refresh({ soft = false } = {}) {
     const loadGeneration = ++generation;
     if (!soft) loading = true;
     loadError = '';
-    try {
-      const response = await defaultFetchSubagents(session);
+    const result = await settle(() => defaultFetchSubagents(session));
+    if (result.ok) {
       if (loadGeneration === generation) {
-        subagents = (response.subagents || []).map(normalizeSubagent);
+        subagents = result.value.subagents.map(normalizeSubagent);
       }
-    } catch (error) {
-      if (loadGeneration === generation) loadError = error.message || String(error);
-    } finally {
-      if (loadGeneration === generation) loading = false;
+    } else if (loadGeneration === generation) {
+      loadError = describeError(result.error);
     }
+    if (loadGeneration === generation) loading = false;
   }
 
   function scheduleRefresh() {
     clearTimeout(updateTimer);
     updateTimer = setTimeout(() => {
-      updateTimer = null;
+      updateTimer = undefined;
       refresh({ soft: true });
     }, 300);
   }
 
-  function sessionURL(session) {
-    return '/session?id=' + encodeURIComponent(session);
+  function sessionURL(value: string) {
+    return '/session?id=' + encodeURIComponent(value);
   }
 
   onMount(() => {
@@ -62,9 +64,7 @@
       // list stays stale until an unrelated broadcast happens to arrive.
       onReconnect: scheduleRefresh,
     });
-    try {
-      statusEvents.connect();
-    } catch {}
+    recoverSync(() => statusEvents.connect(), undefined);
     refresh();
     return () => {
       document.title = previousTitle;

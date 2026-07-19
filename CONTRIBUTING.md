@@ -11,4 +11,10 @@ Thanks for your interest in contributing! pican is currently in an **early stage
 
 If a feature or fix is something I decide to move forward with, I'll invite a pull request at that point.
 
+## Development checks
+
+Use `make build` rather than `go build`; the Go binary embeds the Vite frontend and static export. Before pushing, run `make check`. It covers Oxlint, Oxfmt and Svelte formatting, TypeScript plus `svelte-check`, Knip, unit tests, the production build, installer tests, and `go vet`. Browser flows run separately with `make e2e` after the one-time `make e2e-setup`.
+
+Frontend browser I/O is Effect-backed. Components use the adapters in `web/src/lib/runtime.ts` and must not call `Effect.run*` directly. Because the repository pins an Effect 4 beta, consult the matching `effect-smol` source before writing or changing Effect code.
+
 Thanks for understanding, and I appreciate you taking the time to help make pican better!

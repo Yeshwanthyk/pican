@@ -1,56 +1,89 @@
-<script module>
+<script module lang="ts">
+  import { Schema } from 'effect';
+
+  interface ForkEntry {
+    readonly id?: string;
+    readonly type?: string;
+    readonly message?: unknown;
+  }
+
+  export interface UserMessageItem {
+    readonly entryId: string;
+    readonly text: string;
+    readonly number: number;
+  }
+
+  const UserMessageSchema = Schema.Struct({
+    role: Schema.Literal('user'),
+    content: Schema.Union([Schema.String, Schema.Array(Schema.Unknown)]),
+  });
+  const TextBlockSchema = Schema.Struct({
+    type: Schema.Literal('text'),
+    text: Schema.optionalKey(Schema.Unknown),
+  });
+  const isUserMessage = Schema.is(UserMessageSchema);
+  const isTextBlock = Schema.is(TextBlockSchema);
+
   // Pure helpers shared with SessionPage's open-bridge (for the empty check).
-  export function normalizeText(text) {
+  export function normalizeText(text: unknown): string {
     return String(text || '')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
-  function truncateText(text, maxLength = 96) {
+  function truncateText(text: unknown, maxLength = 96): string {
     const n = normalizeText(text);
     if (!n) return '(empty)';
     return n.length <= maxLength ? n : n.slice(0, maxLength).trimEnd() + '…';
   }
 
-  function extractUserMessageText(entry) {
+  function extractUserMessageText(entry: ForkEntry): string {
     if (entry?.type !== 'message') return '';
     const msg = entry.message;
-    if (!msg || msg.role !== 'user') return '';
+    if (!isUserMessage(msg)) return '';
     const content = msg.content;
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content
-        .filter((b) => b?.type === 'text')
-        .map((b) => b.text)
+        .filter(isTextBlock)
+        .map((b) => String(b.text ?? ''))
         .join(' ');
     }
     return '';
   }
 
   // Latest user messages first; `number` is the 1-based position in send order.
-  export function buildUserMessageList(entries = []) {
-    const messages = [];
+  export function buildUserMessageList(entries: readonly ForkEntry[] = []): UserMessageItem[] {
+    const messages: UserMessageItem[] = [];
     for (const entry of entries) {
       const text = normalizeText(extractUserMessageText(entry));
-      if (text) messages.push({ entryId: entry.id, text, number: messages.length + 1 });
+      if (text && entry.id) messages.push({ entryId: entry.id, text, number: messages.length + 1 });
     }
     return messages.reverse();
   }
 </script>
 
-<script>
+<script lang="ts">
   // Fork palette — Svelte port of live/fork-modal.js. Lists the session's user
   // messages so one can be picked to fork from; search + keyboard nav + preview.
   // Opened via the bindable `open` prop; `entries` are passed fresh (the caller
   // fetches them) and `onSelect(entryId)` performs the fork.
   import FullScreenSheet from './FullScreenSheet.svelte';
 
-  let { open = $bindable(false), entries = [], onSelect = null } = $props();
+  let {
+    open = $bindable(false),
+    entries = [],
+    onSelect = null,
+  }: {
+    open?: boolean;
+    entries?: readonly ForkEntry[];
+    onSelect?: ((entryId: string) => void) | null;
+  } = $props();
 
   let query = $state('');
   let selectedIndex = $state(0);
-  let listEl = $state(null);
-  let searchEl = $state(null);
+  let listEl = $state<HTMLDivElement | null>(null);
+  let searchEl = $state<HTMLInputElement | null>(null);
 
   const userMessages = $derived(buildUserMessageList(entries));
   const filtered = $derived.by(() => {
@@ -64,21 +97,21 @@
     filtered.length ? filtered[Math.min(selectedIndex, filtered.length - 1)] : null,
   );
 
-  function move(delta, focus) {
+  function move(delta: number, focus: boolean): void {
     if (filtered.length === 0) return;
     selectedIndex = Math.max(0, Math.min(selectedIndex + delta, filtered.length - 1));
-    const el = listEl?.querySelector(`[data-idx="${selectedIndex}"]`);
+    const el = listEl?.querySelector<HTMLButtonElement>(`[data-idx="${selectedIndex}"]`);
     el?.scrollIntoView?.({ block: 'nearest' });
     if (focus) el?.focus?.();
   }
 
-  function choose(msg) {
+  function choose(msg: UserMessageItem | null | undefined): void {
     if (!msg) return;
     open = false;
     onSelect?.(msg.entryId);
   }
 
-  function navKey(e, focus) {
+  function navKey(e: KeyboardEvent, focus: boolean): void {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       move(1, focus);

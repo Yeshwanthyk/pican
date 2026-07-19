@@ -81,19 +81,19 @@ apply. iPad portrait exercises mobile, iPad landscape exercises desktop.
 
 ### Expected skips
 
-A full run reports **13 skipped** — these are intentional `test.skip()` guards,
-not failures:
+A full run includes intentional `test.skip()` guards for tests that only apply
+to one side of the responsive breakpoint or that would race on shared
+server-side state. Each skip carries a reason string, visible with
+`npx playwright test --reporter=list`; the healthy invariant is **0 failed**,
+not a fixed passed/skipped count as the matrix grows.
 
-- **7** from `mobile-layout.spec.ts`: it has a mobile test and a desktop test;
-  each skips on the projects whose layout doesn't apply (mobile test skips the 4
-  desktop-layout projects, desktop test skips the 3 mobile-layout projects).
-- **6** from `settings.spec.ts` → "persists a setting server-side across
-  reload": settings live in one global server-side store, so running it on all 7
-  projects in parallel would race on the same key. It's gated to Desktop Chrome
-  (persistence is browser-independent), so the other 6 projects skip it.
+The screenshot capture spec is also excluded from normal runs because it writes
+committed documentation images. Opt into it explicitly:
 
-So `92 passed + 13 skipped + 0 failed` is the healthy state. Each skip carries a
-reason string, visible with `npx playwright test --reporter=list`.
+```bash
+PICAN_E2E_SCREENSHOTS=1 npx playwright test --grep "@screenshots" \
+  --project="Desktop Chrome" --workers=1
+```
 
 ## How the server runs (scripted launch)
 

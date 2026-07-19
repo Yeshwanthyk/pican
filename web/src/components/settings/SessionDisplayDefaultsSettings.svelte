@@ -1,9 +1,13 @@
-<script>
-  import { t } from '../../shared/strings.js';
-  import { boolFor } from '../../settings/settings-support.js';
-  import { TOGGLE_DEFAULT_SETTING_KEYS } from '../../session/ui/toggle-state.js';
+<script lang="ts">
+  import { t } from '../../shared/strings';
+  import { boolFor } from '../../settings/settings-support';
+  import { TOGGLE_DEFAULT_SETTING_KEYS } from '../../session/ui/toggle-state';
+  import type { Settings } from '../../settings/settings-support';
 
-  let { settings = {}, onSave = () => {} } = $props();
+  let {
+    settings = {},
+    onSave = () => {},
+  }: { settings?: Settings; onSave?: (key: string, value: string) => void } = $props();
 
   const thinkingKey = TOGGLE_DEFAULT_SETTING_KEYS.thinkingExpanded;
   const toolsKey = TOGGLE_DEFAULT_SETTING_KEYS.toolsVisible;
@@ -13,7 +17,7 @@
   let toolsVisible = $derived(boolFor(settings, toolsKey, true));
   let toolOutputsExpanded = $derived(boolFor(settings, toolOutputsKey, false));
 
-  function save(settingKey, checked) {
+  function save(settingKey: string, checked: boolean) {
     onSave(settingKey, checked ? 'true' : 'false');
   }
 </script>

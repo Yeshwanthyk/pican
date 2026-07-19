@@ -213,7 +213,7 @@ func TestFilterBtwSummaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	out = s.filterBtwSummaries(all)
-	if len(out) != 2 {
+	if len(out) != 2 || !out[1].Btw {
 		t.Fatalf("expected btw shown when enabled, got %v", out)
 	}
 }

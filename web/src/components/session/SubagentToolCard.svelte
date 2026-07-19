@@ -1,30 +1,43 @@
-<script>
+<script lang="ts">
   import { marked } from 'marked';
   import { icon, Layers } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { navigate } from '../../shared/navigation.js';
-  import { safeMarkedParse } from '../../session/render/markdown.js';
   import ToolOutput from './ToolOutput.svelte';
 
-  let { name, result = null, resultText = '' } = $props();
+  type Detail = Record<string, unknown>;
+  interface ToolResult {
+    readonly details?: Detail;
+  }
+  const isDetail = (value: unknown): value is Detail => typeof value === 'object' && value !== null;
 
-  const details = $derived(
-    result?.details && typeof result.details === 'object' ? result.details : null,
-  );
+  let {
+    name,
+    result = null,
+    resultText = '',
+  }: {
+    name: string;
+    result?: ToolResult | null;
+    resultText?: string;
+  } = $props();
+
+  const details = $derived(isDetail(result?.details) ? result.details : null);
   const rows = $derived.by(() => {
     if (!details) return [];
     if (name === 'subagent_spawn' && details.id) return [details];
     if (name === 'subagent_check' && details.id) return [details];
     if (name === 'subagent_list') {
-      return Array.isArray(details.subagents) ? details.subagents.filter(Boolean) : [];
+      return Array.isArray(details.subagents) ? details.subagents.filter(isDetail) : [];
     }
     if (name === 'subagent_wait' || name === 'subagent_cancel') {
-      const results = Array.isArray(details.results) ? details.results.filter(Boolean) : [];
+      const results: Detail[] = Array.isArray(details.results)
+        ? details.results.filter(isDetail)
+        : [];
       if (name === 'subagent_wait' && Array.isArray(details.pending)) {
         results.push(
           ...details.pending
             .filter((id) => id !== undefined && id !== null)
-            .map((id) => ({ id, status: 'running' })),
+            .map((id): Detail => ({ id, status: 'running' })),
         );
       }
       return results;
@@ -33,8 +46,8 @@
   });
   const hasStructuredDetails = $derived(rows.length > 0);
 
-  const md = (text) => safeMarkedParse(text, { marked });
-  const statusLabel = (status) => {
+  const md = (text: string): string => marked.parse(text, { async: false });
+  const statusLabel = (status: string): string => {
     const key = `session.${status}`;
     const label = t(key);
     return label === key ? status.replaceAll('_', ' ') : label;

@@ -151,16 +151,19 @@ func (s *Server) showBtwInIndex() bool {
 // filterBtwSummaries drops btw scratch-chats from the list unless the user has
 // opted to show them. A no-op when none exist or showing is enabled.
 func (s *Server) filterBtwSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
-	if s.showBtwInIndex() {
+	btwIDs := s.btwSessionIDs()
+	if len(btwIDs) == 0 {
 		return summaries
 	}
-	hidden := s.btwSessionIDs()
-	if len(hidden) == 0 {
+	if s.showBtwInIndex() {
+		for i := range summaries {
+			summaries[i].Btw = btwIDs[summaries[i].ID]
+		}
 		return summaries
 	}
 	out := make([]sessions.SessionSummary, 0, len(summaries))
 	for _, sum := range summaries {
-		if !hidden[sum.ID] {
+		if !btwIDs[sum.ID] {
 			out = append(out, sum)
 		}
 	}

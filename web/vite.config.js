@@ -1,24 +1,24 @@
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vite';
-import { resolve } from 'node:path';
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 export default defineConfig({
   // The Go server serves built assets under /static/. Without this, the chunk
   // loader resolves dynamic imports against /assets/ and they 404.
-  base: '/static/',
+  base: "/static/",
   plugins: [svelte()],
   build: {
     manifest: true,
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       input: {
-        app: resolve(__dirname, 'src/main.js'),
+        app: resolve(__dirname, "src/main.ts"),
       },
       output: {
         manualChunks(id) {
-          if (id.includes('highlight.js')) return 'hljs';
+          if (id.includes("highlight.js")) return "hljs";
           // NOTE: do NOT force @pierre/diffs / shiki into a single manual chunk.
           // The dynamic import('@pierre/diffs') already splits it off, and shiki
           // lazy-loads individual language grammars as separate chunks. Grouping

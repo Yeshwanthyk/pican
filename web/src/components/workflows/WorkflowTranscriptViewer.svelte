@@ -1,18 +1,26 @@
-<script>
-  import { marked } from 'marked';
-  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown.js';
-  import { escapeHtml } from '../../shared/escape.js';
-  import { t } from '../../shared/strings.js';
+<script lang="ts">
+  import { Marked } from 'marked';
+  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown';
+  import { escapeHtml } from '../../shared/escape';
+  import { t } from '../../shared/strings';
   import WorkflowStatusChip from './WorkflowStatusChip.svelte';
-  import { workflowTranscriptGroups } from '../../workflows/workflows.js';
+  import { workflowTranscriptGroups } from '../../workflows/workflows';
+  import type { WorkflowTranscriptGroup } from '../../workflows/workflows';
 
-  let { transcripts = null, agents = [] } = $props();
+  let {
+    transcripts = null,
+    agents = [],
+  }: {
+    transcripts?: unknown;
+    agents?: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  } = $props();
 
-  configureSessionMarkdown({ marked, hljs: null, escapeHtml });
+  const markdown = new Marked();
+  configureSessionMarkdown({ marked: markdown, hljs: null, escapeHtml });
 
   const groups = $derived(workflowTranscriptGroups(transcripts, agents));
-  const md = (text) => safeMarkedParse(String(text || ''), { marked });
-  const agentLabel = (group) =>
+  const md = (text: unknown) => safeMarkedParse(String(text || ''), { marked: markdown });
+  const agentLabel = (group: WorkflowTranscriptGroup) =>
     String(group.agent?.label || t('workflows.agentFallback', { index: Number(group.index) + 1 }));
 </script>
 

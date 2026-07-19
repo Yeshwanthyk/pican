@@ -1,7 +1,39 @@
-<script>
+<script lang="ts">
+  import { Schema } from 'effect';
+  import * as Http from '../../lib/http.js';
+  import type { FetchLike } from '../../lib/http.js';
+  import { describeError } from '../../lib/errors.js';
+  import { runPromise } from '../../lib/runtime.js';
+  import { sessionEntryFromUnknown, type SessionEntry } from '../../session/data/session-types.js';
+  import type { NavigateTo } from '../../session/session-runtime-context.js';
   import { t } from '../../shared/strings.js';
 
-  let { model, sessionId = '', fetchImpl = null, navigateTo = null, windowSize = 500 } = $props();
+  interface EarlierModel {
+    entries: SessionEntry[];
+    total: number;
+    from: number;
+    truncated: boolean;
+    leafId: string;
+    reconcile?: (entries: SessionEntry[]) => void;
+  }
+
+  interface Props {
+    model: EarlierModel;
+    sessionId?: string;
+    fetchImpl?: FetchLike | null;
+    navigateTo?: NavigateTo | null;
+    windowSize?: number;
+  }
+
+  const EarlierResponse = Schema.Struct({ entries: Schema.optional(Schema.Array(Schema.Unknown)) });
+
+  let {
+    model,
+    sessionId = '',
+    fetchImpl = null,
+    navigateTo = null,
+    windowSize = 500,
+  }: Props = $props();
 
   let loading = $state(false);
   let error = $state('');
@@ -15,33 +47,37 @@
     fetchImpl || (typeof window !== 'undefined' ? window.fetch.bind(window) : null),
   );
 
-  async function loadEarlier() {
+  function loadEarlier(): void {
     if (loading || !visible || !effectiveFetch) return;
     const requestFrom = Math.max(0, model.from - windowSize);
     const requestCount = model.from - requestFrom;
     const anchorId = model.entries[0]?.id || null;
     loading = true;
     error = '';
-    try {
-      const url = `/api/session?id=${encodeURIComponent(sessionId)}&from=${requestFrom}&count=${requestCount}`;
-      const res = await effectiveFetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const payload = await res.json();
-      const earlier = Array.isArray(payload?.entries) ? payload.entries : [];
-      if (earlier.length === 0) {
-        model.from = 0;
-        model.truncated = false;
-        return;
-      }
-      model.reconcile?.([...earlier, ...model.entries]);
-      navigateTo?.(model.leafId, anchorId ? 'target' : 'bottom', anchorId || null);
-      model.from = requestFrom;
-      model.truncated = requestFrom > 0;
-    } catch (err) {
-      error = err?.message || String(err);
-    } finally {
-      loading = false;
-    }
+    const url = `/api/session?id=${encodeURIComponent(sessionId)}&from=${requestFrom}&count=${requestCount}`;
+    void runPromise(Http.get(url, EarlierResponse, { fetchImpl: effectiveFetch })).then(
+      (payload) => {
+        const earlier = (payload.entries ?? []).flatMap((entry) => {
+          const parsed = sessionEntryFromUnknown(entry);
+          return parsed ? [parsed] : [];
+        });
+        if (earlier.length === 0) {
+          model.from = 0;
+          model.truncated = false;
+          loading = false;
+          return;
+        }
+        model.reconcile?.([...earlier, ...model.entries]);
+        navigateTo?.(model.leafId, anchorId ? 'target' : 'bottom', anchorId || null);
+        model.from = requestFrom;
+        model.truncated = requestFrom > 0;
+        loading = false;
+      },
+      (failure: unknown) => {
+        error = describeError(failure);
+        loading = false;
+      },
+    );
   }
 </script>
 

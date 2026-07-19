@@ -1,7 +1,9 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { t } from '../../shared/strings.js';
-  import { boolFor, valueFor } from '../../settings/settings-support.js';
+  import { t } from '../../shared/strings';
+  import { boolFor, valueFor } from '../../settings/settings-support';
+  import type { Settings } from '../../settings/settings-support';
+  import { settle } from '../shared/ui-effect';
   import {
     fetchAvailableSounds,
     getSelectedSound,
@@ -10,23 +12,34 @@
     requestNotifyPermission,
     registerPushSubscription,
     unregisterPushSubscription,
-  } from '../../session/chat/done-notifier.js';
+  } from '../../session/chat/done-notifier';
 
-  let { settings = {}, onSave = () => {}, onSaved = () => {} } = $props();
+  let {
+    settings = {},
+    onSave = () => {},
+    onSaved = () => {},
+  }: {
+    settings?: Settings;
+    onSave?: (key: string, value: string) => void;
+    onSaved?: () => void;
+  } = $props();
   const notifyKey = 'pican:v1:notify-on-done';
   const soundKey = 'pican:v1:done-sound';
   let notify = $derived(boolFor(settings, notifyKey, false));
   let sound = $derived(
     valueFor(settings, soundKey, getSelectedSound({ storage: globalThis.localStorage })),
   );
-  let sounds = $state(['cat.mp3', 'done.mp3']);
+  let sounds = $state<ReadonlyArray<string>>(['cat.mp3', 'done.mp3']);
 
-  onMount(async () => {
-    const data = await fetchAvailableSounds({ fetchImpl: window.fetch.bind(window) });
-    sounds = data.sounds || sounds;
+  onMount(() => {
+    void settle(() => fetchAvailableSounds({ fetchImpl: window.fetch.bind(window) })).then(
+      (result) => {
+        if (result.ok) sounds = result.value.sounds || sounds;
+      },
+    );
   });
 
-  async function handleNotifyToggle(checked) {
+  async function handleNotifyToggle(checked: boolean) {
     if (!checked) {
       setDoneNotifyEnabled(false, { storage: localStorage });
       await unregisterPushSubscription({
@@ -44,7 +57,7 @@
     onSave(notifyKey, granted ? 'true' : 'false');
   }
 
-  function handleSound(value) {
+  function handleSound(value: string) {
     onSave(soundKey, value);
     playDoneSound({ windowImpl: window, storage: localStorage });
     onSaved();

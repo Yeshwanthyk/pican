@@ -53,7 +53,7 @@ func assertCSSCustomPropertiesDefined(t *testing.T, name, html string) {
 }
 
 // TestExportBundleIsSelfContained guards the static export runtime built by
-// Vite (web/src/export/export-entry.js). The snapshot must run from a single
+// Vite (web/src/export/export-entry.ts). The snapshot must run from a single
 // inlined <script> with no server, so the bundle may not pull in any live-only
 // machinery. If the export entry accidentally imports a module that reaches
 // SSE/chat/live-reload, that symbol leaks into this bundle and fails here.
@@ -66,11 +66,8 @@ func TestExportBundleIsSelfContained(t *testing.T) {
 	// (tier-2) component imported a live-only module — fix the import, do not
 	// loosen this list. See docs/dev/svelte-migration-plan.md §6.
 	//
-	// NOTE: "fetch(" and "/api/" are NOT yet forbidden — a pre-existing dead
-	// (host-less) path still pulls them into the bundle. Add them here once the
-	// live-only modules are gone (migration Phase 3 cleanup).
 	forbidden := []string{
-		"EventSource", "WebSocket",
+		"EventSource", "WebSocket", "XMLHttpRequest", "fetch(",
 		"runLiveReload", "live-reload-runner", "live-reload",
 		"chatComposerRunner", "ChatComposer",
 		"ArtifactPanel",
@@ -99,21 +96,21 @@ func TestStaticExportKeepsInlineSessionRenderer(t *testing.T) {
 }
 
 func TestIndexSourceReferencesAPINewSession(t *testing.T) {
-	data, err := os.ReadFile(repoPath("web/src/index/sessions.js"))
+	data, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/index/sessions.js: %v", err)
+		t.Fatalf("read web/src/index/sessions.ts: %v", err)
 	}
 	if !strings.Contains(string(data), "/api/new-session") {
-		t.Fatal("web/src/index/sessions.js missing /api/new-session reference")
+		t.Fatal("web/src/index/sessions.ts missing /api/new-session reference")
 	}
 }
 
 func TestIndexSourceReferencesAPIRecentLocations(t *testing.T) {
-	data, err := os.ReadFile(repoPath("web/src/index/sessions.js"))
+	data, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
 	if err != nil {
-		t.Fatalf("read web/src/index/sessions.js: %v", err)
+		t.Fatalf("read web/src/index/sessions.ts: %v", err)
 	}
-	if !strings.Contains(string(data), "/api/recent-locations") {
-		t.Fatal("web/src/index/sessions.js missing /api/recent-locations reference")
+	if !strings.Contains(string(data), "effects.sessions.recentLocations") {
+		t.Fatal("web/src/index/sessions.ts missing recent-locations Effect reference")
 	}
 }

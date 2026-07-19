@@ -1,5 +1,6 @@
 // One-shot screenshot capture for the chat queue + steer flow.
-// Not part of the regular suite — opt in with `--grep "@screenshots"`.
+// Not part of the regular suite — opt in with
+// `PICAN_E2E_SCREENSHOTS=1 npx playwright test --grep "@screenshots"`.
 // Saves PNGs into docs/screenshots/queue-and-steer/ for use in the README / PR.
 
 import path from "node:path";

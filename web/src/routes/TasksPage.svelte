@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { createStatusEvents } from '../shared/status-events.js';
-  import { navigate } from '../shared/navigation.js';
-  import { t } from '../shared/strings.js';
-  import { icon, ChevronLeft, ListChecks } from '../shared/icons.js';
-  import { defaultFetchProjects } from '../index/sessions.js';
+  import { createStatusEvents } from '../shared/status-events';
+  import { navigate } from '../shared/navigation';
+  import { t } from '../shared/strings';
+  import { icon, ChevronLeft, ListChecks } from '../shared/icons';
+  import { defaultFetchProjects } from '../index/sessions';
   import TaskCard from '../components/tasks/TaskCard.svelte';
   import {
     defaultFetchTaskOutput,
@@ -14,16 +14,21 @@
     taskCount,
     taskGroupsByStatus,
     tasksSelectionStorageKey,
-  } from '../tasks/tasks.js';
+    normalizeTaskStore,
+  } from '../tasks/tasks';
+  import type { NormalizedTaskStore } from '../tasks/tasks';
+  import { persistSetting, valueFor } from '../settings/settings-support';
+  import { describeError } from '../lib/errors';
+  import { recoverSync, settle } from '../components/shared/ui-effect';
 
-  let { project = '', session = '' } = $props();
-  let projects = $state([]);
+  let { project = '', session = '' }: { project?: string; session?: string } = $props();
+  let projects = $state<ReadonlyArray<{ readonly path: string }>>([]);
   let selected = $state('');
-  let stores = $state([]);
+  let stores = $state<ReadonlyArray<NormalizedTaskStore>>([]);
   let loading = $state(true);
   let loadError = $state('');
   let generation = 0;
-  let updateTimer = null;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
 
   const selectedStores = $derived(storesForSelection(stores, selected));
   const inProgress = $derived(taskGroupsByStatus(selectedStores, 'in_progress'));
@@ -45,21 +50,20 @@
       loading = false;
       return;
     }
-    try {
-      const response = await defaultFetchTasks(currentProject, session);
+    const result = await settle(() => defaultFetchTasks(currentProject, session));
+    if (result.ok) {
       if (loadGeneration === generation && currentSelection === selected) {
-        stores = response.stores || [];
+        stores = result.value.stores.map(normalizeTaskStore);
       }
-    } catch (error) {
-      if (loadGeneration === generation) loadError = error.message || String(error);
-    } finally {
-      if (loadGeneration === generation) loading = false;
+    } else if (loadGeneration === generation) {
+      loadError = describeError(result.error);
     }
+    if (loadGeneration === generation) loading = false;
   }
 
-  function selectProject(value) {
+  function selectProject(value: string) {
     selected = value;
-    localStorage.setItem(tasksSelectionStorageKey, value);
+    persistSetting(tasksSelectionStorageKey, value);
     const suffix = value ? '?project=' + encodeURIComponent(value) : '';
     navigate('/tasks' + suffix);
     refresh();
@@ -73,34 +77,34 @@
     }
     const response = await defaultFetchProjects();
     projects = (response.projects || []).filter((entry) => entry?.path);
-    const saved = localStorage.getItem(tasksSelectionStorageKey) || '';
+    const saved = valueFor({}, tasksSelectionStorageKey, '');
     const requested = project === 'global' || projects.some((entry) => entry.path === project);
     if (requested) selected = project;
     else if (saved === 'global' || projects.some((entry) => entry.path === saved)) selected = saved;
-    else if (projects.length === 1) selected = projects[0].path;
+    else if (projects.length === 1) selected = projects[0]?.path || '';
     else if (projects.length > 1) {
       const probes = await Promise.all(
         projects.map(async (entry) => {
-          try {
-            const response = await defaultFetchTasks(entry.path);
-            const count = storesForSelection(response.stores || [], entry.path).reduce(
+          const result = await settle(() => defaultFetchTasks(entry.path));
+          if (result.ok) {
+            const normalized = result.value.stores.map(normalizeTaskStore);
+            const count = storesForSelection(normalized, entry.path).reduce(
               (total, store) => total + store.tasks.length,
               0,
             );
             return count > 0 ? entry.path : '';
-          } catch {
-            return '';
           }
+          return '';
         }),
       );
       const withTasks = probes.filter(Boolean);
-      if (withTasks.length === 1) selected = withTasks[0];
+      if (withTasks.length === 1) selected = withTasks[0] ?? '';
     }
-    if (!selected && projects.length > 0) selected = projects[0].path;
-    if (selected) localStorage.setItem(tasksSelectionStorageKey, selected);
+    if (!selected && projects.length > 0) selected = projects[0]?.path || '';
+    if (selected) persistSetting(tasksSelectionStorageKey, selected);
   }
 
-  function scheduleRefresh(payload) {
+  function scheduleRefresh(payload: { readonly project: string }) {
     if (selected !== 'global' && payload.project !== selected) return;
     clearTimeout(updateTimer);
     updateTimer = setTimeout(() => refresh({ soft: true }), 150);
@@ -110,15 +114,14 @@
     const previousTitle = document.title;
     document.title = t('tasks.title');
     const statusEvents = createStatusEvents({ onTasksUpdate: scheduleRefresh });
-    try {
-      statusEvents.connect();
-    } catch {}
-    chooseInitialSelection()
-      .then(() => refresh())
-      .catch((error) => {
-        loadError = error.message || String(error);
+    recoverSync(() => statusEvents.connect(), undefined);
+    void settle(chooseInitialSelection).then(async (result) => {
+      if (result.ok) await refresh();
+      else {
+        loadError = describeError(result.error);
         loading = false;
-      });
+      }
+    });
     return () => {
       document.title = previousTitle;
       clearTimeout(updateTimer);

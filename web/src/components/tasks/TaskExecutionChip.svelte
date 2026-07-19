@@ -1,7 +1,7 @@
-<script>
-  import { t } from '../../shared/strings.js';
+<script lang="ts">
+  import { t } from '../../shared/strings';
 
-  let { status = '' } = $props();
+  let { status = '' }: { status?: string } = $props();
   const normalized = $derived(String(status || '').toLowerCase());
   const label = $derived(t(`tasks.execution.${normalized || 'unknown'}`));
 </script>

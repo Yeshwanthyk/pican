@@ -451,6 +451,12 @@ func projectThread(thread Thread) []map[string]any {
 		title = strings.TrimSpace(thread.Preview)
 	}
 	header := map[string]any{"type": "session", "version": 3, "id": "codex-" + thread.ID, "timestamp": created, "cwd": thread.CWD, "runtime": "codex", "nativeId": thread.ID, "name": title, "preview": thread.Preview, "provider": Provider, "modelProvider": Provider}
+	if title == newSessionName {
+		// StartSession assigns this system placeholder only to make an empty
+		// native thread resumable. It is not a user-owned title, so mark it as
+		// auto-generated and let the normal auto-titler replace it.
+		header["autoTitle"] = true
+	}
 	if thread.Model != "" {
 		header["model"] = thread.Model
 	}

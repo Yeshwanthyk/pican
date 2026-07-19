@@ -44,7 +44,7 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 
 	var out TitleInputs
 	var headerName, sessionInfoName string
-	var sessionInfoAuto bool
+	var headerAuto, sessionInfoAuto bool
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 256*1024*1024)
@@ -61,6 +61,7 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 		case "session":
 			if raw.Name != "" {
 				headerName = raw.Name
+				headerAuto = raw.AutoTitle
 			}
 		case "session_info":
 			if raw.Name != "" {
@@ -93,6 +94,7 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 	case headerName != "":
 		out.CurrentName = headerName
 		out.HasExplicitName = true
+		out.AutoTitled = headerAuto
 	}
 	return out, nil
 }

@@ -15,7 +15,10 @@ async function openDemoSession(page: Page) {
   // viewports; we're exercising the tree overlay.
   await collapseScratchpad(page);
   await page.goto("/");
-  await page.locator(".session-card", { hasText: "add deepseek-v4-pro" }).click();
+  await page
+    .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+    .locator(".session-ticker-link")
+    .click();
   await expect(page).toHaveURL(/\/session\?id=/);
   await page.locator("#tree-toggle").waitFor();
 }
@@ -68,7 +71,10 @@ test.describe("session tree overlay", () => {
   test("?tree=open restores the overlay on load", async ({ page }) => {
     await collapseScratchpad(page);
     await page.goto("/");
-    await page.locator(".session-card", { hasText: "add deepseek-v4-pro" }).click();
+    await page
+      .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+      .locator(".session-ticker-link")
+      .click();
     await expect(page).toHaveURL(/\/session\?id=/);
     const url = new URL(page.url());
     url.searchParams.set("tree", "open");

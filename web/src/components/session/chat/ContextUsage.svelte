@@ -1,8 +1,8 @@
-<script>
+<script lang="ts">
   import { t } from '../../../shared/strings.js';
   import { icon, X } from '../../../shared/icons.js';
 
-  let { popover = false } = $props();
+  let { popover = false }: { popover?: boolean } = $props();
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->

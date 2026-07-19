@@ -1,0 +1,238 @@
+// Lucide icons (https://lucide.dev — ISC license). pican renders icon data to
+// an SVG *string* for Svelte markup ({@html icon(...)}) and export snapshots.
+// Live utility modules that need to swap an icon imperatively can use
+// setIconElement(), which builds an SVG node and replaces children without
+// string-based view rendering.
+//
+// Do not hand-draw custom SVG icons or use unicode glyphs for icons. Import the
+// Lucide icon here and render it with icon(); ESLint enforces this boundary.
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CalendarClock,
+  ChartColumn,
+  Check,
+  CircleCheck,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Clock,
+  Copy,
+  CornerDownRight,
+  Download,
+  ExternalLink,
+  FileDiff,
+  FolderGit2,
+  Ghost,
+  GitFork,
+  Layers,
+  Link2,
+  ListChecks,
+  ListTree,
+  Loader,
+  Maximize2,
+  Moon,
+  MoreHorizontal,
+  Palette,
+  PanelLeft,
+  PanelLeftClose,
+  Paperclip,
+  Pause,
+  Pencil,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  Search,
+  Send,
+  Settings,
+  Share2,
+  Snowflake,
+  Square,
+  SquarePen,
+  Sun,
+  Tag,
+  Terminal,
+  TextQuote,
+  Trash2,
+  Workflow,
+  X,
+  CircleX,
+} from "lucide";
+import type { IconNode } from "lucide";
+
+// Lucide's default SVG presentation attributes (24x24 grid, 2px round strokes).
+type SvgAttribute = string | number | boolean | null | undefined;
+type SvgAttributes = Record<string, SvgAttribute>;
+
+const DEFAULT_ATTRS: SvgAttributes = {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  "stroke-width": "2",
+  "stroke-linecap": "round",
+  "stroke-linejoin": "round",
+};
+
+const attrString = (attrs: Readonly<SvgAttributes>): string =>
+  Object.entries(attrs)
+    .filter(([, v]) => v !== undefined && v !== null && v !== false)
+    .map(([k, v]) => `${k}="${String(v)}"`)
+    .join(" ");
+
+/**
+ * Render a Lucide icon node to an SVG markup string.
+ * @param {Array<[string, Record<string, string|number>]>} node Lucide icon data.
+ * @param {{ size?: number, class?: string, strokeWidth?: number|string }} [opts]
+ * @returns {string}
+ */
+interface IconOptions {
+  readonly size?: number;
+  readonly class?: string;
+  readonly strokeWidth?: number | string;
+}
+
+interface IconNodeOptions extends IconOptions {
+  readonly documentImpl?: Document;
+}
+
+export function icon(
+  node: IconNode,
+  { size = 16, class: className = "", strokeWidth }: IconOptions = {},
+): string {
+  const attrs: SvgAttributes = {
+    ...DEFAULT_ATTRS,
+    width: size,
+    height: size,
+    "aria-hidden": "true",
+  };
+  if (strokeWidth != null) attrs["stroke-width"] = String(strokeWidth);
+  if (className) attrs.class = className;
+  const children = node.map(([tag, childAttrs]) => `<${tag} ${attrString(childAttrs)} />`).join("");
+  return `<svg ${attrString(attrs)}>${children}</svg>`;
+}
+
+export function iconNode(
+  node: IconNode,
+  { size = 16, class: className = "", strokeWidth, documentImpl = document }: IconNodeOptions = {},
+): SVGSVGElement {
+  const svg = documentImpl.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const attrs: SvgAttributes = {
+    ...DEFAULT_ATTRS,
+    width: size,
+    height: size,
+    "aria-hidden": "true",
+  };
+  if (strokeWidth != null) attrs["stroke-width"] = String(strokeWidth);
+  if (className) attrs.class = className;
+  for (const [k, v] of Object.entries(attrs)) svg.setAttribute(k, String(v));
+  for (const [tag, childAttrs] of node) {
+    const child = documentImpl.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [k, v] of Object.entries(childAttrs || {})) child.setAttribute(k, String(v));
+    svg.appendChild(child);
+  }
+  return svg;
+}
+
+export function setIconElement(
+  el: Element | null | undefined,
+  node: IconNode,
+  opts: IconNodeOptions = {},
+): void {
+  if (!el) return;
+  el.replaceChildren(
+    iconNode(node, { ...opts, documentImpl: opts.documentImpl || el.ownerDocument || document }),
+  );
+}
+
+// Theme -> Lucide icon. Keep this in sync with the inlined theme-icon SVGs in
+// the boot script (internal/ui/live_page.go), which paints the icon before the
+// JS bundle loads — both must emit identical markup to avoid a swap on load.
+const THEME_ICONS: Readonly<Record<string, IconNode>> = {
+  dark: Moon,
+  light: Sun,
+  nord: Snowflake,
+  dracula: Ghost,
+  custom: Settings,
+  "catppuccin-mocha": Palette,
+  "catppuccin-latte": Palette,
+  "gruvbox-dark": Palette,
+  "tokyo-night": Palette,
+  "rose-pine": Palette,
+  "github-dark": Palette,
+  "github-light": Palette,
+  "one-dark-pro": Palette,
+  "everforest-dark": Palette,
+  "kanagawa-wave": Palette,
+};
+
+/** SVG markup string for a theme's indicator icon. */
+export function themeIcon(theme: string, opts: IconOptions = {}): string {
+  return icon(THEME_ICONS[theme] ?? Moon, { size: 14, ...opts });
+}
+
+export function setThemeIconElement(
+  el: Element | null | undefined,
+  theme: string,
+  opts: IconNodeOptions = {},
+): void {
+  setIconElement(el, THEME_ICONS[theme] ?? Moon, { size: 14, ...opts });
+}
+
+export {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CalendarClock,
+  ChartColumn,
+  Check,
+  CircleCheck,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Clock,
+  Copy,
+  CornerDownRight,
+  Download,
+  ExternalLink,
+  FileDiff,
+  FolderGit2,
+  Ghost,
+  GitFork,
+  Layers,
+  Link2,
+  ListChecks,
+  ListTree,
+  Loader,
+  Maximize2,
+  Moon,
+  MoreHorizontal,
+  PanelLeft,
+  PanelLeftClose,
+  Paperclip,
+  Pause,
+  Pencil,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  Search,
+  Send,
+  Settings,
+  Share2,
+  Snowflake,
+  Square,
+  SquarePen,
+  Sun,
+  Tag,
+  Terminal,
+  TextQuote,
+  Trash2,
+  Workflow,
+  X,
+  CircleX,
+};

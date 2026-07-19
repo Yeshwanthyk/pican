@@ -1,8 +1,12 @@
-<script>
-  import { t } from '../../shared/strings.js';
-  import { boolFor, valueFor } from '../../settings/settings-support.js';
+<script lang="ts">
+  import { t } from '../../shared/strings';
+  import { boolFor, valueFor } from '../../settings/settings-support';
+  import type { Settings } from '../../settings/settings-support';
 
-  let { settings = {}, onSave = () => {} } = $props();
+  let {
+    settings = {},
+    onSave = () => {},
+  }: { settings?: Settings; onSave?: (key: string, value: string) => void } = $props();
   const spinnerKey = 'pican:spinner-style';
   const layoutKey = 'pican:view-layout';
   const btwKey = 'pican:v1:show-btw-in-index';
@@ -25,7 +29,11 @@
         value={spinner}
         onchange={(e) => onSave(spinnerKey, e.currentTarget.value)}
       >
-        <option value="runcat">Runcat</option><option value="braille">Braille</option>
+        <option value="runcat">{t('settings.spinnerRuncat')}</option><option value="braille"
+          >{t('settings.spinnerBraille')}</option
+        ><option value="pacman">{t('settings.spinnerPacman')}</option><option value="comet"
+          >{t('settings.spinnerComet')}</option
+        >
       </select>
     </div>
   </div>

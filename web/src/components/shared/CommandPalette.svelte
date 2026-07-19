@@ -1,119 +1,39 @@
-<script module>
-  import { getSessionRuntime } from '../../session/session-runtime-context.js';
-
-  function sessionTitle(session) {
-    return session.title || session.Name || session.name || session.ID || session.id || 'Session';
-  }
-
-  function sessionId(session) {
-    return session.id || session.ID || '';
-  }
-
-  function sessionHref(session) {
-    return (
-      session.href ||
-      (sessionId(session) ? '/session?id=' + encodeURIComponent(sessionId(session)) : '')
-    );
-  }
-
-  function sessionMeta(session) {
-    if (session.meta) return session.meta;
-    const model = [session.ModelProvider || session.modelProvider, session.Model || session.model]
-      .filter(Boolean)
-      .join('/');
-    return model || session.Project || session.project || '';
-  }
-
-  export function normalizePaletteSession(session) {
-    const title = sessionTitle(session);
-    const id = sessionId(session);
-    const meta = sessionMeta(session);
-    const project = session.Project || session.project || '';
-    const model = session.Model || session.model || '';
-    const provider = session.ModelProvider || session.modelProvider || '';
-    const runtime = session.Runtime || session.runtime || 'pi';
-    const nativeId = session.NativeID || session.nativeId || '';
-    return {
-      ...session,
-      id,
-      title,
-      meta,
-      href: sessionHref(session),
-      searchText: String(
-        session.searchText ||
-          [title, id, meta, project, model, provider, runtime, nativeId].filter(Boolean).join(' '),
-      ).toLowerCase(),
-    };
-  }
-
-  export function sessionsFromCards(documentImpl = document) {
-    return Array.from(documentImpl.querySelectorAll('.session-card[data-session-id]')).map(
-      (card) => {
-        const title =
-          card.querySelector('.session-title')?.textContent?.trim() ||
-          card.dataset.sessionId ||
-          'Session';
-        const meta =
-          card.querySelector('[data-session-model]')?.textContent?.trim() ||
-          card.querySelector('.session-time')?.textContent?.trim() ||
-          '';
-        return normalizePaletteSession({
-          id: card.dataset.sessionId || '',
-          title,
-          meta,
-          href: card.getAttribute('href') || '',
-          searchText: card.dataset.search || [title, meta, card.dataset.sessionId || ''].join(' '),
-        });
-      },
-    );
-  }
-
-  export function defaultSessionPaletteCwd() {
-    try {
-      const preload = getSessionRuntime().model;
-      const data = preload && typeof preload.header === 'object' ? preload.header : {};
-      return data.cwd || '';
-    } catch {
-      return '';
-    }
-  }
-
-  export async function fetchPaletteSessions({
-    fetchImpl = fetch,
-    getCwd = () => defaultSessionPaletteCwd(),
-    query = '',
-    limit = 50,
-  } = {}) {
-    const cwd = getCwd ? getCwd() : '';
-    const params = [];
-    if (cwd) params.push('project=' + encodeURIComponent(cwd));
-    if (query) params.push('q=' + encodeURIComponent(query));
-    if (Number.isFinite(limit) && limit > 0) params.push('limit=' + limit);
-    const url = '/api/sessions' + (params.length ? '?' + params.join('&') : '');
-    const response = await fetchImpl(url);
-    const data = await response.json();
-    return (data.sessions || []).sort((a, b) => {
-      const da = a.LastActivity || a.lastActivity || '';
-      const db = b.LastActivity || b.lastActivity || '';
-      return db.localeCompare(da);
-    });
-  }
-
-  export function filterPaletteSessions(sessions, query) {
-    if (!query) return sessions;
-    const q = query.toLowerCase();
-    return sessions.filter((session) => session.searchText.includes(q));
-  }
-</script>
-
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { getSessionPaletteApi, setSessionPaletteApi } from '../../shared/command-palette-runtime';
+  import { icon, X } from '../../shared/icons';
+  import { t } from '../../shared/strings';
   import {
-    getSessionPaletteApi,
-    setSessionPaletteApi,
-  } from '../../shared/command-palette-runtime.js';
-  import { icon, X } from '../../shared/icons.js';
-  import { t } from '../../shared/strings.js';
+    defaultSessionPaletteCwd,
+    fetchPaletteSessions,
+    filterPaletteSessions,
+    normalizePaletteSession,
+  } from './command-palette';
+  import type { PaletteSessionInput } from './command-palette';
+  import type { FetchLike } from '../../lib/http';
+  import { settle } from './ui-effect';
+
+  interface LoadOptions {
+    readonly query: string;
+    readonly documentImpl: Document;
+    readonly windowImpl: Window;
+  }
+
+  interface CommandPaletteProps {
+    readonly limit?: number;
+    readonly loadSessions?:
+      | ((options: LoadOptions) => PromiseLike<ReadonlyArray<PaletteSessionInput>>)
+      | null;
+    readonly getCwd?: () => string;
+    readonly onOpen?: (() => void) | null;
+    readonly onClose?: (() => void) | null;
+    readonly onQueryChange?: ((query: string) => void) | null;
+    readonly onNewSession?: (() => void) | null;
+    readonly onImportSession?: (() => void) | null;
+    readonly clearOnClose?: boolean;
+    readonly fetchImpl?: FetchLike | null;
+    readonly navigate?: ((url: string) => void) | null;
+  }
 
   let {
     limit = 8,
@@ -127,14 +47,14 @@
     clearOnClose = false,
     fetchImpl = null,
     navigate = null,
-  } = $props();
+  }: CommandPaletteProps = $props();
 
-  let overlayEl;
-  let inputEl;
-  let resultButtons = [];
+  let overlayEl: HTMLDivElement | null = null;
+  let inputEl: HTMLInputElement | null = null;
+  let resultButtons: HTMLButtonElement[] = [];
   let open = $state(false);
   let query = $state('');
-  let allSessions = $state([]);
+  let allSessions = $state<ReturnType<typeof normalizePaletteSession>[]>([]);
   let selectedIndex = $state(-1);
   let error = $state('');
   let loadGeneration = 0;
@@ -142,7 +62,7 @@
   const effectiveFetch = $derived(fetchImpl || window.fetch.bind(window));
   const visibleSessions = $derived(filterPaletteSessions(allSessions, query).slice(0, limit));
 
-  function go(url) {
+  function go(url: string) {
     if (!url) return;
     if (navigate) navigate(url);
     else window.location.href = url;
@@ -170,15 +90,17 @@
   async function reloadSessions() {
     const generation = ++loadGeneration;
     error = '';
-    try {
-      const loader =
-        loadSessions ||
-        (() => fetchPaletteSessions({ fetchImpl: effectiveFetch, getCwd, query, limit: 50 }));
-      const sessions = await loader({ query, documentImpl: document, windowImpl: window });
+    const loader =
+      loadSessions ||
+      (() => fetchPaletteSessions({ fetchImpl: effectiveFetch, getCwd, query, limit: 50 }));
+    const result = await settle(() =>
+      loader({ query, documentImpl: document, windowImpl: window }),
+    );
+    if (result.ok) {
       if (generation !== loadGeneration) return;
-      allSessions = (sessions || []).map(normalizePaletteSession);
+      allSessions = result.value.map(normalizePaletteSession);
       selectedIndex = -1;
-    } catch {
+    } else {
       if (generation !== loadGeneration) return;
       allSessions = [];
       error = t('palette.failedLoadSessions');
@@ -199,7 +121,7 @@
     return reloadSessions();
   }
 
-  let searchTimer = null;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
   function handleInput() {
     onQueryChange?.(query);
     selectedIndex = -1;
@@ -207,14 +129,14 @@
     searchTimer = setTimeout(() => reloadSessions(), 160);
   }
 
-  function selectVisible(index) {
+  function selectVisible(index: number) {
     const session = visibleSessions[index];
     if (!session) return;
     close();
     go(session.href);
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: KeyboardEvent) {
     if (!open) return;
     const active = document.activeElement;
     const shouldHandle =
@@ -226,6 +148,12 @@
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
+      if (query) {
+        query = '';
+        onQueryChange?.(query);
+        void reloadSessions();
+        return;
+      }
       close();
       return;
     }
@@ -271,7 +199,7 @@
     // code should import command-palette-runtime helpers instead.
     window.__piSessionPalette = api;
     if (typeof previousOpenBridge !== 'function') window.__piOpenSessionPalette = openBridge;
-    const keydown = (e) => handleKeydown(e);
+    const keydown = (event: KeyboardEvent) => handleKeydown(event);
     window.addEventListener('keydown', keydown);
     return () => {
       clearTimeout(searchTimer);
@@ -327,7 +255,16 @@
       {#if error}
         <div class="palette-empty">{error}</div>
       {:else if visibleSessions.length === 0}
-        <div class="palette-empty">{t('palette.noSessionsFound')}</div>
+        <div class="palette-empty plain-state" data-empty="search">
+          <div class="plain-state-line">
+            {query.trim()
+              ? t('palette.noMatches', { query: query.trim() })
+              : t('palette.noSessionsFound')}
+          </div>
+          {#if query.trim()}
+            <div class="plain-state-hint">{t('palette.clearSearchHint')}</div>
+          {/if}
+        </div>
       {:else}
         {#each visibleSessions as session, i (session.id || session.href || i)}
           <button

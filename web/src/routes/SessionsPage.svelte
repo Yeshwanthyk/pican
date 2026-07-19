@@ -1,8 +1,9 @@
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte';
   import CommandPalette from '../components/shared/CommandPalette.svelte';
   import HomeMenu from '../components/index/HomeMenu.svelte';
   import IndexHeader from '../components/index/IndexHeader.svelte';
+  import HomeRail from '../components/index/HomeRail.svelte';
   import NewSessionModal from '../components/index/NewSessionModal.svelte';
   import ProjectsModal from '../components/index/ProjectsModal.svelte';
   import SessionsList from '../components/index/SessionsList.svelte';
@@ -17,6 +18,12 @@
   } from '../shared/settings-store.js';
   import { navigate } from '../shared/navigation.js';
   import { t } from '../shared/strings.js';
+  import { describeError } from '../lib/errors';
+  import type { Project, Schedule } from '../lib/schema';
+  import { sendChat } from '../session/chat/chat-api.js';
+  import { defaultFetchSchedules } from '../index/schedules.js';
+  import { showToast } from '../shared/toast.js';
+  import { ignoreFailure, recoverSync, settle } from '../components/shared/ui-effect';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
   import {
     defaultCreateSession,
@@ -25,59 +32,86 @@
     defaultFetchSessions,
     defaultUpdateProject,
     layoutStorageKey,
+    normalizeRecentLocations,
     normalizeSession,
     shouldRefetchOnReload,
+    type NormalizedSession,
+    type RunningStatus,
   } from '../index/sessions.js';
   import {
     defaultFetchPeers,
     defaultFetchPeerSessions,
     normalizePeerHost,
+    type NormalizedPeerHost,
   } from '../index/peers.js';
 
   const PAGE_SIZE = 100;
+  type Layout = 'timeline' | 'projects';
 
-  let sessions = $state([]);
+  let sessions = $state<NormalizedSession[]>([]);
   let total = $state(0);
   let loadingMore = $state(false);
   let loading = $state(true);
   let layoutReady = $state(false);
-  let layout = $state('timeline');
-  const runningSessionIds = new SvelteSet();
-  const runningStatuses = new SvelteMap();
+  let layout = $state<Layout>('timeline');
+  const runningSessionIds = new SvelteSet<string>();
+  const runningStatuses = new SvelteMap<string, RunningStatus>();
   let newSessionOpen = $state(false);
   let newSessionPath = $state('');
   let newSessionDropdownOpen = $state(false);
   let newSessionRuntime = $state('pi');
-  let recentLocations = $state([]);
+  let recentLocations = $state<string[]>([]);
   let creating = $state(false);
   let newSessionError = $state('');
   let menuOpen = $state(false);
   let projectsOpen = $state(false);
-  let projects = $state([]);
+  let projects = $state<Project[]>([]);
   let projectsFilterEnabled = $state(false);
   let projectsBusy = $state(false);
   let projectsError = $state('');
   let refreshInflight = false;
   let peersConfigured = false;
-  let peerHosts = $state([]);
+  let peerHosts = $state<NormalizedPeerHost[]>([]);
   let peersRefreshInflight = false;
+  let schedules = $state<Schedule[]>([]);
+
+  const defaultProject = $derived(recentLocations[0] || t('index.defaultProject'));
 
   const totalSessionsLabel = $derived(
     total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total }),
   );
   const hasMore = $derived(sessions.length < total);
-  const runningCount = $derived(runningSessionIds.size);
+  const waitingSessions = $derived(sessions.filter((session) => session.waitingQuestion));
+  const waitingIds = $derived(new Set(waitingSessions.map((session) => session.id)));
+  const waitingCount = $derived(waitingSessions.length);
+  const runningCount = $derived(
+    [...runningSessionIds].filter((sessionId) => !waitingIds.has(sessionId)).length,
+  );
 
-  function setRunningSessions(snapshot) {
-    const ids = Array.isArray(snapshot) ? snapshot : snapshot?.ids;
-    const statuses = snapshot && !Array.isArray(snapshot) ? snapshot.statuses : {};
-    runningSessionIds.clear();
-    for (const id of Array.isArray(ids) ? ids : []) runningSessionIds.add(id);
-    runningStatuses.clear();
-    for (const [key, value] of Object.entries(statuses || {})) runningStatuses.set(key, value);
+  function normalizeRunningStatus(value: unknown): RunningStatus | undefined {
+    if (typeof value !== 'object' || value === null) return undefined;
+    const status = value as Partial<Record<keyof RunningStatus, unknown>>;
+    return {
+      modelName: typeof status.modelName === 'string' ? status.modelName : undefined,
+      model: typeof status.model === 'string' ? status.model : undefined,
+      modelProvider: typeof status.modelProvider === 'string' ? status.modelProvider : undefined,
+    };
   }
 
-  function setSessionRunning(id, running, status = {}) {
+  function setRunningSessions(snapshot: {
+    readonly ids: ReadonlyArray<string>;
+    readonly statuses: Readonly<Record<string, unknown>>;
+  }): void {
+    runningSessionIds.clear();
+    for (const id of snapshot.ids) runningSessionIds.add(id);
+    runningStatuses.clear();
+    for (const [key, value] of Object.entries(snapshot.statuses)) {
+      const status = normalizeRunningStatus(value);
+      if (status) runningStatuses.set(key, status);
+    }
+  }
+
+  function setSessionRunning(id: string, running: boolean, status: RunningStatus = {}): void {
     if (running) {
       runningSessionIds.add(id);
       runningStatuses.set(id, status);
@@ -90,45 +124,43 @@
   async function refreshSessions({ preserveWindow = false } = {}) {
     if (refreshInflight || newSessionOpen) return;
     refreshInflight = true;
-    try {
-      const limit = preserveWindow ? Math.max(PAGE_SIZE, sessions.length) : PAGE_SIZE;
-      const response = await defaultFetchSessions({ limit });
-      sessions = (response.sessions || []).map(normalizeSession);
-      total = response.total ?? sessions.length;
+    const limit = preserveWindow ? Math.max(PAGE_SIZE, sessions.length) : PAGE_SIZE;
+    const result = await settle(() => defaultFetchSessions({ limit }));
+    if (result.ok) {
+      sessions = (result.value.sessions || []).map(normalizeSession);
+      total = result.value.total ?? sessions.length;
       await tick();
       refreshSessionPalette();
-    } catch {
-      // Keep existing list if a soft refresh fails.
-    } finally {
-      refreshInflight = false;
-      loading = false;
-      layoutReady = true;
     }
+    // Keep the existing list if a soft refresh fails.
+    refreshInflight = false;
+    loading = false;
+    layoutReady = true;
   }
 
   async function loadMore() {
     if (loadingMore || refreshInflight) return;
     loadingMore = true;
-    try {
-      const response = await defaultFetchSessions({ limit: PAGE_SIZE, offset: sessions.length });
-      const more = (response.sessions || []).map(normalizeSession);
+    const result = await settle(() =>
+      defaultFetchSessions({ limit: PAGE_SIZE, offset: sessions.length }),
+    );
+    if (result.ok) {
+      const more = (result.value.sessions || []).map(normalizeSession);
       const seen = new Set(sessions.map((session) => session.id));
       sessions = [...sessions, ...more.filter((session) => !seen.has(session.id))];
-      total = response.total ?? total;
-    } catch {
-      // Leave the loaded list untouched if a page fails to load.
-    } finally {
-      loadingMore = false;
+      total = result.value.total ?? total;
     }
+    // Leave the loaded list untouched if a page fails to load.
+    loadingMore = false;
   }
 
   const RELOAD_DEBOUNCE_MS = 500;
-  let reloadTimer = null;
-  function scheduleReload() {
+  let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleReload(): void {
     if (reloadTimer) clearTimeout(reloadTimer);
     if (newSessionOpen) return;
     reloadTimer = setTimeout(() => {
-      reloadTimer = null;
+      reloadTimer = undefined;
       refreshSessions({ preserveWindow: true });
       refreshPeerHosts();
     }, RELOAD_DEBOUNCE_MS);
@@ -138,10 +170,10 @@
   // append to any streaming session, indefinitely. A brand-new (unknown) id
   // still refreshes right away so it appears promptly; a known id only
   // refreshes at most once per KNOWN_ID_REFRESH_THROTTLE_MS, since all a
-  // known session's reload can change here is its activity time/ordering.
+  // known session's reload updates activity/waiting summaries at a bounded rate.
   const KNOWN_ID_REFRESH_THROTTLE_MS = 5000;
   let lastKnownIdRefreshAt = 0;
-  function handleReload({ id }) {
+  function handleReload({ id }: { readonly id: string }): void {
     const now = Date.now();
     const knownIds = new Set(sessions.map((session) => session.id));
     if (
@@ -165,27 +197,43 @@
   async function refreshPeerHosts() {
     if (!peersConfigured || peersRefreshInflight) return;
     peersRefreshInflight = true;
-    try {
-      const response = await defaultFetchPeerSessions();
-      peerHosts = (response.hosts || []).map(normalizePeerHost);
-    } catch {
-      // Keep last-known state if a poll fails.
-    } finally {
-      peersRefreshInflight = false;
+    const result = await settle(defaultFetchPeerSessions);
+    if (result.ok) {
+      peerHosts = (result.value.hosts || []).map(normalizePeerHost);
     }
+    // Keep last-known state if a poll fails.
+    peersRefreshInflight = false;
   }
 
   async function initPeers() {
-    try {
-      const response = await defaultFetchPeers();
-      peersConfigured = (response.peers || []).length > 0;
-    } catch {
-      peersConfigured = false;
-    }
+    const result = await settle(defaultFetchPeers);
+    peersConfigured = result.ok && (result.value.peers || []).length > 0;
     if (peersConfigured) await refreshPeerHosts();
   }
 
-  function setLayout(nextLayout) {
+  async function refreshSchedules() {
+    const result = await settle(defaultFetchSchedules);
+    if (result.ok) schedules = [...result.value.schedules];
+  }
+
+  async function answerWaitingQuestion(
+    session: NormalizedSession,
+    answer: string,
+  ): Promise<boolean> {
+    const question = session.waitingQuestion;
+    const body = new FormData();
+    body.set('message', `"${question}" = "${answer}"`);
+    const result = await settle(() => sendChat(session.id, body));
+    if (!result.ok || !result.value.ok) {
+      showToast(t('index.answerFailed'));
+      return false;
+    }
+    session.waitingQuestion = '';
+    session.waitingOptions = [];
+    return true;
+  }
+
+  function setLayout(nextLayout: string): void {
     layout = nextLayout === 'projects' ? 'projects' : 'timeline';
     writeSetting(layoutStorageKey, layout, { storage: localStorage });
   }
@@ -199,12 +247,8 @@
     newSessionRuntime = 'pi';
     newSessionError = '';
     document.body?.classList.add('modal-sheet-open');
-    try {
-      const response = await defaultFetchRecent();
-      recentLocations = (response.locations || []).slice(0, 10);
-    } catch {
-      recentLocations = [];
-    }
+    const result = await settle(defaultFetchRecent);
+    recentLocations = result.ok ? normalizeRecentLocations(result.value).slice(0, 10) : [];
     await tick();
     document.getElementById('sessionPath')?.focus();
   }
@@ -223,18 +267,18 @@
     }
     creating = true;
     newSessionError = '';
-    try {
-      const response = await defaultCreateSession(path, newSessionRuntime);
-      if (response.ok && response.id) {
-        navigate('/session?id=' + encodeURIComponent(response.id));
+    const result = await settle(() => defaultCreateSession(path, newSessionRuntime));
+    if (result.ok) {
+      if (result.value.ok && result.value.id) {
+        creating = false;
+        navigate('/session?id=' + encodeURIComponent(result.value.id));
         return;
       }
-      newSessionError = response.error || t('index.failedCreateSession');
-    } catch (error) {
-      newSessionError = error.message || t('index.networkError');
-    } finally {
-      creating = false;
+      newSessionError = t('index.failedCreateSession');
+    } else {
+      newSessionError = describeError(result.error.cause) || t('index.networkError');
     }
+    creating = false;
   }
 
   function closeMenu() {
@@ -247,15 +291,14 @@
   async function refreshProjectsList() {
     projectsError = '';
     projectsBusy = true;
-    try {
-      const response = await defaultFetchProjects();
-      projects = Array.isArray(response.projects) ? response.projects : [];
-      projectsFilterEnabled = !!response.filterEnabled;
-    } catch (error) {
-      projectsError = error.message || t('index.failedLoadProjects');
-    } finally {
-      projectsBusy = false;
+    const result = await settle(defaultFetchProjects);
+    if (result.ok) {
+      projects = Array.isArray(result.value.projects) ? result.value.projects : [];
+      projectsFilterEnabled = !!result.value.filterEnabled;
+    } else {
+      projectsError = describeError(result.error.cause) || t('index.failedLoadProjects');
     }
+    projectsBusy = false;
   }
 
   async function openProjectsModal() {
@@ -271,18 +314,17 @@
     document.body?.classList.remove('modal-sheet-open');
   }
 
-  async function updateProject(path, action) {
+  async function updateProject(path: string, action: string): Promise<void> {
     projectsBusy = true;
     projectsError = '';
-    try {
-      await defaultUpdateProject(path, action);
+    const result = await settle(() => defaultUpdateProject(path, action));
+    if (result.ok) {
       await refreshSessions();
       await refreshProjectsList();
-    } catch (error) {
-      projectsError = error.message || t('index.failedUpdateProject');
-    } finally {
-      projectsBusy = false;
+    } else {
+      projectsError = describeError(result.error.cause) || t('index.failedUpdateProject');
     }
+    projectsBusy = false;
   }
 
   function openPalette() {
@@ -295,20 +337,25 @@
     configureSettingsSync({ fetchImpl: window.fetch.bind(window) });
     setupKeyboardNav({ windowImpl: window, documentImpl: document });
 
-    try {
-      layout = localStorage.getItem(layoutStorageKey) === 'projects' ? 'projects' : 'timeline';
-    } catch {}
-    hydrateSettings({ storage: localStorage })
-      .then((settings) => {
-        if (!settings) return;
-        const serverLayout = settings[layoutStorageKey] === 'projects' ? 'projects' : 'timeline';
-        if (serverLayout !== layout) setLayout(serverLayout);
-      })
-      .catch(() => {});
+    layout = recoverSync(
+      () => (localStorage.getItem(layoutStorageKey) === 'projects' ? 'projects' : 'timeline'),
+      'timeline' as Layout,
+    );
+    ignoreFailure(async () => {
+      const settings = await hydrateSettings({ storage: localStorage });
+      if (!settings) return;
+      const serverLayout = settings[layoutStorageKey] === 'projects' ? 'projects' : 'timeline';
+      if (serverLayout !== layout) setLayout(serverLayout);
+    });
 
     const statusEvents = createStatusEvents({
       onSnapshot: (snapshot) => setRunningSessions(snapshot),
-      onDelta: (status) => setSessionRunning(status.id, status.running, status),
+      onDelta: (status) =>
+        setSessionRunning(status.id, status.running, {
+          model: status.model,
+          modelName: status.modelName,
+          modelProvider: status.modelProvider,
+        }),
       onMessage: (message) => {
         if (message === 'new-session') refreshSessions({ preserveWindow: true });
       },
@@ -318,15 +365,22 @@
       // happens to arrive.
       onReconnect: () => refreshSessions({ preserveWindow: true }),
     });
-    try {
+    recoverSync(() => {
       statusEvents.connect();
-    } catch {}
+      return true;
+    }, false);
 
-    const keydown = (e) => {
+    const keydown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         e.stopPropagation();
-        toggleTheme(window, document);
+        toggleTheme(
+          {
+            localStorage: window.localStorage,
+            getComputedStyle: () => window.getComputedStyle(document.documentElement),
+          },
+          document,
+        );
         syncThemeIcons(document);
         return;
       }
@@ -351,7 +405,12 @@
     window.addEventListener('click', click);
 
     refreshSessions();
+    ignoreFailure(async () => {
+      const recent = await defaultFetchRecent();
+      recentLocations = normalizeRecentLocations(recent).slice(0, 10);
+    });
     initPeers();
+    refreshSchedules();
 
     return () => {
       document.title = previousTitle;
@@ -368,8 +427,10 @@
   {layout}
   {totalSessionsLabel}
   {runningCount}
-  runningVisible={runningCount > 0}
+  {waitingCount}
+  {menuOpen}
   onSearch={openPalette}
+  onNewSession={openNewSessionModal}
   onToggleMenu={toggleMenu}
   onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
@@ -377,35 +438,63 @@
 
 <HomeMenu
   open={menuOpen}
+  {layout}
   onClose={closeMenu}
   onNewSession={openNewSessionModal}
   onManageProjects={openProjectsModal}
+  onLayoutChange={setLayout}
+  onSchedules={() => navigate('/schedules')}
 />
 
-<button
-  class="new-session-btn new-session-btn-mobile"
-  id="newSessionBtn"
-  type="button"
-  data-new-session-btn
-  aria-label={t('index.startNewSession')}
-  title={t('index.newSession')}
-  onclick={openNewSessionModal}>+</button
->
+<CommandPalette onNewSession={openNewSessionModal} navigate={(url: string) => navigate(url)} />
 
-<CommandPalette onNewSession={openNewSessionModal} navigate={(url) => navigate(url)} />
+<main class="home-layout">
+  <SessionsList
+    {sessions}
+    {layout}
+    {runningSessionIds}
+    {runningStatuses}
+    {loading}
+    {layoutReady}
+    {hasMore}
+    {loadingMore}
+    onLoadMore={loadMore}
+    {defaultProject}
+  />
+  <HomeRail
+    {waitingSessions}
+    {schedules}
+    {peerHosts}
+    onAnswer={answerWaitingQuestion}
+    onSchedules={() => navigate('/schedules')}
+  />
+</main>
 
-<SessionsList
-  {sessions}
-  {layout}
-  {runningSessionIds}
-  {runningStatuses}
-  {loading}
-  {layoutReady}
-  {hasMore}
-  {loadingMore}
-  onLoadMore={loadMore}
-  {peerHosts}
-/>
+<nav class="mobile-thumb-bar" aria-label={t('index.mobileActions')}>
+  <button type="button" class="mobile-thumb-search" onclick={openPalette}
+    ><span>{t('index.searchSessions')}</span><kbd>⌘K</kbd></button
+  >
+  <button
+    type="button"
+    class="mobile-thumb-new"
+    data-new-session-btn
+    aria-label={t('index.startNewSession')}
+    onclick={openNewSessionModal}>+</button
+  >
+  <button
+    type="button"
+    class="mobile-thumb-menu"
+    id="web-menu-btn-mobile"
+    aria-label={t('index.openMenu')}
+    aria-haspopup="menu"
+    aria-expanded={menuOpen}
+    aria-controls="web-menu"
+    onclick={(event) => {
+      event.stopPropagation();
+      toggleMenu();
+    }}>⋯</button
+  >
+</nav>
 
 <NewSessionModal
   open={newSessionOpen}

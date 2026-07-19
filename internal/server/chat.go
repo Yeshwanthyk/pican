@@ -139,6 +139,13 @@ func (s *Server) handleWorkerStatus(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("id")
 
 	status := workers.WorkerStatus{State: workers.WorkerStateIdle}
+	if s.chatSender != nil {
+		cached := s.chatSender.Status(sessionID)
+		if cached.State == workers.WorkerStateError {
+			writeJSON(w, 0, cached)
+			return
+		}
+	}
 	if s.computeRunningStatus(sessionID) {
 		status.State = workers.WorkerStateRunning
 	} else if s.chatSender != nil {

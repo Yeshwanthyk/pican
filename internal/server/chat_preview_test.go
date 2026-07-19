@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pican/internal/rpc"
+	"pican/internal/workers"
 )
 
 func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {
@@ -32,6 +33,29 @@ func TestBroadcastChatPreviewSendsNamedSSEToSession(t *testing.T) {
 	}
 	if !strings.Contains(msg, `"turnId":"turn-1"`) || !strings.Contains(msg, `"itemId":"item-1"`) {
 		t.Fatalf("preview identity was lost in msg = %q", msg)
+	}
+}
+
+func TestBroadcastWorkerStatusSendsExitCodeToSession(t *testing.T) {
+	s := &Server{
+		clients: make([]*sseClient, 0), lastKnown: make(map[string]struct{}),
+		fileMod: make(map[string]time.Time), now: time.Now,
+	}
+	client := s.addClient("a.jsonl")
+	exitCode := 17
+
+	s.BroadcastWorkerStatus("a.jsonl", workers.WorkerStatus{
+		State: workers.WorkerStateError, Error: "exit status 17", ExitCode: &exitCode,
+	})
+
+	select {
+	case token := <-client.ch:
+		got := client.resolveToken(token)
+		if !strings.Contains(got, "event: worker-status") || !strings.Contains(got, `"exitCode":17`) {
+			t.Fatalf("event = %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for worker status")
 	}
 }
 

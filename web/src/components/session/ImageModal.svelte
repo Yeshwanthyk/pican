@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
 
   // Click-to-zoom overlay for inline transcript images (.message-image) and
@@ -10,26 +10,27 @@
 
   let open = $state(false);
   // null (not '') so the bound <img> drops its src attribute when closed.
-  let src = $state(null);
+  let src = $state<string | null>(null);
   let alt = $state('');
-  let containerEl = $state(null);
-  let imgEl = $state(null);
+  let containerEl = $state<HTMLDivElement | null>(null);
+  let imgEl = $state<HTMLImageElement | null>(null);
 
-  function show(nextSrc, nextAlt) {
+  function show(nextSrc: string, nextAlt: string): void {
     if (!nextSrc) return;
     src = nextSrc;
     alt = nextAlt || '';
     open = true;
   }
 
-  function close() {
+  function close(): void {
     open = false;
     src = null;
   }
 
   onMount(() => {
-    const onClick = (e) => {
-      const zoomable = e.target.closest?.(ZOOMABLE_SELECTOR);
+    const onClick = (e: MouseEvent) => {
+      const zoomable =
+        e.target instanceof Element ? e.target.closest<HTMLImageElement>(ZOOMABLE_SELECTOR) : null;
       if (zoomable && zoomable !== imgEl) {
         show(zoomable.currentSrc || zoomable.src, zoomable.alt);
         return;
@@ -37,7 +38,7 @@
       // Click anywhere on the open overlay (backdrop or the image) dismisses it.
       if (open && (e.target === containerEl || e.target === imgEl)) close();
     };
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) close();
     };
     document.addEventListener('click', onClick);

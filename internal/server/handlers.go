@@ -233,8 +233,12 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 
 	sessions.SortSummariesByActivity(summaries)
 
-	pinnedIDs, _ := s.pinnedSessionIDs()
-	markPinnedSummaries(summaries, pinnedIDs)
+	orderedPins, _ := s.orderedPinnedSessionIDs()
+	markPinnedSummaries(summaries, orderedPins)
+	pinnedIDs := make(map[string]bool, len(orderedPins))
+	for _, id := range orderedPins {
+		pinnedIDs[id] = true
+	}
 
 	total := len(summaries)
 	page := paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))

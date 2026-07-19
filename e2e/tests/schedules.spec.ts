@@ -1,4 +1,4 @@
-import { test, expect } from "../lib/test";
+import { test, expect, isMobileLayout } from "../lib/test";
 import { realWorkingDir } from "../lib/sessions";
 
 // Schedules auto-create pi sessions on a cadence (or via Run-now). These specs
@@ -29,7 +29,12 @@ async function openCreateEditor(page: import("@playwright/test").Page) {
 test.describe("schedules (stubbed pi)", () => {
   test("nav button opens the schedules page", async ({ page }) => {
     await page.goto("/");
-    await page.locator(".schedules-nav-btn").click();
+    if (await isMobileLayout(page)) {
+      await page.locator("#web-menu-btn-mobile").click();
+      await page.locator("[data-schedules-menu-btn]").click();
+    } else {
+      await page.locator(".schedules-nav-btn").click();
+    }
     await expect(page).toHaveURL(/\/schedules$/);
     // A create entry point is present (header button on desktop, floating + on
     // mobile).

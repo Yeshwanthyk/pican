@@ -1,24 +1,42 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { icon, ChevronDown } from '../../shared/icons.js';
+  import { loadJSON, saveJSON } from '../../shared/storage.js';
   import { t } from '../../shared/strings.js';
   import {
     collapsedProjectsStorageKey,
+    type DateBucket,
     groupSessionsByDate,
     groupSessionsByProject,
     sessionsCountLabel,
-    splitPinnedSessions,
+    splitHomeSessions,
+    type NormalizedSession,
+    type RunningStatus,
+    type DateSessionGroup,
+    type ProjectSessionGroup,
   } from '../../index/sessions.js';
-  import MachinesSection from './MachinesSection.svelte';
   import SessionCard from './SessionCard.svelte';
 
-  const dateBucketLabels = {
+  const dateBucketLabels: Readonly<Record<DateBucket, string>> = {
     today: 'index.dateToday',
     yesterday: 'index.dateYesterday',
     previous7days: 'index.datePrevious7Days',
     previous30days: 'index.datePrevious30Days',
     older: 'index.dateOlder',
   };
+
+  interface Props {
+    sessions?: ReadonlyArray<NormalizedSession>;
+    layout?: 'timeline' | 'projects';
+    runningSessionIds?: ReadonlySet<string>;
+    runningStatuses?: ReadonlyMap<string, RunningStatus>;
+    loading?: boolean;
+    layoutReady?: boolean;
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void | Promise<void>;
+    defaultProject?: string;
+  }
 
   let {
     sessions = [],
@@ -30,47 +48,47 @@
     hasMore = false,
     loadingMore = false,
     onLoadMore = () => {},
-    peerHosts = [],
-  } = $props();
+    defaultProject = t('index.defaultProject'),
+  }: Props = $props();
 
   let now = $state(Date.now());
-  let collapsed = $state({});
+  let collapsed = $state<Record<string, true>>({});
 
   const isTimeline = $derived(layout === 'timeline');
-  const split = $derived(splitPinnedSessions(sessions));
+  const split = $derived(splitHomeSessions(sessions, runningSessionIds));
+  const nowSessions = $derived([...split.live, ...split.waiting]);
   const pinnedSessions = $derived(split.pinned);
-  const groups = $derived(
-    isTimeline ? groupSessionsByDate(split.rest, now) : groupSessionsByProject(split.rest),
-  );
+  const timelineGroups = $derived(groupSessionsByDate(split.rest, now));
+  const projectGroups = $derived(groupSessionsByProject(split.rest));
 
-  function readCollapsed() {
-    try {
-      const raw = localStorage.getItem(collapsedProjectsStorageKey);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
+  function readCollapsed(): Record<string, true> {
+    const stored = loadJSON(collapsedProjectsStorageKey, {});
+    if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
+    const result: Record<string, true> = {};
+    for (const [project, value] of Object.entries(stored)) {
+      if (value === true || value === 1) result[project] = true;
     }
+    return result;
   }
 
-  function writeCollapsed(state) {
-    try {
-      localStorage.setItem(collapsedProjectsStorageKey, JSON.stringify(state));
-    } catch {}
+  function writeCollapsed(state: Readonly<Record<string, true>>): void {
+    saveJSON(collapsedProjectsStorageKey, state);
   }
 
-  function toggleProject(project) {
-    collapsed = { ...collapsed, [project]: collapsed[project] ? undefined : 1 };
-    if (!collapsed[project]) {
+  function toggleProject(project: string): void {
+    if (collapsed[project]) {
       const next = { ...collapsed };
       delete next[project];
       collapsed = next;
+    } else {
+      collapsed = { ...collapsed, [project]: true };
     }
     writeCollapsed(collapsed);
   }
 
-  function runningCountFor(group) {
+  function runningCountFor(
+    group: DateSessionGroup<NormalizedSession> | ProjectSessionGroup<NormalizedSession>,
+  ): number {
     return group.sessions.filter((session) => runningSessionIds.has(session.id)).length;
   }
 
@@ -90,18 +108,39 @@
   class:content--timeline={isTimeline}
   class:index-layout-ready={layoutReady}
   data-sessions-content
+  data-layout={layout}
 >
   {#if loading && sessions.length === 0}
-    <div class="empty-state">
-      <h3>{t('index.loadingSessions')}</h3>
-      <p>{t('index.loadingSessionsHint')}</p>
+    <div class="empty-state plain-state">
+      <div class="plain-state-line">{t('index.loadingSessions')}</div>
+      <div class="plain-state-hint">{t('index.loadingSessionsHint')}</div>
     </div>
   {:else if sessions.length === 0}
-    <div class="empty-state">
-      <h3>{t('index.noSessionsYet')}</h3>
-      <p>{t('index.noSessionsYetHint')}</p>
+    <div class="empty-state plain-state" data-empty="first-run">
+      <div class="plain-state-line">{t('index.noSessionsYet')}</div>
+      <div class="plain-state-hint">
+        {t('index.noSessionsYetHint', { project: defaultProject })}
+      </div>
     </div>
   {:else}
+    {#if nowSessions.length > 0}
+      <div class="timeline-section timeline-section--now" data-bucket="now">
+        <div class="date-separator">
+          <span class="date-separator-label">{t('index.now')}</span>
+          <span class="date-separator-count">{sessionsCountLabel(nowSessions.length)}</span>
+        </div>
+        <div class="session-grid">
+          {#each nowSessions as session (session.id)}
+            <SessionCard
+              {session}
+              running={runningSessionIds.has(session.id)}
+              runningStatus={runningStatuses.get(session.id)}
+              {now}
+            />
+          {/each}
+        </div>
+      </div>
+    {/if}
     {#if pinnedSessions.length > 0}
       <div class="timeline-section" data-bucket="pinned">
         <div class="date-separator">
@@ -120,11 +159,8 @@
         </div>
       </div>
     {/if}
-    {#if peerHosts.length > 0}
-      <MachinesSection hosts={peerHosts} {now} />
-    {/if}
     {#if isTimeline}
-      {#each groups as group (group.bucket)}
+      {#each timelineGroups as group (group.bucket)}
         {@const runningCount = runningCountFor(group)}
         <div class="timeline-section" data-bucket={group.bucket}>
           <div class="date-separator">
@@ -148,14 +184,14 @@
         </div>
       {/each}
     {:else}
-      {#each groups as group (group.project + ':' + group.sessions[0]?.id)}
+      {#each projectGroups as group (group.project + ':' + group.sessions[0]?.id)}
         {@const runningCount = runningCountFor(group)}
         {@const isCollapsed = !!collapsed[group.project]}
         <div class="project-group" class:collapsed={isCollapsed} data-project={group.project}>
           <button
             class="project-toggle"
             type="button"
-            aria-expanded={String(!isCollapsed)}
+            aria-expanded={!isCollapsed}
             onclick={() => toggleProject(group.project)}
           >
             <span class="project-chevron" aria-hidden="true"

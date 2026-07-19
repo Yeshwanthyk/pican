@@ -1,35 +1,59 @@
-<script>
+<script lang="ts">
   import { onMount, tick } from 'svelte';
   import SessionShell from '../components/session/SessionShell.svelte';
-  import { applyLazyHighlighting } from '../session/lazy-highlight.js';
-  import { loadSessionPageState } from './session-page-data.js';
-  import { SessionDataModel } from '../session/data/session-data.svelte.js';
+  import { applyLazyHighlighting } from '../session/lazy-highlight';
+  import { loadSessionPageState } from './session-page-data';
+  import { SessionDataModel } from '../session/data/session-data.svelte';
+  import { isUnknownRecord } from '../session/data/session-types';
   import {
     hydrateSessionModel,
     createLiveSessionRuntime,
-  } from '../session/page/session-page-model.js';
+  } from '../session/page/session-page-model';
   import {
     applySessionPageBodyClasses,
     applyStoredSessionLayout,
-  } from '../session/page/session-page-layout.js';
-  import { startSessionPageRuntime } from '../session/page/session-page-runtime.js';
-  import { setSessionModel } from '../session/session-context.js';
-  import { resetSessionModals } from '../session/session-modals.svelte.js';
-  import { resetSessionRuntime } from '../session/session-runtime.js';
-  import { resetSessionRuntimeContext } from '../session/session-runtime-context.js';
-  import { t } from '../shared/strings.js';
+  } from '../session/page/session-page-layout';
+  import { startSessionPageRuntime } from '../session/page/session-page-runtime';
+  import { setSessionModel } from '../session/session-context';
+  import { resetSessionModals } from '../session/session-modals.svelte';
+  import { resetSessionRuntime } from '../session/session-runtime';
+  import { resetSessionRuntimeContext } from '../session/session-runtime-context';
+  import { t } from '../shared/strings';
+  import { errorMessage, settle } from '../components/shared/ui-effect';
 
   // The reactive session model (docs/dev/svelte-migration-plan.md): created once
   // and provided via context so descendant components read from it. Hydrated
   // from the session payload below; the live runtime (startSessionPageRuntime in
   // onMount) mutates it on reload.
-  const sessionModel = setSessionModel(new SessionDataModel());
+  // oxlint-disable-next-line typescript/no-unsafe-declaration-merging -- compatibility shim for the session partition's string-indexed runtime contract
+  interface RouteSessionDataModel {
+    [key: string]: unknown;
+  }
+
+  class RouteSessionDataModel extends SessionDataModel {
+    override load(data: unknown): void {
+      if (isUnknownRecord(data)) super.load(data);
+    }
+
+    override reconcile(entries: ReadonlyArray<unknown> = [], options?: unknown): void {
+      const normalized = entries.filter(isUnknownRecord);
+      const record = isUnknownRecord(options) ? options : {};
+      super.reconcile(normalized, {
+        isDelta: record.isDelta === true,
+        replaceExisting: record.replaceExisting === true,
+      });
+    }
+  }
+
+  const sessionModel = setSessionModel(new RouteSessionDataModel());
 
   // Post-render hook for the message pane: <SessionContent> renders
   // model.activePath as <SessionEntry> components and runs afterRender after each
   // render. wireSessionContentRuntime() (in onMount) assigns it (toggle state +
   // lazy highlight); the $state proxy makes the hook apply reactively.
-  const contentRuntime = $state({ afterRender: null });
+  const contentRuntime = $state<{ afterRender: ((container: HTMLElement) => void) | null }>({
+    afterRender: null,
+  });
 
   let loading = $state(true);
   let showLoading = $state(false);
@@ -45,14 +69,14 @@
   let runtime = $state('pi');
   let nativeId = $state('');
   let sessionUUID = $state('');
-  let dataEl = $state(null);
+  let dataEl = $state<HTMLScriptElement | null>(null);
 
   onMount(() => {
     const previousTitle = document.title;
     const previousRuntime = document.body?.dataset.runtime;
     const previousNativeId = document.body?.dataset.nativeId;
     let active = true;
-    let disposeRuntime = null;
+    let disposeRuntime: (() => void) | null = null;
     const disposeBodyClasses = applySessionPageBodyClasses({ documentImpl: document });
     applyStoredSessionLayout({
       documentImpl: document,
@@ -66,12 +90,15 @@
       if (active && loading) showLoading = true;
     }, 200);
 
-    (async () => {
-      try {
-        const state = await loadSessionPageState({
+    void (async () => {
+      const result = await settle(() =>
+        loadSessionPageState({
           locationSearch: window.location.search,
           fetchImpl: window.fetch.bind(window),
-        });
+        }),
+      );
+      if (result.ok) {
+        const state = result.value;
         if (!active) return;
         sessionId = state.sessionId;
         title = state.title;
@@ -104,7 +131,7 @@
         clearTimeout(loadingTimer);
         await tick();
         if (!active) return;
-        // Svelte does not interpolate mustache tags inside a <script> raw-text
+        // Svelte does not interpolate mustache tags inside a <script lang="ts"> raw-text
         // element, so the embedded session payload must be assigned directly.
         if (dataEl) dataEl.textContent = payloadBase64;
         disposeRuntime = startSessionPageRuntime({
@@ -114,9 +141,9 @@
           documentImpl: document,
         });
         applyLazyHighlighting(document);
-      } catch (err) {
+      } else {
         if (!active) return;
-        error = err?.message || 'Failed to load session';
+        error = errorMessage(result.error, 'Failed to load session');
         loading = false;
         clearTimeout(loadingTimer);
       }

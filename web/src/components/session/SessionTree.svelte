@@ -1,25 +1,26 @@
-<script>
+<script lang="ts">
   // On-demand conversation-branch tree, opened as a FullScreenSheet overlay
   // (centered dialog on desktop, bottom sheet on mobile) — same pattern as
   // DiffModal. Replaces the old persistent docked `<aside id="sidebar">`.
   import FullScreenSheet from './FullScreenSheet.svelte';
   import { t } from '../../shared/strings.js';
   import { getSessionModel } from '../../session/session-context.js';
+  import type { SessionDataModel } from '../../session/data/session-data.svelte.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import { closeTree } from '../../session/session-modals.svelte.js';
   import SessionTreeNodes from './SessionTreeNodes.svelte';
 
-  let { open = $bindable(false) } = $props();
+  let { open = $bindable(false) }: { open?: boolean } = $props();
 
-  const model = getSessionModel();
+  const model = getSessionModel<SessionDataModel>();
 
   // Route a tree-node click through the shared navigator so message content
   // scrolls after the reactive render. Navigate to the newest leaf under the
   // clicked node, with the clicked node as the scroll target, and close the
   // overlay — on every viewport, since the tree is now an on-demand sheet
   // rather than a persistent panel.
-  function onNavigate(id) {
-    const leaf = model?.newestLeaf(id) || id;
+  function onNavigate(id: string): void {
+    const leaf = model.newestLeaf(id) || id;
     const navigateTo = getSessionRuntime().navigateTo;
     navigateTo?.(leaf, 'target', id);
     closeTree();
@@ -53,11 +54,7 @@
       >
     </div>
   </div>
-  {#if model}<SessionTreeNodes {model} {onNavigate} />{:else}<div
-      class="tree-container"
-      id="tree-container"
-    ></div>
-    <div class="tree-status" id="tree-status"></div>{/if}
+  <SessionTreeNodes {model} {onNavigate} />
 </FullScreenSheet>
 
 <!-- Styles live in internal/ui/embedded/styles/session.css (the app loads global

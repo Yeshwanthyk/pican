@@ -1,19 +1,31 @@
-<script>
+<script lang="ts">
   // Working-tree diff review modal. Lazy-loads @pierre/diffs (a large,
   // shadow-DOM diff renderer) only when opened, fetches the session's
   // uncommitted diff, and renders a split/unified CodeView.
+  import { Effect } from 'effect';
   import { tick, onMount } from 'svelte';
+  import type {
+    CodeView,
+    CodeViewDiffItem,
+    CodeViewOptions,
+    FileContents,
+    FileDiffMetadata,
+  } from '@pierre/diffs';
+  import { runSync } from '../../lib/runtime.js';
+  import * as Http from '../../lib/http.js';
+  import { runPromise } from '../../lib/runtime.js';
+  import { GitDiffSchema } from '../../lib/schema.js';
   import FullScreenSheet from './FullScreenSheet.svelte';
   import { t } from '../../shared/strings.js';
   import { ChevronDown, ChevronRight, iconNode } from '../../shared/icons.js';
-  import { getDiff } from '../../session/chat/diff-api.js';
 
-  let { open = $bindable(false), sessionId = '' } = $props();
+  let { open = $bindable(false), sessionId = '' }: { open?: boolean; sessionId?: string } =
+    $props();
 
   let loading = $state(false);
   let errorMsg = $state('');
   let emptyState = $state(''); // '', 'empty', 'notrepo'
-  let layout = $state('split');
+  let layout = $state<'split' | 'unified'>('split');
   // Per-file collapse state. The Set holds collapsed file names; the count
   // mirrors its size as $state so the "Collapse all" toggle label is reactive
   // (a raw Set's mutations don't notify Svelte). fileCount is the total once
@@ -21,7 +33,7 @@
   // non-reactive collection here: we don't iterate it in any template, only
   // call has()/add()/delete() imperatively from render callbacks.
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- imperative storage; collapsedCount carries the reactivity
-  let collapsedFiles = new Set();
+  let collapsedFiles = new Set<string>();
   let collapsedCount = $state(0);
   let fileCount = $state(0);
   const allCollapsed = $derived(fileCount > 0 && collapsedCount >= fileCount);
@@ -33,14 +45,14 @@
   let isMobile = $state(false);
 
   // Imperative, non-reactive handles (DOM-heavy; kept out of $state).
-  let viewport = null; // container node, owned by CodeView (via the action)
-  let diffsMod = null;
-  let codeView = null;
+  let viewport: HTMLElement | null = null; // container node, owned by CodeView (via the action)
+  let diffsMod: typeof import('@pierre/diffs') | null = null;
+  let codeView: CodeView<undefined> | null = null;
   // The full CodeView options. setOptions REPLACES (not merges), so every
   // setOptions call must pass the complete object.
-  let codeViewOptions = null;
-  let fileDiffs = null; // Map<fileName, FileDiffMetadata>
-  let themeObserver = null;
+  let codeViewOptions: CodeViewOptions<undefined> | null = null;
+  let fileDiffs: Map<string, FileDiffMetadata> | null = null;
+  let themeObserver: MutationObserver | null = null;
   // CodeView.updateItem only re-renders when the item's `version` changes, so
   // every (re)built item gets a fresh monotonic version.
   let itemVersion = 0;
@@ -48,7 +60,9 @@
   onMount(() => {
     if (typeof window.matchMedia !== 'function') return;
     const mql = window.matchMedia(MOBILE_QUERY);
-    const sync = () => (isMobile = mql.matches);
+    const sync = (): void => {
+      isMobile = mql.matches;
+    };
     sync();
     mql.addEventListener('change', sync);
     return () => mql.removeEventListener('change', sync);
@@ -58,7 +72,7 @@
   // action mounts when <FullScreenSheet> reveals its body (open) and is
   // destroyed when it tears down (close), which is exactly the diff lifecycle.
   // CodeView fully owns this node's subtree, so Svelte never reconciles it.
-  function mountDiff(node) {
+  function mountDiff(node: HTMLElement): { destroy(): void } {
     viewport = node;
     init();
     return {
@@ -71,13 +85,15 @@
   // Resolve `promise` but reject with a stage-labelled timeout if it stalls, so
   // a hang surfaces (in the UI and the console) as a specific step rather than
   // an opaque "Loading diff…". The stage names are logged for support.
-  function withStage(stage, promise, ms) {
+  function withStage<T>(stage: string, promise: Promise<T>, ms: number): Promise<T> {
     const started = performance.now();
     console.info(`[diff] ${stage}: start`);
-    let timer;
-    const timeout = new Promise((_, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        // oxlint-disable-next-line pican/no-error-constructor -- Promise.race timeout adapter must reject with the sentinel Error consumed below.
         const err = new Error(`__diff_timeout__:${stage}`);
+        // oxlint-disable-next-line pican/no-promise-reject -- Promise.race timeout adapter boundary; rejection preserves the existing caller contract.
         reject(err);
       }, ms);
     });
@@ -87,63 +103,69 @@
         console.info(`[diff] ${stage}: done in ${Math.round(performance.now() - started)}ms`);
         return value;
       },
-      (err) => {
+      (err: unknown) => {
         clearTimeout(timer);
         console.error(
           `[diff] ${stage}: failed after ${Math.round(performance.now() - started)}ms`,
           err,
         );
+        // oxlint-disable-next-line pican/no-try-catch-or-throw -- Third-party Promise adapter must rethrow the renderer rejection unchanged.
         throw err;
       },
     );
   }
 
-  async function init() {
+  function init(): void {
     loading = true;
     errorMsg = '';
     emptyState = '';
-    try {
-      // Load the (large, lazy) renderer and the diff in parallel; surface
-      // whichever stalls.
-      const [mod, diffRes] = await Promise.all([
-        withStage('renderer', import('@pierre/diffs'), 30000),
-        withStage('diff', getDiff(sessionId), 25000),
-      ]);
-      diffsMod = mod;
-      if (!diffRes.isRepo) {
-        emptyState = 'notrepo';
+    void Promise.all([
+      withStage('renderer', import('@pierre/diffs'), 30000),
+      withStage(
+        'diff',
+        runPromise(Http.get('/api/git/diff?id=' + encodeURIComponent(sessionId), GitDiffSchema)),
+        25000,
+      ),
+    ]).then(
+      async ([mod, diffRes]) => {
+        diffsMod = mod;
+        if (!diffRes.isRepo) {
+          emptyState = 'notrepo';
+          loading = false;
+          return;
+        }
+        const files = mod.parsePatchFiles(diffRes.diff || '').flatMap((p) => p.files);
+        if (files.length === 0) {
+          emptyState = 'empty';
+          loading = false;
+          return;
+        }
+        fileDiffs = new Map(files.map((f) => [f.name, f]));
+        fileCount = files.length;
         loading = false;
-        return;
-      }
-      const files = mod.parsePatchFiles(diffRes.diff || '').flatMap((p) => p.files);
-      if (files.length === 0) {
-        emptyState = 'empty';
+        // Let the container un-hide before CodeView measures its height.
+        await tick();
+        buildCodeView(files);
+      },
+      (error: unknown) => {
+        // oxlint-disable-next-line pican/no-instanceof-error, pican/no-unknown-error-message, pican/no-unknown-error-message -- UI boundary preserves third-party and timeout error text.
+        const msg = error instanceof Error ? error.message : String(error);
+        errorMsg = msg.startsWith('__diff_timeout__')
+          ? `${t('diff.timeout')} (${msg.split(':')[1] || ''})`
+          : msg;
         loading = false;
-        return;
-      }
-      fileDiffs = new Map(files.map((f) => [f.name, f]));
-      fileCount = files.length;
-      loading = false;
-      // Let the container un-hide before CodeView measures its height.
-      await tick();
-      buildCodeView(files);
-    } catch (err) {
-      const msg = String(err?.message || err);
-      errorMsg = msg.startsWith('__diff_timeout__')
-        ? `${t('diff.timeout')} (${msg.split(':')[1] || ''})`
-        : msg;
-      loading = false;
-    }
+      },
+    );
   }
 
-  function teardown() {
+  function teardown(): void {
     themeObserver?.disconnect();
     themeObserver = null;
-    try {
-      codeView?.cleanUp();
-    } catch {
-      /* ignore */
-    }
+    runSync(
+      Effect.try({ try: () => codeView?.cleanUp(), catch: () => undefined }).pipe(
+        Effect.orElseSucceed(() => undefined),
+      ),
+    );
     viewport = null;
     codeView = null;
     codeViewOptions = null;
@@ -151,7 +173,7 @@
     loading = false;
     errorMsg = '';
     emptyState = '';
-    collapsedFiles = new Set();
+    collapsedFiles = new Set<string>();
     collapsedCount = 0;
     fileCount = 0;
   }
@@ -161,13 +183,16 @@
   // pierre bundle, so this only needs the light ones.
   const LIGHT_THEMES = ['light', 'catppuccin-latte', 'github-light'];
 
-  function currentThemeType() {
-    return LIGHT_THEMES.includes(document.documentElement.dataset.theme) ? 'light' : 'dark';
+  function currentThemeType(): 'light' | 'dark' {
+    return LIGHT_THEMES.includes(document.documentElement.dataset.theme ?? '') ? 'light' : 'dark';
   }
 
-  function buildCodeView(files) {
-    const { CodeView } = diffsMod;
-    codeViewOptions = {
+  function buildCodeView(files: FileDiffMetadata[]): void {
+    const viewportNode = viewport;
+    const module = diffsMod;
+    if (!module || !viewportNode) return;
+    const { CodeView } = module;
+    const options: CodeViewOptions<undefined> = {
       diffStyle: layout,
       themeType: currentThemeType(),
       // pierre-dark / pierre-light are the library's bundled default themes;
@@ -175,10 +200,12 @@
       theme: { dark: 'pierre-dark', light: 'pierre-light' },
       lineHoverHighlight: 'both',
       stickyHeaders: true,
-      renderHeaderPrefix: (fileDiff) => buildCollapseToggle(fileDiff),
+      renderHeaderPrefix: (fileDiff: FileContents | FileDiffMetadata) =>
+        buildCollapseToggle(fileDiff),
     };
-    codeView = new CodeView(codeViewOptions);
-    codeView.setup(viewport);
+    codeViewOptions = options;
+    codeView = new CodeView(options);
+    codeView.setup(viewportNode);
     codeView.setItems(files.map((f) => makeItem(f)));
     codeView.render();
 
@@ -192,14 +219,14 @@
 
   // setOptions replaces the whole options object, so always merge into the
   // retained codeViewOptions and pass the complete object.
-  function applyOptions(patch) {
+  function applyOptions(patch: Partial<CodeViewOptions<undefined>>): void {
     if (!codeView || !codeViewOptions) return;
     codeViewOptions = { ...codeViewOptions, ...patch };
     codeView.setOptions(codeViewOptions);
     codeView.render();
   }
 
-  function makeItem(file) {
+  function makeItem(file: FileDiffMetadata): CodeViewDiffItem<undefined> {
     return {
       id: file.name,
       type: 'diff',
@@ -213,7 +240,7 @@
   // DOM but we attach a real click listener directly on the button; the
   // library calls renderHeaderPrefix again on each updateItem, so the chevron
   // icon stays in sync after toggleFileCollapsed.
-  function buildCollapseToggle(fileDiff) {
+  function buildCollapseToggle(fileDiff: FileContents | FileDiffMetadata): HTMLButtonElement {
     const collapsed = collapsedFiles.has(fileDiff.name);
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -231,18 +258,18 @@
     return btn;
   }
 
-  function setFileCollapsed(fileName, collapsed) {
+  function setFileCollapsed(fileName: string, collapsed: boolean): void {
     if (collapsed) collapsedFiles.add(fileName);
     else collapsedFiles.delete(fileName);
     collapsedCount = collapsedFiles.size;
   }
 
-  function toggleFileCollapsed(fileName) {
+  function toggleFileCollapsed(fileName: string): void {
     setFileCollapsed(fileName, !collapsedFiles.has(fileName));
     refreshItem(fileName);
   }
 
-  function toggleAllCollapsed() {
+  function toggleAllCollapsed(): void {
     if (!fileDiffs) return;
     const names = [...fileDiffs.keys()];
     const collapse = !names.every((n) => collapsedFiles.has(n));
@@ -250,18 +277,48 @@
     for (const name of names) refreshItem(name);
   }
 
-  function refreshItem(fileName) {
+  function refreshItem(fileName: string): void {
     const file = fileDiffs?.get(fileName);
     if (!file || !codeView) return;
     codeView.updateItem(makeItem(file));
   }
 
-  function setLayout(next) {
+  function setLayout(next: 'split' | 'unified'): void {
     if (next === layout) return;
     layout = next;
     applyOptions({ diffStyle: next });
   }
 </script>
+
+{#snippet toolbar()}
+  <!-- Lives in the sheet header on desktop and as a second row in the body
+       on mobile (a phone-width header can't hold "← Diff" plus Split/Unified
+       + Collapse all without crushing the back button). -->
+  <div class="diff-toolbar">
+    <div class="diff-toggle" role="group" aria-label={t('diff.title')}>
+      <button
+        type="button"
+        class="diff-toggle-btn"
+        class:active={layout === 'split'}
+        onclick={() => setLayout('split')}>{t('diff.split')}</button
+      >
+      <button
+        type="button"
+        class="diff-toggle-btn"
+        class:active={layout === 'unified'}
+        onclick={() => setLayout('unified')}>{t('diff.unified')}</button
+      >
+    </div>
+    <button
+      type="button"
+      class="diff-toolbar-btn"
+      disabled={fileCount === 0}
+      onclick={toggleAllCollapsed}
+    >
+      {allCollapsed ? t('diff.expandAll') : t('diff.collapseAll')}
+    </button>
+  </div>
+{/snippet}
 
 <FullScreenSheet
   bind:open
@@ -271,37 +328,6 @@
   bodyClass="diff-sheet-body"
   headerExtra={isMobile ? null : toolbar}
 >
-  {#snippet toolbar()}
-    <!-- Lives in the sheet header on desktop and as a second row in the body
-         on mobile (a phone-width header can't hold "← Diff" plus Split/Unified
-         + Collapse all without crushing the back button). e2e selectors still
-         target .diff-toolbar. -->
-    <div class="diff-toolbar">
-      <div class="diff-toggle" role="group" aria-label={t('diff.title')}>
-        <button
-          type="button"
-          class="diff-toggle-btn"
-          class:active={layout === 'split'}
-          onclick={() => setLayout('split')}>{t('diff.split')}</button
-        >
-        <button
-          type="button"
-          class="diff-toggle-btn"
-          class:active={layout === 'unified'}
-          onclick={() => setLayout('unified')}>{t('diff.unified')}</button
-        >
-      </div>
-      <button
-        type="button"
-        class="diff-toolbar-btn"
-        disabled={fileCount === 0}
-        onclick={toggleAllCollapsed}
-      >
-        {allCollapsed ? t('diff.expandAll') : t('diff.collapseAll')}
-      </button>
-    </div>
-  {/snippet}
-
   {#if isMobile}
     {@render toolbar()}
   {/if}

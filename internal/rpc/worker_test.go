@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,63 @@ func TestStatusReportsRunningDuringRecentStreamActivity(t *testing.T) {
 
 	if got := w.Status(); got.State != workers.WorkerStateRunning {
 		t.Fatalf("status = %q, want running", got.State)
+	}
+}
+
+func TestWaitPropagatesWorkerExitCodeToStatusSink(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "exit 23")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	var notified workers.WorkerStatus
+	w := &piRPCWorker{
+		cmd:        cmd,
+		status:     workers.WorkerStatus{State: workers.WorkerStateRunning},
+		pending:    make(map[string]chan response),
+		statusSink: func(status workers.WorkerStatus) { notified = status },
+	}
+
+	w.wait()
+
+	got := w.Status()
+	if got.State != workers.WorkerStateError || got.ExitCode == nil || *got.ExitCode != 23 {
+		t.Fatalf("status = %#v, want error with exit code 23", got)
+	}
+	if notified.ExitCode == nil || *notified.ExitCode != 23 {
+		t.Fatalf("notified = %#v, want exit code 23", notified)
+	}
+}
+
+func TestWorkerExitCodeEnrichesEarlierEOFError(t *testing.T) {
+	w := &piRPCWorker{
+		status:  workers.WorkerStatus{State: workers.WorkerStateRunning},
+		pending: make(map[string]chan response),
+	}
+	w.setError(io.ErrUnexpectedEOF, nil)
+	exitCode := 41
+	w.setError(errors.New("exit status 41"), &exitCode)
+
+	got := w.Status()
+	if got.ExitCode == nil || *got.ExitCode != 41 {
+		t.Fatalf("status = %#v, want enriched exit code 41", got)
+	}
+}
+
+func TestIntentionalCloseDoesNotPublishWorkerDown(t *testing.T) {
+	var notifications int
+	w := &piRPCWorker{
+		status:     workers.WorkerStatus{State: workers.WorkerStateIdle},
+		pending:    make(map[string]chan response),
+		statusSink: func(workers.WorkerStatus) { notifications++ },
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	w.setError(io.ErrUnexpectedEOF, nil)
+
+	if notifications != 0 {
+		t.Fatalf("status notifications = %d, want 0 for intentional close", notifications)
 	}
 }
 
@@ -285,7 +343,7 @@ func TestExtensionUIPendingClearsOnWorkerError(t *testing.T) {
 		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
 	}
 	w.handleRPCLine(`{"type":"extension_ui_request","id":"ui-1","method":"input","title":"Name"}`)
-	w.setError(io.ErrUnexpectedEOF)
+	w.setError(io.ErrUnexpectedEOF, nil)
 	if got := w.PendingExtensionUI(); len(got) != 0 {
 		t.Fatalf("pending after exit = %s", got)
 	}

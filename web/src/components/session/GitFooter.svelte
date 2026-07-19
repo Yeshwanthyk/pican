@@ -1,37 +1,63 @@
-<script module>
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { icon, ChevronDown, ExternalLink } from '../../shared/icons.js';
+  import { t } from '../../shared/strings.js';
+  import * as Http from '../../lib/http.js';
+  import { describeError } from '../../lib/errors.js';
+  import { GitInfoSchema, GitRenameResponseSchema, type GitInfo } from '../../lib/schema.js';
+  import { runPromise } from '../../lib/runtime.js';
+
   // Prompt text the split button injects into the composer for each git action.
-  export const DRAFT_PR_PROMPT =
+  const DRAFT_PR_PROMPT =
     'Commit any uncommitted changes on this branch with a clear message, push ' +
     'the branch to the remote, then open a draft pull request with ' +
     '`gh pr create --draft`. Review the diff first (`git status`, `git diff`, ' +
     '`git log`) and write a clear PR title, a description summarizing what ' +
     'changed and why, and a short test plan.';
 
-  export const MERGE_PR_PROMPT =
+  const MERGE_PR_PROMPT =
     'Merge the pull request for this branch once its checks are green: run ' +
     '`gh pr merge` (use a squash merge unless the project prefers otherwise) and ' +
     'delete the branch after merging.';
-</script>
-
-<script>
-  import { onMount } from 'svelte';
-  import { icon, ChevronDown, ExternalLink } from '../../shared/icons.js';
-  import { t } from '../../shared/strings.js';
-  import * as defaultGitApi from '../../session/chat/git-api.js';
 
   // The branch indicator + smart git action control beneath the chat composer.
   // The bar stays visible (even outside a git repo) because it also hosts the
   // always-available btw button. gitApi is injectable for tests.
-  let { sessionId = '', gitApi = defaultGitApi } = $props();
+  interface GitApi {
+    readonly getGitInfo: (sessionId: string) => Promise<GitInfo>;
+    readonly renameBranch: (sessionId: string, name: string) => Promise<unknown>;
+  }
+
+  const defaultGitApi: GitApi = {
+    getGitInfo: (id) =>
+      runPromise(Http.get(`/api/git/info?id=${encodeURIComponent(id)}`, GitInfoSchema)),
+    renameBranch: (id, name) =>
+      runPromise(
+        Http.post(
+          `/api/git/rename-branch?id=${encodeURIComponent(id)}`,
+          { name },
+          GitRenameResponseSchema,
+        ),
+      ),
+  };
+
+  let { sessionId = '', gitApi }: { sessionId?: string; gitApi?: Partial<GitApi> } = $props();
+  const api = $derived<GitApi>({ ...defaultGitApi, ...gitApi });
 
   onMount(() => {
     const documentImpl = document;
     const windowImpl = window;
-    const bar = documentImpl.getElementById('pi-git-bar');
-    if (!bar || !gitApi) return;
+    const barNode = documentImpl.getElementById('pi-git-bar');
+    if (!barNode) return;
+    const bar = barNode;
 
-    const cleanups = [];
-    const on = (host, type, handler, opts) => {
+    const cleanups: Array<() => void> = [];
+    const on = (
+      host: EventTarget,
+      type: string,
+      handler: EventListener,
+      opts?: boolean | AddEventListenerOptions,
+    ): void => {
       host.addEventListener(type, handler, opts);
       cleanups.push(() => host.removeEventListener(type, handler, opts));
     };
@@ -39,7 +65,7 @@
     const branchWrap = documentImpl.getElementById('pi-git-branch');
     const nameEl = documentImpl.getElementById('pi-git-branch-name');
     const editBtn = documentImpl.getElementById('pi-git-branch-edit');
-    const input = documentImpl.getElementById('pi-git-branch-input');
+    const input = documentImpl.querySelector<HTMLInputElement>('#pi-git-branch-input');
     const prWrap = documentImpl.getElementById('pi-git-pr');
     const primaryBtn = documentImpl.getElementById('pi-git-primary');
     const primaryLabel = documentImpl.getElementById('pi-git-primary-label');
@@ -57,26 +83,32 @@
     let existingPrUrl = '';
     let primaryAction = () => {};
 
-    const show = (el, visible) => {
+    const show = (el: HTMLElement | null, visible: boolean): void => {
       if (el) el.hidden = !visible;
     };
 
-    function insertPrompt(text) {
-      const textarea = documentImpl.getElementById('pi-chat-message');
+    function insertPrompt(text: string): void {
+      const textarea = documentImpl.querySelector<HTMLTextAreaElement>('#pi-chat-message');
       if (!textarea) return;
       textarea.value = text;
       const EventCtor = windowImpl.Event || (typeof Event !== 'undefined' ? Event : null);
       if (EventCtor) textarea.dispatchEvent(new EventCtor('input', { bubbles: true }));
       if (typeof textarea.focus === 'function') textarea.focus();
     }
-    function openUrl(url) {
+    function openUrl(url: string): void {
       if (url && typeof windowImpl.open === 'function') windowImpl.open(url, '_blank', 'noopener');
     }
 
     // Each action is { label, run, external? }. `external` actions open a URL in
     // a new tab, so their label gets a trailing external-link icon. The plan
     // picks one primary plus a list of secondary actions shown under the caret.
-    const ACTIONS = {
+    type ActionKey = 'draft' | 'manual' | 'view' | 'merge';
+    interface GitAction {
+      readonly label: string;
+      readonly external?: boolean;
+      readonly run: () => void;
+    }
+    const ACTIONS: Readonly<Record<ActionKey, GitAction>> = {
       draft: { label: t('git.createPr'), run: () => insertPrompt(DRAFT_PR_PROMPT) },
       manual: { label: t('git.createPrManually'), external: true, run: () => openUrl(prCreateUrl) },
       view: { label: t('git.viewPr'), external: true, run: () => openUrl(existingPrUrl) },
@@ -85,7 +117,13 @@
 
     // Decide the primary action + secondary list from the current git state.
     // On the default branch there is no PR flow, so no action control at all.
-    function planActions({ isDefault, hasPr }) {
+    function planActions({
+      isDefault,
+      hasPr,
+    }: {
+      readonly isDefault: boolean;
+      readonly hasPr: boolean;
+    }): { readonly primary: ActionKey | null; readonly secondary: ActionKey[] } {
       if (isDefault) {
         return { primary: null, secondary: [] };
       }
@@ -95,7 +133,7 @@
       return { primary: 'view', secondary: ['merge'] };
     }
 
-    function applyInfo(info) {
+    function applyInfo(info: GitInfo): void {
       if (!info || !info.isRepo || !info.branch) {
         // Not a git repo: hide the git controls but keep the bar itself visible,
         // since it also hosts the always-available btw button.
@@ -130,7 +168,8 @@
       show(primaryBtn, !!primary);
 
       const secondary = new Set(plan.secondary);
-      Object.keys(items).forEach((key) => show(items[key], secondary.has(key)));
+      const actionKeys: ReadonlyArray<ActionKey> = ['view', 'draft', 'manual', 'merge'];
+      actionKeys.forEach((key) => show(items[key], secondary.has(key)));
       show(caretBtn, plan.secondary.length > 0);
       if (plan.secondary.length === 0) setMenuOpen(false);
 
@@ -138,15 +177,12 @@
       bar.hidden = false;
     }
 
-    function refresh() {
-      return gitApi
-        .getGitInfo(sessionId)
-        .then(applyInfo)
-        .catch(() => {});
+    function refresh(): Promise<void> {
+      return api.getGitInfo(sessionId).then(applyInfo, () => undefined);
     }
 
     // ── Branch rename ──
-    function openEditor() {
+    function openEditor(): void {
       if (!input) return;
       input.value = currentBranch;
       input.hidden = false;
@@ -155,41 +191,42 @@
       input.focus();
       input.select();
     }
-    function closeEditor() {
+    function closeEditor(): void {
       if (!input) return;
       input.hidden = true;
       if (nameEl) nameEl.hidden = false;
       if (editBtn) editBtn.hidden = false;
     }
-    function commitRename() {
+    function commitRename(): void {
       const next = (input ? input.value : '').trim();
       if (!next || next === currentBranch) {
         closeEditor();
         return;
       }
-      gitApi
-        .renameBranch(sessionId, next)
-        .then(() => {
+      void api.renameBranch(sessionId, next).then(
+        () => {
           closeEditor();
           return refresh();
-        })
-        .catch((err) => {
+        },
+        (error: unknown) => {
           if (input) {
-            input.title = (err && err.message) || t('git.renameFailed');
+            input.title = describeError(error);
             input.focus();
             input.select();
           }
-        });
+        },
+      );
     }
 
     if (editBtn) {
-      on(editBtn, 'click', (e) => {
+      on(editBtn, 'click', (e: Event) => {
         e.preventDefault();
         openEditor();
       });
     }
     if (input) {
-      on(input, 'keydown', (e) => {
+      on(input, 'keydown', (e: Event) => {
+        if (!(e instanceof KeyboardEvent)) return;
         if (e.key === 'Enter') {
           e.preventDefault();
           commitRename();
@@ -202,40 +239,48 @@
     }
 
     // ── Split button ──
-    function setMenuOpen(open) {
+    function setMenuOpen(open: boolean): void {
       if (!prMenu || !caretBtn) return;
       prMenu.hidden = !open;
       caretBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     if (primaryBtn) {
-      on(primaryBtn, 'click', (e) => {
+      on(primaryBtn, 'click', (e: Event) => {
         e.preventDefault();
         setMenuOpen(false);
         primaryAction();
       });
     }
     if (caretBtn) {
-      on(caretBtn, 'click', (e) => {
+      on(caretBtn, 'click', (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
         setMenuOpen(prMenu ? prMenu.hidden : false);
       });
     }
-    on(documentImpl, 'click', (e) => {
-      if (prMenu && !prMenu.hidden && prWrap && !prWrap.contains(e.target)) setMenuOpen(false);
+    on(documentImpl, 'click', (e: Event) => {
+      if (
+        prMenu &&
+        !prMenu.hidden &&
+        prWrap &&
+        e.target instanceof Node &&
+        !prWrap.contains(e.target)
+      )
+        setMenuOpen(false);
     });
 
-    Object.keys(items).forEach((key) => {
+    const itemKeys: ReadonlyArray<ActionKey> = ['view', 'draft', 'manual', 'merge'];
+    itemKeys.forEach((key) => {
       const el = items[key];
       if (!el) return;
-      on(el, 'click', (e) => {
+      on(el, 'click', (e: Event) => {
         e.preventDefault();
         setMenuOpen(false);
         ACTIONS[key].run();
       });
     });
 
-    refresh();
+    void refresh();
 
     return () => {
       for (const fn of cleanups) fn();

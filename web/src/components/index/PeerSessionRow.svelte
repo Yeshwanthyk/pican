@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { t } from '../../shared/strings.js';
   import { icon, ExternalLink } from '../../shared/icons.js';
   import {
@@ -6,6 +6,7 @@
     formatSessionMetrics,
     sessionModelLabel,
   } from '../../index/sessions.js';
+  import type { NormalizedPeerSession } from '../../index/peers.js';
 
   // A remote peer's session, read-only: no pin button, no chat-availability
   // badge (that's local-worker state, meaningless for a machine we never
@@ -13,7 +14,12 @@
   // /session page rather than local SPA routing — session ids are bare
   // filenames and are not unique across machines, so there is no safe local
   // route for them. See docs/sequence-flows/peers.md.
-  let { session, now = Date.now() } = $props();
+  interface Props {
+    session: NormalizedPeerSession;
+    now?: number;
+  }
+
+  let { session, now = Date.now() }: Props = $props();
 
   const href = $derived(
     `${session.hostUrl || ''}/session?id=${encodeURIComponent(session.id || '')}`,

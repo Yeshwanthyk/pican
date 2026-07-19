@@ -1,18 +1,31 @@
-<script>
+<script lang="ts">
   // Keyboard Shortcuts modal — Svelte port of live/shortcuts-modal.js. Renders
   // inside <FullScreenSheet> with reactive search filtering. Display-only
   // (no callbacks); opened via the bindable `open` prop.
   import { t } from '../../shared/strings.js';
   import FullScreenSheet from './FullScreenSheet.svelte';
 
-  let { open = $bindable(false) } = $props();
+  let { open = $bindable(false) }: { open?: boolean } = $props();
 
   const isMac =
     typeof navigator !== 'undefined' &&
     (navigator.platform || '').toUpperCase().indexOf('MAC') >= 0;
 
   // Built once at initialization; shortcut labels are static for the page.
-  const groups = [
+  interface ShortcutItem {
+    readonly desc: string;
+    readonly keys: readonly string[];
+    readonly keysWin: readonly string[];
+    readonly note?: string;
+  }
+
+  interface ShortcutGroup {
+    readonly category: string;
+    readonly note?: string;
+    readonly items: readonly ShortcutItem[];
+  }
+
+  const groups: readonly ShortcutGroup[] = [
     {
       category: t('shortcuts.catGeneral'),
       items: [
@@ -82,10 +95,10 @@
       .filter((cat) => cat.items.length > 0);
   });
 
-  const keysFor = (item) => (isMac ? item.keys : item.keysWin || item.keys);
+  const keysFor = (item: ShortcutItem): readonly string[] => (isMac ? item.keys : item.keysWin);
 
   // Focus the search box shortly after open (parity with the old 50ms focus).
-  let searchEl = $state(null);
+  let searchEl = $state<HTMLInputElement | null>(null);
   $effect(() => {
     if (open && searchEl) {
       const id = setTimeout(() => searchEl?.focus(), 50);

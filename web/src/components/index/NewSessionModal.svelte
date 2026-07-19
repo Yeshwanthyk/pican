@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { icon, ArrowLeft } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import {
@@ -13,7 +13,23 @@
     defaultFetchProjects,
     defaultFetchRuntimes,
     normalizeRuntimesResponse,
+    type NormalizedRuntime,
   } from '../../index/sessions.js';
+  import type { DirEntry, Project, RuntimesResponse } from '../../lib/schema';
+  import { ignoreFailure, settle } from '../shared/ui-effect';
+
+  interface Props {
+    open?: boolean;
+    recent?: ReadonlyArray<string>;
+    path?: string;
+    creating?: boolean;
+    error?: string;
+    dropdownOpen?: boolean;
+    runtime?: string;
+    fetchRuntimes?: () => Promise<RuntimesResponse>;
+    onClose?: () => void;
+    onCreate?: () => void | Promise<void>;
+  }
 
   let {
     open = false,
@@ -26,18 +42,18 @@
     fetchRuntimes = defaultFetchRuntimes,
     onClose = () => {},
     onCreate = () => {},
-  } = $props();
+  }: Props = $props();
 
-  let inputEl;
-  let projects = $state([]);
+  let inputEl = $state<HTMLInputElement>();
+  let projects = $state<Project[]>([]);
   let projectsLoaded = false;
-  let browsedEntries = $state([]);
+  let browsedEntries = $state<DirEntry[]>([]);
   let parentPath = $state('');
   let pathExists = $state(true);
   let highlightIndex = $state(-1);
   let browseGeneration = 0;
-  let debounceTimer = null;
-  let runtimes = $state([]);
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let runtimes = $state<ReadonlyArray<NormalizedRuntime>>([]);
   let runtimeGeneration = 0;
 
   const pathLike = $derived(isPathLikeQuery(path));
@@ -53,17 +69,21 @@
   async function loadProjectsOnce() {
     if (projectsLoaded) return;
     projectsLoaded = true;
-    try {
-      const response = await defaultFetchProjects();
-      projects = Array.isArray(response.projects) ? response.projects : [];
-    } catch {
-      projects = [];
-    }
+    const result = await settle(defaultFetchProjects);
+    projects = result.ok && Array.isArray(result.value.projects) ? result.value.projects : [];
   }
 
   $effect(() => {
     if (open) loadProjectsOnce();
   });
+
+  async function loadRuntimes(generation: number): Promise<void> {
+    const result = await settle(fetchRuntimes);
+    if (generation !== runtimeGeneration) return;
+    const normalized = normalizeRuntimesResponse(result.ok ? result.value : undefined);
+    runtimes = normalized.runtimes;
+    runtime = normalized.selectedRuntime;
+  }
 
   $effect(() => {
     if (!open) {
@@ -73,19 +93,7 @@
     const generation = ++runtimeGeneration;
     runtimes = [];
     runtime = '';
-    fetchRuntimes()
-      .then((response) => {
-        if (generation !== runtimeGeneration) return;
-        const normalized = normalizeRuntimesResponse(response);
-        runtimes = normalized.runtimes;
-        runtime = normalized.selectedRuntime;
-      })
-      .catch(() => {
-        if (generation !== runtimeGeneration) return;
-        const normalized = normalizeRuntimesResponse();
-        runtimes = normalized.runtimes;
-        runtime = normalized.selectedRuntime;
-      });
+    ignoreFailure(() => loadRuntimes(generation));
     return () => {
       runtimeGeneration += 1;
     };
@@ -98,14 +106,13 @@
   async function runBrowse() {
     if (!isPathLikeQuery(path)) return;
     const generation = ++browseGeneration;
-    try {
-      const response = await defaultBrowsePath(path);
-      if (generation !== browseGeneration) return;
-      browsedEntries = Array.isArray(response.entries) ? response.entries : [];
-      parentPath = response.parentPath || '';
-      pathExists = !!response.exists;
-    } catch {
-      if (generation !== browseGeneration) return;
+    const result = await settle(() => defaultBrowsePath(path));
+    if (generation !== browseGeneration) return;
+    if (result.ok) {
+      browsedEntries = Array.isArray(result.value.entries) ? result.value.entries : [];
+      parentPath = result.value.parentPath || '';
+      pathExists = !!result.value.exists;
+    } else {
       browsedEntries = [];
       pathExists = false;
     }
@@ -128,7 +135,7 @@
     }
   }
 
-  function drillInto(entry) {
+  function drillInto(entry: DirEntry | undefined): void {
     if (!entry) return;
     clearTimeout(debounceTimer);
     path = entry.fullPath.endsWith('/') ? entry.fullPath : entry.fullPath + '/';
@@ -137,7 +144,7 @@
     runBrowse();
   }
 
-  function selectEntry(entry) {
+  function selectEntry(entry: DirEntry | undefined): void {
     if (!entry) return;
     clearTimeout(debounceTimer);
     path = entry.fullPath;
@@ -145,21 +152,21 @@
     dropdownOpen = false;
   }
 
-  function handleEntryClick(entry) {
+  function handleEntryClick(entry: DirEntry): void {
     selectEntry(entry);
     inputEl?.focus();
   }
 
-  function chooseRecent(loc) {
+  function chooseRecent(loc: string): void {
     clearTimeout(debounceTimer);
     path = loc;
     dropdownOpen = false;
     requestAnimationFrame(() => document.getElementById('sessionPath')?.focus());
   }
 
-  function handleRuntimeKeydown(e) {
+  function handleRuntimeKeydown(e: KeyboardEvent & { currentTarget: HTMLButtonElement }): void {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-    const options = Array.from(
+    const options = Array.from<HTMLButtonElement>(
       e.currentTarget.parentElement?.querySelectorAll('[role="radio"]:not(:disabled)') || [],
     );
     if (options.length === 0) return;
@@ -172,11 +179,13 @@
       const direction = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
       next = (Math.max(0, current) + direction + options.length) % options.length;
     }
-    options[next].click();
-    options[next].focus();
+    const option = options[next];
+    if (!option) return;
+    option.click();
+    option.focus();
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void {
     if (dropdownOpen && visibleEntries.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();

@@ -171,7 +171,7 @@ func TestParseSummaryCachedIncrementalAppendMatchesFromScratch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("from-scratch parse: %v", err)
 	}
-	if summary2 != want {
+	if !reflect.DeepEqual(summary2, want) {
 		t.Fatalf("incremental summary = %+v, want %+v", summary2, want)
 	}
 	if summary2.MessageCount != 3 {
@@ -280,7 +280,7 @@ func TestParseSummaryCachedHandlesPartialTrailingLineAcrossCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary2 != want {
+	if !reflect.DeepEqual(summary2, want) {
 		t.Fatalf("incremental summary = %+v, want %+v", summary2, want)
 	}
 	if summary2.MessageCount != 3 {
@@ -319,7 +319,7 @@ func TestParseSummaryCachedRandomizedAppends(t *testing.T) {
 		if err != nil {
 			t.Fatalf("round %d: ParseSummary: %v", round, err)
 		}
-		if summary != want {
+		if !reflect.DeepEqual(summary, want) {
 			t.Fatalf("round %d: incremental = %+v, want %+v", round, summary, want)
 		}
 		prior = &cacheEntry{summary: summary, parse: state}
@@ -330,7 +330,7 @@ func TestParseSummaryCachedRandomizedAppends(t *testing.T) {
 
 func sessionsEqualIgnoringOrder(t *testing.T, a, b Session) bool {
 	t.Helper()
-	if a.SessionSummary != b.SessionSummary {
+	if !reflect.DeepEqual(a.SessionSummary, b.SessionSummary) {
 		return false
 	}
 	if !reflect.DeepEqual(a.Header, b.Header) {

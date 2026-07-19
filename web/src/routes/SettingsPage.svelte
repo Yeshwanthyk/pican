@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import AppearanceSettings from '../components/settings/AppearanceSettings.svelte';
   import ArtifactSettings from '../components/settings/ArtifactSettings.svelte';
@@ -7,14 +7,16 @@
   import SessionDisplayDefaultsSettings from '../components/settings/SessionDisplayDefaultsSettings.svelte';
   import SessionsListSettings from '../components/settings/SessionsListSettings.svelte';
   import SessionTitleSettings from '../components/settings/SessionTitleSettings.svelte';
-  import { icon, ArrowLeft, ChevronRight } from '../shared/icons.js';
-  import { t } from '../shared/strings.js';
-  import { navigate } from '../shared/navigation.js';
-  import { loadSettings, persistSetting } from '../settings/settings-support.js';
+  import { icon, ArrowLeft, ChevronRight } from '../shared/icons';
+  import { t } from '../shared/strings';
+  import { navigate } from '../shared/navigation';
+  import { loadSettings, persistSetting } from '../settings/settings-support';
+  import type { Settings } from '../settings/settings-support';
+  import { recoverSync, settle } from '../components/shared/ui-effect';
 
-  let settings = $state({});
+  let settings = $state<Settings>({});
   let savedVisible = $state(false);
-  let savedTimer = null;
+  let savedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const sections = [
     { id: 'appearance', labelKey: 'settings.appearance' },
@@ -36,22 +38,20 @@
     t(sections.find((s) => s.id === activeSection)?.labelKey || 'settings.title'),
   );
 
-  function sectionFromUrl(win) {
-    try {
+  function sectionFromUrl(win: Window): string | null {
+    return recoverSync(() => {
       const id = new URLSearchParams(win.location.search).get('section');
       return id && sectionIds.has(id) ? id : null;
-    } catch {
-      return null;
-    }
+    }, null);
   }
 
-  function syncSectionUrl(win, id) {
-    try {
+  function syncSectionUrl(win: Window, id: string) {
+    recoverSync(() => {
       win.history.replaceState(win.history.state, '', `${win.location.pathname}?section=${id}`);
-    } catch {}
+    }, undefined);
   }
 
-  function selectSection(id) {
+  function selectSection(id: string) {
     activeSection = id;
     if (isMobile) mobileShowingPane = true;
     syncSectionUrl(window, id);
@@ -61,7 +61,7 @@
     mobileShowingPane = false;
   }
 
-  function onHomeBack(e) {
+  function onHomeBack(e: MouseEvent) {
     if (e.defaultPrevented) return;
     if (typeof e.button === 'number' && e.button !== 0) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -81,7 +81,7 @@
     }, 1200);
   }
 
-  function saveSetting(key, value) {
+  function saveSetting(key: string, value: string) {
     settings = { ...settings, [key]: value };
     persistSetting(key, value, { storage: localStorage });
     flashSaved();
@@ -91,15 +91,14 @@
     const previousTitle = document.title;
     document.title = `${t('settings.title')} — ${t('common.productName')}`;
 
-    try {
+    cameFromApp = recoverSync(() => {
       const ref = document.referrer;
-      cameFromApp =
+      return (
         !!ref &&
         new URL(ref).origin === window.location.origin &&
-        new URL(ref).pathname !== '/settings';
-    } catch {
-      cameFromApp = false;
-    }
+        new URL(ref).pathname !== '/settings'
+      );
+    }, false);
 
     const mq = window.matchMedia?.('(max-width: 760px)');
     const updateMobile = () => {
@@ -115,11 +114,9 @@
       if (isMobile) mobileShowingPane = true;
     }
 
-    loadSettings({ windowImpl: window })
-      .then((loaded) => {
-        settings = loaded || {};
-      })
-      .catch(() => {});
+    void settle(() => loadSettings({ windowImpl: window })).then((result) => {
+      if (result.ok) settings = result.value;
+    });
     return () => {
       document.title = previousTitle;
       clearTimeout(savedTimer);

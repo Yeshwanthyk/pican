@@ -1,16 +1,19 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { t } from '../../shared/strings.js';
-  import { icon, Trash2 } from '../../shared/icons.js';
+  import { t } from '../../shared/strings';
+  import { icon, Trash2 } from '../../shared/icons';
   import {
     defaultFetchPeers,
     defaultFetchPeerSessions,
     defaultRemovePeer,
     defaultUpsertPeer,
-  } from '../../index/peers.js';
+  } from '../../index/peers';
+  import type { PeerList } from '../../lib/schema';
+  import { settle } from '../shared/ui-effect';
 
-  let peers = $state([]);
-  let onlineByName = $state({});
+  type Peer = PeerList['peers'][number];
+  let peers = $state<ReadonlyArray<Peer>>([]);
+  let onlineByName = $state<Record<string, boolean>>({});
   let loading = $state(true);
   let error = $state('');
   let busy = $state(false);
@@ -23,26 +26,23 @@
   // endpoint the homepage polls — a failure here just leaves the dot in its
   // last-known state rather than surfacing as a page error.
   async function checkOnline() {
-    try {
-      const response = await defaultFetchPeerSessions();
-      const next = {};
-      for (const host of response.hosts || []) next[host.name] = !!host.online;
+    const result = await settle(defaultFetchPeerSessions);
+    if (result.ok) {
+      const next: Record<string, boolean> = {};
+      for (const host of result.value.hosts || []) next[host.name] = !!host.online;
       onlineByName = next;
-    } catch {
-      // Keep last-known online state.
     }
   }
 
   async function refresh() {
     error = '';
-    try {
-      const response = await defaultFetchPeers();
-      peers = Array.isArray(response.peers) ? response.peers : [];
-    } catch (err) {
-      error = err.message || t('settings.machineFailedLoad');
-    } finally {
-      loading = false;
+    const result = await settle(defaultFetchPeers);
+    if (result.ok) {
+      peers = result.value.peers;
+    } else {
+      error = t('settings.machineFailedLoad');
     }
+    loading = false;
     if (peers.length > 0) checkOnline();
   }
 
@@ -59,30 +59,28 @@
     }
     busy = true;
     error = '';
-    try {
-      await defaultUpsertPeer(trimmedName, trimmedUrl, token.trim());
+    const result = await settle(() => defaultUpsertPeer(trimmedName, trimmedUrl, token.trim()));
+    if (result.ok) {
       name = '';
       baseUrl = '';
       token = '';
       await refresh();
-    } catch (err) {
-      error = err.message || t('settings.machineFailedSave');
-    } finally {
-      busy = false;
+    } else {
+      error = t('settings.machineFailedSave');
     }
+    busy = false;
   }
 
-  async function removePeer(peerName) {
+  async function removePeer(peerName: string) {
     busy = true;
     error = '';
-    try {
-      await defaultRemovePeer(peerName);
+    const result = await settle(() => defaultRemovePeer(peerName));
+    if (result.ok) {
       await refresh();
-    } catch (err) {
-      error = err.message || t('settings.machineFailedRemove');
-    } finally {
-      busy = false;
+    } else {
+      error = t('settings.machineFailedRemove');
     }
+    busy = false;
   }
 
   onMount(() => {

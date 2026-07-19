@@ -249,3 +249,31 @@ func TestHandleListPins_ReapsOrphanedPins(t *testing.T) {
 		t.Fatal("pin for keep.jsonl should survive reaping")
 	}
 }
+
+func TestHandleListPins_PreservesPinOrder(t *testing.T) {
+	s := newPinsServer(t)
+	for _, id := range []string{"alpha.jsonl", "beta.jsonl", "gamma.jsonl"} {
+		writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "sub"), id, "/home/user/project")
+	}
+	// newPinsServer intentionally returns one fixed timestamp. The rowid tie
+	// breaker must still retain the order in which these pins were created.
+	for _, id := range []string{"beta.jsonl", "alpha.jsonl", "gamma.jsonl"} {
+		if err := s.setSessionPinned(id, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pins", nil)
+	w := httptest.NewRecorder()
+	s.handleListPins(w, req)
+	var resp struct {
+		Pins []string `json:"pins"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"beta.jsonl", "alpha.jsonl", "gamma.jsonl"}
+	if strings.Join(resp.Pins, ",") != strings.Join(want, ",") {
+		t.Fatalf("pins = %v, want %v", resp.Pins, want)
+	}
+}

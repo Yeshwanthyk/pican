@@ -35,6 +35,13 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if sessID == globalSessID {
 		s.writeStatusSnapshot(w)
 		flusher.Flush()
+	} else if s.chatSender != nil {
+		status := s.chatSender.Status(sessID)
+		if status.State == "error" {
+			data, _ := json.Marshal(status)
+			fmt.Fprintf(w, "event: worker-status\ndata: %s\n\n", data)
+			flusher.Flush()
+		}
 	}
 
 	for {

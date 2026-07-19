@@ -26,6 +26,7 @@ import (
 	"pican/internal/schedules"
 	"pican/internal/sessions"
 	"pican/internal/updater"
+	"pican/internal/workers"
 
 	_ "modernc.org/sqlite"
 )
@@ -486,6 +487,9 @@ func eventKey(msg string) string {
 	if strings.HasPrefix(msg, "event: chat-preview\n") {
 		return "chat-preview"
 	}
+	if strings.HasPrefix(msg, "event: worker-status\n") {
+		return "worker-status"
+	}
 	return ""
 }
 
@@ -507,6 +511,17 @@ func (s *Server) BroadcastChatPreview(sessionID string, preview rpc.StreamPrevie
 		return
 	}
 	msg, err := formatSSEJSONEvent("chat-preview", preview)
+	if err != nil {
+		return
+	}
+	s.broadcast(sessionID, msg)
+}
+
+func (s *Server) BroadcastWorkerStatus(sessionID string, status workers.WorkerStatus) {
+	if sessionID == "" || sessionID == globalSessID {
+		return
+	}
+	msg, err := formatSSEJSONEvent("worker-status", status)
 	if err != nil {
 		return
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	AppEntry = "src/main.js"
+	AppEntry = "src/main.ts"
 
 	// Backward-compatible unexported alias used by package tests.
 	appEntry = AppEntry

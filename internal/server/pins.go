@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,29 +22,44 @@ const sessionPinsSchema = `CREATE TABLE IF NOT EXISTS session_pins (
 // pinnedSessionIDs returns the set of pinned session ids. The second return
 // value is false when pins are unavailable (no database).
 func (s *Server) pinnedSessionIDs() (map[string]bool, bool) {
-	if s.db == nil {
+	ordered, ok := s.orderedPinnedSessionIDs()
+	if !ok {
 		return nil, false
 	}
-	rows, err := s.db.Query("SELECT session_id FROM session_pins")
-	if err != nil {
-		return nil, false
-	}
-	defer rows.Close()
-	set := make(map[string]bool)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, false
-		}
+	set := make(map[string]bool, len(ordered))
+	for _, id := range ordered {
 		set[id] = true
 	}
 	return set, true
 }
 
+// orderedPinnedSessionIDs returns pins oldest-first, which is the fixed order
+// users established by pinning them. rowid breaks ties for legacy rows whose
+// timestamps only had second precision.
+func (s *Server) orderedPinnedSessionIDs() ([]string, bool) {
+	if s.db == nil {
+		return nil, false
+	}
+	rows, err := s.db.Query("SELECT session_id FROM session_pins ORDER BY created_at ASC, rowid ASC")
+	if err != nil {
+		return nil, false
+	}
+	defer rows.Close()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return ids, true
+}
+
 func (s *Server) setSessionPinned(sessionID string, pinned bool) error {
 	if pinned {
 		_, err := s.db.Exec(`INSERT INTO session_pins (session_id, created_at) VALUES (?, ?)
-			ON CONFLICT(session_id) DO NOTHING`, sessionID, s.now().Format(time.RFC3339))
+			ON CONFLICT(session_id) DO NOTHING`, sessionID, s.now().Format(time.RFC3339Nano))
 		return err
 	}
 	_, err := s.db.Exec("DELETE FROM session_pins WHERE session_id = ?", sessionID)
@@ -95,16 +109,11 @@ func (s *Server) handleListPins(w http.ResponseWriter, r *http.Request) {
 	if summaries, err := s.loadSummaries(); err == nil {
 		s.reapOrphanedPins(summaries)
 	}
-	pinned, ok := s.pinnedSessionIDs()
+	ids, ok := s.orderedPinnedSessionIDs()
 	if !ok {
 		writeJSON(w, 0, map[string]any{"pins": []string{}})
 		return
 	}
-	ids := make([]string, 0, len(pinned))
-	for id := range pinned {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	writeJSON(w, 0, map[string]any{"pins": ids})
 }
 
@@ -137,15 +146,19 @@ func (s *Server) handleSetPin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 0, map[string]any{"ok": true, "pinned": body.Pinned})
 }
 
-// markPinnedSummaries sets Pinned=true in place on every summary whose ID is
-// in pinned.
-func markPinnedSummaries(summaries []sessions.SessionSummary, pinned map[string]bool) {
-	if len(pinned) == 0 {
+// markPinnedSummaries sets pin state and the stable, one-based pin order.
+func markPinnedSummaries(summaries []sessions.SessionSummary, ordered []string) {
+	if len(ordered) == 0 {
 		return
 	}
+	ranks := make(map[string]int, len(ordered))
+	for index, id := range ordered {
+		ranks[id] = index + 1
+	}
 	for i := range summaries {
-		if pinned[summaries[i].ID] {
+		if rank := ranks[summaries[i].ID]; rank > 0 {
 			summaries[i].Pinned = true
+			summaries[i].PinOrder = rank
 		}
 	}
 }

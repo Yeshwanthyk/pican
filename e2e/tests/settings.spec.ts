@@ -381,7 +381,8 @@ test.describe("settings page", () => {
       // computed.
       await page.goto("/");
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
       await expect(
@@ -408,7 +409,8 @@ test.describe("settings page", () => {
       // this is the "in-session override" the bug used to leak to every other
       // session.
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
       const demoUrl = page.url();
@@ -424,7 +426,8 @@ test.describe("settings page", () => {
       // must apply — the demo override must not leak.
       await page.goto("/");
       await page
-        .locator(".session-card", { hasText: "Fix the failing unit test" })
+        .locator(".session-ticker-row", { hasText: "Fix the failing unit test" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
       await expect(
@@ -460,7 +463,8 @@ test.describe("settings page", () => {
         );
       });
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
 
@@ -499,7 +503,8 @@ test.describe("settings page", () => {
       await page.goto("/");
       await page.evaluate(() => window.localStorage.clear());
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
 
@@ -521,7 +526,8 @@ test.describe("settings page", () => {
       // disabled; show tools again, assert it's re-enabled.
       await page.goto("/");
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
       const toolOutputBtn = page.locator('[data-action="toggle-tool-output"]');
@@ -561,7 +567,8 @@ test.describe("settings page", () => {
     }) => {
       await page.goto("/");
       await page
-        .locator(".session-card", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
+        .locator(".session-ticker-link")
         .click();
       await expect(page).toHaveURL(/\/session\?id=/);
 

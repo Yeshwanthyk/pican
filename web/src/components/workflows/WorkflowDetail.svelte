@@ -1,27 +1,33 @@
-<script>
-  import { marked } from 'marked';
-  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown.js';
-  import { escapeHtml } from '../../shared/escape.js';
-  import { t } from '../../shared/strings.js';
-  import { formatWorkflowDate } from '../../workflows/workflows.js';
+<script lang="ts">
+  import { Marked } from 'marked';
+  import { configureSessionMarkdown, safeMarkedParse } from '../../session/render/markdown';
+  import { escapeHtml } from '../../shared/escape';
+  import { t } from '../../shared/strings';
+  import { formatWorkflowDate } from '../../workflows/workflows';
   import WorkflowStatusChip from './WorkflowStatusChip.svelte';
   import WorkflowTranscriptViewer from './WorkflowTranscriptViewer.svelte';
+  import type { WorkflowRunDetail } from '../../lib/schema';
+  import { stringifyJson } from '../shared/ui-effect';
 
-  let { detail } = $props();
+  let { detail }: { detail: WorkflowRunDetail } = $props();
 
-  configureSessionMarkdown({ marked, hljs: null, escapeHtml });
+  const markdown = new Marked();
+  configureSessionMarkdown({ marked: markdown, hljs: null, escapeHtml });
 
   const workflow = $derived(detail?.workflow || {});
-  const phases = $derived(Array.isArray(workflow.phases) ? workflow.phases : []);
-  const agents = $derived(Array.isArray(workflow.agents) ? workflow.agents : []);
-  const md = (text) => safeMarkedParse(String(text || ''), { marked });
+  const records = (value: unknown): ReadonlyArray<Readonly<Record<string, unknown>>> =>
+    Array.isArray(value)
+      ? value.filter(
+          (entry): entry is Readonly<Record<string, unknown>> =>
+            typeof entry === 'object' && entry !== null && !Array.isArray(entry),
+        )
+      : [];
+  const phases = $derived(records(workflow.phases));
+  const agents = $derived(records(workflow.agents));
+  const md = (text: unknown) => safeMarkedParse(String(text || ''), { marked: markdown });
   const resultJSON = $derived.by(() => {
     if (detail?.result == null || typeof detail.result === 'string') return '';
-    try {
-      return JSON.stringify(detail.result, null, 2);
-    } catch {
-      return String(detail.result);
-    }
+    return stringifyJson(detail.result) || String(detail.result);
   });
 </script>
 
@@ -40,13 +46,13 @@
       {#if workflow.startedAt}
         <div>
           <dt>{t('workflows.started')}</dt>
-          <dd>{formatWorkflowDate(workflow.startedAt)}</dd>
+          <dd>{formatWorkflowDate(String(workflow.startedAt))}</dd>
         </div>
       {/if}
       {#if workflow.finishedAt}
         <div>
           <dt>{t('workflows.finished')}</dt>
-          <dd>{formatWorkflowDate(workflow.finishedAt)}</dd>
+          <dd>{formatWorkflowDate(String(workflow.finishedAt))}</dd>
         </div>
       {/if}
       {#if workflow.sessionId}
