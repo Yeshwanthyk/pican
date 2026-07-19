@@ -21,7 +21,7 @@ describe("PinnedSessionSwitcher", () => {
           }),
         );
       }
-      throw new Error(`unexpected request: ${url}`);
+      return new Response(`unexpected request: ${url}`, { status: 404 });
     });
     vi.stubGlobal("fetch", fetchImpl);
 
