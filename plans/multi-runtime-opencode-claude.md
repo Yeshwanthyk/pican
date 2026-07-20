@@ -252,6 +252,16 @@ Remove Codex-specific routing only where the new registry has an equivalent. Cod
 
 Gate: existing Pi and Codex unit, integration, frontend, and E2E behavior is unchanged. `make check` passes. Update architecture docs. Commit this wave separately.
 
+Wave 1 implementation record on `multi-runtime-opencode-claude`:
+
+- Added the startup-owned ordered registry contract, explicit Pi/Codex descriptors and capabilities, availability/catalog/factory bindings, validated open runtime IDs, and projection modes. Only Pi and Codex are registered; OpenCode and Claude remain unselectable.
+- Replaced the internal runtime enum with a deduplicated selected set ordered by registration. Legacy `pi`, `codex`, and exact alias `both` remain accepted; comma-separated registered IDs provide the future multi-runtime form.
+- Routed worker construction, runtime availability, `/api/runtimes`, model selection, status-file policy, and backend pagination policy through the selected registry while retaining the shared `ChatWorker`/manager lifecycle.
+- Kept Codex native lifecycle methods on its separate service, Pi transcripts append-only, Codex projections replaceable and native-backed, and live/export rendering separate. Legacy `server.Deps` runtime fields remain a Pi/Codex-only compatibility boundary.
+- Architecture is recorded in `docs/architecture/system-overview.md`, `backend.md`, and `codex-runtime.md`. `make check` completed successfully in the uncommitted Wave 1 worktree. `make e2e` was not run, so this record makes no standalone Playwright/E2E claim. Per the implementation-session instruction, no commit was created.
+
+Wave 1 gate status: repository lint, typecheck, format check, dependency analysis, frontend/extension/memory/Go/install tests, vet, and the required `make build` passed through `make check`. The separate E2E evidence remains open.
+
 ### Wave 2 — Runtime-neutral projection infrastructure
 
 Extract generic atomic projection and preservation logic from `internal/codex` while leaving Codex translation inside `internal/codex`. Add explicit projection metadata consumed by backend pagination and frontend live reconciliation instead of `runtime == "codex"` checks.

@@ -43,27 +43,56 @@ describe("index sessions helpers", () => {
   });
 
   it("normalizes runtime responses and selects an available default", () => {
-    expect(
-      normalizeRuntimesResponse({
-        defaultRuntime: "codex",
-        runtimes: [
-          { id: "pi", available: false, reason: "pi missing" },
-          { id: "codex", available: true },
-        ],
-      }),
-    ).toEqual({
+    const normalized = normalizeRuntimesResponse({
+      defaultRuntime: "codex",
+      runtimes: [
+        { id: "pi", available: false, reason: "pi missing" },
+        { id: "codex", available: true },
+      ],
+    });
+    expect(normalized).toMatchObject({
       defaultRuntime: "codex",
       selectedRuntime: "codex",
       runtimes: [
-        { id: "pi", available: false, reason: "pi missing" },
-        { id: "codex", available: true, reason: "" },
+        { id: "pi", label: "Pi", available: false, reason: "pi missing" },
+        { id: "codex", label: "Codex", available: true, reason: "" },
       ],
     });
+    expect(normalized.runtimes[0]?.capabilities.chat).toBe(false);
     expect(normalizeRuntimesResponse()).toMatchObject({
       defaultRuntime: "pi",
       selectedRuntime: "pi",
-      runtimes: [{ id: "pi", available: true, reason: "" }],
+      runtimes: [{ id: "pi", label: "Pi", available: true, reason: "" }],
     });
+  });
+
+  it("preserves open runtime descriptors and normalizes explicit capabilities", () => {
+    const normalized = normalizeRuntimesResponse({
+      defaultRuntime: "custom-runtime",
+      runtimes: [
+        {
+          id: "CUSTOM-RUNTIME",
+          label: "Custom Runtime",
+          available: true,
+          projectionMode: "replaceable-projection",
+          capabilities: { create: true, chat: false, files: true, userQuestions: false },
+        },
+      ],
+    });
+
+    expect(normalized).toMatchObject({
+      defaultRuntime: "custom-runtime",
+      selectedRuntime: "custom-runtime",
+      runtimes: [
+        {
+          id: "custom-runtime",
+          label: "Custom Runtime",
+          projectionMode: "replaceable-projection",
+          capabilities: { create: true, chat: false, files: true, userQuestions: false },
+        },
+      ],
+    });
+    expect(Object.keys(normalized.runtimes[0]?.capabilities ?? {})).toHaveLength(22);
   });
 
   it("includes the selected runtime when creating a session", async () => {

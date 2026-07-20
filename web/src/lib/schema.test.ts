@@ -25,9 +25,25 @@ describe("API schemas", () => {
     await expect(decode(RuntimesResponseSchema, {})).resolves.toEqual({});
     await expect(
       decode(RuntimesResponseSchema, {
-        runtimes: [{ id: "pi", capabilities: { chat: true } }],
+        runtimes: [
+          {
+            id: "custom-runtime",
+            label: "Custom Runtime",
+            projectionMode: "replaceable-projection",
+            capabilities: { create: true, chat: false, userQuestions: false },
+          },
+        ],
       }),
-    ).resolves.toMatchObject({ runtimes: [{ id: "pi" }] });
+    ).resolves.toMatchObject({
+      runtimes: [
+        {
+          id: "custom-runtime",
+          label: "Custom Runtime",
+          projectionMode: "replaceable-projection",
+          capabilities: { create: true, chat: false, userQuestions: false },
+        },
+      ],
+    });
     await expect(
       decode(RecentLocationsSchema, { locations: ["/one", { path: "/two", label: "Two" }] }),
     ).resolves.toMatchObject({ locations: ["/one", { path: "/two" }] });

@@ -14,6 +14,7 @@ import (
 
 	"pican/internal/agentdir"
 	"pican/internal/codex"
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 	"pican/internal/ui"
 )
@@ -93,12 +94,13 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+
 	var id string
 	if resolved.Session.Runtime == "codex" {
-		if available, reason := s.runtimeStatus("codex"); !available {
-			writeJSONError(w, http.StatusServiceUnavailable, reason)
-			return
-		}
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -168,12 +170,13 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+
 	var id string
 	if resolved.Session.Runtime == "codex" {
-		if available, reason := s.runtimeStatus("codex"); !available {
-			writeJSONError(w, http.StatusServiceUnavailable, reason)
-			return
-		}
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -324,10 +327,10 @@ func (s *Server) handleApiSession(w http.ResponseWriter, r *http.Request) {
 	isDeltaRequest := afterCountStr != ""
 	deltaOk := false
 	if isDeltaRequest {
-		// Codex projections are atomically replaced caches, not append-only
-		// transcripts. Entries can be inserted before preserved local metadata,
-		// so an entry count is not a valid delta cursor; force a full reconcile.
-		if resolved.Session.Runtime != "codex" {
+		// Replaceable projections can insert entries before preserved local
+		// metadata, so an entry count is not a valid delta cursor. Native Pi
+		// transcripts remain append-only and can safely serve a suffix.
+		if s.projectionMode(resolved.Session.Runtime) == runtimes.ProjectionAppendOnlyNative {
 			// ?afterCount=N asks for only the entries appended since the client's
 			// last known count (used by the live-reload SSE handler so a stream of
 			// small appends doesn't re-send the whole conversation each time). n
@@ -550,12 +553,13 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
+		writeJSONError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+
 	var renameErr error
 	if resolved.Session.Runtime == "codex" {
-		if available, reason := s.runtimeStatus("codex"); !available {
-			writeJSONError(w, http.StatusServiceUnavailable, reason)
-			return
-		}
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return

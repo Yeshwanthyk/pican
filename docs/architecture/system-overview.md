@@ -13,8 +13,8 @@ pican is a local HTTP server that lets you browse and interact with Pi sessions 
 | Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained Gist) |
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
-| Agent runtime | JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio` |
-| Session Storage | Native Pi JSONL transcripts plus rebuildable Codex projections under `~/.pi/agent/sessions`; Codex remains authoritative in `~/.codex` |
+| Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio` |
+| Session Storage | Registry-declared append-only Pi transcripts plus replaceable Codex projections under `~/.pi/agent/sessions`; Codex remains authoritative in `~/.codex` |
 | Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
@@ -108,6 +108,14 @@ pican is a local HTTP server that lets you browse and interact with Pi sessions 
    └──────────────────────────────────────────────────────────────────┘
 ```
 
+## Runtime Registry
+
+App startup owns an ordered `runtimes.Registry`. Wave 1 registers Pi first and Codex second, then derives a selected registry from `-runtime`; OpenCode and Claude are deliberately not registered or selectable. Runtime IDs are validated lowercase open strings, so adding a future runtime does not extend an enum, but only startup registrations are accepted.
+
+Each registration binds a serializable descriptor (`id`, label, command/version, projection mode, explicit capabilities) to an availability probe, optional catalog adapter, and optional `workers.Factory`. Registration validation enforces the important ownership invariants: a chat-capable runtime has a worker factory, and a replaceable-projection runtime has a catalog. Native lifecycle APIs that do not form a truthful common contract remain runtime-specific; Codex archive/delete/unarchive and native rename/fork still use the separate Codex service.
+
+The selected registry is the server's runtime source of truth. `/api/runtimes` returns selected registrations in startup order with current availability. The worker manager still owns one-worker-per-session lifecycle and delegates only construction: it parses the trusted session runtime, rejects disabled runtimes, then calls `Registry.NewWorker`. Projection mode now controls backend status-file and pagination behavior: append-only Pi can use status files and `afterCount` suffixes; replaceable Codex projections ignore Pi status files and force full reconciliation. This prefactor does not alter the static export path, which renders only the persisted session snapshot and has no registry, worker, API, or SSE behavior.
+
 ## Network Binding
 
 ```
@@ -174,13 +182,28 @@ across devices. See `internal/server/projects.go`.
 
 ## Startup Order
 
-1. Parse CLI flags, including `-runtime=pi|codex|both` (default `pi`) and `-codex-command`.
-2. Resolve `~/.pi/agent/sessions`: Codex-only mode creates it; Pi/both mode requires it.
-3. In Codex-enabled modes, run the initial catalog sync. Codex-only startup fails closed; both mode logs failure and continues with Pi. Start the one-minute periodic sync.
-4. Determine bind host and enforce auth for explicit non-loopback binds.
-5. Build `server.Deps` with runtime-aware model discovery, Codex service, and the shared worker manager.
-6. Create `Server` → starts file/status watchers, sweepers, scheduler, and queue drainer.
-7. Register routes and embedded Vite assets.
-8. Optionally configure Tailscale Serve HTTPS for localhost.
-9. Write `~/.pi/agent/pican/pican-state.json` (with flock), optionally open a browser, and warm the Pi model cache when enabled.
-10. Start `http.Server`; on `SIGINT`/`SIGTERM`, stop catalog sync, workers, server goroutines, and HTTP gracefully.
+1. Construct app-level Pi and Codex registrations in that order. Pi owns its worker factory and model loader; Codex owns its catalog/availability syncer, worker factory, and model loader.
+2. Parse `-runtime=pi|codex|both|<comma-separated registered IDs>` (default `pi`) and `-codex-command`. `both` remains an exact alias for `pi,codex`; selection is deduplicated and normalized back to registration order.
+3. Derive a selected registry that is not mutated after startup. OpenCode, Claude, malformed IDs, and valid-but-unregistered IDs fail CLI parsing before any runtime starts.
+4. Resolve `~/.pi/agent/sessions`: any selected append-only-native runtime requires it; a replaceable-projection-only selection creates it.
+5. Run each selected catalog adapter initially. Codex-only startup fails closed; a mixed selection logs Codex failure and continues with Pi. Start the one-minute periodic Codex sync.
+6. Determine bind host and auth policy, then build the shared worker manager. On first activity for a session it parses the session header, defaults an absent runtime to Pi, verifies selection, and dispatches construction through the selected registry.
+7. Build `server.Deps` with the selected registry, runtime-aware model discovery, shared manager, and separate Codex lifecycle service; `server.New` validates the default runtime and starts server-owned watchers and background loops.
+8. Register routes and embedded live-app assets, then optionally configure Tailscale Serve.
+9. Write the state file, optionally open a browser, warm the Pi model cache when enabled, and start `http.Server`.
+10. On `SIGINT`/`SIGTERM`, shut down HTTP, cancel catalog sync, close workers, and stop server goroutines.
+
+```text
+Main
+ ├─ newRuntimeRegistry(Pi, Codex) ── owns registrations + model loaders
+ ├─ parseRuntime(...) ────────────── selects registered IDs
+ ├─ selectedRegistry() ───────────── passed to server and worker dispatch
+ ├─ Catalog.Sync() / syncer.start()  Codex availability + projection refresh
+ ├─ workers.NewManager(factory)
+ │    └─ ParseFile → selected Registry.NewWorker(runtime, session, path)
+ │         ├─ Pi factory    → pi --mode rpc
+ │         └─ Codex factory → validate projection → codex app-server --stdio
+ └─ server.New(Deps{RuntimeRegistry, ChatSender, ModelsFor, CodexService})
+      ├─ /api/runtimes → descriptors + live availability
+      └─ projectionMode(runtime) → status and pagination policy
+```

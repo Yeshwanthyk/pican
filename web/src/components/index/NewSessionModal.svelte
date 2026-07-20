@@ -277,7 +277,7 @@
                     aria-hidden="true"
                   />
                 {/if}
-                <span>{t(`runtime.${option.id}`)}</span>
+                <span>{option.label}</span>
               </span>
               {#if !option.available}
                 <small

@@ -7,19 +7,39 @@ pican can host Pi sessions, Codex threads, or both from the same binary. Codex i
 ```bash
 pican -runtime=pi                  # default
 pican -runtime=codex
-pican -runtime=both
+pican -runtime=both                 # legacy alias for pi,codex
+pican -runtime=pi,codex             # explicit ordered-registry selection form
 pican -runtime=both -codex-command=/absolute/path/to/codex
 PICAN_CODEX_COMMAND=/absolute/path/to/codex pican -runtime=both
 ```
 
 `-codex-command` and `PICAN_CODEX_COMMAND` name the **Codex executable**, not a shell command. The flag wins over the environment variable; the fallback is `codex` from `PATH`. pican appends `app-server --stdio` and executes the resulting argv directly.
 
+Startup registers Pi and Codex in one ordered runtime registry. The selected subset, not a `pi|codex|both` enum, is passed to the server and worker factory. Only those two registrations exist in Wave 1, so well-formed but unregistered IDs such as `opencode` and `claude` are rejected. The exact legacy value `both` aliases `pi,codex`; comma-separated input is case-normalized, deduplicated, and returned in registration order.
+
+The Codex registration declares `replaceable-projection`, its current supported capabilities, command metadata, catalog/availability adapter, and worker factory. The registry owns dispatch metadata only. Codex remains authoritative for thread state, the Codex adapter owns projection replacement, `workers.Manager` retains worker lifecycle, and Codex-native archive/delete/unarchive plus rename/fork semantics stay on the separate `CodexService` rather than widening the common contract.
+
 Session-directory startup behavior is runtime-specific:
 
 - `pi` and `both` require the configured `~/.pi/agent/sessions` directory to exist.
 - `codex` creates it when absent because it contains only pican's generated projections.
 
-At startup, Codex-enabled modes perform a catalog sync with a 15-second timeout and repeat it every minute. `codex` mode exits if the initial sync cannot reach Codex. `both` logs the failure and continues with Pi; the runtime selector marks Codex unavailable, Pi remains usable, and combined model discovery keeps the Pi models if Codex discovery fails. A later successful periodic sync restores Codex availability. Catalog pruning is bounded to projections that existed before the native list snapshot began, and recently materialized projections receive a convergence grace period, so a newly created thread cannot be removed merely because it is too new to appear in that snapshot.
+At startup, Codex-enabled modes invoke the registration's catalog adapter through an app-owned syncer with a 15-second timeout and repeat it every minute. A failed sync forcibly reports `Complete: false`, updates only Codex availability, and cannot authorize pruning. `codex` mode exits if the initial sync cannot reach Codex. `both` or `pi,codex` logs the failure and continues with Pi; `/api/runtimes` marks Codex unavailable, existing projections remain viewable/exportable, and combined model discovery keeps Pi models after Pi discovery succeeds. A later successful periodic sync restores Codex availability. Catalog pruning is bounded to projections that existed before the native list snapshot began, and recently materialized projections receive a convergence grace period, so a newly created thread cannot be removed merely because it is too new to appear in that snapshot.
+
+The startup and first-chat call graph is:
+
+```text
+app.Main
+ ├─ runtimes.Codex(descriptor, catalogSyncer, workerFactory)
+ ├─ initial Catalog.Sync → codex.Sync → thread/list + thread/read → atomic projections
+ ├─ periodic catalogSyncer.start (1 minute)
+ └─ workers.Manager factory
+      └─ parse projection header → selected Registry.NewWorker("codex", ...)
+           └─ Codex factory validates projection metadata
+                └─ codex.NewWorker → codex app-server --stdio → thread/resume
+```
+
+This is a dispatch prefactor only: Codex native protocol, projection replacement, live preview handoff, process-tree termination, and worker reuse/reap behavior are unchanged.
 
 ## Authentication and interaction policy
 

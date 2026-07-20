@@ -23,6 +23,7 @@ import (
 	"pican/internal/codex"
 	"pican/internal/render"
 	"pican/internal/rpc"
+	"pican/internal/runtimes"
 	"pican/internal/schedules"
 	"pican/internal/sessions"
 	"pican/internal/updater"
@@ -68,11 +69,15 @@ type Deps struct {
 	RenderAppShell      func(w io.Writer, bootstrap string) error
 	Models              func(ctx context.Context) (json.RawMessage, error)
 	ModelsFor           func(ctx context.Context, query ModelQuery) (json.RawMessage, error)
-	DefaultRuntime      string
-	EnabledRuntimes     []string
-	RuntimeAvailable    func(runtime string) (bool, string)
-	Codex               CodexService
-	Now                 func() time.Time
+	// RuntimeRegistry is the startup-owned source of runtime descriptors,
+	// capabilities, availability, and projection semantics. The legacy fields
+	// below remain accepted so existing embedders can migrate independently.
+	RuntimeRegistry  *runtimes.Registry
+	DefaultRuntime   string
+	EnabledRuntimes  []string
+	RuntimeAvailable func(runtime string) (bool, string)
+	Codex            CodexService
+	Now              func() time.Time
 	// Updater reports current/latest version + changelog. Optional; when nil
 	// the version endpoints are not registered.
 	Updater *updater.Checker
@@ -103,8 +108,7 @@ type Server struct {
 	models              func(ctx context.Context) (json.RawMessage, error)
 	modelsFor           func(ctx context.Context, query ModelQuery) (json.RawMessage, error)
 	defaultRuntime      string
-	enabledRuntimes     map[string]bool
-	runtimeAvailable    func(runtime string) (bool, string)
+	runtimeRegistry     *runtimes.Registry
 	codex               CodexService
 	lastKnown           map[string]struct{} // session ids currently broadcast as running
 	lastKnownMu         sync.Mutex
@@ -193,8 +197,6 @@ func New(deps Deps) (*Server, error) {
 		models:              deps.Models,
 		modelsFor:           deps.ModelsFor,
 		defaultRuntime:      deps.DefaultRuntime,
-		enabledRuntimes:     make(map[string]bool),
-		runtimeAvailable:    deps.RuntimeAvailable,
 		codex:               deps.Codex,
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),
@@ -215,14 +217,20 @@ func New(deps Deps) (*Server, error) {
 			userOwned: make(map[string]bool),
 		},
 	}
+	s.runtimeRegistry, err = serverRuntimeRegistry(deps)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 	if s.defaultRuntime == "" {
-		s.defaultRuntime = "pi"
+		// Legacy Deps defaulted to Pi regardless of list order. A supplied
+		// registry is ordered startup configuration, so its first descriptor is
+		// authoritative when no explicit default is provided.
+		s.defaultRuntime = defaultRuntimeID(s.runtimeRegistry, deps.RuntimeRegistry == nil)
 	}
-	if len(deps.EnabledRuntimes) == 0 {
-		deps.EnabledRuntimes = []string{"pi"}
-	}
-	for _, runtime := range deps.EnabledRuntimes {
-		s.enabledRuntimes[runtime] = true
+	if _, err := s.runtimeRegistry.Open(s.defaultRuntime); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("default runtime %q is not registered: %w", s.defaultRuntime, err)
 	}
 	s.schedules.Now = now
 	s.chatQueue.Now = now

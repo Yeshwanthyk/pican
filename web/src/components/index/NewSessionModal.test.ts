@@ -28,6 +28,28 @@ describe("NewSessionModal runtimes", () => {
     expect(fetchRuntimes).toHaveBeenCalledTimes(1);
   });
 
+  it("renders a server label for an open runtime ID", async () => {
+    render(NewSessionModal, {
+      props: {
+        open: true,
+        fetchRuntimes: async () => ({
+          defaultRuntime: "custom-runtime",
+          runtimes: [
+            { id: "pi", label: "Backend Pi", available: true },
+            { id: "custom-runtime", label: "Custom Runtime", available: true },
+          ],
+        }),
+      },
+    });
+
+    expect(await screen.findByRole("radio", { name: "Pi" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Custom Runtime" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.queryByText("runtime.custom-runtime")).not.toBeInTheDocument();
+  });
+
   it("supports radio-group arrow keys while skipping unavailable runtimes", async () => {
     render(NewSessionModal, {
       props: {

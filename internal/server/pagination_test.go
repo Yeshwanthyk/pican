@@ -220,7 +220,11 @@ func TestHandleApiSession_CodexAfterCountForcesFullReconcile(t *testing.T) {
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+	registry, err := serverRuntimeRegistry(Deps{EnabledRuntimes: []string{"pi", "codex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{sessionsDir: root, cache: sessions.NewCache(), runtimeRegistry: registry}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=5", nil)
 	w := httptest.NewRecorder()
@@ -238,6 +242,34 @@ func TestHandleApiSession_CodexAfterCountForcesFullReconcile(t *testing.T) {
 	}
 	if resp.From != 0 || len(resp.Entries) != totalEntries {
 		t.Fatalf("from=%d entries=%d, want full %d-entry reconcile", resp.From, len(resp.Entries), totalEntries)
+	}
+}
+
+func TestHandleApiSession_UnknownRuntimeAfterCountForcesFullReconcile(t *testing.T) {
+	root := t.TempDir()
+	const messages = 4
+	const totalEntries = messages + 1
+	path := writeSessionWithNMessages(t, root, "proj", "s.jsonl", messages)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"cwd":`, `"runtime":"future","nativeId":"native","cwd":`, 1))
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{sessionsDir: root, cache: sessions.NewCache()}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/session?id=s.jsonl&afterCount=2", nil)
+	w := httptest.NewRecorder()
+	s.handleApiSession(w, req)
+
+	var resp deltaResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.DeltaOk || resp.From != 0 || len(resp.Entries) != totalEntries {
+		t.Fatalf("unknown runtime delta response = %+v, want full reconcile", resp)
 	}
 }
 

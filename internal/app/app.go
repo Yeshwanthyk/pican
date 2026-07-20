@@ -15,9 +15,8 @@ import (
 
 	"pican/internal/agentdir"
 	"pican/internal/auth"
-	"pican/internal/codex"
 	"pican/internal/frontend"
-	"pican/internal/rpc"
+	"pican/internal/runtimes"
 	"pican/internal/server"
 	"pican/internal/sessions"
 	"pican/internal/ui"
@@ -37,7 +36,7 @@ func Main(version string) {
 	open := flag.Bool("o", false, "auto-open browser")
 	insecure := flag.Bool("insecure", false, "allow non-loopback bind without "+tokenEnvVar+" (DANGEROUS)")
 	showVersion := flag.Bool("version", false, "print version and exit")
-	runtimeFlag := flag.String("runtime", "pi", "agent runtime: pi, codex, or both")
+	runtimeFlag := flag.String("runtime", "pi", "agent runtimes: pi, codex, both, or a comma-separated list")
 	codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
 	flag.Parse()
 
@@ -46,20 +45,54 @@ func Main(version string) {
 		os.Exit(0)
 	}
 
-	runtimeMode, err := parseRuntime(*runtimeFlag)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	codexArgv := codexCommand(codexExecutable(*codexCommandFlag))
+	codexPath := codexExecutable(*codexCommandFlag)
+	codexArgv := codexCommand(codexPath)
 
 	agentDir := agentdir.Path()
 	if err := seedSoundsDir(agentDir); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to seed sounds directory: %v\n", err)
 	}
 	sessionsDir := filepath.Join(agentDir, "sessions")
+
+	var srv *server.Server
+	currentServer := func() *server.Server { return srv }
+	catalog := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 15*time.Second, time.Minute)
+	registry, err := newRuntimeRegistry(
+		applicationRuntime{
+			registration: runtimes.Pi(runtimes.BuiltinOptions{
+				Command:           "pi",
+				AvailabilityProbe: func(context.Context) runtimes.Availability { return runtimes.Availability{Available: true} },
+				WorkerFactory:     piWorkerFactory(currentServer),
+			}),
+			models: piModels,
+		},
+		applicationRuntime{
+			registration: runtimes.Codex(runtimes.BuiltinOptions{
+				Command:           codexPath,
+				AvailabilityProbe: catalog.availability,
+				Catalog:           catalog,
+				WorkerFactory:     codexWorkerFactory(sessionsDir, codexArgv, currentServer),
+			}),
+			models: codexModels(codexArgv),
+		},
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initialize runtime registry: %v\n", err)
+		os.Exit(1)
+	}
+	enabledRuntimes, err := parseRuntime(*runtimeFlag, registry)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	enabledRegistry, err := enabledRuntimes.selectedRegistry()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "resolve enabled runtimes: %v\n", err)
+		os.Exit(1)
+	}
+
 	if _, statErr := os.Stat(sessionsDir); os.IsNotExist(statErr) {
-		if runtimeMode == runtimeCodex {
+		if !enabledRuntimes.requiresExistingSessionsDir() {
 			if mkdirErr := os.MkdirAll(sessionsDir, 0755); mkdirErr != nil {
 				fmt.Fprintf(os.Stderr, "create sessions directory: %v\n", mkdirErr)
 				os.Exit(1)
@@ -70,20 +103,23 @@ func Main(version string) {
 		}
 	}
 
-	var catalog *catalogSyncer
-	if runtimeMode.enables("codex") {
-		catalog = newCatalogSyncer(func(ctx context.Context) error {
-			_, syncErr := codex.Sync(ctx, sessionsDir, codexArgv)
-			return syncErr
-		}, 15*time.Second, time.Minute)
-		if syncErr := catalog.sync(context.Background()); syncErr != nil {
-			if runtimeMode == runtimeCodex {
-				fmt.Fprintf(os.Stderr, "Codex runtime unavailable: %v\n", syncErr)
+	var activeCatalogs []*catalogSyncer
+	for _, runtimeID := range enabledRuntimes.ordered {
+		registration, _ := registry.registry.Lookup(runtimeID)
+		if registration.Catalog == nil {
+			continue
+		}
+		if _, syncErr := registration.Catalog.Sync(context.Background()); syncErr != nil {
+			if enabledRuntimes.only(runtimeID) {
+				fmt.Fprintf(os.Stderr, "%s runtime unavailable: %v\n", registration.Descriptor.Label, syncErr)
 				os.Exit(1)
 			}
-			fmt.Fprintf(os.Stderr, "Codex unavailable; continuing with Pi: %v\n", syncErr)
+			fmt.Fprintf(os.Stderr, "%s unavailable; continuing with %s: %v\n", registration.Descriptor.Label, enabledRuntimes.labelsExcept(runtimeID), syncErr)
 		}
-		catalog.start()
+		if syncer, ok := registration.Catalog.(*catalogSyncer); ok {
+			syncer.start()
+			activeCatalogs = append(activeCatalogs, syncer)
+		}
 	}
 
 	bindHost := chooseBindHost(*hostOverride)
@@ -100,79 +136,19 @@ func Main(version string) {
 
 	versionChecker := updater.New(version)
 
-	var srv *server.Server
 	manager := workers.NewManager(func(sessionID, sessionPath string) (workers.ChatWorker, error) {
-		parsed, parseErr := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
-		if parseErr != nil {
-			return nil, fmt.Errorf("read session runtime: %w", parseErr)
+		parsed, err := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
+		if err != nil {
+			return nil, fmt.Errorf("read session runtime: %w", err)
 		}
-		if parsed.Runtime == "codex" {
-			if _, metadataErr := codex.ReadProjectionMetadata(sessionPath); metadataErr != nil {
-				return nil, metadataErr
-			}
-			if !runtimeMode.enables("codex") {
-				return nil, fmt.Errorf("Codex runtime is not enabled")
-			}
-			workerCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
-			defer cancel()
-			return codex.NewWorker(workerCtx, sessionPath, codexArgv, codex.Callbacks{
-				Preview: func(preview codex.Preview) {
-					if srv != nil {
-						srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{Content: preview.Text, Done: preview.Done, TurnID: preview.TurnID, ItemID: preview.ItemID})
-					}
-				},
-				Status: func(workers.WorkerStatus) {
-					if srv != nil {
-						srv.NotifyWorkerUpdate(sessionID, false)
-					}
-				},
-				Projection: func(projection codex.Projection) {
-					if srv != nil {
-						target := projection.ID
-						if target == "" {
-							target = sessionID
-						}
-						srv.NotifyWorkerUpdate(target, true)
-					}
-				},
-				Lifecycle: func(action string, affectedID string) {
-					if srv != nil {
-						target := affectedID
-						if target == "" || target == parsed.NativeID {
-							target = sessionID
-						}
-						srv.NotifyCodexLifecycle(action, target)
-					}
-				},
-				Error: func(err error) {
-					fmt.Fprintf(os.Stderr, "Codex worker failed for %s: %v\n", sessionID, err)
-					if srv != nil {
-						srv.NotifyWorkerUpdate(sessionID, true)
-					}
-				},
-			})
+		runtimeID := parsed.Runtime
+		if runtimeID == "" {
+			runtimeID = string(runtimes.PiID)
 		}
-		if !runtimeMode.enables("pi") {
-			return nil, fmt.Errorf("Pi runtime is not enabled")
+		if !enabledRuntimes.enables(runtimeID) {
+			return nil, fmt.Errorf("%s runtime is not enabled", runtimeID)
 		}
-		return rpc.NewPiWorkerWithStatusEvents(
-			sessionPath,
-			func(preview rpc.StreamPreview) {
-				if srv != nil {
-					srv.BroadcastChatPreview(sessionID, preview)
-				}
-			},
-			func(event string, payload json.RawMessage) {
-				if srv != nil {
-					srv.BroadcastExtensionUI(sessionID, event, payload)
-				}
-			},
-			func(status workers.WorkerStatus) {
-				if srv != nil {
-					srv.BroadcastWorkerStatus(sessionID, status)
-				}
-			},
-		)
+		return enabledRegistry.NewWorker(runtimeID, sessionID, sessionPath)
 	})
 	var srvErr error
 	srv, srvErr = server.New(server.Deps{
@@ -184,29 +160,15 @@ func Main(version string) {
 		RenderExportSession: ui.RenderExportSessionPage,
 		RenderAppShell:      ui.RenderAppShell,
 		Models: func(ctx context.Context) (json.RawMessage, error) {
-			return runtimeModels(ctx, runtimeMode, codexArgv, sessionsDir, server.ModelQuery{})
+			return runtimeModels(ctx, enabledRuntimes, sessionsDir, server.ModelQuery{})
 		},
 		ModelsFor: func(ctx context.Context, query server.ModelQuery) (json.RawMessage, error) {
-			return runtimeModels(ctx, runtimeMode, codexArgv, sessionsDir, query)
+			return runtimeModels(ctx, enabledRuntimes, sessionsDir, query)
 		},
-		DefaultRuntime: func() string {
-			if runtimeMode == runtimeCodex {
-				return "codex"
-			}
-			return "pi"
-		}(),
-		EnabledRuntimes: runtimeMode.enabledRuntimes(),
-		RuntimeAvailable: func(runtime string) (bool, string) {
-			if runtime == "pi" {
-				return runtimeMode.enables("pi"), ""
-			}
-			if catalog == nil {
-				return false, "Codex runtime is not enabled"
-			}
-			return catalog.status()
-		},
+		RuntimeRegistry: enabledRegistry,
+		DefaultRuntime:  enabledRuntimes.defaultRuntime(),
 		Codex: func() server.CodexService {
-			if !runtimeMode.enables("codex") {
+			if !enabledRuntimes.enables(string(runtimes.CodexID)) {
 				return nil
 			}
 			return codexService{sessionsDir: sessionsDir, command: codexArgv}
@@ -290,7 +252,7 @@ func Main(version string) {
 		}()
 	}
 
-	if runtimeMode.enables("pi") {
+	if enabledRuntimes.enables(string(runtimes.PiID)) {
 		warmModelsCache()
 	}
 
@@ -312,7 +274,7 @@ func Main(version string) {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
-		if catalog != nil {
+		for _, catalog := range activeCatalogs {
 			catalog.close()
 		}
 		_ = manager.Close()

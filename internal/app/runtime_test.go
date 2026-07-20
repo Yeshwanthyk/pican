@@ -2,25 +2,123 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"pican/internal/runtimes"
+	"pican/internal/server"
 )
 
+func testRuntimeRegistry(t *testing.T, ids ...runtimes.ID) *runtimeRegistry {
+	t.Helper()
+	registered := make([]applicationRuntime, 0, len(ids))
+	for _, id := range ids {
+		registered = append(registered, applicationRuntime{
+			registration: runtimes.Registration{
+				Descriptor: runtimes.Descriptor{
+					ID:             id,
+					Label:          string(id),
+					Command:        string(id),
+					ProjectionMode: runtimes.ProjectionAppendOnlyNative,
+				},
+				AvailabilityProbe: func(context.Context) runtimes.Availability {
+					return runtimes.Availability{Available: true}
+				},
+			},
+		})
+	}
+	registry, err := newRuntimeRegistry(registered...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
 func TestParseRuntimeAndCodexCommand(t *testing.T) {
-	for _, value := range []string{"pi", "codex", "both"} {
-		mode, err := parseRuntime(value)
-		if err != nil || string(mode) != value {
-			t.Fatalf("parseRuntime(%q) = %q, %v", value, mode, err)
+	registry := testRuntimeRegistry(t, runtimes.PiID, runtimes.CodexID, "future")
+	tests := []struct {
+		value string
+		want  []string
+	}{
+		{"pi", []string{"pi"}},
+		{"codex", []string{"codex"}},
+		{"both", []string{"pi", "codex"}},
+		{" CODEX, pi ", []string{"pi", "codex"}},
+		{"pi,pi", []string{"pi"}},
+		{"future,pi", []string{"pi", "future"}},
+	}
+	for _, tt := range tests {
+		enabled, err := parseRuntime(tt.value, registry)
+		if err != nil || !reflect.DeepEqual(enabled.enabledRuntimes(), tt.want) {
+			t.Fatalf("parseRuntime(%q) = %v, %v; want %v", tt.value, enabled.enabledRuntimes(), err, tt.want)
 		}
 	}
-	if _, err := parseRuntime("other"); err == nil {
-		t.Fatal("invalid runtime accepted")
+	for _, value := range []string{"other", "pi,other", "pi,", "both,pi"} {
+		if _, err := parseRuntime(value, registry); err == nil {
+			t.Fatalf("parseRuntime(%q) accepted invalid input", value)
+		}
 	}
 	got := codexCommand("/path with spaces/codex")
 	if len(got) != 3 || got[0] != "/path with spaces/codex" || got[1] != "app-server" || got[2] != "--stdio" {
 		t.Fatalf("argv = %#v", got)
+	}
+}
+
+func TestRuntimeModelsDispatchesThroughRegistryAndDegradesAfterSuccess(t *testing.T) {
+	codexErr := errors.New("codex unavailable")
+	registry, err := newRuntimeRegistry(
+		applicationRuntime{
+			registration: testRuntimeRegistry(t, runtimes.PiID).registry.List()[0],
+			models: func(context.Context) ([]json.RawMessage, error) {
+				return []json.RawMessage{json.RawMessage(`{"id":"pi-model"}`)}, nil
+			},
+		},
+		applicationRuntime{
+			registration: testRuntimeRegistry(t, runtimes.CodexID).registry.List()[0],
+			models: func(context.Context) ([]json.RawMessage, error) {
+				return nil, codexErr
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled, err := parseRuntime("both", registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{})
+	if err != nil || string(data) != `{"models":[{"id":"pi-model"}]}` {
+		t.Fatalf("aggregate models = %s, %v", data, err)
+	}
+	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{Runtime: "codex"}); !errors.Is(err, codexErr) {
+		t.Fatalf("targeted Codex error = %v, want %v", err, codexErr)
+	}
+	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{Runtime: "future"}); err == nil {
+		t.Fatal("unknown runtime model query accepted")
+	}
+}
+
+func TestCatalogSyncerAvailabilityTracksSyncResult(t *testing.T) {
+	wantErr := errors.New("offline")
+	syncer := newCatalogSyncer("Codex", func(context.Context) (runtimes.CatalogResult, error) {
+		return runtimes.CatalogResult{Complete: true}, wantErr
+	}, time.Second, time.Minute)
+	result, err := syncer.Sync(context.Background())
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Sync error = %v, want %v", err, wantErr)
+	}
+	if result.Complete {
+		t.Fatal("failed catalog sync remained complete")
+	}
+	status := syncer.availability(context.Background())
+	if status.Available || status.Reason != "Codex runtime is unavailable: offline" {
+		t.Fatalf("availability = %+v", status)
 	}
 }
 
@@ -29,7 +127,7 @@ func TestCatalogSyncerSingleFlightAndShutdown(t *testing.T) {
 	var maximum atomic.Int32
 	started := make(chan struct{}, 1)
 	release := make(chan struct{})
-	syncer := newCatalogSyncer(func(ctx context.Context) error {
+	syncer := newCatalogSyncer("test", func(ctx context.Context) (runtimes.CatalogResult, error) {
 		n := active.Add(1)
 		defer active.Add(-1)
 		for {
@@ -44,17 +142,17 @@ func TestCatalogSyncerSingleFlightAndShutdown(t *testing.T) {
 		}
 		select {
 		case <-release:
-			return nil
+			return runtimes.CatalogResult{Complete: true}, nil
 		case <-ctx.Done():
-			return ctx.Err()
+			return runtimes.CatalogResult{}, ctx.Err()
 		}
 	}, time.Second, time.Millisecond)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { defer wg.Done(); _ = syncer.sync(context.Background()) }()
+	go func() { defer wg.Done(); _, _ = syncer.Sync(context.Background()) }()
 	<-started
-	go func() { defer wg.Done(); _ = syncer.sync(context.Background()) }()
+	go func() { defer wg.Done(); _, _ = syncer.Sync(context.Background()) }()
 	close(release)
 	wg.Wait()
 	if maximum.Load() != 1 {
@@ -73,10 +171,10 @@ func TestCatalogSyncerSingleFlightAndShutdown(t *testing.T) {
 
 func TestCatalogSyncerShutdownCancelsActiveSync(t *testing.T) {
 	started := make(chan struct{})
-	syncer := newCatalogSyncer(func(ctx context.Context) error {
+	syncer := newCatalogSyncer("test", func(ctx context.Context) (runtimes.CatalogResult, error) {
 		close(started)
 		<-ctx.Done()
-		return ctx.Err()
+		return runtimes.CatalogResult{}, ctx.Err()
 	}, time.Minute, time.Millisecond)
 	syncer.start()
 	<-started

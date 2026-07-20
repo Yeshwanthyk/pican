@@ -52,6 +52,9 @@ pican/
 │   │   ├── projection.go       # Atomic Codex → session projection materialization
 │   │   ├── worker.go           # Resumed per-session app-server worker
 │   │   └── types.go            # Stable protocol subset and model mapping
+│   ├── runtimes/
+│   │   ├── registry.go         # Ordered descriptors, availability, catalogs, worker dispatch
+│   │   └── builtins.go         # Pi/Codex registrations and explicit capabilities
 │   ├── rpc/
 │   │   ├── client.go           # JSONL RPC command builders
 │   │   ├── worker.go           # pi --mode rpc subprocess worker
@@ -157,7 +160,9 @@ type Server struct {
 
 `Deps` (passed to `New`) supplies everything wired from `internal/app`: the
 `RenderExportSession` and `RenderAppShell` renderers, `Models`, `Cache`, `Auth`,
-`ChatSender`, plus the optional `Updater`, `RunInstall`, and `RunRestart`. When
+`ChatSender`, the selected startup-owned `RuntimeRegistry`, and the separate
+`CodexService` lifecycle adapter. Legacy runtime fields remain accepted for
+source compatibility. When
 `Updater` is nil the version/update routes are not registered; when
 `RunInstall`/`RunRestart` are nil the corresponding endpoints respond `503`.
 
@@ -203,9 +208,75 @@ type Session struct {
 }
 ```
 
+### `runtimes.Registry`
+
+The app registers only Pi and Codex in deterministic startup order, then selects an enabled subset from the CLI. OpenCode and Claude are not registered in Wave 1. IDs are open validated strings (`[a-z][a-z0-9-]*`, without trailing or repeated hyphens), so the registry is extensible without making unregistered runtimes usable.
+
+```go
+type Registration struct {
+    Descriptor        Descriptor
+    AvailabilityProbe AvailabilityProbe
+    Catalog           CatalogAdapter // required for replaceable projections
+    WorkerFactory     workers.Factory // required when Chat is true
+}
+
+type Descriptor struct {
+    ID             ID
+    Label          string
+    Command        string
+    Version        string
+    ProjectionMode ProjectionMode // append-only-native | replaceable-projection
+    Capabilities   Capabilities
+}
+
+type CatalogResult struct {
+    SessionIDs []string
+    Complete   bool // absence may authorize pruning only when true
+}
+```
+
+`Registry` owns validated registration order and dispatch metadata, not active workers or native session lifecycle. Registration rejects duplicate IDs, missing probes, chat without a factory, and replaceable projection without a catalog. `List` and `IDs` preserve registration order; `Open` distinguishes malformed IDs from well-formed but unregistered IDs. The selected registry passed to the server contains only CLI-enabled registrations.
+
+| Concern | Owner |
+|---|---|
+| Registration order, descriptor, capability declaration, probe/catalog/factory binding | app startup + `runtimes.Registry` |
+| CLI selection and per-runtime model loaders | `internal/app` |
+| Catalog schedule, timeout, completeness downgrade on error, current Codex availability | app-owned `catalogSyncer` |
+| Worker reuse, single-flight creation, crash eviction, cancellation/shutdown, 10-minute reap | `workers.Manager` |
+| Pi append-only transcript and `session_info` metadata | Pi/session pipeline; unchanged |
+| Codex native thread | Codex under `~/.codex` |
+| Codex replaceable projection | Codex adapter under `~/.pi/agent/sessions` |
+| Codex archive/delete/unarchive and native rename/fork semantics | separate `CodexService`, not the common registry |
+| Live session/API/SSE behavior | `server.Server` |
+| Static export/share rendering | `internal/ui` export path; no runtime registry or worker dependency |
+
+Production dispatch is:
+
+```text
+CLI → app registrations → parse selection → selected runtimes.Registry
+                                      ├─ server.New(RuntimeRegistry)
+                                      │    └─ /api/runtimes + projection policy
+                                      └─ workers.Manager factory
+                                           └─ ParseFile → enabled? → Registry.NewWorker
+                                                ├─ Pi workers.Factory
+                                                └─ Codex workers.Factory
+```
+
+Tests substitute registrations, probes, catalogs, and factories directly; server tests may also use the legacy `Deps` fields through the compatibility builder. This keeps tests process-free while proving order, validation, availability, completeness, dispatch, API metadata, and projection-mode behavior.
+
+### Compatibility boundary
+
+Wave 1 preserves the public Pi/Codex surface while moving internals to the registry:
+
+- CLI `pi`, `codex`, and exact legacy alias `both` still work; comma-separated registered IDs are additive. Selection is case-normalized, deduplicated, and emitted in registration order. Unknown or malformed IDs fail startup, so OpenCode/Claude remain unavailable.
+- `server.Deps.RuntimeRegistry` is the canonical path. Legacy `EnabledRuntimes` and `RuntimeAvailable` remain source-compatible for existing tests/embedders and are converted to a Pi/Codex-only compatibility registry. Legacy defaulting still prefers Pi; a supplied registry defaults to its first registration. An explicit default outside the registry is rejected.
+- `/api/runtimes` retains `defaultRuntime`, `id`, `available`, optional `reason`, and the existing capabilities object. It adds `label`, `command`, optional `version`, `projectionMode`, and the complete capability set. Entries retain selected registry order; frontend parsing keeps the new metadata optional and falls back to translated/runtime IDs for labels.
+- Missing persisted runtime metadata still means Pi. Persisted Pi/Codex sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
+- `ChatWorker` and `workers.Manager` lifecycle contracts are unchanged. Registry dispatch replaces only the hard-coded Pi/Codex factory branch.
+
 ### `workers.Manager`
 
-Manages runtime-specific subprocesses per session. The factory chooses `pi --mode rpc` or `codex app-server --stdio` from validated session metadata; the manager owns reuse, single-flight creation, error eviction, and the shared 10-minute idle reap policy.
+Manages runtime-specific subprocesses per session. Its factory reads validated session metadata and dispatches through `runtimes.Registry`; the manager owns reuse, single-flight creation, error eviction, and the shared 10-minute idle reap policy.
 
 ```go
 type Manager struct {
@@ -271,7 +342,7 @@ type piRPCWorker struct {
 | `/api/set-model` | POST | `handleSetModel` | Change model for session |
 | `/api/set-thinking-level` | POST | `handleSetThinkingLevel` | Change thinking level |
 | `/api/models` | GET | `handleAvailableModels` | List models for `runtime` or session `id` |
-| `/api/runtimes` | GET | `handleRuntimes` | Configured runtimes and current availability |
+| `/api/runtimes` | GET | `handleRuntimes` | Ordered configured runtime descriptors, capabilities, and current availability |
 | `/api/worker-status` | GET | `handleWorkerStatus` | Get worker state for session |
 | `/api/commands` | GET | `handleCommands` | List slash commands exposed by the session worker |
 | `/metrics` | GET | `handleMetricsPage` | Worker metrics dashboard (self-contained HTML) |

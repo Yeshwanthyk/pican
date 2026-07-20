@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pican/internal/chat"
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 	"pican/internal/workers"
 )
@@ -87,7 +88,7 @@ func (s *Server) readSessionStatus(sessionID string) *workers.WorkerStatus {
 	if sessionID == "" {
 		return nil
 	}
-	if resolved, err := sessions.ResolveByID(s.sessionsDir, sessionID); err == nil && resolved.Session.Runtime == "codex" {
+	if resolved, err := sessions.ResolveByID(s.sessionsDir, sessionID); err == nil && s.projectionMode(resolved.Session.Runtime) != runtimes.ProjectionAppendOnlyNative {
 		return nil
 	}
 	path := filepath.Join(s.sessionStatusDir(), sessionID)

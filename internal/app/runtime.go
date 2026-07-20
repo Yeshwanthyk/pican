@@ -5,49 +5,221 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"pican/internal/codex"
+	"pican/internal/rpc"
+	"pican/internal/runtimes"
 	"pican/internal/server"
 	"pican/internal/sessions"
+	"pican/internal/workers"
 )
 
-type runtimeMode string
+type runtimeModelLoader func(context.Context) ([]json.RawMessage, error)
 
-const (
-	runtimePi    runtimeMode = "pi"
-	runtimeCodex runtimeMode = "codex"
-	runtimeBoth  runtimeMode = "both"
-)
-
-func parseRuntime(value string) (runtimeMode, error) {
-	switch runtimeMode(strings.ToLower(strings.TrimSpace(value))) {
-	case runtimePi:
-		return runtimePi, nil
-	case runtimeCodex:
-		return runtimeCodex, nil
-	case runtimeBoth:
-		return runtimeBoth, nil
-	default:
-		return "", fmt.Errorf("invalid runtime %q: must be pi, codex, or both", value)
-	}
+type applicationRuntime struct {
+	registration runtimes.Registration
+	models       runtimeModelLoader
 }
 
-func (m runtimeMode) enables(runtime string) bool {
-	return string(m) == runtime || m == runtimeBoth
+type runtimeRegistry struct {
+	registry *runtimes.Registry
+	models   map[runtimes.ID]runtimeModelLoader
 }
 
-func (m runtimeMode) enabledRuntimes() []string {
-	if m == runtimeBoth {
-		return []string{"pi", "codex"}
+func newRuntimeRegistry(registered ...applicationRuntime) (*runtimeRegistry, error) {
+	registrations := make([]runtimes.Registration, 0, len(registered))
+	models := make(map[runtimes.ID]runtimeModelLoader, len(registered))
+	for _, runtime := range registered {
+		registrations = append(registrations, runtime.registration)
+		if runtime.models != nil {
+			models[runtime.registration.Descriptor.ID] = runtime.models
+		} else if runtime.registration.Descriptor.Capabilities.ModelListing {
+			return nil, fmt.Errorf("runtime %q: model listing capability requires a model loader", runtime.registration.Descriptor.ID)
+		}
 	}
-	return []string{string(m)}
+	registry, err := runtimes.New(registrations...)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeRegistry{registry: registry, models: models}, nil
+}
+
+type runtimeSet struct {
+	registry *runtimeRegistry
+	ordered  []runtimes.ID
+	enabled  map[runtimes.ID]struct{}
+}
+
+func parseRuntime(value string, registry *runtimeRegistry) (runtimeSet, error) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "both" {
+		normalized = "pi,codex"
+	}
+	if normalized == "" {
+		return runtimeSet{}, fmt.Errorf("invalid runtime %q: runtime is required", value)
+	}
+
+	selected := make(map[runtimes.ID]struct{})
+	for _, part := range strings.Split(normalized, ",") {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			return runtimeSet{}, fmt.Errorf("invalid runtime %q: empty runtime ID", value)
+		}
+		registration, err := registry.registry.Open(name)
+		if err != nil {
+			return runtimeSet{}, fmt.Errorf("invalid runtime %q: %w", value, err)
+		}
+		selected[registration.Descriptor.ID] = struct{}{}
+	}
+
+	ordered := make([]runtimes.ID, 0, len(selected))
+	for _, id := range registry.registry.IDs() {
+		if _, ok := selected[id]; ok {
+			ordered = append(ordered, id)
+		}
+	}
+	return runtimeSet{registry: registry, ordered: ordered, enabled: selected}, nil
+}
+
+func (s runtimeSet) enables(runtime string) bool {
+	_, ok := s.enabled[runtimes.ID(runtime)]
+	return ok
+}
+
+func (s runtimeSet) only(runtime runtimes.ID) bool {
+	return len(s.ordered) == 1 && s.ordered[0] == runtime
+}
+
+func (s runtimeSet) labelsExcept(excluded runtimes.ID) string {
+	labels := make([]string, 0, len(s.ordered)-1)
+	for _, id := range s.ordered {
+		if id == excluded {
+			continue
+		}
+		registration, ok := s.registry.registry.Lookup(id)
+		if ok {
+			labels = append(labels, registration.Descriptor.Label)
+		}
+	}
+	return strings.Join(labels, ", ")
+}
+
+func (s runtimeSet) enabledRuntimes() []string {
+	enabled := make([]string, len(s.ordered))
+	for i, id := range s.ordered {
+		enabled[i] = string(id)
+	}
+	return enabled
+}
+
+func (s runtimeSet) selectedRegistry() (*runtimes.Registry, error) {
+	registrations := make([]runtimes.Registration, 0, len(s.ordered))
+	for _, id := range s.ordered {
+		registration, ok := s.registry.registry.Lookup(id)
+		if !ok {
+			return nil, fmt.Errorf("runtime %q is no longer registered", id)
+		}
+		registrations = append(registrations, registration)
+	}
+	return runtimes.New(registrations...)
+}
+
+func (s runtimeSet) defaultRuntime() string {
+	if len(s.ordered) == 0 {
+		return "pi"
+	}
+	return string(s.ordered[0])
+}
+
+func (s runtimeSet) requiresExistingSessionsDir() bool {
+	for _, id := range s.ordered {
+		registration, ok := s.registry.registry.Lookup(id)
+		if ok && registration.Descriptor.ProjectionMode == runtimes.ProjectionAppendOnlyNative {
+			return true
+		}
+	}
+	return false
 }
 
 func codexCommand(executable string) []string {
 	return []string{executable, "app-server", "--stdio"}
+}
+
+func piWorkerFactory(currentServer func() *server.Server) workers.Factory {
+	return func(sessionID, sessionPath string) (workers.ChatWorker, error) {
+		return rpc.NewPiWorkerWithStatusEvents(
+			sessionPath,
+			func(preview rpc.StreamPreview) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastChatPreview(sessionID, preview)
+				}
+			},
+			func(event string, payload json.RawMessage) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastExtensionUI(sessionID, event, payload)
+				}
+			},
+			func(status workers.WorkerStatus) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastWorkerStatus(sessionID, status)
+				}
+			},
+		)
+	}
+}
+
+func codexWorkerFactory(sessionsDir string, command []string, currentServer func() *server.Server) workers.Factory {
+	return func(sessionID, sessionPath string) (workers.ChatWorker, error) {
+		parsed, err := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
+		if err != nil {
+			return nil, fmt.Errorf("read session runtime: %w", err)
+		}
+		if _, err := codex.ReadProjectionMetadata(sessionPath); err != nil {
+			return nil, err
+		}
+		workerCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		defer cancel()
+		return codex.NewWorker(workerCtx, sessionPath, command, codex.Callbacks{
+			Preview: func(preview codex.Preview) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{Content: preview.Text, Done: preview.Done, TurnID: preview.TurnID, ItemID: preview.ItemID})
+				}
+			},
+			Status: func(workers.WorkerStatus) {
+				if srv := currentServer(); srv != nil {
+					srv.NotifyWorkerUpdate(sessionID, false)
+				}
+			},
+			Projection: func(projection codex.Projection) {
+				if srv := currentServer(); srv != nil {
+					target := projection.ID
+					if target == "" {
+						target = sessionID
+					}
+					srv.NotifyWorkerUpdate(target, true)
+				}
+			},
+			Lifecycle: func(action string, affectedID string) {
+				if srv := currentServer(); srv != nil {
+					target := affectedID
+					if target == "" || target == parsed.NativeID {
+						target = sessionID
+					}
+					srv.NotifyCodexLifecycle(action, target)
+				}
+			},
+			Error: func(err error) {
+				fmt.Fprintf(os.Stderr, "Codex worker failed for %s: %v\n", sessionID, err)
+				if srv := currentServer(); srv != nil {
+					srv.NotifyWorkerUpdate(sessionID, true)
+				}
+			},
+		})
+	}
 }
 
 type codexService struct {
@@ -88,10 +260,11 @@ func (c codexService) AutoTitleSession(path, name string, now func() time.Time) 
 
 type catalogSyncer struct {
 	mu         sync.Mutex
+	label      string
 	syncing    bool
 	available  bool
 	reason     string
-	syncFn     func(context.Context) error
+	syncFn     func(context.Context) (runtimes.CatalogResult, error)
 	timeout    time.Duration
 	interval   time.Duration
 	stop       chan struct{}
@@ -103,42 +276,52 @@ type catalogSyncer struct {
 	runCancel  context.CancelFunc
 }
 
-func newCatalogSyncer(syncFn func(context.Context) error, timeout, interval time.Duration) *catalogSyncer {
-	return &catalogSyncer{syncFn: syncFn, timeout: timeout, interval: interval, stop: make(chan struct{}), done: make(chan struct{})}
+func newCatalogSyncer(label string, syncFn func(context.Context) (runtimes.CatalogResult, error), timeout, interval time.Duration) *catalogSyncer {
+	return &catalogSyncer{label: label, syncFn: syncFn, timeout: timeout, interval: interval, stop: make(chan struct{}), done: make(chan struct{})}
 }
 
-func (s *catalogSyncer) sync(ctx context.Context) error {
+func (s *catalogSyncer) Sync(ctx context.Context) (runtimes.CatalogResult, error) {
 	syncCtx, cancel := context.WithTimeout(ctx, s.timeout)
 	s.mu.Lock()
 	if s.syncing {
 		s.mu.Unlock()
 		cancel()
-		return nil
+		return runtimes.CatalogResult{}, nil
 	}
 	s.syncing = true
 	s.syncCancel = cancel
 	s.mu.Unlock()
 
-	err := s.syncFn(syncCtx)
+	result, err := s.syncFn(syncCtx)
 	cancel()
+	if err != nil {
+		// A failed scan can never authorize projection pruning, even if a
+		// buggy adapter returned contradictory completeness metadata.
+		result.Complete = false
+	}
 
 	s.mu.Lock()
 	s.syncing = false
 	s.syncCancel = nil
 	s.available = err == nil
 	if err != nil {
-		s.reason = "Codex runtime is unavailable: " + err.Error()
+		s.reason = s.label + " runtime is unavailable: " + err.Error()
 	} else {
 		s.reason = ""
 	}
 	s.mu.Unlock()
-	return err
+	return result, err
 }
 
 func (s *catalogSyncer) status() (bool, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.available, s.reason
+}
+
+func (s *catalogSyncer) availability(context.Context) runtimes.Availability {
+	available, reason := s.status()
+	return runtimes.Availability{Available: available, Reason: reason}
 }
 
 func (s *catalogSyncer) start() {
@@ -155,7 +338,7 @@ func (s *catalogSyncer) start() {
 			for {
 				select {
 				case <-ticker.C:
-					_ = s.sync(runCtx)
+					_, _ = s.Sync(runCtx)
 				case <-s.stop:
 					return
 				}
@@ -182,52 +365,78 @@ func (s *catalogSyncer) close() {
 	}
 }
 
-func runtimeModels(ctx context.Context, mode runtimeMode, command []string, sessionsDir string, query server.ModelQuery) (json.RawMessage, error) {
+func runtimeModels(ctx context.Context, enabled runtimeSet, sessionsDir string, query server.ModelQuery) (json.RawMessage, error) {
 	runtime := query.Runtime
 	if runtime == "" && query.SessionID != "" {
 		if resolved, err := sessions.ResolveByID(sessionsDir, query.SessionID); err == nil {
 			runtime = resolved.Session.Runtime
 		}
 	}
-	if runtime != "" && !mode.enables(runtime) {
+	if runtime != "" && !enabled.enables(runtime) {
 		return nil, fmt.Errorf("runtime %q is not enabled", runtime)
 	}
-	wantPi := mode.enables("pi") && (runtime == "" || runtime == "pi")
-	wantCodex := mode.enables("codex") && (runtime == "" || runtime == "codex")
 
-	var models []json.RawMessage
-	if wantPi {
-		data, err := defaultModelsCache.get(ctx)
-		if err != nil {
-			return nil, err
-		}
-		var payload struct {
-			Models []json.RawMessage `json:"models"`
-		}
-		if err := json.Unmarshal(data, &payload); err != nil {
-			return nil, err
-		}
-		models = append(models, payload.Models...)
+	ids := enabled.ordered
+	if runtime != "" {
+		ids = []runtimes.ID{runtimes.ID(runtime)}
 	}
-	if wantCodex {
-		codexModels, err := codex.FetchModels(ctx, command)
+	var models []json.RawMessage
+	discoveredAnyRuntime := false
+	for _, id := range ids {
+		loader := enabled.registry.models[id]
+		if loader == nil {
+			return nil, fmt.Errorf("runtime %q does not support model discovery", id)
+		}
+		discovered, err := loader(ctx)
 		if err != nil {
-			if runtime == "" && wantPi {
-				// Both mode degrades to the preserved Pi payload.
-			} else {
+			if runtime != "" || !discoveredAnyRuntime {
 				return nil, err
 			}
-		} else {
-			for _, model := range codexModels {
-				data, marshalErr := json.Marshal(model)
-				if marshalErr != nil {
-					return nil, marshalErr
-				}
-				models = append(models, data)
-			}
+			continue
 		}
+		discoveredAnyRuntime = true
+		models = append(models, discovered...)
 	}
 	return json.Marshal(map[string]any{"models": models})
+}
+
+func piModels(ctx context.Context) ([]json.RawMessage, error) {
+	data, err := defaultModelsCache.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Models []json.RawMessage `json:"models"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	return payload.Models, nil
+}
+
+func codexModels(command []string) runtimeModelLoader {
+	return func(ctx context.Context) ([]json.RawMessage, error) {
+		discovered, err := codex.FetchModels(ctx, command)
+		if err != nil {
+			return nil, err
+		}
+		models := make([]json.RawMessage, 0, len(discovered))
+		for _, model := range discovered {
+			data, err := json.Marshal(model)
+			if err != nil {
+				return nil, err
+			}
+			models = append(models, data)
+		}
+		return models, nil
+	}
+}
+
+func codexCatalog(sessionsDir string, command []string) func(context.Context) (runtimes.CatalogResult, error) {
+	return func(ctx context.Context) (runtimes.CatalogResult, error) {
+		result, err := codex.Sync(ctx, sessionsDir, command)
+		return runtimes.CatalogResult{SessionIDs: result.IDs, Complete: err == nil}, err
+	}
 }
 
 func codexExecutable(flagValue string) string {

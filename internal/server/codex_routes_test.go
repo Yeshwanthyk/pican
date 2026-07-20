@@ -91,14 +91,20 @@ func newCodexRouteServer(t *testing.T) (*Server, *fakeCodexService, string, stri
 		t.Fatal(err)
 	}
 	entryID, _ := parsed.Entries[1]["id"].(string)
+	registry, err := serverRuntimeRegistry(Deps{
+		EnabledRuntimes:  []string{"pi", "codex"},
+		RuntimeAvailable: func(string) (bool, string) { return true, "" },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := &Server{
-		sessionsDir:      root,
-		cache:            sessions.NewCache(),
-		codex:            fake,
-		defaultRuntime:   "pi",
-		enabledRuntimes:  map[string]bool{"pi": true, "codex": true},
-		runtimeAvailable: func(string) (bool, string) { return true, "" },
-		now:              time.Now,
+		sessionsDir:     root,
+		cache:           sessions.NewCache(),
+		codex:           fake,
+		defaultRuntime:  "pi",
+		runtimeRegistry: registry,
+		now:             time.Now,
 		modelsFor: func(context.Context, ModelQuery) (json.RawMessage, error) {
 			return json.RawMessage(`{"models":[{"provider":"openai-codex","id":"gpt"}]}`), nil
 		},
@@ -185,12 +191,19 @@ func TestCodexNativeLifecycleRoutes(t *testing.T) {
 
 func TestCodexUnavailableKeepsProjectionViewableButDisablesChat(t *testing.T) {
 	s, _, sessionID, _ := newCodexRouteServer(t)
-	s.runtimeAvailable = func(runtime string) (bool, string) {
-		if runtime == "codex" {
-			return false, "Codex runtime is unavailable"
-		}
-		return true, ""
+	registry, err := serverRuntimeRegistry(Deps{
+		EnabledRuntimes: []string{"pi", "codex"},
+		RuntimeAvailable: func(runtime string) (bool, string) {
+			if runtime == "codex" {
+				return false, "Codex runtime is unavailable"
+			}
+			return true, ""
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
+	s.runtimeRegistry = registry
 	rec := httptest.NewRecorder()
 	s.handleApiSession(rec, httptest.NewRequest(http.MethodGet, "/api/session?id="+sessionID, nil))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"chatAvailable":false`) || !strings.Contains(rec.Body.String(), "Codex runtime is unavailable") {

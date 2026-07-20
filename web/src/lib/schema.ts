@@ -246,11 +246,39 @@ export const PeerHostSchema = Schema.Struct({
 });
 export const PeerSessionListSchema = Schema.Struct({ hosts: Schema.Array(PeerHostSchema) });
 
+export const RuntimeCapabilitiesSchema = Schema.Struct({
+  create: optionalBoolean,
+  resume: optionalBoolean,
+  fork: optionalBoolean,
+  clone: optionalBoolean,
+  rename: optionalBoolean,
+  archive: optionalBoolean,
+  unarchive: optionalBoolean,
+  delete: optionalBoolean,
+  chat: optionalBoolean,
+  cancel: optionalBoolean,
+  steer: optionalBoolean,
+  persistentQueue: optionalBoolean,
+  images: optionalBoolean,
+  files: optionalBoolean,
+  modelListing: optionalBoolean,
+  modelSwitching: optionalBoolean,
+  effortSelection: optionalBoolean,
+  reasoningSelection: optionalBoolean,
+  slashCommands: optionalBoolean,
+  subagents: optionalBoolean,
+  interactiveApprovals: optionalBoolean,
+  userQuestions: optionalBoolean,
+});
+export type RuntimeCapabilities = typeof RuntimeCapabilitiesSchema.Type;
+
 export const RuntimeInfoSchema = Schema.Struct({
   id: Schema.String,
+  label: optionalString,
   available: optionalBoolean,
   reason: optionalString,
-  capabilities: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  projectionMode: optionalString,
+  capabilities: Schema.optionalKey(RuntimeCapabilitiesSchema),
 });
 export const RuntimesResponseSchema = Schema.Struct({
   defaultRuntime: optionalString,
