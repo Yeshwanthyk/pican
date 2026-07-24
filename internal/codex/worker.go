@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -988,25 +987,13 @@ func cloneThread(thread Thread) Thread {
 }
 
 func (w *Worker) appendSetting(kind string, fields map[string]any) error {
-	lockAny, _ := projectionLocks.LoadOrStore(w.sessionPath, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-	f, err := os.OpenFile(w.sessionPath, os.O_WRONLY|os.O_APPEND, 0)
+	store, err := projectionStoreForPath(w.sessionPath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	entry := map[string]any{"type": kind, "id": "codex-local-" + stableHash(kind, time.Now().UTC().Format(time.RFC3339Nano)), "timestamp": time.Now().UTC().Format(time.RFC3339Nano)}
 	for k, v := range fields {
 		entry[k] = v
 	}
-	data, err := json.Marshal(entry)
-	if err != nil {
-		return err
-	}
-	if _, err = f.Write(append(data, '\n')); err != nil {
-		return err
-	}
-	return f.Sync()
+	return store.AppendLocal(w.sessionPath, entry)
 }

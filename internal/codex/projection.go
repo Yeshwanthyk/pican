@@ -2,7 +2,6 @@ package codex
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,15 +9,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
+	"pican/internal/projections"
 	"pican/internal/sessions"
 )
-
-var projectionLocks sync.Map
 
 var ErrNoTurnBoundary = errors.New("Codex entry has no turn boundary")
 
@@ -44,6 +40,14 @@ type ProjectionMetadata struct {
 func ReadProjectionMetadata(path string) (ProjectionMetadata, error) {
 	if filepath.Base(path) != filepath.Clean(filepath.Base(path)) || !strings.HasPrefix(filepath.Base(path), "codex-") {
 		return ProjectionMetadata{}, errors.New("not a Codex projection")
+	}
+	store, err := projectionStoreForPath(path)
+	if err != nil {
+		return ProjectionMetadata{}, err
+	}
+	identity, err := store.ReadMetadata(path)
+	if err != nil {
+		return ProjectionMetadata{}, err
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -72,7 +76,7 @@ func ReadProjectionMetadata(path string) (ProjectionMetadata, error) {
 		}
 		switch entry.Type {
 		case "session":
-			if entry.Runtime != "codex" || entry.ModelProvider != Provider || entry.NativeID == "" || entry.CWD == "" {
+			if entry.Runtime != identity.Runtime || entry.ModelProvider != Provider || entry.NativeID != identity.NativeID || entry.CWD != identity.CWD {
 				return ProjectionMetadata{}, errors.New("invalid Codex projection metadata")
 			}
 			metadata = ProjectionMetadata{
@@ -107,30 +111,23 @@ func RemoveProjection(path, nativeID string) error {
 	if nativeID == "" || metadata.NativeID != nativeID {
 		return errors.New("Codex projection native id mismatch")
 	}
-	lockAny, _ := projectionLocks.LoadOrStore(path, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-	return os.Remove(path)
+	store, err := projectionStoreForPath(path)
+	if err != nil {
+		return err
+	}
+	return store.Remove(path, nativeID)
 }
 
 // FindProjections returns validated Codex projections below sessionsDir.
 func FindProjections(sessionsDir string) (map[string]string, error) {
-	out := map[string]string{}
-	err := filepath.WalkDir(sessionsDir, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "codex-") || filepath.Ext(entry.Name()) != ".jsonl" {
-			return nil
-		}
-		metadata, err := ReadProjectionMetadata(path)
-		if err == nil {
-			out[metadata.NativeID] = path
-		}
-		return nil
+	store, err := projections.NewStore(sessionsDir, "codex")
+	if err != nil {
+		return nil, err
+	}
+	return store.FindValidated(func(path string, _ projections.Metadata) error {
+		_, err := ReadProjectionMetadata(path)
+		return err
 	})
-	return out, err
 }
 
 // ResolveTurnID maps a projected entry to its authoritative Codex turn.
@@ -163,39 +160,30 @@ func ResolveTurnID(path, entryID string) (string, error) {
 	return "", sessions.ErrSessionEntryNotFound
 }
 
-// LabelSessionEntry serializes local labels with Materialize so an atomic
+// RenameProjection serializes local names with Materialize so an atomic
 // projection refresh cannot race and discard the append.
 func RenameProjection(path, name string, now func() time.Time) error {
-	lockAny, _ := projectionLocks.LoadOrStore(path, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-	if _, err := ReadProjectionMetadata(path); err != nil {
+	store, err := projectionStoreForPath(path)
+	if err != nil {
 		return err
 	}
-	return sessions.RenameSession(path, name, now)
+	return store.Rename(path, name, now)
 }
 
 func AutoTitleSession(path, name string, now func() time.Time) error {
-	lockAny, _ := projectionLocks.LoadOrStore(path, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-	if _, err := ReadProjectionMetadata(path); err != nil {
+	store, err := projectionStoreForPath(path)
+	if err != nil {
 		return err
 	}
-	return sessions.AutoTitleSession(path, name, now)
+	return store.AutoTitle(path, name, now)
 }
 
 func LabelSessionEntry(path, targetID, label string, now func() time.Time) error {
-	lockAny, _ := projectionLocks.LoadOrStore(path, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-	if _, err := ReadProjectionMetadata(path); err != nil {
+	store, err := projectionStoreForPath(path)
+	if err != nil {
 		return err
 	}
-	return sessions.LabelSessionEntry(path, targetID, label, now)
+	return store.Label(path, targetID, label, now)
 }
 
 // ProjectionPath returns the only path Materialize may write for thread.
@@ -206,108 +194,62 @@ func ProjectionPath(sessionsDir string, thread Thread) (string, error) {
 	if strings.ContainsAny(thread.ID, "/\\") || thread.ID == "." || thread.ID == ".." {
 		return "", fmt.Errorf("unsafe codex thread id %q", thread.ID)
 	}
-	cwd := canonicalProjectPath(thread.CWD)
-	return filepath.Join(sessionsDir, sessions.EncodeProjectName(cwd), "codex-"+thread.ID+".jsonl"), nil
+	store, err := projections.NewStore(sessionsDir, "codex")
+	if err != nil {
+		return "", err
+	}
+	return store.Path(thread.ID, thread.CWD)
 }
 
 func canonicalProjectPath(path string) string {
-	absolute, err := filepath.Abs(path)
-	if err == nil {
-		path = absolute
-	}
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		path = resolved
-	}
-	return filepath.Clean(path)
+	return projections.CanonicalCWD(path)
+}
+
+func projectionStoreForPath(path string) (*projections.Store, error) {
+	return projections.NewStore(filepath.Dir(filepath.Dir(path)), "codex")
 }
 
 // Materialize atomically replaces a Codex projection while preserving local
 // session_info, label, model_change, and thinking_level_change entries.
 func Materialize(sessionsDir string, thread Thread) (Projection, error) {
-	path, err := ProjectionPath(sessionsDir, thread)
+	store, err := projections.NewStore(sessionsDir, "codex")
 	if err != nil {
 		return Projection{}, err
 	}
 	thread.CWD = canonicalProjectPath(thread.CWD)
-	lockAny, _ := projectionLocks.LoadOrStore(path, &sync.Mutex{})
-	lock := lockAny.(*sync.Mutex)
-	lock.Lock()
-	defer lock.Unlock()
-
-	paths, err := projectionPaths(sessionsDir, path, thread.ID)
-	if err != nil {
-		return Projection{}, err
-	}
-	// thread/read does not include the active model or reasoning effort. Keep
-	// the last projected values unless an open/start response supplied newer
-	// ones, otherwise periodic catalog refreshes erase worker settings.
-	for _, candidate := range paths {
-		metadata, metadataErr := ReadProjectionMetadata(candidate)
-		if metadataErr != nil {
-			continue
-		}
-		if thread.Model == "" {
-			thread.Model = metadata.Model
-		}
-		if thread.Effort == "" {
-			thread.Effort = metadata.Effort
-		}
-		if len(thread.ApprovalPolicy) == 0 {
-			thread.ApprovalPolicy = append(json.RawMessage(nil), metadata.ApprovalPolicy...)
-		}
-		if len(thread.Sandbox) == 0 {
-			thread.Sandbox = append(json.RawMessage(nil), metadata.Sandbox...)
-		}
-	}
-	preserved, err := readLocalEntriesFrom(paths)
-	if err != nil {
-		return Projection{}, fmt.Errorf("preserve local Codex projection entries: %w", err)
-	}
-	capturedTurns, err := readCapturedToolTurns(paths)
-	if err != nil {
-		return Projection{}, fmt.Errorf("preserve captured Codex tool activity: %w", err)
-	}
-	thread = mergeCapturedToolTurns(thread, capturedTurns)
-	entries := projectThread(thread)
-	entries = append(entries, preserved...)
-	if err := writeJSONLAtomic(path, entries); err != nil {
-		return Projection{}, err
-	}
-	for _, duplicate := range paths {
-		if duplicate != path {
-			if err := os.Remove(duplicate); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return Projection{}, fmt.Errorf("remove duplicate Codex projection: %w", err)
+	projection, err := store.Replace(thread.ID, thread.CWD, func(paths []string) ([]map[string]any, error) {
+		// thread/read does not include the active model or reasoning effort. Keep
+		// the last projected values unless an open/start response supplied newer
+		// ones, otherwise periodic catalog refreshes erase worker settings.
+		for _, candidate := range paths {
+			metadata, metadataErr := ReadProjectionMetadata(candidate)
+			if metadataErr != nil {
+				continue
+			}
+			if thread.Model == "" {
+				thread.Model = metadata.Model
+			}
+			if thread.Effort == "" {
+				thread.Effort = metadata.Effort
+			}
+			if len(thread.ApprovalPolicy) == 0 {
+				thread.ApprovalPolicy = append(json.RawMessage(nil), metadata.ApprovalPolicy...)
+			}
+			if len(thread.Sandbox) == 0 {
+				thread.Sandbox = append(json.RawMessage(nil), metadata.Sandbox...)
 			}
 		}
-	}
-	return Projection{ID: filepath.Base(path), Path: path, NativeID: thread.ID}, nil
-}
-
-func projectionPaths(sessionsDir, target, nativeID string) ([]string, error) {
-	projects, err := os.ReadDir(sessionsDir)
+		capturedTurns, err := readCapturedToolTurns(paths)
+		if err != nil {
+			return nil, fmt.Errorf("preserve captured Codex tool activity: %w", err)
+		}
+		thread = mergeCapturedToolTurns(thread, capturedTurns)
+		return projectThread(thread), nil
+	})
 	if err != nil {
-		return nil, err
+		return Projection{}, err
 	}
-	paths := make([]string, 0, 1)
-	if _, err := os.Stat(target); err == nil {
-		paths = append(paths, target)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-	for _, project := range projects {
-		if !project.IsDir() {
-			continue
-		}
-		candidate := filepath.Join(sessionsDir, project.Name(), filepath.Base(target))
-		if candidate == target {
-			continue
-		}
-		metadata, err := ReadProjectionMetadata(candidate)
-		if err == nil && metadata.NativeID == nativeID {
-			paths = append(paths, candidate)
-		}
-	}
-	return paths, nil
+	return Projection{ID: projection.ID, Path: projection.Path, NativeID: projection.NativeID}, nil
 }
 
 type capturedToolTurn struct {
@@ -612,114 +554,8 @@ func projectItem(threadID, turnID, model string, item ThreadItem, timestamp stri
 	}
 }
 
-func readLocalEntriesFrom(paths []string) ([]map[string]any, error) {
-	var out []map[string]any
-	seen := map[string]struct{}{}
-	for _, path := range paths {
-		entries, err := readLocalEntries(path)
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range entries {
-			key, _ := entry["id"].(string)
-			if key == "" {
-				encoded, err := json.Marshal(entry)
-				if err != nil {
-					return nil, err
-				}
-				key = string(encoded)
-			}
-			if _, exists := seen[key]; exists {
-				continue
-			}
-			seen[key] = struct{}{}
-			out = append(out, entry)
-		}
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		left, _ := out[i]["timestamp"].(string)
-		right, _ := out[j]["timestamp"].(string)
-		return left < right
-	})
-	return out, nil
-}
-
-func readLocalEntries(path string) ([]map[string]any, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var out []map[string]any
-	s := bufio.NewScanner(f)
-	s.Buffer(make([]byte, 64<<10), maxLineBytes)
-	line := 0
-	for s.Scan() {
-		line++
-		var e map[string]any
-		if err := json.Unmarshal(s.Bytes(), &e); err != nil {
-			return nil, fmt.Errorf("decode projection line %d: %w", line, err)
-		}
-		switch e["type"] {
-		case "session_info", "label", "model_change", "thinking_level_change":
-			out = append(out, e)
-		}
-	}
-	return out, s.Err()
-}
 func writeJSONLAtomic(path string, entries []map[string]any) error {
-	var data bytes.Buffer
-	for _, e := range entries {
-		if err := json.NewEncoder(&data).Encode(e); err != nil {
-			return err
-		}
-	}
-	if current, err := os.ReadFile(path); err == nil && bytes.Equal(current, data.Bytes()) {
-		return nil
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".codex-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmp := f.Name()
-	ok := false
-	defer func() {
-		_ = f.Close()
-		if !ok {
-			_ = os.Remove(tmp)
-		}
-	}()
-	if _, err = f.Write(data.Bytes()); err != nil {
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	if err = os.Rename(tmp, path); err != nil {
-		return err
-	}
-	dir, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	err = dir.Sync()
-	closeErr := dir.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	ok = true
-	return nil
+	return projections.WriteJSONLAtomic(path, entries)
 }
 func stableHash(parts ...string) string {
 	h := sha256.New()
