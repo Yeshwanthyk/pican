@@ -5,6 +5,7 @@
   import { icon, Pin, PinOff } from '../../shared/icons.js';
   import { showToast } from '../../shared/toast.js';
   import { describeError } from '../../lib/errors';
+  import { runtimeDisplay } from '../../lib/runtime-display';
   import { settle } from '../shared/ui-effect';
   import {
     defaultUpdatePin,
@@ -30,15 +31,7 @@
   const href = $derived(`/session?id=${encodeURIComponent(session.id || '')}`);
   const title = $derived(session.name || session.id || '');
   const modelLabel = $derived(formatRunningModel(runningStatus) || sessionModelLabel(session));
-  const runtimeMark = $derived(
-    session.runtime === 'codex'
-      ? { src: '/codex-icon.svg', label: t('runtime.codex') }
-      : session.runtime === 'claude'
-        ? { src: '/claude-icon.svg', label: t('runtime.claude') }
-        : session.runtime === 'pi'
-          ? { src: '/pi-icon.svg', label: t('runtime.pi') }
-          : null,
-  );
+  const runtimeMark = $derived(runtimeDisplay(session.runtime));
   const search = $derived(sessionSearchText(session));
   const metrics = $derived(formatSessionMetrics(session));
   const waiting = $derived(Boolean(session.waitingQuestion));
@@ -93,14 +86,18 @@
     ontouchstart={startPrefetch}
   >
     <div class="session-ticker-title-line">
-      {#if runtimeMark}
+      {#if runtimeMark.icon}
         <img
           class="session-ticker-runtime-mark"
-          src={runtimeMark.src}
+          src={runtimeMark.icon}
           alt=""
           aria-hidden="true"
           title={runtimeMark.label}
         />
+      {:else}
+        <span class="session-ticker-runtime-mark" aria-hidden="true" title={runtimeMark.label}
+          >{runtimeMark.initial}</span
+        >
       {/if}
       <span class="session-ticker-markers" aria-hidden="true">
         {#if session.pinned}<span>⌖</span>{/if}

@@ -61,11 +61,17 @@ pican/
 │   │   ├── projection.go       # Atomic Codex → session projection materialization
 │   │   ├── worker.go           # Resumed per-session app-server worker
 │   │   └── types.go            # Stable protocol subset and model mapping
+│   ├── opencode/
+│   │   ├── client.go           # Authenticated HTTP client + one global SSE demultiplexer
+│   │   ├── supervisor.go       # Loopback child lifecycle, health, restart/backoff
+│   │   ├── catalog.go          # Native list/read and partial-safe reconciliation
+│   │   ├── projection.go       # OpenCode message/part translation
+│   │   └── lifecycle.go        # Native create/update/fork/delete service
 │   ├── projections/
 │   │   └── store.go            # Runtime-neutral identity locks, preservation, migration, atomic JSONL replacement
 │   ├── runtimes/
 │   │   ├── registry.go         # Ordered descriptors, availability, catalogs, worker dispatch
-│   │   └── builtins.go         # Pi/Codex/Claude registrations and explicit capabilities
+│   │   └── builtins.go         # Pi/Codex/Claude/OpenCode registrations and explicit capabilities
 │   ├── rpc/
 │   │   ├── client.go           # JSONL RPC command builders
 │   │   ├── worker.go           # pi --mode rpc subprocess worker
@@ -221,7 +227,7 @@ type Session struct {
 
 ### `runtimes.Registry`
 
-The app registers Pi, Codex, and Claude in deterministic startup order, then selects an enabled subset from the CLI. OpenCode remains unregistered. IDs are open validated strings (`[a-z][a-z0-9-]*`, without trailing or repeated hyphens), so the registry is extensible without making unregistered runtimes usable.
+The app registers Pi, Codex, Claude, and OpenCode in deterministic startup order, then selects an enabled subset from the CLI. IDs are open validated strings (`[a-z][a-z0-9-]*`, without trailing or repeated hyphens), so the registry is extensible without making unregistered runtimes usable.
 
 ```go
 type Registration struct {
@@ -255,10 +261,12 @@ type CatalogResult struct {
 | Catalog schedule, timeout, and completeness downgrade on error | app-owned `catalogSyncer` per selected replaceable runtime |
 | Claude native scan, partial-safe pruning, per-file refresh, and debounce | `internal/claude.Catalog` + `Watcher` |
 | Claude CLI/auth availability (independent of cached projection readability) | bounded cached `internal/claude.Probe` |
+| OpenCode health, authenticated HTTP, global SSE, bounded restart/recovery | supervised `internal/opencode` service |
 | Worker reuse, single-flight creation, crash eviction, cancellation/shutdown, 10-minute reap | `workers.Manager` |
 | Pi append-only transcript and `session_info` metadata | Pi/session pipeline; unchanged |
 | Codex native thread | Codex under `~/.codex` |
 | Claude native transcript | configured `<claude-home>/projects/*/*.jsonl`, strictly read-only |
+| OpenCode native session/message state | supervised OpenCode server/API |
 | Replaceable projection filesystem mechanics | `projections.Store` under `~/.pi/agent/sessions` |
 | Codex item translation and sparse captured tool-turn retention | Codex adapter |
 | Codex archive/delete/unarchive and native rename/fork semantics | separate `CodexService`, not the common registry |
@@ -268,14 +276,15 @@ type CatalogResult struct {
 Production dispatch is:
 
 ```text
-CLI → app Pi/Codex/Claude registrations → parse selection → selected runtimes.Registry
+CLI → app Pi/Codex/Claude/OpenCode registrations → parse selection → selected runtimes.Registry
                                       ├─ server.New(RuntimeRegistry)
                                       │    └─ /api/runtimes + projection policy
                                       └─ workers.Manager factory
                                            └─ ParseFile → enabled? → Registry.NewWorker
                                                 ├─ Pi workers.Factory
                                                 ├─ Codex workers.Factory
-                                                └─ Claude: installed-CLI stream-json factory
+                                                ├─ Claude: installed-CLI stream-json factory
+                                                └─ OpenCode: lightweight worker over shared HTTP/SSE
 ```
 
 Tests substitute registrations, probes, catalogs, and factories directly; server tests may also use the legacy `Deps` fields through the compatibility builder. This keeps tests process-free while proving order, validation, availability, completeness, dispatch, API metadata, and projection-mode behavior.
@@ -284,19 +293,19 @@ Tests substitute registrations, probes, catalogs, and factories directly; server
 
 Wave 1 preserves the public Pi/Codex surface while moving internals to the registry:
 
-- CLI `pi`, `codex`, `claude`, and exact legacy alias `both` work; comma-separated registered IDs are additive. `both` remains exactly Pi+Codex. Selection is case-normalized, deduplicated, and emitted in registration order. Unknown or malformed IDs fail startup, so OpenCode remains unavailable.
+- CLI `pi`, `codex`, `claude`, `opencode`, and exact legacy alias `both` work; comma-separated registered IDs are additive. `both` remains exactly Pi+Codex. Selection is case-normalized, deduplicated, and emitted in registration order. Unknown or malformed IDs fail startup.
 - `server.Deps.RuntimeRegistry` is the canonical path. Legacy `EnabledRuntimes` and `RuntimeAvailable` remain source-compatible for existing tests/embedders and are converted to a Pi/Codex-only compatibility registry. Legacy defaulting still prefers Pi; a supplied registry defaults to its first registration. An explicit default outside the registry is rejected.
 - `/api/runtimes` retains `defaultRuntime`, `id`, `available`, optional `reason`, and the existing capabilities object. It adds `label`, `command`, optional `version`, `projectionMode`, and the complete capability set. Entries retain selected registry order; frontend parsing keeps the new metadata optional and falls back to translated/runtime IDs for labels.
-- Missing persisted runtime metadata still means Pi. Persisted Pi/Codex/Claude sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
+- Missing persisted runtime metadata still means Pi. Persisted Pi/Codex/Claude/OpenCode sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
 - `ChatWorker` and `workers.Manager` lifecycle contracts are unchanged. Registry dispatch replaces only the hard-coded Pi/Codex factory branch.
 
 ### Runtime operation boundary
 
 Runtime-dependent HTTP handlers authorize operations from the selected registry descriptor, never from request-body capability data or frontend state. A declared-but-unsupported operation returns `409` with the stable form `<label> runtime does not support <operation>`; a supported operation whose runtime probe is unavailable returns `503` with the current availability reason. Session-scoped endpoints resolve the persisted session first, so a caller cannot use a conflicting runtime query to select a different model or mutation path.
 
-Create, fork, clone, rename, chat/steer, cancel, persistent queue operations, model listing/switching, effort/reasoning selection, slash commands, file/image attachments, schedules, btw creation, and auto-title all cross this boundary. Session and btw creation dispatch explicitly to Pi, Codex, or Claude; lifecycle mutations remain Pi/Codex-only. Schedules deliberately remain Pi/Codex-only at the Claude gate and fail before persistence for another default runtime. Labels are the sole local exception: Pi remains append-only, Codex uses its adapter, and another runtime may mutate only pican-owned label metadata through an identity-validated replaceable projection store.
+Create, fork, clone, rename, delete, chat/steer, cancel, persistent queue operations, model listing/switching, effort/reasoning selection, slash commands, file/image attachments, schedules, btw creation, and auto-title all cross this boundary. OpenCode lifecycle dispatch uses its native create/update/fork/delete endpoints; unsupported archive, steer, queue, attachment, effort, and interaction paths fail closed before dispatch. Labels are pican-local projection metadata.
 
-`/api/session` additively returns the trusted `runtimeLabel`, complete `capabilities`, `projectionMode`, and a server-built `resumeCommand`. Resume commands are emitted only for known Pi/Codex/Claude argument contracts and every shell argument is quoted by the server. The live frontend uses these fields to remove or disable unsupported actions. Static export still renders only persisted data and does not receive or consult the registry.
+`/api/session` additively returns the trusted `runtimeLabel`, complete `capabilities`, `projectionMode`, and a server-built `resumeCommand`. Resume commands are emitted only for known runtime argument contracts, including `<opencode-command> --session <native-id>`, and every shell argument is quoted by the server. The live frontend uses these fields to remove or disable unsupported actions. Static export still renders only persisted data and does not receive or consult the registry.
 
 ### `workers.Manager`
 
@@ -321,7 +330,7 @@ state, model, plus PID/uptime/idle for workers implementing the optional
 
 ### Runtime workers
 
-`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process and resumes the projection's native thread ID over Codex JSON-RPC. `claude.Worker` owns one installed `claude` bidirectional stream-json process, selecting mutually exclusive fresh `--session-id` or existing `--resume` launch modes from validated projection/native identity. All implement `workers.ChatWorker`; the registry dispatches by the persisted runtime header, and the manager retains single-flight creation, crash eviction, process cleanup, and ten-minute idle reaping. Runtime capabilities still gate unsupported queueing, steering, settings, and commands independently.
+`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process. `claude.Worker` owns one installed `claude` bidirectional stream-json process. OpenCode uses one supervised authenticated loopback child and global SSE stream; each active session receives a lightweight `ChatWorker` that shares that service and validates canonical cwd/native identity. The manager retains single-flight creation, crash eviction, and idle reaping. Runtime capabilities still gate unsupported queueing, steering, settings, and commands independently.
 
 The Codex worker consumes ordered app-server notifications, emits preview/status callbacks, and atomically refreshes the projection. It never treats projected JSONL as authoritative conversation state. See [codex-runtime.md](./codex-runtime.md).
 
@@ -332,6 +341,8 @@ The Codex worker consumes ordered app-server notifications, emits preview/status
 `Store.Replace` canonicalizes cwd, gathers the target plus validated duplicates, reads and deduplicates pican-owned `session_info`, `label`, `model_change`, and `thinking_level_change` entries, invokes the runtime adapter's projection builder under the identity lock, validates the replacement header, atomically commits the JSONL with file and directory fsync, and only then removes revalidated duplicates. Identical bytes are a no-op so file watchers do not emit false reloads. Codex delegates these mechanics to the store while retaining its native metadata extraction, item translation, turn mapping, and sparse captured tool-turn merge inside `internal/codex`.
 
 Claude uses the same projection store but keeps native parsing, translation, and stream-json lifecycle inside `internal/claude`. A complete catalog scan may remove validated Claude projections absent from native membership, except a `claudeFresh` creation intent awaiting its first prompt. Malformed lines, incomplete tails, concurrent appends, per-file failures, and per-file watcher refreshes make the pass partial and prohibit pruning. Unknown valid records retain opaque `claudeRaw`; deterministic entry IDs derive from native session/record/block identity. Live stdout is transient: result handling retries read-only native refresh until the matching `claudeMessageId` is projected, then retires the preview and publishes reload without persisting stdout content.
+
+OpenCode also uses the shared store. Its adapter translates API session/message/part data while preserving raw native payloads where useful. One complete authenticated list/read reconciliation may prune absent validated OpenCode projections; partial lists, reads, cwd mismatches, child failure, and recovery never prune. Shared SSE events trigger affected-session reads and projection replacement rather than becoming a second persisted transcript.
 
 The Pi worker shape is:
 
@@ -464,8 +475,8 @@ Broadcasting is fire-and-forget with a buffered channel (16). If the client is s
 
 Three signals are OR'd together to determine if a session is "running":
 
-1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by terminal Pi; ignored for replaceable Codex/Claude projections
-2. **In-process runtime worker**: `chatSender.Status(id).State == running` (Pi, Codex, or Claude)
+1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by terminal Pi; ignored for replaceable Codex/Claude/OpenCode projections
+2. **In-process runtime worker**: `chatSender.Status(id).State == running` (all chat-capable runtimes)
 3. **Recent projection/transcript activity**: modtime within the short activity window
 
 Status changes are broadcast as SSE `status-delta` events to `__all__` subscribers. A 1-second sweeper periodically revalidates all known running sessions to clean up stale states.

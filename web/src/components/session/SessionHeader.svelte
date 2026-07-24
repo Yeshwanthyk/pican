@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import * as Http from '../../lib/http.js';
   import { describeError } from '../../lib/errors.js';
+  import { runtimeDisplay } from '../../lib/runtime-display.js';
   import { runPromise } from '../../lib/runtime.js';
   import { NewSessionResponseSchema } from '../../lib/schema.js';
   import {
@@ -48,17 +49,8 @@
   } = $props();
 
   const safeResumeCommand = $derived(capabilities.resume ? resumeCommand : '');
-  const displayRuntimeLabel = $derived(
-    runtimeLabel ||
-      (runtime === 'pi' ? t('runtime.pi') : runtime === 'codex' ? t('runtime.codex') : runtime),
-  );
-  const runtimeMark = $derived(
-    runtime === 'codex'
-      ? { src: '/codex-icon.svg', label: t('runtime.codex') }
-      : runtime === 'pi'
-        ? { src: '/pi-icon.svg', label: t('runtime.pi') }
-        : { src: '', label: displayRuntimeLabel },
-  );
+  const runtimeMark = $derived(runtimeDisplay(runtime, runtimeLabel));
+  const displayRuntimeLabel = $derived(runtimeMark.label);
 
   // The title prop seeds the shared store (and re-seeds it on session switch);
   // renames/auto-titling update the store, which this component renders and
@@ -190,13 +182,15 @@
   >
     <span
       class="session-header-runtime"
-      title={runtime === 'codex' && nativeId
-        ? t('session.nativeIdTitle', { id: nativeId })
+      title={nativeId
+        ? runtime === 'codex'
+          ? t('session.nativeIdTitle', { id: nativeId })
+          : t('session.nativeSessionTitle', { runtime: runtimeMark.label, id: nativeId })
         : runtimeMark.label}
     >
-      {#if runtimeMark.src}<img
+      {#if runtimeMark.icon}<img
           class="session-header-runtime-mark"
-          src={runtimeMark.src}
+          src={runtimeMark.icon}
           alt=""
           aria-hidden="true"
         />{:else}<span class="session-header-runtime-mark" aria-hidden="true"

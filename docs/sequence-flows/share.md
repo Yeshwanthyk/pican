@@ -1,6 +1,6 @@
 # Sequence Flow: Share to GitHub Gist
 
-This flow covers a user clicking **Share** on a Pi, Codex, or Claude session page, creating a private GitHub Gist containing a standalone HTML snapshot.
+This flow covers a user clicking **Share** on a Pi, Codex, Claude, or OpenCode session page, creating a private GitHub Gist containing a standalone HTML snapshot.
 
 ## Sequence Diagram
 
@@ -88,7 +88,7 @@ If not logged in → `400` error: `"GitHub CLI not logged in. Run 'gh auth login
 
 ### 4. Find and Render Session
 
-The handler resolves the session by ID through the common parser. For Codex or Claude this reads the latest local projection; sharing contacts neither app-server nor the Claude CLI/native transcript. It then calls:
+The handler resolves the session by ID through the common parser. For Codex, Claude, or OpenCode this reads the latest local projection; sharing contacts no native runtime or child service. It then calls:
 
 ```go
 renderExportSessionPage(session, theme)
@@ -147,4 +147,4 @@ The shared HTML is completely **self-contained**:
 - Markdown rendering via inline `marked.min.js`
 - Syntax highlighting via inline `highlight.min.js`
 - No server dependencies — it works if saved and opened locally
-- Snapshot-only runtime metadata; no Pi RPC, Codex app-server, Claude CLI/filesystem access, chat, or SSE behavior
+- Snapshot-only runtime metadata; no Pi RPC, Codex app-server, Claude CLI/filesystem access, OpenCode HTTP/SSE, chat, or live behavior

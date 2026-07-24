@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS btw_sessions (
 
 1. Default `path` to the user's home directory when omitted.
 2. Require the default runtime's `create` and `chat` capabilities and current availability.
-3. Dispatch creation explicitly to Pi, Codex, or Claude. The selected default runtime must currently support both create and chat.
+3. Dispatch creation explicitly to Pi, Codex, Claude, or OpenCode. The selected default runtime must support both create and chat.
 4. The selected adapter writes/materializes the fresh session.
 5. `setBtwSessionID(parent, id)` records it as the active btw for that parent,
    **orphaning the prior active btw** in a single transaction (`active=0` for the

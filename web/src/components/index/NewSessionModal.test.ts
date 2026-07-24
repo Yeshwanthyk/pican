@@ -55,6 +55,30 @@ describe("NewSessionModal runtimes", () => {
     expect(screen.queryByText("runtime.custom-runtime")).not.toBeInTheDocument();
   });
 
+  it("renders OpenCode as a selectable capability-driven runtime", async () => {
+    render(NewSessionModal, {
+      props: {
+        open: true,
+        fetchRuntimes: async () => ({
+          defaultRuntime: "opencode",
+          runtimes: [
+            { id: "pi", available: true },
+            {
+              id: "opencode",
+              available: true,
+              capabilities: { create: true, chat: true, modelListing: true },
+            },
+          ],
+        }),
+      },
+    });
+
+    const opencode = await screen.findByRole("radio", { name: "OpenCode" });
+    expect(opencode).toHaveAttribute("aria-checked", "true");
+    expect(opencode.querySelector(".runtime-segment-mark")).toHaveTextContent("O");
+    expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+  });
+
   it("shows but disables a runtime without create capability", async () => {
     render(NewSessionModal, {
       props: {

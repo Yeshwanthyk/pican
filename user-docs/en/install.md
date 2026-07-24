@@ -4,8 +4,8 @@
 
 ### Remote control
 
-- Run one binary with Pi, Codex, Claude, or a comma-separated combination (`both` remains Pi+Codex; default `pi`)
-- Continue Pi, Codex, or Claude sessions from the browser with text or image attachments
+- Run one binary with Pi, Codex, Claude, OpenCode, or a comma-separated combination (`both` remains Pi+Codex; default `pi`)
+- Continue Pi, Codex, Claude, or OpenCode sessions from the browser with the controls each runtime supports
 - Start a brand-new session against any project path, right from the web UI
 - In-browser model switching and thinking-level selection where the session runtime supports them
 - Per-session worker status (idle / running / error) with crashed-worker eviction and 10-minute idle reaping
@@ -14,7 +14,7 @@
 
 ### Reading sessions
 
-- Browse Pi transcripts and materialized Codex/Claude sessions together, with runtime badges, filters, search, and branch navigation
+- Browse Pi transcripts and materialized Codex/Claude/OpenCode sessions together, with runtime badges, filters, search, and branch navigation
 - Live incremental updates while pi is still running (via fsnotify; ~ms latency)
 - Follow mode for tailing active sessions
 - Deep links to individual messages
@@ -28,6 +28,7 @@
 - `pi` on your `PATH` when Pi runtime is enabled
 - Codex CLI installed and signed in when Codex runtime is enabled
 - Claude CLI installed and signed in for Claude browser chat, creation, terminal resume, and model availability (cached projections remain readable without it)
+- OpenCode installed when the OpenCode runtime is enabled (cached projections remain readable while its supervised child is unavailable)
 - Optional: `gh` for sharing
 - On Windows: pi needs a bash shell for its shell tool — [Git for Windows](https://git-scm.com/download/win) is enough (see pi's Windows docs)
 
@@ -167,10 +168,12 @@ pican -o
 # Custom port
 pican -p 8080
 
-# Runtime: pi (default), codex, claude, or a comma-separated set
+# Runtime: pi (default), codex, claude, opencode, or a comma-separated set
 # "both" remains the Pi+Codex alias
 pican -runtime=both
 pican -runtime=pi,claude
+pican -runtime=opencode
+pican -runtime=pi,codex,claude,opencode
 
 # Explicit Codex executable path (not a shell command)
 pican -runtime=both -codex-command=/absolute/path/to/codex
@@ -183,6 +186,11 @@ pican -runtime=claude \
   -claude-home=/absolute/path/to/.claude
 # Environment fallbacks: PICAN_CLAUDE_COMMAND, PICAN_CLAUDE_HOME,
 # then CLAUDE_CONFIG_DIR for the home.
+
+# OpenCode with an explicit executable path
+pican -runtime=opencode -opencode-command=/absolute/path/to/opencode
+# equivalent fallback when the flag is absent:
+PICAN_OPENCODE_COMMAND=/absolute/path/to/opencode pican -runtime=opencode
 
 # Override bind host (loopback is unauthenticated by default)
 pican --host 127.0.0.1
@@ -238,21 +246,33 @@ Codex sessions support text/images, steering an active turn, persistent queues, 
 
 The configured Claude home defaults to `~/.claude`. pican reads `projects/*/*.jsonl` as the authoritative transcript catalog and never rewrites those files. It creates rebuildable `claude-<session-id>.jsonl` projections under the Pi sessions directory for search, viewing, labels, download, export, share, and live external-session discovery.
 
-Command precedence is `-claude-command`, `PICAN_CLAUDE_COMMAND`, then `claude`. Home precedence is `-claude-home`, `PICAN_CLAUDE_HOME`, `CLAUDE_CONFIG_DIR`, then `~/.claude`. For the default home, pican leaves `CLAUDE_CONFIG_DIR` unset so Claude Code uses the native subscription/OAuth profile; non-default homes remain explicitly isolated. pican probes the installed CLI with `--version` and `auth status --json`; missing CLI/auth disables Claude operations without hiding cached projections. Native changes are debounced and reconciled every minute as recovery. Malformed lines or incomplete appends never authorize projection deletion.
+Command precedence is `-claude-command`, `PICAN_CLAUDE_COMMAND`, then `claude`. Home precedence is `-claude-home`, `PICAN_CLAUDE_HOME`, `CLAUDE_CONFIG_DIR`, then `~/.claude`. For the default home, pican leaves `CLAUDE_CONFIG_DIR` unset so Claude Code uses the native subscription/OAuth profile; non-default homes remain explicitly isolated. pican probes the installed CLI with `--version` and `auth status --json`; missing CLI/auth disables Claude operations without hiding cached projections. Native changes are debounced, with a ten-minute `(mtime,size)`-gated recovery reconcile. Malformed lines or incomplete appends never authorize projection deletion.
 
 Creating a browser session records a fresh UUID projection; the first prompt creates native Claude state, while existing sessions resume their native UUID. Each active session gets one long-lived installed `claude` bidirectional stream-json process. Text and image input, cancellation, terminal resume, and model discovery are supported. Steering, persistent queues, in-session model/effort changes, rename, fork/clone, archive/delete, approvals, and user questions remain unavailable.
 
 > **Warning:** Claude browser workers always launch with `--dangerously-skip-permissions`. Model-generated commands can access the host without confirmation. pican does not expose Claude approval or `AskUserQuestion` dialogs.
 
+## OpenCode runtime
+
+pican runs OpenCode through the supported headless HTTP/SSE API. Command precedence is `-opencode-command`, `PICAN_OPENCODE_COMMAND`, `~/.opencode/bin/opencode` when installed there, then `opencode` from `PATH`. pican starts one supervised `opencode serve` child on `127.0.0.1` with an ephemeral port and a generated Basic Auth password. That child port isn't exposed as a user-facing service, and its credential isn't logged or returned by the pican API.
+
+One child safely serves sessions from multiple projects. pican includes and validates the canonical directory on every scoped native request, then demultiplexes one global SSE stream by directory and native session ID. This prevents updates from one project or session reaching another.
+
+OpenCode owns the native session history. pican creates atomically replaceable `opencode-<session-id>.jsonl` projections under the Pi sessions directory for the shared list, search, renderer, labels, download, export, and share surfaces. A failed or partial native catalog never prunes projections, and cached projections stay readable while OpenCode restarts.
+
+Supported controls are create/resume, rename, fork/clone, delete, text chat, cancel, and model listing/switching. The session header copies `<configured-opencode-command> --session <native-session-id>` for terminal resume. Archive/unarchive, steering a running response, persistent queues, images/files, effort/reasoning controls, slash commands, subagent UI, approvals, and user questions aren't supported; pican hides those controls and rejects direct requests with a precise runtime capability error.
+
+If the child exits or its SSE stream fails, Pi, Codex, and Claude continue normally. pican restarts OpenCode with bounded backoff, assigns new credentials, reconnects SSE, and reconciles native list/read state before reporting it available again.
+
 ## Browser Chat
 
-Open a session page and use the composer at the bottom to continue that exact Pi, Codex, or Claude session.
+Open a session page and use the composer at the bottom to continue that exact Pi, Codex, Claude, or OpenCode session.
 
 - `Enter` sends, `Shift+Enter` inserts a newline
-- Drag-and-drop or paste images directly into the composer
+- Drag-and-drop or paste images when the selected runtime supports attachments; OpenCode currently supports text only
 - The model picker and thinking/reasoning-level selector are scoped to the session runtime
-- Each active session gets one dedicated, reusable Pi, Codex, or Claude worker, so different sessions do not block each other
-- Steering and persistent queues appear only for runtimes that support them; Claude requires the current turn to finish or be cancelled before the next send
+- Pi, Codex, and Claude use reusable per-session workers; OpenCode sessions use lightweight workers over one supervised shared child and event stream
+- Steering and persistent queues appear only for runtimes that support them; Claude and OpenCode require the current turn to finish or be cancelled before the next send
 
 ## Sharing Sessions
 

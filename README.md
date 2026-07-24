@@ -1,12 +1,12 @@
 # pican
 
-pican is a self-hosted browser UI and installable PWA for native [Pi](https://pi.dev) sessions, [Codex CLI](https://developers.openai.com/codex/cli/) threads, and Claude Code sessions.
+pican is a self-hosted browser UI and installable PWA for native [Pi](https://pi.dev) sessions, [Codex CLI](https://developers.openai.com/codex/cli/) threads, Claude Code sessions, and OpenCode sessions.
 
 One server can select any registered runtime combination. It keeps native state authoritative while presenting a shared session list, transcript viewer, chat surface, and export surface.
 
 ## Features
 
-- Unified Pi, Codex, and Claude session browser
+- Unified Pi, Codex, Claude, and OpenCode session browser
 - Live token streaming, tool calls, reasoning, and status updates
 - Continue sessions with text and image attachments
 - Runtime-scoped model and reasoning-effort controls where supported
@@ -42,6 +42,8 @@ pican                         # Pi runtime, port 31415
 pican -runtime=codex          # Codex only
 pican -runtime=both           # Pi and Codex
 pican -runtime=pi,claude      # Pi + Claude catalog and browser chat
+pican -runtime=opencode       # OpenCode only
+pican -runtime=pi,codex,claude,opencode
 pican -runtime=both -p 8080   # custom port
 ```
 
@@ -52,22 +54,26 @@ PICAN_TOKEN=...                       # required for non-loopback binds
 PICAN_CODEX_COMMAND=/path/to/codex    # Codex executable override
 PICAN_CLAUDE_COMMAND=/path/to/claude  # Claude executable override
 PICAN_CLAUDE_HOME=/path/to/.claude    # Claude config/transcript home
+PICAN_OPENCODE_COMMAND=/path/to/opencode # OpenCode executable override
 PI_CODING_AGENT_DIR=/path/to/agent    # Pi agent directory override
 ```
 
 The installed Codex CLI owns authentication and thread state under `~/.codex`; pican never reads `auth.json`. Codex sessions currently run with `approvalPolicy: never` and `danger-full-access`, equivalent to `codex --yolo`. Claude transcripts under the configured home's `projects/` directory are strictly read-only; pican creates replaceable local projections and runs one installed `claude` stream-json process per active session. Claude browser chat always passes `--dangerously-skip-permissions`; interactive approvals and user questions are not supported.
+
+OpenCode runs as one pican-supervised child bound to an ephemeral loopback port with a generated Basic Auth password. Native OpenCode state remains authoritative; pican's projections are rebuildable. OpenCode supports create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching. Unsupported controls such as archives, steering, queues, attachments, effort, approvals, and questions stay absent and fail closed.
 
 ## Data
 
 - Pi transcripts: `~/.pi/agent/sessions`
 - Codex state: `~/.codex`
 - Claude state: configured Claude home, default `~/.claude` (read-only)
+- OpenCode state: owned by the installed OpenCode runtime
 - pican data: `~/.pi/agent/pican`
 - pican database: `~/.pi/agent/pican.sqlite`
 - pican memory database: `~/.pi/agent/pican-memory.sqlite`
 - pican config: `~/.config/pican/env`
 
-Codex and Claude projections under the Pi sessions directory are local presentation caches. Native runtime state remains authoritative.
+Codex, Claude, and OpenCode projections under the Pi sessions directory are local presentation caches. Native runtime state remains authoritative.
 
 ## Development
 

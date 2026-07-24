@@ -5,6 +5,7 @@
   import { navigate } from '../../shared/navigation';
   import { openSessionPalette } from '../../shared/command-palette-runtime';
   import { t } from '../../shared/strings';
+  import { runtimeDisplay } from '../../lib/runtime-display';
   import { normalizeSession, type NormalizedSession } from '../../index/sessions';
   import { settle } from '../shared/ui-effect';
 
@@ -17,15 +18,6 @@
   let pinBusy = $state(false);
 
   const currentPinned = $derived(sessions.some((session) => session.id === sessionId));
-
-  function runtimeMark(session: NormalizedSession): {
-    readonly src: string;
-    readonly label: string;
-  } {
-    return session.runtime === 'codex'
-      ? { src: '/codex-icon.svg', label: t('runtime.codex') }
-      : { src: '/pi-icon.svg', label: t('runtime.pi') };
-  }
 
   function close(): void {
     if (popover && typeof popover.hidePopover === 'function') popover.hidePopover();
@@ -117,7 +109,7 @@
       <div class="pinned-session-switcher-state">{t('session.noPinnedSessions')}</div>
     {:else}
       {#each sessions as session (session.id)}
-        {@const mark = runtimeMark(session)}
+        {@const mark = runtimeDisplay(session.runtime)}
         <button
           type="button"
           class="pinned-session-switcher-row"
@@ -125,13 +117,19 @@
           aria-current={session.id === sessionId ? 'page' : undefined}
           onclick={() => openSession(session.id)}
         >
-          <img
-            class="pinned-session-switcher-runtime-mark"
-            src={mark.src}
-            alt=""
-            aria-hidden="true"
-            title={mark.label}
-          />
+          {#if mark.icon}
+            <img
+              class="pinned-session-switcher-runtime-mark"
+              src={mark.icon}
+              alt=""
+              aria-hidden="true"
+              title={mark.label}
+            />
+          {:else}
+            <span class="pinned-session-switcher-runtime-mark" aria-hidden="true" title={mark.label}
+              >{mark.initial}</span
+            >
+          {/if}
           <span class="pinned-session-switcher-copy">
             <span class="pinned-session-switcher-title">{session.name}</span>
             <span class="pinned-session-switcher-project">{session.project}</span>

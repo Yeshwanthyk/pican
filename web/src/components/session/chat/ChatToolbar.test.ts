@@ -83,4 +83,30 @@ describe("ChatToolbar", () => {
     expect(document.querySelector("#pi-chat-queue")).toBeNull();
     expect(byId("pi-chat-send").style.display).toBe("none");
   });
+
+  it("shows only OpenCode's proven live controls", () => {
+    const toolbar = new ChatToolbarState();
+    toolbar.modelLabel = "anthropic/claude-sonnet-4";
+    toolbar.setStatus("running", "running");
+    render(ChatToolbar, {
+      props: {
+        chatAvailable: true,
+        toolbar,
+        capabilities: {
+          ...defaultRuntimeCapabilities("opencode"),
+          chat: true,
+          cancel: true,
+          modelListing: true,
+          modelSwitching: true,
+        },
+      },
+    });
+
+    expect(document.querySelector("#pi-chat-attach")).toBeNull();
+    expect(document.querySelector("#pi-chat-thinking-label")).toBeNull();
+    expect(byId("pi-chat-model-label")).toHaveTextContent("anthropic/claude-sonnet-4");
+    expect(byId("pi-chat-cancel")).toHaveTextContent("Cancel");
+    expect(document.querySelector("#pi-chat-queue")).toBeNull();
+    expect(byId("pi-chat-send").style.display).toBe("none");
+  });
 });

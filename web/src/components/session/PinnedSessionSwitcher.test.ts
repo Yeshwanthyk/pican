@@ -9,7 +9,9 @@ describe("PinnedSessionSwitcher", () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/pins") {
-        return new Response(JSON.stringify({ pins: ["second.jsonl", "first.jsonl"] }));
+        return new Response(
+          JSON.stringify({ pins: ["second.jsonl", "third.jsonl", "first.jsonl"] }),
+        );
       }
       if (url === "/api/sessions?limit=1") {
         return new Response(
@@ -29,6 +31,13 @@ describe("PinnedSessionSwitcher", () => {
                 pinned: true,
                 runtime: "codex",
               },
+              {
+                id: "third.jsonl",
+                name: "Third",
+                project: "/repo/three",
+                pinned: true,
+                runtime: "opencode",
+              },
             ],
           }),
         );
@@ -46,19 +55,20 @@ describe("PinnedSessionSwitcher", () => {
     switcher?.dispatchEvent(toggle);
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".pinned-session-switcher-row")).toHaveLength(2);
+      expect(container.querySelectorAll(".pinned-session-switcher-row")).toHaveLength(3);
     });
     const titles = Array.from(
       container.querySelectorAll(".pinned-session-switcher-title"),
       (node) => node.textContent,
     );
-    expect(titles).toEqual(["Second", "First"]);
+    expect(titles).toEqual(["Second", "Third", "First"]);
     expect(
       Array.from(
         container.querySelectorAll<HTMLImageElement>(".pinned-session-switcher-runtime-mark"),
         (mark) => mark.getAttribute("src"),
       ),
-    ).toEqual(["/codex-icon.svg", "/pi-icon.svg"]);
+    ).toEqual(["/codex-icon.svg", null, "/pi-icon.svg"]);
+    expect(container.querySelector('[title="OpenCode"]')).toHaveTextContent("O");
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("First");
   });
 });

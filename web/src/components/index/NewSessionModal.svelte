@@ -16,6 +16,7 @@
     type NormalizedRuntime,
   } from '../../index/sessions.js';
   import type { DirEntry, Project, RuntimesResponse } from '../../lib/schema';
+  import { runtimeDisplay } from '../../lib/runtime-display';
   import { ignoreFailure, settle } from '../shared/ui-effect';
 
   interface Props {
@@ -253,6 +254,7 @@
         <legend>{t('index.runtimeLabel')}</legend>
         <div class="runtime-segments" role="radiogroup" aria-label={t('index.runtimeLabel')}>
           {#each runtimes as option (option.id)}
+            {@const mark = runtimeDisplay(option.id, option.label)}
             <button
               type="button"
               class="runtime-segment"
@@ -272,22 +274,10 @@
               onkeydown={handleRuntimeKeydown}
             >
               <span class="runtime-segment-label">
-                {#if option.id === 'pi'}
-                  <img class="runtime-segment-mark" src="/pi-icon.svg" alt="" aria-hidden="true" />
-                {:else if option.id === 'codex'}
-                  <img
-                    class="runtime-segment-mark"
-                    src="/codex-icon.svg"
-                    alt=""
-                    aria-hidden="true"
-                  />
-                {:else if option.id === 'claude'}
-                  <img
-                    class="runtime-segment-mark"
-                    src="/claude-icon.svg"
-                    alt=""
-                    aria-hidden="true"
-                  />
+                {#if mark.icon}
+                  <img class="runtime-segment-mark" src={mark.icon} alt="" aria-hidden="true" />
+                {:else}
+                  <span class="runtime-segment-mark" aria-hidden="true">{mark.initial}</span>
                 {/if}
                 <span>{option.label}</span>
               </span>

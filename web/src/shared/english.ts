@@ -22,6 +22,7 @@ export default {
   "runtime.pi": "Pi",
   "runtime.codex": "Codex",
   "runtime.claude": "Claude",
+  "runtime.opencode": "OpenCode",
 
   // ── Sessions index ──
   "index.title": "pican",
@@ -305,6 +306,7 @@ export default {
   "session.workerExitedHint": "send your next message to restart the worker · transcript is saved",
   "session.noWorkingDirectory": "No working directory available for this session",
   "session.nativeIdTitle": "Codex thread {id}",
+  "session.nativeSessionTitle": "{runtime} session {id}",
   "session.filterDefault": "Default",
   "session.filterNoTools": "No-tools",
   "session.filterUser": "User",

@@ -1,7 +1,7 @@
 # Sequence Flow: Schedules
 
 Schedules run the runtime selected by their model provider, or the configured
-default runtime when no provider selects Codex. When a schedule fires it creates
+default runtime when no provider selects a runtime. When a schedule fires it creates
 a **fresh session**, sends the schedule's instructions as the first message, and
 lets that runtime run autonomously. Each firing is recorded so the
 created sessions can be tagged, filtered, and surfaced in a run log — and so a
@@ -105,7 +105,7 @@ that elapsed while the process was down are **skipped** rather than replayed.
 The `/schedules` page itself is the SPA shell (served by the catch-all index
 route); the Svelte router renders `SchedulesPage.svelte`.
 
-Schedule create/update and Run-now validate the target runtime's trusted registry descriptor. They require `create` and `chat`, and also model switching plus effort/reasoning selection when those settings are present. Unsupported operations return `409`; an unavailable runtime returns `503`. Session creation dispatches explicitly to Pi or Codex. At the Claude gate, a Claude-default schedule is rejected before persistence because runtime selection is still coupled to schedule model/provider data; Claude scheduling remains deferred.
+Schedule create/update and Run-now validate the target runtime's trusted registry descriptor. They require `create` and `chat`, and also model switching plus effort/reasoning selection when those settings are present. Unsupported operations return `409`; an unavailable runtime returns `503`. Session creation dispatches explicitly to Pi, Codex, or OpenCode. An OpenCode provider/model selects OpenCode and creates a native session through the supervised service before the first prompt. Claude scheduling remains deferred.
 
 ## Push notifications
 

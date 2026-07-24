@@ -1,6 +1,6 @@
 # Sequence Flow: Viewing a Session
 
-This flow covers a user opening a native Pi transcript or a materialized Codex/Claude projection.
+This flow covers a user opening a native Pi transcript or a materialized Codex, Claude, or OpenCode projection.
 
 ## Sequence Diagram
 
@@ -28,7 +28,7 @@ Browser ── GET /events?id=abc ──────▶ Server (SSE)
 GET /api/session?id=<session-id>
 ```
 
-The route normalizes `runtime`, `nativeId`, and the projected/native session UUID from the API/header, builds the renderer payload, and mounts the session UI. Codex pages copy `codex resume <nativeId>`; Pi pages copy `pi --session <sessionUUID>`; Claude pages copy a server-built `claude --resume <nativeId>` command for the native default profile, or prefix `CLAUDE_CONFIG_DIR=<configured-home>` for a non-default isolated profile, and expose browser chat only while the installed CLI is authenticated.
+The route normalizes `runtime`, `nativeId`, and the projected/native session UUID from the API/header, builds the renderer payload, and mounts the session UI. The server builds and shell-quotes each terminal command: Pi uses `pi --session`, Codex uses `codex resume`, Claude uses `claude --resume` with any configured home, and OpenCode uses `<configured-command> --session <nativeId>`.
 
 `SessionContent` derives render items from the active root-to-leaf path. Consecutive tool-only activity stays as individual entries through four tool calls; longer runs render inside a collapsed native `<details>` while preserving the original entry components and `entry-<id>` anchors. Navigation opens ancestor details before scrolling to a nested anchor.
 
@@ -81,9 +81,9 @@ Security: `filepath.Base(id) != id` prevents path traversal.
   "chatDisabledReason": "",
   "model": "...",
   "modelProvider": "...",
-  "runtime": "pi|codex|claude",
+  "runtime": "pi|codex|claude|opencode",
   "nativeId": "<native session id, when applicable>",
-  "runtimeLabel": "Pi|Codex|Claude|configured label",
+  "runtimeLabel": "Pi|Codex|Claude|OpenCode|configured label",
   "capabilities": { "chat": true, "rename": true },
   "projectionMode": "append-only-native|replaceable-projection",
   "resumeCommand": "server-built safe terminal command, or empty"
@@ -106,7 +106,7 @@ The server:
 2. Sends `:ok\n\n` (SSE comment to confirm connection)
 3. Blocks reading from `client.ch` or `r.Context().Done()`
 
-When a Pi transcript append or atomic Codex/Claude projection replacement changes the file, the session-directory watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, and reconciles canonical entries. Codex worker callbacks also request reload directly; Claude native changes first pass through its separate read-only debounced catalog watcher, which atomically replaces the derived projection.
+When a Pi transcript append or atomic replaceable projection update changes the file, the session-directory watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, and reconciles canonical entries. Codex and OpenCode workers request reload after projection materialization; Claude native changes pass through its read-only watcher.
 
 ## Rename Flow
 
@@ -117,7 +117,7 @@ POST /api/rename-session?id=<session-id>
 { "name": "New title" }
 ```
 
-For Pi, the server appends a `session_info` line, preserving the append-only transcript rule. For Codex, it calls `thread/name/set` on the authoritative thread and atomically refreshes the projection; local projection metadata remains preserved. Claude does not declare rename support in this phase, so the action is absent and direct requests return `409`.
+For Pi, the server appends a `session_info` line, preserving the append-only transcript rule. For Codex, it calls `thread/name/set` on the authoritative thread and atomically refreshes the projection. OpenCode calls its native update endpoint and refreshes the projection. Claude does not declare rename support, so the action is absent and direct requests return `409`.
 
 ## Runtime unavailable / cached viewing
 

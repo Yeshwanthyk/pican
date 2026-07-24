@@ -1,6 +1,6 @@
 # Sequence Flow: Chat Message
 
-This flow covers a user typing a message (with optional image attachment) in the session page chat composer and sending it through the session's Pi, Codex, or Claude runtime.
+This flow covers a user typing a message in the session page chat composer and sending it through Pi, Codex, Claude, or OpenCode. Attachments are parsed only when the runtime declares the corresponding capability; OpenCode 1.18.4 is text-only in pican.
 
 ## Sequence Diagram
 
@@ -146,6 +146,7 @@ lock → reuse healthy worker / evict error worker / join in-flight creation
       → Pi: start `pi --mode rpc`, then switch_session
       → Codex: validate projection, start `codex app-server --stdio`, then thread/resume
       → Claude: validate projection/native UUID, start installed `claude` stream-json with fresh `--session-id` or existing `--resume`
+      → OpenCode: attach a lightweight worker to the supervised shared HTTP/SSE service
   → store one worker for the session
 ```
 
@@ -170,6 +171,12 @@ For Codex, `codex.Worker.Prompt` converts text and attachments to app-server inp
 
 For Claude, `claude.Worker.Prompt` writes one stream-json user object containing text and base64 image content blocks. The first input triggers and validates `system:init` within a bounded launch timeout; subsequent sequential prompts reuse the process. Concurrent sends are rejected because Claude does not declare `steer`.
 
+For OpenCode, the worker sends `prompt_async` with the canonical directory and
+native session ID. One authenticated global SSE subscription carries all
+OpenCode events; pican demultiplexes them by directory/session identity.
+OpenCode does not declare attachments or steering, so those requests fail
+before native dispatch.
+
 ### 5. Response handling
 
 For Pi, the `consume()` goroutine reads JSONL lines from `pi`'s stdout:
@@ -183,6 +190,10 @@ It matches by `id` and delivers to the waiting `pending` channel. The worker the
 Codex uses JSON-RPC responses plus notifications. `turn/started`, item deltas/completions, `turn/completed`, and thread-status notifications update worker state, emit best-effort `chat-preview`, refresh the projection, and trigger canonical `reload` reconciliation.
 
 Claude translates `system:init`, `stream_event`, `assistant`, `result`, and `error` records to worker status/preview callbacks. Unknown valid record types are ignored with bounded metadata-only diagnostics; malformed output or identity mismatch fails the worker. On `result`, the worker waits for the matching native assistant message to reach the read-only transcript projection before retiring the preview and becoming idle.
+
+OpenCode translates native message/part/status events to bounded preview and
+worker status, then re-reads native history and atomically replaces the
+projection. Global `sync` events aren't treated as session content.
 
 ### 6. Streaming events
 
@@ -220,11 +231,14 @@ After 10 minutes of idle time (no user-initiated actions), the reaper goroutine 
 
 ### 9. Cancelling a Chat
 
-`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt`; Claude sends a stream-json `control_request` interrupt and kills the process tree only if its bounded acknowledgement deadline expires.
+`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt`; Claude sends a stream-json `control_request`; OpenCode calls its native abort endpoint with the canonical directory and session ID.
 
 ### 10. Model and effort
 
 The browser requests `/api/models?id=<sessionId>`, which selects the session runtime. Pi retains its existing model behavior. Codex uses app-server `model/list`; model and effort selections are appended as local projection metadata, preserved across refresh, and applied to later turns. The selected model is also supplied when a reaped worker resumes.
+
+OpenCode discovers provider/model pairs through the shared service and supports
+model switching. It does not expose effort or reasoning controls.
 
 ### 11. Steering and Queuing
 
@@ -255,6 +269,10 @@ pause/resume, and per-row delete / send-now / edit actions.
   delete the focused row, ↩ send the focused queued message now (skip-ahead),
   **E** pop the focused queued message back into the textarea for editing, Esc
   blur the panel.
+
+Claude and OpenCode declare neither steering nor persistent queues. Their
+composer waits for the active turn to finish or be cancelled; stale-client
+requests receive the runtime's `409` unsupported-operation response.
 
 REST surface (single handler in `internal/server/chat_queue.go`):
 

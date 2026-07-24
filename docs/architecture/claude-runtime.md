@@ -31,7 +31,7 @@ A parser snapshot opens the file read-only, records its initial size, consumes o
 
 User, assistant, thinking, tool-use, tool-result, image, model, usage, native title, and parent-chain data are translated into pican's rendering contract. Assistant entries retain `claudeMessageId`, allowing the live preview to retire only when the matching native message reaches the projection.
 
-`internal/projections.Store` owns identity locking, safe paths, local metadata preservation, duplicate migration, and fsync-backed atomic replacement. A full sync prunes only a pre-scan snapshot after a complete stable native scan. Per-file watcher refreshes never prune. Startup sync, a one-minute recovery scan, and a 100 ms debounced native watcher cover external changes and missed filesystem events.
+`internal/projections.Store` owns identity locking, safe paths, local metadata preservation, duplicate migration, and fsync-backed atomic replacement. A full sync prunes only a pre-scan snapshot after a complete stable native scan. Per-file watcher refreshes never prune. The 100 ms debounced native watcher is the primary freshness path. Startup performs a full sync, while a ten-minute recovery scan covers missed filesystem events and out-of-band changes. Recovery scans compare each transcript's `(mtime,size)` fingerprint with the last successfully observed snapshot, so unchanged files skip parsing and materialization.
 
 ## Fresh creation and resume
 

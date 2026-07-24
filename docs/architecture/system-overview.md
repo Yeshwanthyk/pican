@@ -2,7 +2,7 @@
 
 ## What pican Does
 
-pican is a local HTTP server that lets you browse and continue Pi sessions, Codex threads, and Claude Code sessions in a web browser. All three use one session list, viewer, live-update path, and export surface while retaining native runtime authority.
+pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude Code, and OpenCode sessions in a web browser. All four use one session list, viewer, live-update path, and export surface while retaining native runtime authority.
 
 ## Tech Stack
 
@@ -13,8 +13,8 @@ pican is a local HTTP server that lets you browse and continue Pi sessions, Code
 | Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained Gist) |
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
-| Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI |
-| Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under `~/.pi/agent/sessions`; Codex remains authoritative in `~/.codex`, Claude under configured `<claude-home>/projects` |
+| Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI; supervised authenticated HTTP/SSE via `opencode serve` |
+| Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under `~/.pi/agent/sessions`; Codex, Claude, and OpenCode retain native authority |
 | Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
@@ -105,6 +105,7 @@ pican is a local HTTP server that lets you browse and continue Pi sessions, Code
    │   codex app-server --stdio   (per-active-Codex-session worker)     │
    │   claude stream-json          (per-active-Claude-session worker)   │
    │   claude --version/auth status (bounded availability probe)        │
+   │   opencode serve              (one supervised loopback HTTP/SSE child)│
    │   gh gist create             (share session as private gist)       │
    │                                                                   │
    └──────────────────────────────────────────────────────────────────┘
@@ -112,11 +113,11 @@ pican is a local HTTP server that lets you browse and continue Pi sessions, Code
 
 ## Runtime Registry
 
-App startup owns an ordered `runtimes.Registry`. It registers Pi, Codex, then Claude and derives a selected registry from `-runtime`; OpenCode remains unregistered and unselectable. Runtime IDs are validated lowercase open strings, so adding a future runtime does not extend an enum, but only startup registrations are accepted.
+App startup owns an ordered `runtimes.Registry`. It registers Pi, Codex, Claude, then OpenCode and derives a selected registry from `-runtime`. Runtime IDs are validated lowercase open strings, so adding a future runtime does not extend an enum, but only startup registrations are accepted.
 
 Each registration binds a serializable descriptor (`id`, label, command/version, projection mode, explicit capabilities) to an availability probe, optional catalog adapter, and optional `workers.Factory`. Registration validation enforces the important ownership invariants: a chat-capable runtime has a worker factory, and a replaceable-projection runtime has a catalog. Native lifecycle APIs that do not form a truthful common contract remain runtime-specific; Codex archive/delete/unarchive and native rename/fork still use the separate Codex service.
 
-The selected registry is the server's runtime source of truth. `/api/runtimes` returns selected registrations in startup order with current availability. Runtime-dependent handlers resolve the persisted session runtime, check its trusted descriptor capability, then check current availability before dispatch. Unsupported operations return `409`; supported operations on an unavailable runtime return `503`. Create dispatch names Pi, Codex, and Claude explicitly; native mutation paths still fail closed unless their runtime adapter declares and implements the operation. Claude declares create, resume, chat, cancel, images/files, and model listing while leaving steering, queueing, model switching, approvals/questions, and lifecycle mutations disabled.
+The selected registry is the server's runtime source of truth. `/api/runtimes` returns selected registrations in startup order with current availability. Runtime-dependent handlers resolve the persisted session runtime, check its trusted descriptor capability, then check current availability before dispatch. Unsupported operations return `409`; supported operations on an unavailable runtime return `503`. Native mutation paths fail closed unless their runtime adapter declares and implements the operation. OpenCode declares create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching; archive, steering, queues, effort/reasoning, attachments, commands, subagent UI, approvals, and questions remain disabled.
 
 The worker manager still owns one-worker-per-session lifecycle and delegates only construction: it parses the trusted session runtime, rejects disabled runtimes, then calls `Registry.NewWorker`. Projection mode controls backend status-file and pagination behavior and is included additively in both `/api/session` and the embedded session bootstrap alongside runtime label, complete capabilities, and the server-built terminal resume command. The live frontend uses capabilities to gate mutation and composer controls, and projection mode for delta eligibility and same-ID replacement: `append-only-native` may use `afterCount` and preserve known entry objects, while `replaceable-projection` forces a full snapshot and replaces known objects whose stable IDs now carry newer content or status. Unknown modes take the conservative replaceable path. This does not alter the static export path, which renders only the persisted session snapshot and has no registry, worker, API, or SSE behavior.
 
@@ -152,6 +153,7 @@ name, while pican itself continues listening only on localhost.
 │   │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl  ← Pi transcript
 │   │   ├── codex-019abc….jsonl                        ← Codex projection
 │   │   ├── claude-<uuid>.jsonl                        ← Claude projection
+│   │   ├── opencode-<native-id>.jsonl                 ← OpenCode projection
 │   │   └── …
 │   └── --another--project--/
 │       └── …
@@ -189,11 +191,11 @@ across devices. See `internal/server/projects.go`.
 
 ## Startup Order
 
-1. Construct app-level Pi, Codex, and Claude registrations in that order. Pi owns its worker factory and model loader; Codex owns its catalog/availability syncer, worker factory, and model loader; Claude owns a read-only filesystem catalog, CLI probe, aliases, fresh-session projection creator, and stream-json worker factory.
-2. Parse `-runtime=pi|codex|claude|both|<comma-separated registered IDs>` (default `pi`) plus runtime command/home flags. `both` remains an exact alias for `pi,codex`; selection is deduplicated and normalized back to registration order.
-3. Derive a selected registry that is not mutated after startup. OpenCode, malformed IDs, and valid-but-unregistered IDs fail CLI parsing before any runtime starts.
+1. Construct app-level Pi, Codex, Claude, and OpenCode registrations in that order. OpenCode owns one supervised loopback HTTP/SSE service shared by its catalog, model, lifecycle, and worker adapters.
+2. Parse `-runtime=pi|codex|claude|opencode|both|<comma-separated registered IDs>` (default `pi`) plus runtime command/home flags. `both` remains an exact alias for `pi,codex`; selection is deduplicated and normalized back to registration order.
+3. Derive a selected registry that is not mutated after startup. Malformed and valid-but-unregistered IDs fail CLI parsing before any runtime starts.
 4. Resolve `~/.pi/agent/sessions`: any selected append-only-native runtime requires it; a replaceable-projection-only selection creates it.
-5. Run each selected catalog adapter initially and every minute. Claude additionally starts a debounced watcher on its configured home; partial scans and file refreshes never prune. A missing/logged-out Claude CLI affects only availability, not filesystem projection readability.
+5. Run each selected catalog adapter initially. Codex then runs a cheap minute-level list with `UpdatedAt`-gated hydration. Claude starts a debounced watcher plus periodic recovery. OpenCode starts its authenticated loopback child, health/version checks it, connects one global event stream, then lists/reads and reconciles before availability. Partial scans never prune.
 6. Determine bind host and auth policy, then build the shared worker manager. On first activity for a session it parses the session header, defaults an absent runtime to Pi, verifies selection, and dispatches construction through the selected registry.
 7. Build `server.Deps` with the selected registry, runtime-aware model discovery, shared manager, narrow Claude creation service, and separate Codex lifecycle service; `server.New` validates the default runtime and starts server-owned watchers and background loops.
 8. Register routes and embedded live-app assets, then optionally configure Tailscale Serve.
@@ -202,16 +204,17 @@ across devices. See `internal/server/projects.go`.
 
 ```text
 Main
- ├─ newRuntimeRegistry(Pi, Codex, Claude) ── registrations + model loaders
+ ├─ newRuntimeRegistry(Pi, Codex, Claude, OpenCode) ── registrations + model loaders
  ├─ parseRuntime(...) ────────────── selects registered IDs
  ├─ selectedRegistry() ───────────── passed to server and worker dispatch
- ├─ Catalog.Sync() / syncer.start()  periodic Codex + Claude reconciliation
+ ├─ Catalog.Sync() / syncer.start()  runtime reconciliation
  ├─ claude.Watch() ──────────────── debounced native transcript refresh
  ├─ workers.NewManager(factory)
  │    └─ ParseFile → selected Registry.NewWorker(runtime, session, path)
  │         ├─ Pi factory    → pi --mode rpc
  │         ├─ Codex factory → validate projection → codex app-server --stdio
- │         └─ Claude        → installed CLI stream-json (`--session-id` fresh / `--resume` existing)
+ │         ├─ Claude        → installed CLI stream-json (`--session-id` fresh / `--resume` existing)
+ │         └─ OpenCode      → lightweight worker over shared authenticated HTTP/SSE
  ├─ projections.Store ─────────── replaceable path/lock/preserve/atomic-write contract
  └─ server.New(Deps{RuntimeRegistry, ChatSender, ModelsFor, CodexService})
       ├─ /api/runtimes → descriptors + live availability

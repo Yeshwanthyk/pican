@@ -2,7 +2,7 @@
 
 **Thinking about trying pican? Go for it — you'll fall in love.**
 
-pican is a web UI and PWA for [pi](https://pi.dev) sessions, installed Codex CLI threads, and Claude Code sessions. One binary can browse and continue all three while each runtime keeps its native state authoritative.
+pican is a web UI and PWA for [pi](https://pi.dev) sessions, installed Codex CLI threads, Claude Code sessions, and OpenCode sessions. One binary can browse and continue all four while each runtime keeps its native state authoritative.
 
 **pican is built for two kinds of people:**
 
@@ -17,7 +17,7 @@ You're already deep in the flow with pi in your terminal. pican keeps that momen
 
 - **Resume from anywhere** — continue a session from your phone, tablet, or another computer. No SSH, no Termius — just open your browser.
 - **Multi-session dashboard** — kick off work in one session while watching another stream. Search across projects, filter by branch, find what you need fast.
-- **Runtime choice** — select Pi, Codex, Claude, or a comma-separated combination. Pi remains provider-agnostic; Codex uses its installed CLI/state; Claude native project transcripts remain read-only and authoritative.
+- **Runtime choice** — select Pi, Codex, Claude, OpenCode, or a comma-separated combination. Pi remains provider-agnostic; each other runtime keeps its native state authoritative.
 - **Safe remote access** — built-in token auth so you can expose it on your LAN or Tailscale without worry.
 - **Share your work** — export sessions as static snapshots or secret GitHub Gists in one click.
 
@@ -44,12 +44,12 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | | |
 |---|---|
 | 📱 **PWA** | Install pican as a Progressive Web App on desktop, phone, or tablet for a native feel. |
-| 🔄 **Continue sessions** | Pick up Pi sessions or native Codex threads — text, images, runtime-scoped model/effort controls, steering, queues, and cancel. |
+| 🔄 **Continue sessions** | Pick up Pi, Codex, Claude, or OpenCode sessions with only the controls that runtime supports. |
 | 🆕 **Start new sessions** | Create fresh sessions against any project path, straight from the web UI. |
 | 📡 **Live streaming** | Watch runtime responses stream in real time. Follow mode keeps you locked on the latest. |
 | 🌲 **Tree view** | Navigate the projected conversation structure and jump to an entry; Pi retains its native message tree. |
-| 🔀 **Fork sessions** | Fork Pi at an entry; Codex maps the selected projected entry to its containing native turn. |
-| 🔍 **Browse & search** | Browse Pi, Codex, and Claude histories together with runtime/native identity preserved. |
+| 🔀 **Fork sessions** | Fork Pi at an entry; Codex and OpenCode map supported projected entries to native turn/message boundaries. |
+| 🔍 **Browse & search** | Browse Pi, Codex, Claude, and OpenCode histories together with runtime/native identity preserved. |
 | 🌿 **Git integration** | See the current branch and open a GitHub PR right from the session viewer. |
 | 📝 **Scratchpad** | Jot down notes, todos, or quick thoughts alongside your sessions without switching apps. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pican feel like *yours*. |
@@ -64,7 +64,7 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 
 | If you're looking for… | Read |
 |---|---|
-| How to install, configure runtimes (including Claude home), and use pican | [install.md](install.md) |
+| How to install, configure runtimes (including Claude and OpenCode), and use pican | [install.md](install.md) |
 | Use pican as a personal assistant | [personal-assistant.md](personal-assistant.md) |
 | Keyboard shortcuts reference | [keyboard-shortcuts.md](keyboard-shortcuts.md) |
 | What's coming next | [roadmap.md](roadmap.md) |

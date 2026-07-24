@@ -6,7 +6,7 @@ This directory documents the key runtime sequences in pican.
 |----------|-------------|
 | [server-startup.md](./server-startup.md) | Runtime selection, native catalog sync, and network startup |
 | [session-viewing.md](./session-viewing.md) | Loading and rendering a session page |
-| [chat.md](./chat.md) | Capability-driven sending, streaming, steering, queueing, and cancellation through Pi, Codex, or Claude |
+| [chat.md](./chat.md) | Capability-driven sending, streaming, steering, queueing, and cancellation through Pi, Codex, Claude, or OpenCode |
 | [live-reload.md](./live-reload.md) | How file changes propagate to the browser |
 | [artifacts.md](./artifacts.md) | Detecting (path-keyed/edit-aware), rendering, and sandbox-previewing artifacts |
 | [mention-autocomplete.md](./mention-autocomplete.md) | `@`-triggered file/folder path autocomplete in the chat composer |

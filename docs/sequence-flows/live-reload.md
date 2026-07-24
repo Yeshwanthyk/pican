@@ -4,12 +4,13 @@ pican pushes real-time updates to the browser via **Server-Sent Events (SSE)**. 
 
 ## Overview
 
-There are four cooperating live-update mechanisms:
+There are five cooperating live-update mechanisms:
 
 1. **File Change Reload** — when an append-only transcript is appended or a replaceable projection is atomically replaced, the session page fetches `/api/session`, reconciles canonical entries according to `projectionMode`, and refreshes its title
 2. **Claude native watcher/worker convergence** — changes under configured `<claude-home>/projects` are debounced, parsed from read-only stable snapshots, and atomically projected; a live worker also retries result-time refresh until the matching native message is authoritative
 3. **Worker-driven reload** — Codex worker callbacks can emit reload immediately after projection materialization
-4. **Running Status Updates** — when a session starts/stops running, the index page updates card badges in real time
+4. **OpenCode shared event stream** — one native global SSE connection is demultiplexed by canonical directory/session ID, followed by native read and projection replacement
+5. **Running Status Updates** — when a session starts/stops running, the index page updates card badges in real time
 
 ## 1. File Change Reload
 
@@ -71,7 +72,7 @@ On `Create` events:
 On `Write`, `Create`, or `Rename` events for `.jsonl` files:
 - Schedule debounce (50ms)
 
-`Create`/`Rename` matter because replaceable Codex/Claude projections are atomically renamed over their prior files rather than appended. New files also broadcast `new-session`.
+`Create`/`Rename` matter because replaceable Codex/Claude/OpenCode projections are atomically renamed over their prior files rather than appended. New files also broadcast `new-session`.
 
 ### Debouncer
 
@@ -91,7 +92,17 @@ The debouncer prevents multiple reloads when editors write files in chunks (e.g.
 
 ### Claude native path
 
-Claude has a second watcher because its authoritative files live outside `sessionsDir`. It watches the configured home, `projects`, and direct project directories. A 100 ms debounce coalesces append bursts. Create/write refreshes only the affected transcript and can never prune. Remove/rename or directory changes request a full catalog scan; pruning occurs only if every native directory and transcript snapshot is complete. A one-minute periodic full sync is the recovery path for missed events or watcher startup failure. The adapter never writes beneath the Claude home.
+Claude has a second watcher because its authoritative files live outside `sessionsDir`. It watches the configured home, `projects`, and direct project directories. A 100 ms debounce coalesces append bursts. Create/write refreshes only the affected transcript and can never prune. Remove/rename or directory changes request a full catalog scan; pruning occurs only if every native directory and transcript snapshot is complete. A ten-minute reconcile is the recovery path for missed events or watcher startup failure, and unchanged `(mtime,size)` transcripts with existing projections skip parsing and materialization. The adapter never writes beneath the Claude home.
+
+### OpenCode native path
+
+OpenCode events arrive through one authenticated `/global/event` subscription
+owned by the supervised child generation. pican validates the canonical
+directory and native session ID before routing an event. Message, part, and
+status updates refresh only the affected native session and atomically replace
+its projection. A child/SSE failure marks only OpenCode unavailable; bounded
+restart assigns a new port and credential, then list/read reconciliation
+completes before availability returns.
 
 ### Polling Fallback
 
@@ -148,8 +159,8 @@ Polling scans all `.jsonl` files and compares modtimes against `fileMod` map.
 
 `computeRunningStatus(sessionID)` returns true if **any** of these are true:
 
-1. **session-status file** exists and is fresh/running (Pi only; ignored for replaceable Codex/Claude projections)
-2. **Runtime worker** status is `running` (Pi, Codex, or Claude)
+1. **session-status file** exists and is fresh/running (Pi only; ignored for replaceable projections)
+2. **Runtime worker** status is `running` (Pi, Codex, Claude, or OpenCode)
 3. **Recent transcript/projection activity** is within the short grace window
 
 ### Status Sweeper
@@ -180,7 +191,7 @@ This catches cases where a signal goes stale (e.g., terminal process crashes wit
 | `new-session` | `__all__` | `"new-session"` | New `.jsonl` file created |
 | `status-snapshot` | `__all__` | `{"running": ["id1", "id2"]}` | Client connects to `/events?id=__all__` |
 | `status-delta` | `__all__` | `{"id": "abc", "running": true}` | Running status changes |
-| `chat-preview` | `sessID` | `{"content": "...", "done": false}` | Best-effort Pi stream or Codex item-delta preview |
+| `chat-preview` | `sessID` | `{"content": "...", "done": false}` | Best-effort runtime preview before authoritative transcript/projection convergence |
 
 ### Browser Handling
 

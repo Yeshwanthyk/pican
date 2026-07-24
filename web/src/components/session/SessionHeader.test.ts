@@ -87,6 +87,34 @@ describe("SessionHeader runtime commands", () => {
     expect(container.querySelector(".session-header-runtime")?.textContent).toContain("F");
   });
 
+  it("uses OpenCode identity and server capabilities without assuming Pi controls", () => {
+    const { container } = render(SessionHeader, {
+      props: {
+        title: "OpenCode session",
+        runtime: "opencode",
+        runtimeLabel: "OpenCode",
+        nativeId: "ses_123",
+        capabilities: {
+          ...defaultRuntimeCapabilities("opencode"),
+          create: true,
+          resume: true,
+          chat: true,
+          cancel: true,
+          modelListing: true,
+        },
+        resumeCommand: "opencode --session ses_123",
+      },
+    });
+
+    expect(container.querySelector(".session-header-runtime")).toHaveAttribute(
+      "title",
+      "OpenCode session ses_123",
+    );
+    expect(container.querySelector(".session-header-runtime-mark")).toHaveTextContent("O");
+    expect(container.querySelector("#new-session-header-btn")).not.toBeNull();
+    expect(container.querySelector<HTMLButtonElement>("#resume-btn")).not.toBeDisabled();
+  });
+
   it("preserves runtime when starting a sibling session", async () => {
     const fetchImpl = vi.fn(async () => ({
       json: async () => ({ error: "stop" }),

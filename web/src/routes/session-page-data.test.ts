@@ -94,6 +94,56 @@ describe("session-page-data", () => {
     });
   });
 
+  it("uses the OpenCode display label while trusting explicit server capabilities", () => {
+    const state = buildSessionPageState({
+      sessionId: "opencode.jsonl",
+      btoaImpl,
+      data: {
+        runtime: "opencode",
+        nativeId: "ses_123",
+        header: { cwd: "/tmp/project" },
+        capabilities: {
+          create: true,
+          resume: true,
+          fork: true,
+          clone: true,
+          rename: true,
+          delete: true,
+          chat: true,
+          cancel: true,
+          modelListing: true,
+          modelSwitching: true,
+        },
+      },
+    });
+
+    expect(state.runtimeLabel).toBe("OpenCode");
+    expect(state.capabilities).toEqual({
+      create: true,
+      resume: true,
+      fork: true,
+      clone: true,
+      rename: true,
+      archive: false,
+      unarchive: false,
+      delete: true,
+      chat: true,
+      cancel: true,
+      steer: false,
+      persistentQueue: false,
+      images: false,
+      files: false,
+      modelListing: true,
+      modelSwitching: true,
+      effortSelection: false,
+      reasoningSelection: false,
+      slashCommands: false,
+      subagents: false,
+      interactiveApprovals: false,
+      userQuestions: false,
+    });
+  });
+
   it("only fetches the session on the network path; the scratchpad is the sidebar’s job", async () => {
     const seen: string[] = [];
     const fetchImpl = async (url: RequestInfo | URL) => {

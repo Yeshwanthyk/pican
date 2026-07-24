@@ -12,6 +12,7 @@ import {
   type CompleteRuntimeCapabilities,
 } from "../lib/runtime-capabilities";
 import { consumeSessionPrefetch } from "./session-prefetch";
+import { runtimeDisplay } from "../lib/runtime-display";
 
 interface TextDecoderConstructor {
   new (label?: string): { decode(input?: AllowSharedBufferSource): string };
@@ -238,8 +239,7 @@ export function buildSessionPageState({
     sessionId,
     title,
     runtime,
-    runtimeLabel:
-      data.runtimeLabel || (runtime === "pi" ? "Pi" : runtime === "codex" ? "Codex" : runtime),
+    runtimeLabel: runtimeDisplay(runtime, data.runtimeLabel).label,
     capabilities,
     projectionMode: data.projectionMode || "",
     resumeCommand: data.resumeCommand || "",

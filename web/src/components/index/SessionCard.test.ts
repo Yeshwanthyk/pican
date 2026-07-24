@@ -59,6 +59,16 @@ describe("SessionCard ticker row", () => {
     expect(container.querySelector(".session-ticker-runtime-mark")).toHaveAttribute("src", src);
   });
 
+  it("renders an OpenCode mark without using another runtime's icon", () => {
+    const { container } = render(SessionCard, {
+      props: { session: session({ runtime: "opencode" }) },
+    });
+    const mark = container.querySelector(".session-ticker-runtime-mark");
+    expect(mark).toHaveTextContent("O");
+    expect(mark).toHaveAttribute("title", "OpenCode");
+    expect(mark).not.toHaveAttribute("src");
+  });
+
   it("renders running and waiting status lines with distinct semantics", () => {
     const now = Date.parse("2026-01-01T00:02:00Z");
     const running = render(SessionCard, {

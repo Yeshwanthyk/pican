@@ -15,7 +15,7 @@ PICAN_CODEX_COMMAND=/absolute/path/to/codex pican -runtime=both
 
 `-codex-command` and `PICAN_CODEX_COMMAND` name the **Codex executable**, not a shell command. The flag wins over the environment variable; the fallback is `codex` from `PATH`. pican appends `app-server --stdio` and executes the resulting argv directly.
 
-Startup registers Pi, Codex, and Claude in one ordered runtime registry. The selected subset, not a closed enum, is passed to the server and worker factory. OpenCode remains unregistered, so `opencode` is rejected. The exact legacy value `both` aliases `pi,codex`; comma-separated input is case-normalized, deduplicated, and returned in registration order.
+Startup registers Pi, Codex, Claude, and OpenCode in one ordered runtime registry. The selected subset, not a closed enum, is passed to the server and worker factory. The exact legacy value `both` aliases `pi,codex`; comma-separated input is case-normalized, deduplicated, and returned in registration order.
 
 The Codex registration declares `replaceable-projection`, its current supported capabilities, command metadata, catalog/availability adapter, and worker factory. The registry owns dispatch metadata only. Codex remains authoritative for thread state, `internal/projections.Store` owns generic projection replacement mechanics, the Codex adapter owns native-to-pican translation, `workers.Manager` retains worker lifecycle, and Codex-native archive/delete/unarchive plus rename/fork semantics stay on the separate `CodexService` rather than widening the common contract.
 
@@ -24,15 +24,17 @@ Session-directory startup behavior is runtime-specific:
 - `pi` and `both` require the configured `~/.pi/agent/sessions` directory to exist.
 - `codex` creates it when absent because it contains only pican's generated projections.
 
-At startup, Codex-enabled modes invoke the registration's catalog adapter through an app-owned syncer with a 15-second timeout and repeat it every minute. A failed sync forcibly reports `Complete: false`, updates only Codex availability, and cannot authorize pruning. `codex` mode exits if the initial sync cannot reach Codex. `both` or `pi,codex` logs the failure and continues with Pi; `/api/runtimes` marks Codex unavailable, existing projections remain viewable/exportable, and combined model discovery keeps Pi models after Pi discovery succeeds. A later successful periodic sync restores Codex availability. Catalog pruning is bounded to projections that existed before the native list snapshot began, and recently materialized projections receive a convergence grace period, so a newly created thread cannot be removed merely because it is too new to appear in that snapshot.
+At startup, Codex-enabled modes invoke the registration's catalog adapter through an app-owned syncer with a 15-second timeout and repeat it every minute. Each periodic pass performs the cheap paginated `thread/list`, then compares each row's `UpdatedAt` with the value retained by the syncer. Only new or changed threads, or threads whose projection disappeared out of band, require `thread/read` and materialization. Restarting pican intentionally performs one full hydration.
+
+A failed sync forcibly reports `Complete: false`, updates only Codex availability, and cannot authorize pruning. `codex` mode exits if the initial sync cannot reach Codex. `both` or `pi,codex` logs the failure and continues with Pi; `/api/runtimes` marks Codex unavailable, existing projections remain viewable/exportable, and combined model discovery keeps Pi models after Pi discovery succeeds. A later successful periodic sync restores Codex availability. A successful complete native list is authoritative for membership: validated projections that existed before the list began and are absent from its ID set are pruned. A projection created concurrently with the list is outside that pre-list snapshot and is retained.
 
 The startup and first-chat call graph is:
 
 ```text
 app.Main
  ├─ runtimes.Codex(descriptor, catalogSyncer, workerFactory)
- ├─ initial Catalog.Sync → codex.Sync → thread/list + thread/read → atomic projections
- ├─ periodic catalogSyncer.start (1 minute)
+ ├─ initial Catalog.Sync → thread/list + thread/read → atomic projections
+ ├─ periodic catalogSyncer.start (1 minute) → thread/list + UpdatedAt-gated reads
  └─ workers.Manager factory
       └─ parse projection header → selected Registry.NewWorker("codex", ...)
            └─ Codex factory validates projection metadata
@@ -96,7 +98,7 @@ Codex sessions use the same browser routes and controls where the semantics matc
 | Surface | Codex behavior |
 |---|---|
 | Create | `thread/start`, then `thread/read` and projection materialization; model and reasoning effort can be inherited from the source session. |
-| List/read | Startup and periodic `thread/list` + `thread/read` sync all visible, non-archived thread source kinds. A fully successful list prunes validated Codex projections absent from that list; list failure never prunes, and Pi files are never candidates. |
+| List/read | Startup hydrates every visible, non-archived thread source kind. Periodic sync always runs `thread/list` but gates `thread/read` and materialization on `UpdatedAt`; missing projections are rehydrated. A fully successful list prunes validated Codex projections absent from its ID set; list failure never prunes, and Pi files are never candidates. |
 | Chat | `turn/start` with text and image data URLs. Threads and turns enforce `approvalPolicy: never` plus danger-full-access sandboxing (Codex YOLO mode). Start and steer carry unique `clientUserMessageId` values; returned turn IDs are authoritative. While a turn is active, immediate sends use `turn/steer`. |
 | Queue | Uses the same persistent server-side SQLite queue and drainer; dispatch reaches the Codex worker when it becomes idle. |
 | Cancel | `turn/interrupt` for the active native turn. |
