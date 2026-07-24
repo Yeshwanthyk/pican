@@ -39,6 +39,78 @@ func TestSessionCacheReusesParsedSessions(t *testing.T) {
 	}
 }
 
+func TestParsedSessionCacheEvictsLeastRecentlyUsedUnderBytePressure(t *testing.T) {
+	root := t.TempDir()
+	firstPath := writeSessionFile(t, root, "--tmp--project--", "first.jsonl")
+	writeSessionFile(t, root, "--tmp--project--", "second.jsonl")
+
+	first, err := ParseFile(firstPath, "--tmp--project--", "first.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget := approximateSessionBytes(first) + 32
+	c := NewCache(WithSessionCacheByteBudget(budget))
+
+	if _, err := c.Resolve(root, "first.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Resolve(root, "second.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	stats := c.Stats()
+	if stats.SessionEntries != 1 || stats.SessionEvictions != 1 {
+		t.Fatalf("after pressure: stats = %#v", stats)
+	}
+	if stats.SessionBytes > budget {
+		t.Fatalf("cache bytes = %d, budget = %d", stats.SessionBytes, budget)
+	}
+
+	if _, err := c.Resolve(root, "first.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	stats = c.Stats()
+	if stats.SessionParses != 3 {
+		t.Fatalf("session parses = %d, want 3 after evicted access", stats.SessionParses)
+	}
+}
+
+func TestResolveSummaryDoesNotPopulateFullSessionCache(t *testing.T) {
+	root := t.TempDir()
+	writeSessionFile(t, root, "--tmp--project--", "session.jsonl")
+	c := NewCache()
+
+	first, err := c.ResolveSummary(root, "session.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := c.ResolveSummary(root, "session.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID != second.ID {
+		t.Fatalf("summary ids differ: %q != %q", first.ID, second.ID)
+	}
+	stats := c.Stats()
+	if stats.SummaryParses != 1 || stats.SummaryHits != 1 {
+		t.Fatalf("summary stats = %#v", stats)
+	}
+	if stats.SessionParses != 0 || stats.SessionEntries != 0 {
+		t.Fatalf("metadata-only resolve populated full cache: %#v", stats)
+	}
+
+	fullFirst := NewCache()
+	if _, err := fullFirst.Resolve(root, "session.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fullFirst.ResolveSummary(root, "session.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	stats = fullFirst.Stats()
+	if stats.SummaryParses != 0 || stats.SummaryHits != 1 {
+		t.Fatalf("summary did not reuse parsed full session: %#v", stats)
+	}
+}
+
 func TestSessionCacheInvalidateForcesResolveAtSameModTime(t *testing.T) {
 	root := t.TempDir()
 	path := writeSessionFile(t, root, "--tmp--project--", "session.jsonl")
@@ -113,11 +185,11 @@ func TestSessionCacheEvictsRemovedFiles(t *testing.T) {
 	path := writeSessionFile(t, root, "--tmp--project--", "session.jsonl")
 
 	c := NewCache()
-	if _, err := c.LoadAll(root); err != nil {
-		t.Fatalf("first loadAll: %v", err)
+	if _, err := c.Resolve(root, "session.jsonl"); err != nil {
+		t.Fatalf("resolve: %v", err)
 	}
-	if len(c.entries) != 1 {
-		t.Fatalf("after first: cache size = %d, want 1", len(c.entries))
+	if stats := c.Stats(); stats.SessionEntries != 1 {
+		t.Fatalf("after resolve: stats = %#v", stats)
 	}
 
 	if err := os.Remove(path); err != nil {
@@ -133,6 +205,9 @@ func TestSessionCacheEvictsRemovedFiles(t *testing.T) {
 	}
 	if len(c.entries) != 0 {
 		t.Fatalf("expected cache to evict deleted file, size=%d", len(c.entries))
+	}
+	if stats := c.Stats(); stats.SessionEntries != 0 || stats.SessionBytes != 0 {
+		t.Fatalf("expected parsed session eviction after deletion, stats=%#v", stats)
 	}
 }
 

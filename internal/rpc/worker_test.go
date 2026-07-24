@@ -85,6 +85,22 @@ func TestWorkerExitCodeEnrichesEarlierEOFError(t *testing.T) {
 	}
 }
 
+func TestWorkerStderrCaptureIsBounded(t *testing.T) {
+	stderr := &workers.BoundedWriter{Max: 64 << 10}
+	w := &piRPCWorker{stderrBuf: stderr}
+	input := strings.Repeat("a", 70<<10) + "stderr-tail"
+	if _, err := stderr.Write([]byte(input)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := len(stderr.String()); got != 64<<10 {
+		t.Fatalf("captured stderr bytes = %d, want %d", got, 64<<10)
+	}
+	if err := w.withStderr(errors.New("worker failed")); !strings.HasSuffix(err.Error(), "stderr-tail") {
+		t.Fatalf("worker error lost stderr tail: %v", err)
+	}
+}
+
 func TestIntentionalCloseDoesNotPublishWorkerDown(t *testing.T) {
 	var notifications int
 	w := &piRPCWorker{

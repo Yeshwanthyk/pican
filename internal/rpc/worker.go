@@ -31,7 +31,7 @@ type piRPCWorker struct {
 	currentModel         string
 	currentProvider      string
 	currentThinkingLevel string
-	stderrBuf            *strings.Builder
+	stderrBuf            *workers.BoundedWriter
 	commands             []workers.SlashCommand
 	commandsCached       bool
 	lastActive           atomic.Int64 // unix nanos; only user-initiated actions update this
@@ -102,8 +102,8 @@ func NewPiWorkerWithStatusEvents(sessionPath string, streamSink StreamEventSink,
 	if err != nil {
 		return nil, err
 	}
-	var stderrBuf strings.Builder
-	cmd.Stderr = &stderrBuf
+	stderrBuf := &workers.BoundedWriter{Max: 64 << 10}
+	cmd.Stderr = stderrBuf
 	worker := &piRPCWorker{
 		sessionPath:        sessionPath,
 		startedAt:          time.Now(),
@@ -112,7 +112,7 @@ func NewPiWorkerWithStatusEvents(sessionPath string, streamSink StreamEventSink,
 		status:             workers.WorkerStatus{State: workers.WorkerStateIdle},
 		pending:            make(map[string]chan response),
 		pendingExtensionUI: make(map[string]pendingExtensionUIRequest),
-		stderrBuf:          &stderrBuf,
+		stderrBuf:          stderrBuf,
 		streamSink:         streamSink,
 		streamPreview:      &streamPreviewAccumulator{},
 		extensionUISink:    extensionUISink,

@@ -364,6 +364,34 @@ func (erroredWorker) Status() WorkerStatus {
 }
 func (erroredWorker) Close() error { return nil }
 
+type closableErroredWorker struct {
+	erroredWorker
+	closed bool
+}
+
+func (w *closableErroredWorker) Close() error {
+	w.closed = true
+	return nil
+}
+
+func TestManagerReapsErroredWorkerWithoutIdleReport(t *testing.T) {
+	w := &closableErroredWorker{}
+	manager := NewManagerWithTTL(func(string, string) (ChatWorker, error) { return w, nil }, time.Minute)
+	defer manager.Close()
+	if err := manager.EnsureWorker(context.Background(), "a.jsonl", "/tmp/a.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+
+	manager.reapOnce(time.Now())
+
+	if got := manager.Snapshot(); len(got) != 0 {
+		t.Fatalf("errored worker survived reap: %+v", got)
+	}
+	if !w.closed {
+		t.Fatal("reaped errored worker was not closed")
+	}
+}
+
 // inspectableWorker implements the optional inspector interface so Snapshot can
 // surface PID, uptime, and idle duration.
 type inspectableWorker struct {

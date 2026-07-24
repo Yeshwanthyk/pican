@@ -158,8 +158,13 @@ func (m *Manager) reapOnce(now time.Time) {
 	var dead []ChatWorker
 	for id, w := range m.workers {
 		// Send reserves the session before worker lookup/Prompt. Do not close an
-		// idle worker in the accepted-send window before Prompt marks it running.
+		// worker in the accepted-send window before Prompt marks it running.
 		if m.pendingSends[id] > 0 {
+			continue
+		}
+		if w.Status().State == WorkerStateError {
+			dead = append(dead, w)
+			delete(m.workers, id)
 			continue
 		}
 		reaper, ok := w.(idleReportable)

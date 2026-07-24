@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
+	"path/filepath"
+	"sync"
 )
 
 type SyncResult struct {
@@ -14,19 +15,40 @@ type SyncResult struct {
 	Errors map[string]string `json:"errors,omitempty"`
 }
 
-const projectionPruneGrace = 2 * time.Minute
+type Catalog struct {
+	sessionsDir string
+	command     []string
+
+	mu        sync.Mutex
+	updatedAt map[string]int64
+}
+
+func NewCatalog(sessionsDir string, command []string) *Catalog {
+	return &Catalog{
+		sessionsDir: sessionsDir,
+		command:     append([]string(nil), command...),
+		updatedAt:   make(map[string]int64),
+	}
+}
 
 // Sync imports every visible, non-archived Codex thread. A successful complete
 // list is authoritative for membership: validated Codex projections absent
 // from it are pruned. Pi files and projections after a list failure are never
 // removed.
 func Sync(ctx context.Context, sessionsDir string, command []string) (SyncResult, error) {
+	return NewCatalog(sessionsDir, command).Sync(ctx)
+}
+
+func (catalog *Catalog) Sync(ctx context.Context) (SyncResult, error) {
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+
 	// Membership pruning applies only to projections that existed before this
 	// list began. A thread created concurrently may not appear in the list's
 	// snapshot and must not have its newly materialized projection removed.
-	initialProjections, initialScanErr := FindProjections(sessionsDir)
+	initialProjections, initialScanErr := FindProjections(catalog.sessionsDir)
 
-	c, err := NewClient(ctx, command, nil)
+	c, err := NewClient(ctx, catalog.command, nil)
 	if err != nil {
 		return SyncResult{}, err
 	}
@@ -39,16 +61,22 @@ func Sync(ctx context.Context, sessionsDir string, command []string) (SyncResult
 	listedIDs := make(map[string]struct{}, len(threads))
 	for _, listed := range threads {
 		listedIDs[listed.ID] = struct{}{}
+		_, projected := initialProjections[listed.ID]
+		if updatedAt, exists := catalog.updatedAt[listed.ID]; initialScanErr == nil && projected && exists && updatedAt == listed.UpdatedAt {
+			result.IDs = append(result.IDs, filepath.Base(initialProjections[listed.ID]))
+			continue
+		}
 		thread, readErr := c.ReadThread(ctx, listed.ID)
 		if readErr != nil {
 			result.Errors[listed.ID] = readErr.Error()
 			continue
 		}
-		projection, writeErr := Materialize(sessionsDir, thread)
+		projection, writeErr := Materialize(catalog.sessionsDir, thread)
 		if writeErr != nil {
 			result.Errors[listed.ID] = writeErr.Error()
 			continue
 		}
+		catalog.updatedAt[listed.ID] = listed.UpdatedAt
 		result.IDs = append(result.IDs, projection.ID)
 	}
 	if initialScanErr != nil {
@@ -58,15 +86,14 @@ func Sync(ctx context.Context, sessionsDir string, command []string) (SyncResult
 			if _, visible := listedIDs[nativeID]; visible {
 				continue
 			}
-			// A freshly created thread can lag behind thread/list even when the
-			// projection predates this sync's snapshot. Keep recent/active caches;
-			// a later catalog pass can prune them once Codex has converged.
-			if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) < projectionPruneGrace {
-				continue
-			}
 			if removeErr := RemoveProjection(path, nativeID); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
 				result.Errors[nativeID] = removeErr.Error()
 			}
+		}
+	}
+	for nativeID := range catalog.updatedAt {
+		if _, visible := listedIDs[nativeID]; !visible {
+			delete(catalog.updatedAt, nativeID)
 		}
 	}
 	if len(result.Errors) == 0 {

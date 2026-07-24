@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -11,6 +12,34 @@ import (
 	"pican/internal/chat"
 	"pican/internal/workers"
 )
+
+func TestWorkerClearsPreviewOnAbortWithoutActiveTurn(t *testing.T) {
+	w := &Worker{
+		preview: map[string]*strings.Builder{"turn\x00item": {}},
+	}
+
+	if err := w.Abort(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.preview) != 0 {
+		t.Fatalf("preview entries after abort = %d, want 0", len(w.preview))
+	}
+}
+
+func TestWorkerClearsPreviewOnProtocolError(t *testing.T) {
+	w := &Worker{
+		preview:  map[string]*strings.Builder{"turn\x00item": {}},
+		statusCh: make(chan workers.WorkerStatus, 1),
+	}
+
+	wantErr := errors.New("protocol failed")
+	if got := w.protocolError(wantErr); !errors.Is(got, wantErr) {
+		t.Fatalf("protocolError() = %v, want %v", got, wantErr)
+	}
+	if len(w.preview) != 0 {
+		t.Fatalf("preview entries after protocol error = %d, want 0", len(w.preview))
+	}
+}
 
 func TestWorkerResumePromptSteerInterruptSettingsStatusAndPreview(t *testing.T) {
 	root := t.TempDir()
@@ -191,6 +220,30 @@ func TestWorkerSeparatesAgentPreviewFromProjectionAndToolOutput(t *testing.T) {
 	defer mu.Unlock()
 	if len(previews) != previewCount {
 		t.Fatalf("tool output leaked into assistant previews: %+v", previews[previewCount:])
+	}
+}
+
+func TestWorkerMaterializesEachRevisionOnce(t *testing.T) {
+	root := t.TempDir()
+	thread := testThread()
+	thread.CWD = t.TempDir()
+	projectionCount := 0
+	w := &Worker{
+		sessionsDir: root,
+		revision:    1,
+		callbacks: Callbacks{Projection: func(Projection) {
+			projectionCount++
+		}},
+	}
+
+	w.materializeRevision(thread, 1)
+	w.materializeRevision(thread, 1)
+
+	if projectionCount != 2 {
+		t.Fatalf("projection callbacks = %d, want cached projection reuse on the second call", projectionCount)
+	}
+	if !w.hasMaterializedRevision || w.materializedRevision != 1 || w.materializedProjection.Path == "" {
+		t.Fatalf("materialized revision cache = has:%v revision:%d projection:%+v", w.hasMaterializedRevision, w.materializedRevision, w.materializedProjection)
 	}
 }
 

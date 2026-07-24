@@ -6,11 +6,15 @@ package projections
 import (
 	"bufio"
 	"bytes"
+	"container/list"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -20,9 +24,30 @@ import (
 	"pican/internal/sessions"
 )
 
-const maxLineBytes = 32 << 20
+const (
+	maxLineBytes              = 32 << 20
+	maxProjectionFingerprints = 8192
+)
 
 var identityLocks keyedLocker
+var projectionFingerprints fingerprintCache
+
+type projectionFingerprint struct {
+	info        os.FileInfo
+	changeStamp string
+	hash        [sha256.Size]byte
+}
+
+type fingerprintEntry struct {
+	path        string
+	fingerprint projectionFingerprint
+}
+
+type fingerprintCache struct {
+	mu      sync.Mutex
+	entries map[string]*list.Element
+	order   list.List
+}
 
 // Metadata is the trusted projection-header identity shared by replaceable
 // runtimes. Runtime-specific adapters may validate additional header fields.
@@ -211,6 +236,7 @@ func (s *Store) Replace(nativeID, cwd string, build ReplaceBuild) (Projection, e
 		if err := os.Remove(duplicate); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return Projection{}, fmt.Errorf("remove duplicate %s projection: %w", s.runtime, err)
 		}
+		forgetProjectionFingerprint(duplicate)
 	}
 	return Projection{ID: filepath.Base(target), Path: target, NativeID: nativeID}, nil
 }
@@ -230,7 +256,11 @@ func (s *Store) Remove(path, nativeID string) error {
 	if metadata.NativeID != nativeID {
 		return fmt.Errorf("%s projection native id mismatch", s.runtime)
 	}
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	forgetProjectionFingerprint(path)
+	return nil
 }
 
 // Rename appends pican-owned display metadata without racing replacement.
@@ -302,7 +332,11 @@ func (s *Store) mutate(path string, mutation func(current string) error) error {
 	if validated.Runtime != metadata.Runtime || validated.NativeID != metadata.NativeID {
 		return fmt.Errorf("%s projection identity changed before mutation", s.runtime)
 	}
-	return mutation(current)
+	if err := mutation(current); err != nil {
+		return err
+	}
+	forgetProjectionFingerprint(current)
+	return nil
 }
 
 func (s *Store) findIdentityPath(nativeID string) (string, error) {
@@ -492,10 +526,13 @@ func WriteJSONLAtomic(path string, entries []map[string]any) error {
 			return err
 		}
 	}
-	if current, err := os.ReadFile(path); err == nil && bytes.Equal(current, data.Bytes()) {
-		return nil
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+	contentHash := sha256.Sum256(data.Bytes())
+	unchanged, err := projectionUnchanged(path, data.Len(), contentHash)
+	if err != nil {
 		return err
+	}
+	if unchanged {
+		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -518,10 +555,18 @@ func WriteJSONLAtomic(path string, entries []map[string]any) error {
 	if err = f.Sync(); err != nil {
 		return err
 	}
+	writtenInfo, err := f.Stat()
+	if err != nil {
+		return err
+	}
 	if err = f.Close(); err != nil {
 		return err
 	}
 	if err = os.Rename(tmp, path); err != nil {
+		return err
+	}
+	renamedInfo, err := os.Stat(path)
+	if err != nil {
 		return err
 	}
 	dir, err := os.Open(filepath.Dir(path))
@@ -537,7 +582,175 @@ func WriteJSONLAtomic(path string, entries []map[string]any) error {
 		return closeErr
 	}
 	ok = true
+	cacheProjectionFingerprint(path, writtenInfo, renamedInfo, contentHash)
 	return nil
+}
+
+func projectionUnchanged(path string, size int, contentHash [sha256.Size]byte) (bool, error) {
+	clean := filepath.Clean(path)
+	info, err := os.Stat(clean)
+	if errors.Is(err, os.ErrNotExist) {
+		forgetProjectionFingerprint(clean)
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	cached, ok := projectionFingerprints.get(clean)
+	if ok && cached.matches(info) {
+		return cached.hash == contentHash, nil
+	}
+	if info.Size() != int64(size) {
+		return false, nil
+	}
+
+	f, err := os.Open(clean)
+	if err != nil {
+		return false, err
+	}
+	hasher := sha256.New()
+	_, copyErr := io.Copy(hasher, f)
+	closeErr := f.Close()
+	if copyErr != nil {
+		return false, copyErr
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+	after, err := os.Stat(clean)
+	if err != nil {
+		return false, err
+	}
+	if !sameFileSnapshot(info, after) {
+		return false, nil
+	}
+	var diskHash [sha256.Size]byte
+	copy(diskHash[:], hasher.Sum(nil))
+	if changeStamp, ok := projectionChangeStamp(after); ok {
+		projectionFingerprints.put(clean, projectionFingerprint{info: after, changeStamp: changeStamp, hash: diskHash})
+	}
+	return diskHash == contentHash, nil
+}
+
+func cacheProjectionFingerprint(path string, writtenInfo, renamedInfo os.FileInfo, contentHash [sha256.Size]byte) {
+	info, err := os.Stat(path)
+	if err != nil || !sameFileIdentity(writtenInfo, renamedInfo) || !sameProjectionVersion(renamedInfo, info) {
+		forgetProjectionFingerprint(path)
+		return
+	}
+	clean := filepath.Clean(path)
+	changeStamp, ok := projectionChangeStamp(info)
+	if !ok {
+		forgetProjectionFingerprint(clean)
+		return
+	}
+	projectionFingerprints.put(clean, projectionFingerprint{info: info, changeStamp: changeStamp, hash: contentHash})
+}
+
+func forgetProjectionFingerprint(path string) {
+	projectionFingerprints.forget(filepath.Clean(path))
+}
+
+func (fingerprint projectionFingerprint) matches(info os.FileInfo) bool {
+	if fingerprint.info == nil ||
+		fingerprint.info.Size() != info.Size() ||
+		!fingerprint.info.ModTime().Equal(info.ModTime()) ||
+		!os.SameFile(fingerprint.info, info) {
+		return false
+	}
+	changeStamp, ok := projectionChangeStamp(info)
+	return ok && changeStamp == fingerprint.changeStamp
+}
+
+func sameProjectionVersion(before, after os.FileInfo) bool {
+	if !sameFileSnapshot(before, after) {
+		return false
+	}
+	beforeStamp, beforeOK := projectionChangeStamp(before)
+	afterStamp, afterOK := projectionChangeStamp(after)
+	return beforeOK && afterOK && beforeStamp == afterStamp
+}
+
+func sameFileIdentity(before, after os.FileInfo) bool {
+	return before != nil &&
+		after != nil &&
+		before.Size() == after.Size() &&
+		before.ModTime().Equal(after.ModTime()) &&
+		os.SameFile(before, after)
+}
+
+func sameFileSnapshot(before, after os.FileInfo) bool {
+	if !sameFileIdentity(before, after) {
+		return false
+	}
+	beforeStamp, beforeOK := projectionChangeStamp(before)
+	afterStamp, afterOK := projectionChangeStamp(after)
+	return !beforeOK || !afterOK || beforeStamp == afterStamp
+}
+
+func projectionChangeStamp(info os.FileInfo) (string, bool) {
+	if info == nil || info.Sys() == nil {
+		return "", false
+	}
+	value := reflect.ValueOf(info.Sys())
+	for value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return "", false
+		}
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return "", false
+	}
+	for _, name := range []string{"Ctimespec", "Ctim", "Ctime", "ChangeTime"} {
+		field := value.FieldByName(name)
+		if field.IsValid() && field.CanInterface() {
+			return fmt.Sprint(field.Interface()), true
+		}
+	}
+	return "", false
+}
+
+func (cache *fingerprintCache) get(path string) (projectionFingerprint, bool) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	element := cache.entries[path]
+	if element == nil {
+		return projectionFingerprint{}, false
+	}
+	cache.order.MoveToFront(element)
+	return element.Value.(fingerprintEntry).fingerprint, true
+}
+
+func (cache *fingerprintCache) put(path string, fingerprint projectionFingerprint) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.entries == nil {
+		cache.entries = make(map[string]*list.Element)
+	}
+	if element := cache.entries[path]; element != nil {
+		element.Value = fingerprintEntry{path: path, fingerprint: fingerprint}
+		cache.order.MoveToFront(element)
+		return
+	}
+	cache.entries[path] = cache.order.PushFront(fingerprintEntry{path: path, fingerprint: fingerprint})
+	if cache.order.Len() <= maxProjectionFingerprints {
+		return
+	}
+	oldest := cache.order.Back()
+	entry := oldest.Value.(fingerprintEntry)
+	delete(cache.entries, entry.path)
+	cache.order.Remove(oldest)
+}
+
+func (cache *fingerprintCache) forget(path string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if element := cache.entries[path]; element != nil {
+		delete(cache.entries, path)
+		cache.order.Remove(element)
+	}
 }
 
 type keyedLocker struct {

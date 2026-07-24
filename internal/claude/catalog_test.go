@@ -145,6 +145,94 @@ func TestCatalogHomesAreIsolated(t *testing.T) {
 	}
 }
 
+func TestCatalogSkipsUnchangedFingerprintAndReconcilesChangedFile(t *testing.T) {
+	const nativeID = "00000000-0000-4000-8000-000000000075"
+	home := t.TempDir()
+	sessionsDir := t.TempDir()
+	cwd := t.TempDir()
+	path := writeNative(t, home, "-tmp-gated", nativeID, nativeRecord(nativeID, cwd, "first"))
+	catalog, err := NewCatalog(home, sessionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := catalog.Sync(context.Background())
+	if err != nil || !first.Complete {
+		t.Fatalf("initial sync = %+v, %v", first, err)
+	}
+	projections, err := FindProjections(sessionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantID := filepath.Base(projections[nativeID])
+	if len(first.SessionIDs) != 1 || first.SessionIDs[0] != wantID {
+		t.Fatalf("initial IDs = %v, want [%s]", first.SessionIDs, wantID)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(nativeRecord(nativeID, cwd, "other")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	unchanged, err := catalog.Sync(context.Background())
+	if err != nil || !unchanged.Complete {
+		t.Fatalf("fingerprint-gated sync = %+v, %v", unchanged, err)
+	}
+	if len(unchanged.SessionIDs) != 1 || unchanged.SessionIDs[0] != wantID {
+		t.Fatalf("unchanged IDs = %v, want [%s]", unchanged.SessionIDs, wantID)
+	}
+	projected, err := os.ReadFile(projections[nativeID])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(projected), "other") {
+		t.Fatal("same (mtime,size) transcript was reparsed")
+	}
+
+	if err := os.Remove(projections[nativeID]); err != nil {
+		t.Fatal(err)
+	}
+	rehydrated, err := catalog.Sync(context.Background())
+	if err != nil || !rehydrated.Complete {
+		t.Fatalf("missing-projection reconcile = %+v, %v", rehydrated, err)
+	}
+	if len(rehydrated.SessionIDs) != 1 || rehydrated.SessionIDs[0] != wantID {
+		t.Fatalf("rehydrated IDs = %v, want [%s]", rehydrated.SessionIDs, wantID)
+	}
+	projections, err = FindProjections(sessionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, err = os.ReadFile(projections[nativeID])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(projected), "other") {
+		t.Fatal("unchanged native transcript did not rehydrate its missing projection")
+	}
+
+	if err := os.WriteFile(path, []byte(nativeRecord(nativeID, cwd, "third")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	changed := info.ModTime().Add(2 * time.Second)
+	if err := os.Chtimes(path, changed, changed); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := catalog.Sync(context.Background()); err != nil || !result.Complete {
+		t.Fatalf("changed reconcile sync = %+v, %v", result, err)
+	}
+	projected, err = os.ReadFile(projections[nativeID])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(projected), "third") {
+		t.Fatal("changed transcript was not reconciled")
+	}
+}
+
 func TestWatcherRecoversAfterProjectsDirectoryRecreation(t *testing.T) {
 	const nativeID = "00000000-0000-4000-8000-000000000081"
 	home := t.TempDir()

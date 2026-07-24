@@ -47,6 +47,9 @@ type Worker struct {
 	completedTurns                          map[string]struct{}
 	revision                                uint64
 	materializePending                      bool
+	materializedRevision                    uint64
+	materializedProjection                  Projection
+	hasMaterializedRevision                 bool
 	closed                                  bool
 	startedAt                               time.Time
 	lastActive                              time.Time
@@ -117,6 +120,9 @@ func NewWorker(ctx context.Context, sessionPath string, command []string, callba
 		_ = c.Close()
 		return nil, err
 	}
+	w.materializedRevision = w.revision
+	w.materializedProjection = projection
+	w.hasMaterializedRevision = true
 	close(ready)
 	if callbacks.Projection != nil {
 		callbacks.Projection(projection)
@@ -243,6 +249,7 @@ func (w *Worker) Abort(ctx context.Context) error {
 	defer w.turnOpMu.Unlock()
 	w.mu.Lock()
 	turn := w.activeTurn
+	clear(w.preview)
 	w.lastActive = time.Now()
 	w.mu.Unlock()
 	if turn == "" {
@@ -319,6 +326,7 @@ func (w *Worker) protocolError(err error) error {
 		w.mu.Unlock()
 		return err
 	}
+	clear(w.preview)
 	w.setStatusLocked(workers.WorkerStateError, err.Error())
 	w.mu.Unlock()
 	if w.callbacks.Error != nil {
@@ -949,7 +957,21 @@ func (w *Worker) materializeRevision(thread Thread, revision uint64) {
 		w.mu.Unlock()
 		return
 	}
+	if w.hasMaterializedRevision && w.materializedRevision == revision {
+		projection := w.materializedProjection
+		callback := w.callbacks.Projection
+		w.mu.Unlock()
+		if callback != nil {
+			callback(projection)
+		}
+		return
+	}
 	projection, err := Materialize(w.sessionsDir, thread)
+	if err == nil {
+		w.materializedRevision = revision
+		w.materializedProjection = projection
+		w.hasMaterializedRevision = true
+	}
 	w.mu.Unlock()
 	if err != nil {
 		w.protocolError(err)

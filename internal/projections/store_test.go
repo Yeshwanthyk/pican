@@ -2,6 +2,7 @@ package projections
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,73 @@ func TestStoreReplaceCreatesMissingSessionsDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(projection.Path); err != nil {
 		t.Fatalf("projection was not created: %v", err)
+	}
+}
+
+func TestWriteJSONLAtomicUsesFingerprintCacheAndDetectsExternalChanges(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "projection.jsonl")
+	entries := replacementEntries("claude", "native", "/tmp/project", "new")
+	if err := WriteJSONLAtomic(path, entries); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := projectionFingerprints.get(path); !ok {
+		t.Fatal("new projection did not warm the fingerprint cache")
+	}
+
+	if err := WriteJSONLAtomic(path, entries); err != nil {
+		t.Fatalf("cached identical write failed: %v", err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Fatalf("cached identical write changed modtime: before=%v after=%v", before.ModTime(), after.ModTime())
+	}
+
+	external := []byte(strings.Replace(string(original), `"content":"new"`, `"content":"old"`, 1))
+	if len(external) != len(original) {
+		t.Fatal("test fixture must preserve projection size")
+	}
+	if err := os.WriteFile(path, external, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, before.ModTime(), before.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSONLAtomic(path, entries); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(restored) != string(original) {
+		t.Fatalf("external projection change was hidden by fingerprint cache:\n%s", restored)
+	}
+}
+
+func TestFingerprintCacheIsBounded(t *testing.T) {
+	var cache fingerprintCache
+	for i := 0; i <= maxProjectionFingerprints; i++ {
+		cache.put(fmt.Sprintf("/projection/%d", i), projectionFingerprint{})
+	}
+	if got := cache.order.Len(); got != maxProjectionFingerprints {
+		t.Fatalf("fingerprint cache entries = %d, want %d", got, maxProjectionFingerprints)
+	}
+	if _, ok := cache.get("/projection/0"); ok {
+		t.Fatal("oldest fingerprint survived capacity eviction")
+	}
+	if _, ok := cache.get(fmt.Sprintf("/projection/%d", maxProjectionFingerprints)); !ok {
+		t.Fatal("newest fingerprint was evicted")
 	}
 }
 

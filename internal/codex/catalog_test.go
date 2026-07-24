@@ -32,10 +32,6 @@ func TestSyncPrunesOnlyValidatedCodexProjectionAfterSuccessfulList(t *testing.T)
 	if _, err = os.Stat(codexProjection.Path); err != nil {
 		t.Fatalf("pruned after failed list: %v", err)
 	}
-	old := time.Now().Add(-projectionPruneGrace - time.Minute)
-	if err := os.Chtimes(codexProjection.Path, old, old); err != nil {
-		t.Fatal(err)
-	}
 	if _, err = Sync(context.Background(), root, helperCommand("empty-list")); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +43,7 @@ func TestSyncPrunesOnlyValidatedCodexProjectionAfterSuccessfulList(t *testing.T)
 	}
 }
 
-func TestSyncKeepsRecentProjectionMissingFromList(t *testing.T) {
+func TestSyncPrunesRecentProjectionMissingFromAuthoritativeList(t *testing.T) {
 	root := t.TempDir()
 	projection, err := Materialize(root, Thread{ID: "recent", CWD: t.TempDir(), CreatedAt: 1})
 	if err != nil {
@@ -56,8 +52,74 @@ func TestSyncKeepsRecentProjectionMissingFromList(t *testing.T) {
 	if _, err := Sync(context.Background(), root, helperCommand("empty-list")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(projection.Path); err != nil {
-		t.Fatalf("recent projection was pruned before Codex list convergence: %v", err)
+	if _, err := os.Stat(projection.Path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("recent projection remains after authoritative list: %v", err)
+	}
+}
+
+func TestCatalogSkipsUnchangedThreadAndReadsUpdatedThread(t *testing.T) {
+	root := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "rpc.log")
+	catalog := NewCatalog(root, helperCommand("normal", logPath))
+
+	first, err := catalog.Sync(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	projections, err := FindProjections(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantID := filepath.Base(projections["thread-1"])
+	if len(first.IDs) != 1 || first.IDs[0] != wantID {
+		t.Fatalf("initial IDs = %v, want [%s]", first.IDs, wantID)
+	}
+	second, err := catalog.Sync(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.IDs) != 1 || second.IDs[0] != wantID {
+		t.Fatalf("unchanged IDs = %v, want [%s]", second.IDs, wantID)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(data), "thread/list\n"); got != 2 {
+		t.Fatalf("thread/list calls = %d, want 2", got)
+	}
+	if got := strings.Count(string(data), "thread/read\n"); got != 1 {
+		t.Fatalf("thread/read calls = %d, want 1 for unchanged UpdatedAt", got)
+	}
+
+	if err := os.Remove(projections["thread-1"]); err != nil {
+		t.Fatal(err)
+	}
+	rehydrated, err := catalog.Sync(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rehydrated.IDs) != 1 || rehydrated.IDs[0] != wantID {
+		t.Fatalf("rehydrated IDs = %v, want [%s]", rehydrated.IDs, wantID)
+	}
+	data, err = os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(data), "thread/read\n"); got != 2 {
+		t.Fatalf("thread/read calls after projection deletion = %d, want 2", got)
+	}
+
+	catalog.updatedAt["thread-1"]--
+	if _, err := catalog.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(data), "thread/read\n"); got != 3 {
+		t.Fatalf("thread/read calls after UpdatedAt change = %d, want 3", got)
 	}
 }
 

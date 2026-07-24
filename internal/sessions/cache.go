@@ -1,12 +1,15 @@
 package sessions
 
 import (
+	"container/list"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
+
+const defaultSessionCacheByteBudget int64 = 200 << 20
 
 type cacheEntry struct {
 	modTime time.Time
@@ -19,6 +22,8 @@ type sessionCacheEntry struct {
 	modTime time.Time
 	session Session
 	parse   fileParseState
+	path    string
+	bytes   int64
 }
 
 // dirListing is a project directory's cached file-name list (.jsonl only),
@@ -32,10 +37,13 @@ type dirListing struct {
 }
 
 type Cache struct {
-	mu           sync.Mutex
-	entries      map[string]cacheEntry        // keyed by full file path
-	pathIndex    map[string]string            // filename -> full file path
-	sessionCache map[string]sessionCacheEntry // path -> full parsed session
+	mu            sync.Mutex
+	entries       map[string]cacheEntry    // keyed by full file path
+	pathIndex     map[string]string        // filename -> full file path
+	sessionCache  map[string]*list.Element // path -> element in sessionLRU
+	sessionLRU    list.List                // most recently used at the front
+	sessionBytes  int64
+	sessionBudget int64
 
 	rootDir     string
 	hasRoot     bool
@@ -43,17 +51,122 @@ type Cache struct {
 	projectDirs []string              // subdirectory names under rootDir, valid while rootModTime matches
 	dirListings map[string]dirListing // project dir name -> cached .jsonl name list
 
-	parses   int // diagnostic: number of ParseSummary calls
-	hits     int // diagnostic: number of cache hits
-	dirReads int // diagnostic: number of real os.ReadDir calls issued (root + subdirs)
+	parses           int // diagnostic: number of ParseSummary calls
+	hits             int // diagnostic: number of cache hits
+	sessionParses    int // diagnostic: number of full-session parse calls
+	sessionHits      int // diagnostic: number of full-session cache hits
+	sessionEvictions int
+	dirReads         int // diagnostic: number of real os.ReadDir calls issued (root + subdirs)
 }
 
-func NewCache() *Cache {
-	return &Cache{
-		entries:      make(map[string]cacheEntry),
-		pathIndex:    make(map[string]string),
-		sessionCache: make(map[string]sessionCacheEntry),
-		dirListings:  make(map[string]dirListing),
+type CacheOption func(*Cache)
+
+// WithSessionCacheByteBudget overrides the parsed-session cache budget. A
+// non-positive budget disables retention while preserving Resolve behavior.
+func WithSessionCacheByteBudget(bytes int64) CacheOption {
+	return func(c *Cache) {
+		c.sessionBudget = bytes
+	}
+}
+
+func NewCache(options ...CacheOption) *Cache {
+	c := &Cache{
+		entries:       make(map[string]cacheEntry),
+		pathIndex:     make(map[string]string),
+		sessionCache:  make(map[string]*list.Element),
+		sessionBudget: defaultSessionCacheByteBudget,
+		dirListings:   make(map[string]dirListing),
+	}
+	for _, option := range options {
+		option(c)
+	}
+	return c
+}
+
+// CacheStats is a point-in-time diagnostic snapshot used by /api/metrics.
+type CacheStats struct {
+	SummaryParses    int
+	SummaryHits      int
+	SessionParses    int
+	SessionHits      int
+	SessionEntries   int
+	SessionBytes     int64
+	SessionEvictions int
+}
+
+func (c *Cache) Stats() CacheStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return CacheStats{
+		SummaryParses:    c.parses,
+		SummaryHits:      c.hits,
+		SessionParses:    c.sessionParses,
+		SessionHits:      c.sessionHits,
+		SessionEntries:   len(c.sessionCache),
+		SessionBytes:     c.sessionBytes,
+		SessionEvictions: c.sessionEvictions,
+	}
+}
+
+func (c *Cache) removeSessionEntryLocked(path string) {
+	elem, ok := c.sessionCache[path]
+	if !ok {
+		return
+	}
+	entry := elem.Value.(*sessionCacheEntry)
+	c.sessionBytes -= entry.bytes
+	c.sessionLRU.Remove(elem)
+	delete(c.sessionCache, path)
+}
+
+func (c *Cache) storeSessionEntryLocked(entry sessionCacheEntry) {
+	c.removeSessionEntryLocked(entry.path)
+	elem := c.sessionLRU.PushFront(&entry)
+	c.sessionCache[entry.path] = elem
+	c.sessionBytes += entry.bytes
+	for c.sessionBytes > c.sessionBudget && c.sessionLRU.Len() > 0 {
+		oldest := c.sessionLRU.Back()
+		oldEntry := oldest.Value.(*sessionCacheEntry)
+		c.removeSessionEntryLocked(oldEntry.path)
+		c.sessionEvictions++
+	}
+}
+
+func approximateSessionBytes(session Session) int64 {
+	size := int64(256)
+	size += int64(len(session.ID) + len(session.SessionUUID) + len(session.Filename) +
+		len(session.Name) + len(session.Project) + len(session.Runtime) +
+		len(session.NativeID) + len(session.LastActivity))
+	size += approximateValueBytes(session.Header)
+	size += 24
+	for _, entry := range session.Entries {
+		size += approximateValueBytes(entry)
+	}
+	return size
+}
+
+func approximateValueBytes(value any) int64 {
+	switch value := value.(type) {
+	case nil:
+		return 0
+	case bool, float64, int, int64, uint64:
+		return 16
+	case string:
+		return int64(16 + len(value))
+	case []any:
+		size := int64(24 + 16*len(value))
+		for _, item := range value {
+			size += approximateValueBytes(item)
+		}
+		return size
+	case map[string]any:
+		size := int64(64 + 32*len(value))
+		for key, item := range value {
+			size += int64(len(key)) + approximateValueBytes(item)
+		}
+		return size
+	default:
+		return 16
 	}
 }
 
@@ -222,6 +335,13 @@ func (c *Cache) LoadAll(dir string) ([]SessionSummary, error) {
 		if _, ok := seen[p]; !ok {
 			delete(c.entries, p)
 			delete(c.pathIndex, filepath.Base(p))
+			c.removeSessionEntryLocked(p)
+		}
+	}
+	for p := range c.sessionCache {
+		if _, ok := seen[p]; !ok {
+			delete(c.pathIndex, filepath.Base(p))
+			c.removeSessionEntryLocked(p)
 		}
 	}
 
@@ -302,6 +422,79 @@ func (c *Cache) FindPath(name string) (string, bool) {
 	return p, ok
 }
 
+// ResolveSummary resolves one session without retaining its full Entries and
+// Header maps. It is intended for hot metadata-only paths such as worker
+// status checks.
+func (c *Cache) ResolveSummary(sessionsDir, id string) (SessionSummary, error) {
+	if id == "" || filepath.Base(id) != id || filepath.Ext(id) != ".jsonl" {
+		return SessionSummary{}, ErrInvalidSessionID
+	}
+
+	path, ok := c.FindPath(id)
+	if !ok {
+		var err error
+		path, err = findPathByFilename(sessionsDir, id)
+		if err != nil {
+			return SessionSummary{}, err
+		}
+		c.mu.Lock()
+		c.pathIndex[id] = path
+		c.mu.Unlock()
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		c.mu.Lock()
+		delete(c.pathIndex, id)
+		delete(c.entries, path)
+		c.removeSessionEntryLocked(path)
+		c.mu.Unlock()
+		return SessionSummary{}, err
+	}
+
+	c.mu.Lock()
+	entry, cached := c.entries[path]
+	if cached && entry.modTime.Equal(info.ModTime()) {
+		c.hits++
+		c.mu.Unlock()
+		return entry.summary, nil
+	}
+	if elem, ok := c.sessionCache[path]; ok {
+		full := elem.Value.(*sessionCacheEntry)
+		if full.modTime.Equal(info.ModTime()) {
+			// Metadata-only status polling must not keep a large parsed session
+			// artificially hot in the LRU, so don't move this element.
+			c.hits++
+			summary := full.session.SessionSummary
+			c.mu.Unlock()
+			return summary, nil
+		}
+	}
+	var prior *cacheEntry
+	if cached {
+		priorCopy := entry
+		prior = &priorCopy
+	}
+	c.mu.Unlock()
+
+	dirName := filepath.Base(filepath.Dir(path))
+	summary, state, err := parseSummaryCached(path, dirName, id, prior)
+	if err != nil {
+		return SessionSummary{}, err
+	}
+	c.mu.Lock()
+	c.parses++
+	c.entries[path] = cacheEntry{
+		modTime: info.ModTime(),
+		dirName: dirName,
+		summary: summary,
+		parse:   state,
+	}
+	c.pathIndex[id] = path
+	c.mu.Unlock()
+	return summary, nil
+}
+
 // Invalidate drops parsed data and path resolution for a session. Runtime-backed
 // projections may be atomically replaced or moved between canonicalized project
 // directories, so the next read must rediscover the authoritative path rather
@@ -312,7 +505,7 @@ func (c *Cache) Invalidate(id string) {
 	delete(c.pathIndex, id)
 	for path := range c.sessionCache {
 		if filepath.Base(path) == id {
-			delete(c.sessionCache, path)
+			c.removeSessionEntryLocked(path)
 		}
 	}
 	for path := range c.entries {
@@ -345,12 +538,25 @@ func (c *Cache) Resolve(sessionsDir, id string) (ResolvedSession, error) {
 
 	info, err := os.Stat(path)
 	if err != nil {
+		c.mu.Lock()
+		delete(c.pathIndex, id)
+		delete(c.entries, path)
+		c.removeSessionEntryLocked(path)
+		c.mu.Unlock()
 		return ResolvedSession{}, err
 	}
 	modTime := info.ModTime()
 
 	c.mu.Lock()
-	ce, hasCached := c.sessionCache[path]
+	elem, hasCached := c.sessionCache[path]
+	var ce sessionCacheEntry
+	if hasCached {
+		ce = *elem.Value.(*sessionCacheEntry)
+	}
+	if hasCached && ce.modTime.Equal(modTime) {
+		c.sessionLRU.MoveToFront(elem)
+		c.sessionHits++
+	}
 	c.mu.Unlock()
 
 	if hasCached && ce.modTime.Equal(modTime) {
@@ -369,7 +575,14 @@ func (c *Cache) Resolve(sessionsDir, id string) (ResolvedSession, error) {
 	}
 
 	c.mu.Lock()
-	c.sessionCache[path] = sessionCacheEntry{modTime: modTime, session: sess, parse: state}
+	c.sessionParses++
+	c.storeSessionEntryLocked(sessionCacheEntry{
+		modTime: modTime,
+		session: sess,
+		parse:   state,
+		path:    path,
+		bytes:   approximateSessionBytes(sess),
+	})
 	c.mu.Unlock()
 
 	return ResolvedSession{Session: sess, Path: path}, nil
