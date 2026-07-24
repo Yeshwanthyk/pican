@@ -254,9 +254,10 @@ short-lived `codex app-server --stdio`
 
 Restart performs one full hydration. Later passes retain `UpdatedAt` state, so
 the recurring work is the paginated list plus targeted reads. Per-thread
-failures are recorded without deleting older projections. In `both` mode a
-failed sync marks Codex unavailable but leaves Pi and cached Codex viewing
-intact.
+failures are recorded without deleting older projections. Codex executable and
+authentication health is probed independently: a deferred or failed catalog
+pass leaves cached viewing intact without disabling healthy create, resume, or
+chat operations.
 
 ## Data Flow: Claude Catalog Sync
 

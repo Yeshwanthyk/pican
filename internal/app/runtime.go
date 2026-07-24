@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -54,6 +56,34 @@ type runtimeSet struct {
 	registry *runtimeRegistry
 	ordered  []runtimes.ID
 	enabled  map[runtimes.ID]struct{}
+}
+
+type runtimeCandidate struct {
+	id      runtimes.ID
+	command string
+}
+
+func resolveRuntimeSelection(value string, candidates []runtimeCandidate, lookPath func(string) (string, error)) (string, error) {
+	if !strings.EqualFold(strings.TrimSpace(value), "auto") {
+		return value, nil
+	}
+	var installed []string
+	for _, candidate := range candidates {
+		if strings.TrimSpace(candidate.command) == "" {
+			continue
+		}
+		if _, err := lookPath(candidate.command); err == nil {
+			installed = append(installed, string(candidate.id))
+		}
+	}
+	if len(installed) == 0 {
+		return "", errors.New("no supported runtimes found; install pi, codex, claude, or opencode, or pass -runtime explicitly")
+	}
+	return strings.Join(installed, ","), nil
+}
+
+func discoverRuntimeSelection(value string, candidates []runtimeCandidate) (string, error) {
+	return resolveRuntimeSelection(value, candidates, exec.LookPath)
 }
 
 func runtimeSelectionIncludes(value string, target runtimes.ID) bool {
@@ -419,7 +449,7 @@ func (s *catalogSyncer) availability(context.Context) runtimes.Availability {
 	return runtimes.Availability{Available: available, Reason: reason}
 }
 
-func (s *catalogSyncer) start() {
+func (s *catalogSyncer) start(immediate bool) {
 	s.startOnce.Do(func() {
 		runCtx, runCancel := context.WithCancel(context.Background())
 		s.mu.Lock()
@@ -428,6 +458,9 @@ func (s *catalogSyncer) start() {
 		s.mu.Unlock()
 		go func() {
 			defer close(s.done)
+			if immediate {
+				_, _ = s.Sync(runCtx)
+			}
 			ticker := time.NewTicker(s.interval)
 			defer ticker.Stop()
 			for {

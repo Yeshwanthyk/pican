@@ -38,7 +38,8 @@ See [the installation guide](user-docs/en/install.md) for manual downloads, Wind
 ## Run
 
 ```bash
-pican                         # Pi runtime, port 31415
+pican                         # Auto-detect installed runtimes, port 31415
+pican -runtime=pi             # Explicit Pi-only override
 pican -runtime=codex          # Codex only
 pican -runtime=both           # Pi and Codex
 pican -runtime=pi,claude      # Pi + Claude catalog and browser chat

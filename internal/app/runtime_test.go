@@ -78,6 +78,47 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 	}
 }
 
+func TestResolveRuntimeSelectionAutoDiscoversInstalledCommandsInRegistryOrder(t *testing.T) {
+	candidates := []runtimeCandidate{
+		{id: runtimes.PiID, command: "pi"},
+		{id: runtimes.CodexID, command: "/custom/codex"},
+		{id: runtimes.ClaudeID, command: "claude"},
+		{id: runtimes.OpenCodeID, command: "/custom/opencode"},
+	}
+	installed := map[string]bool{"pi": true, "claude": true, "/custom/opencode": true}
+	selection, err := resolveRuntimeSelection(" AUTO ", candidates, func(command string) (string, error) {
+		if installed[command] {
+			return command, nil
+		}
+		return "", errors.New("not found")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selection != "pi,claude,opencode" {
+		t.Fatalf("selection = %q", selection)
+	}
+}
+
+func TestResolveRuntimeSelectionPreservesExplicitOverride(t *testing.T) {
+	selection, err := resolveRuntimeSelection("codex,pi", nil, func(string) (string, error) {
+		t.Fatal("explicit selection performed discovery")
+		return "", nil
+	})
+	if err != nil || selection != "codex,pi" {
+		t.Fatalf("selection = %q, err = %v", selection, err)
+	}
+}
+
+func TestResolveRuntimeSelectionRejectsEmptyDiscovery(t *testing.T) {
+	_, err := resolveRuntimeSelection("auto", []runtimeCandidate{{id: runtimes.PiID, command: "pi"}}, func(string) (string, error) {
+		return "", errors.New("not found")
+	})
+	if err == nil {
+		t.Fatal("empty discovery was accepted")
+	}
+}
+
 func TestOpenCodeExecutablePrecedence(t *testing.T) {
 	t.Setenv("PICAN_OPENCODE_COMMAND", "/env/opencode")
 	if got := openCodeExecutable("/flag/opencode"); got != "/flag/opencode" {
@@ -190,7 +231,7 @@ func TestCatalogSyncerSingleFlightAndShutdown(t *testing.T) {
 		t.Fatalf("maximum concurrent syncs = %d", maximum.Load())
 	}
 
-	syncer.start()
+	syncer.start(false)
 	done := make(chan struct{})
 	go func() { syncer.close(); close(done) }()
 	select {
@@ -207,7 +248,7 @@ func TestCatalogSyncerShutdownCancelsActiveSync(t *testing.T) {
 		<-ctx.Done()
 		return runtimes.CatalogResult{}, ctx.Err()
 	}, time.Minute, time.Millisecond)
-	syncer.start()
+	syncer.start(false)
 	<-started
 	done := make(chan struct{})
 	go func() {
@@ -218,5 +259,20 @@ func TestCatalogSyncerShutdownCancelsActiveSync(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("catalog shutdown did not cancel active sync")
+	}
+}
+
+func TestCatalogSyncerCanRetryImmediately(t *testing.T) {
+	called := make(chan struct{}, 1)
+	syncer := newCatalogSyncer("test", func(context.Context) (runtimes.CatalogResult, error) {
+		called <- struct{}{}
+		return runtimes.CatalogResult{Complete: true}, nil
+	}, time.Second, time.Hour)
+	syncer.start(true)
+	defer syncer.close()
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatal("immediate catalog retry did not run")
 	}
 }

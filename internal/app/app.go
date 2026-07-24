@@ -17,6 +17,7 @@ import (
 	"pican/internal/agentdir"
 	"pican/internal/auth"
 	"pican/internal/claude"
+	"pican/internal/codex"
 	"pican/internal/frontend"
 	"pican/internal/opencode"
 	"pican/internal/runtimes"
@@ -39,7 +40,7 @@ func Main(version string) {
 	open := flag.Bool("o", false, "auto-open browser")
 	insecure := flag.Bool("insecure", false, "allow non-loopback bind without "+tokenEnvVar+" (DANGEROUS)")
 	showVersion := flag.Bool("version", false, "print version and exit")
-	runtimeFlag := flag.String("runtime", "pi", "agent runtimes: pi, codex, claude, opencode, both, or a comma-separated list")
+	runtimeFlag := flag.String("runtime", "auto", "agent runtimes: auto, pi, codex, claude, opencode, both, or a comma-separated list")
 	codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
 	claudeCommandFlag := flag.String("claude-command", "", "path to the Claude executable")
 	claudeHomeFlag := flag.String("claude-home", "", "Claude config home containing projects/")
@@ -55,6 +56,16 @@ func Main(version string) {
 	codexArgv := codexCommand(codexPath)
 	claudePath := claude.ResolveCommand(*claudeCommandFlag)
 	openCodePath := openCodeExecutable(*openCodeCommandFlag)
+	runtimeSelection, err := discoverRuntimeSelection(*runtimeFlag, []runtimeCandidate{
+		{id: runtimes.PiID, command: "pi"},
+		{id: runtimes.CodexID, command: codexPath},
+		{id: runtimes.ClaudeID, command: claudePath},
+		{id: runtimes.OpenCodeID, command: openCodePath},
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	claudeHome, err := claude.ResolveHome(*claudeHomeFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "resolve Claude home: %v\n", err)
@@ -69,7 +80,13 @@ func Main(version string) {
 
 	var srv *server.Server
 	currentServer := func() *server.Server { return srv }
-	codexCatalogSyncer := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 15*time.Second, time.Minute)
+	codexCatalogSyncer := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 10*time.Minute, time.Minute)
+	codexProbe := codex.NewProbe(codexPath, 30*time.Second)
+	if runtimeSelectionIncludes(runtimeSelection, runtimes.CodexID) {
+		probeCtx, probeCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = codexProbe.Refresh(probeCtx)
+		probeCancel()
+	}
 	claudeCatalog, err := claude.NewCatalog(claudeHome, sessionsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "initialize Claude catalog: %v\n", err)
@@ -77,7 +94,7 @@ func Main(version string) {
 	}
 	claudeCatalogSyncer := newCatalogSyncer("Claude", claudeCatalog.Sync, 15*time.Second, 10*time.Minute)
 	claudeProbe := claude.NewProbe(claudePath, claudeHome, 30*time.Second)
-	if runtimeSelectionIncludes(*runtimeFlag, runtimes.ClaudeID) {
+	if runtimeSelectionIncludes(runtimeSelection, runtimes.ClaudeID) {
 		probeCtx, probeCancel := context.WithTimeout(context.Background(), 3*time.Second)
 		_ = claudeProbe.Refresh(probeCtx)
 		probeCancel()
@@ -157,7 +174,8 @@ func Main(version string) {
 			applicationRuntime{
 				registration: runtimes.Codex(runtimes.BuiltinOptions{
 					Command:           codexPath,
-					AvailabilityProbe: codexCatalogSyncer.availability,
+					Version:           codexProbe.Version(),
+					AvailabilityProbe: codexProbe.Availability,
 					Catalog:           codexCatalogSyncer,
 					WorkerFactory:     codexWorkerFactory(sessionsDir, codexArgv, currentServer),
 				}),
@@ -190,7 +208,7 @@ func Main(version string) {
 		fmt.Fprintf(os.Stderr, "initialize runtime registry: %v\n", err)
 		os.Exit(1)
 	}
-	enabledRuntimes, err := parseRuntime(*runtimeFlag, registry)
+	enabledRuntimes, err := parseRuntime(runtimeSelection, registry)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -240,7 +258,7 @@ func Main(version string) {
 		fmt.Fprintf(os.Stderr, "initialize enabled runtime registry: %v\n", err)
 		os.Exit(1)
 	}
-	enabledRuntimes, err = parseRuntime(*runtimeFlag, registry)
+	enabledRuntimes, err = parseRuntime(runtimeSelection, registry)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -258,19 +276,18 @@ func Main(version string) {
 			continue
 		}
 		if runtimeID == runtimes.OpenCodeID {
-			openCodeCatalogSyncer.start()
+			openCodeCatalogSyncer.start(false)
 			activeCatalogs = append(activeCatalogs, openCodeCatalogSyncer)
 			continue
 		}
-		if _, syncErr := registration.Catalog.Sync(context.Background()); syncErr != nil {
-			if enabledRuntimes.only(runtimeID) {
-				fmt.Fprintf(os.Stderr, "%s runtime unavailable: %v\n", registration.Descriptor.Label, syncErr)
-				os.Exit(1)
-			}
-			fmt.Fprintf(os.Stderr, "%s unavailable; continuing with %s: %v\n", registration.Descriptor.Label, enabledRuntimes.labelsExcept(runtimeID), syncErr)
+		startupCtx, startupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		_, syncErr := registration.Catalog.Sync(startupCtx)
+		startupCancel()
+		if syncErr != nil {
+			fmt.Fprintf(os.Stderr, "%s catalog reconciliation deferred: %v\n", registration.Descriptor.Label, syncErr)
 		}
 		if syncer, ok := registration.Catalog.(*catalogSyncer); ok {
-			syncer.start()
+			syncer.start(syncErr != nil)
 			activeCatalogs = append(activeCatalogs, syncer)
 		}
 	}

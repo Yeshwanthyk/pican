@@ -1,6 +1,6 @@
 # Sequence Flow: Server Startup
 
-This document traces the execution from starting pican to the first HTTP request. Pi remains the default runtime; Codex, Claude, and OpenCode are optional registered runtime phases.
+This document traces the execution from starting pican to the first HTTP request. The default selection discovers installed Pi, Codex, Claude, and OpenCode commands; explicit runtime selection remains available.
 
 ## Sequence Diagram
 
@@ -65,14 +65,14 @@ port := flag.String("p", "31415", "port to listen on")
 hostOverride := flag.String("host", "", "host/IP to bind; defaults to 127.0.0.1")
 open := flag.Bool("o", false, "auto-open browser")
 insecure := flag.Bool("insecure", false, "allow non-loopback bind without PICAN_TOKEN")
-runtimeFlag := flag.String("runtime", "pi", "agent runtimes: pi, codex, claude, opencode, both, or a comma-separated list")
+runtimeFlag := flag.String("runtime", "auto", "agent runtimes: auto, pi, codex, claude, opencode, both, or a comma-separated list")
 codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
 claudeCommandFlag := flag.String("claude-command", "", "path to the Claude executable")
 claudeHomeFlag := flag.String("claude-home", "", "Claude config home containing projects/")
 openCodeCommandFlag := flag.String("opencode-command", "", "path to the OpenCode executable")
 ```
 
-`-runtime` accepts registered comma-separated IDs; `both` remains exactly `pi,codex`. OpenCode command precedence is `-opencode-command`, `PICAN_OPENCODE_COMMAND`, `~/.opencode/bin/opencode` when installed there, then `opencode` from `PATH`. Other runtime overrides retain their documented precedence. Command values are executable paths, never shell fragments.
+The default `auto` selection resolves each configured command with `exec.LookPath` and enables installed runtimes in Pi, Codex, Claude, OpenCode registry order. `-runtime` accepts registered comma-separated IDs as an explicit override; `both` remains exactly `pi,codex`. OpenCode command precedence is `-opencode-command`, `PICAN_OPENCODE_COMMAND`, `~/.opencode/bin/opencode` when installed there, then `opencode` from `PATH`. Other runtime overrides retain their documented precedence. Command values are executable paths, never shell fragments.
 
 ### 2. Agent & Sessions Directory
 
@@ -85,9 +85,9 @@ Any selection containing Pi requires the sessions directory to exist. Replaceabl
 
 ### 3. Codex Catalog Initialization
 
-When Codex is enabled, startup synchronously runs `codex.Sync` with a 15-second timeout. A short-lived `codex app-server --stdio` client initializes, lists every page of visible non-archived threads, reads each thread with turns, and atomically materializes `codex-<thread-id>.jsonl` projections. Per-thread failures leave older projections intact.
+When Codex is enabled, startup first runs a bounded executable/version/auth probe. This health signal is independent from catalog freshness, so a large native catalog cannot disable otherwise-working create, resume, model, or chat operations.
 
-Codex-only mode exits if this initial sync fails. `both` mode logs degradation and continues with Pi; Codex is reported unavailable while cached projections remain readable/exportable. Sync retries every minute using `thread/list`; only new, changed, or missing projections trigger `thread/read` and materialization. Availability follows the latest completed attempt.
+Startup gives initial `codex.Sync` reconciliation 15 seconds. If it doesn't finish, pican serves cached projections and immediately continues the same reconciliation in the background with a ten-minute bound. Later retries run every minute using `thread/list`; only new, changed, or missing projections trigger `thread/read` and materialization. Per-thread or list failures leave older projections intact and never authorize pruning.
 
 ### 4. Claude Catalog Initialization
 

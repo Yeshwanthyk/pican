@@ -5,7 +5,8 @@ pican can host Pi sessions, Codex threads, or both from the same binary. Codex i
 ## Runtime selection
 
 ```bash
-pican -runtime=pi                  # default
+pican                              # auto-discover installed runtimes
+pican -runtime=pi                  # explicit Pi-only override
 pican -runtime=codex
 pican -runtime=both                 # legacy alias for pi,codex
 pican -runtime=pi,codex             # explicit ordered-registry selection form
@@ -15,18 +16,18 @@ PICAN_CODEX_COMMAND=/absolute/path/to/codex pican -runtime=both
 
 `-codex-command` and `PICAN_CODEX_COMMAND` name the **Codex executable**, not a shell command. The flag wins over the environment variable; the fallback is `codex` from `PATH`. pican appends `app-server --stdio` and executes the resulting argv directly.
 
-Startup registers Pi, Codex, Claude, and OpenCode in one ordered runtime registry. The selected subset, not a closed enum, is passed to the server and worker factory. The exact legacy value `both` aliases `pi,codex`; comma-separated input is case-normalized, deduplicated, and returned in registration order.
+Startup registers Pi, Codex, Claude, and OpenCode in one ordered runtime registry. The default `auto` selection enables runtimes whose configured executables resolve on the host; an explicit `-runtime` value overrides discovery. The selected subset, not a closed enum, is passed to the server and worker factory. The exact legacy value `both` aliases `pi,codex`; comma-separated input is case-normalized, deduplicated, and returned in registration order.
 
-The Codex registration declares `replaceable-projection`, its current supported capabilities, command metadata, catalog/availability adapter, and worker factory. The registry owns dispatch metadata only. Codex remains authoritative for thread state, `internal/projections.Store` owns generic projection replacement mechanics, the Codex adapter owns native-to-pican translation, `workers.Manager` retains worker lifecycle, and Codex-native archive/delete/unarchive plus rename/fork semantics stay on the separate `CodexService` rather than widening the common contract.
+The Codex registration declares `replaceable-projection`, its current supported capabilities, command metadata, independent executable/auth availability probe, catalog adapter, and worker factory. The registry owns dispatch metadata only. Codex remains authoritative for thread state, `internal/projections.Store` owns generic projection replacement mechanics, the Codex adapter owns native-to-pican translation, `workers.Manager` retains worker lifecycle, and Codex-native archive/delete/unarchive plus rename/fork semantics stay on the separate `CodexService` rather than widening the common contract.
 
 Session-directory startup behavior is runtime-specific:
 
-- `pi` and `both` require the configured `~/.pi/agent/sessions` directory to exist.
-- `codex` creates it when absent because it contains only pican's generated projections.
+- Any selection containing `pi` requires the configured `~/.pi/agent/sessions` directory to exist.
+- Projection-only selections create it when absent because it contains only pican's generated projections.
 
-At startup, Codex-enabled modes invoke the registration's catalog adapter through an app-owned syncer with a 15-second timeout and repeat it every minute. Each periodic pass performs the cheap paginated `thread/list`, then compares each row's `UpdatedAt` with the value retained by the syncer. Only new or changed threads, or threads whose projection disappeared out of band, require `thread/read` and materialization. Restarting pican intentionally performs one full hydration.
+At startup, Codex-enabled modes first probe the installed executable, version, and login status. Catalog freshness is separate from operational health. Initial reconciliation gets a 15-second startup budget; if it is deferred, the background syncer retries immediately with a ten-minute bound and then repeats every minute. Each periodic pass performs paginated `thread/list`, then compares each row's `UpdatedAt` with the value retained by the syncer. Only new or changed threads, or threads whose projection disappeared out of band, require `thread/read` and materialization. Restarting pican intentionally performs one full hydration.
 
-A failed sync forcibly reports `Complete: false`, updates only Codex availability, and cannot authorize pruning. `codex` mode exits if the initial sync cannot reach Codex. `both` or `pi,codex` logs the failure and continues with Pi; `/api/runtimes` marks Codex unavailable, existing projections remain viewable/exportable, and combined model discovery keeps Pi models after Pi discovery succeeds. A later successful periodic sync restores Codex availability. A successful complete native list is authoritative for membership: validated projections that existed before the list began and are absent from its ID set are pruned. A projection created concurrently with the list is outside that pre-list snapshot and is retained.
+A failed sync forcibly reports `Complete: false` and cannot authorize pruning, but it does not make a healthy Codex executable unavailable or stop pican in Codex-only mode. Existing projections remain viewable/exportable while background reconciliation retries. A successful complete native list is authoritative for membership: validated projections that existed before the list began and are absent from its ID set are pruned. A projection created concurrently with the list is outside that pre-list snapshot and is retained.
 
 The startup and first-chat call graph is:
 
@@ -77,7 +78,7 @@ This differs from native Pi sessions:
 - Codex owns conversation state in `~/.codex`; pican atomically replaces the projected conversation after native thread updates.
 - Local projection metadata is preserved across replacements. Native archive/delete APIs call app-server first and remove only the validated projection after success; deleting a cache file directly still does not delete the Codex thread.
 
-Projection files intentionally use the normal session parser and cache. That gives Codex threads the unified session list, viewer, SSE reload, download, static export, and GitHub Gist share paths. `/api/session` and the embedded bootstrap declare `projectionMode: "replaceable-projection"`; live reload uses that metadata, not a Codex runtime check, to force full entry reconciliation. Pi's `afterCount` optimization is invalid for an atomically replaced projection because new native entries can be inserted before preserved local metadata. Same-ID entries are replaced from the new snapshot because running tool output and status evolve under stable item IDs; Pi's append-only identity reuse remains unchanged. If Codex later becomes unavailable, already-materialized projections remain browseable and exportable. Runtime-dependent operations are disabled with the reported unavailability reason until sync recovers. This is local cached viewing while the Codex runtime is offline; the PWA service worker does not cache session data for use when the pican HTTP server itself is offline.
+Projection files intentionally use the normal session parser and cache. That gives Codex threads the unified session list, viewer, SSE reload, download, static export, and GitHub Gist share paths. `/api/session` and the embedded bootstrap declare `projectionMode: "replaceable-projection"`; live reload uses that metadata, not a Codex runtime check, to force full entry reconciliation. Pi's `afterCount` optimization is invalid for an atomically replaced projection because new native entries can be inserted before preserved local metadata. Same-ID entries are replaced from the new snapshot because running tool output and status evolve under stable item IDs; Pi's append-only identity reuse remains unchanged. If the Codex executable or login later becomes unavailable, already-materialized projections remain browseable and exportable. Runtime-dependent operations are disabled with the probe's reason; catalog lag alone is reported in logs and does not disable healthy operations. This is local cached viewing while the Codex runtime is offline; the PWA service worker does not cache session data for use when the pican HTTP server itself is offline.
 
 ## Worker and thread lifecycle
 

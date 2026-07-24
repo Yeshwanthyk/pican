@@ -4,7 +4,7 @@
 
 ### Remote control
 
-- Run one binary with Pi, Codex, Claude, OpenCode, or a comma-separated combination (`both` remains Pi+Codex; default `pi`)
+- Run one binary that auto-detects installed Pi, Codex, Claude, and OpenCode executables, or pass an explicit runtime selection (`both` remains Pi+Codex)
 - Continue Pi, Codex, Claude, or OpenCode sessions from the browser with the controls each runtime supports
 - Start a brand-new session against any project path, right from the web UI
 - In-browser model switching and thinking-level selection where the session runtime supports them
@@ -168,8 +168,9 @@ pican -o
 # Custom port
 pican -p 8080
 
-# Runtime: pi (default), codex, claude, opencode, or a comma-separated set
+# Runtime: auto (default), pi, codex, claude, opencode, or a comma-separated set
 # "both" remains the Pi+Codex alias
+pican -runtime=pi
 pican -runtime=both
 pican -runtime=pi,claude
 pican -runtime=opencode
@@ -199,7 +200,7 @@ pican --host 127.0.0.1
 PICAN_TOKEN=$(openssl rand -hex 16) pican --host 192.168.1.50
 ```
 
-By default, pican enables only Pi and binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pican also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PICAN_TOKEN` to be set; pass `--insecure` to override for local testing.
+By default, pican discovers supported executables on `PATH` plus OpenCode's standard `~/.opencode/bin/opencode` installation and enables the installed set in Pi, Codex, Claude, OpenCode registry order. `-runtime` remains an explicit override. Pican binds to `127.0.0.1`. If Tailscale is running with MagicDNS, pican also runs `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and prints the HTTPS tailnet URL. Any explicit non-loopback bind requires `PICAN_TOKEN` to be set; pass `--insecure` to override for local testing.
 
 ## Remote Access
 
@@ -225,16 +226,16 @@ pican
 
 ## Codex runtime
 
-The installed Codex CLI owns sign-in and persistent thread state. pican starts `codex app-server --stdio` with the current environment unchanged, including `HOME`; it never reads `~/.codex/auth.json`. Run `codex` normally first to install/sign in, then choose `-runtime=codex` or `-runtime=both`.
+The installed Codex CLI owns sign-in and persistent thread state. pican starts `codex app-server --stdio` with the current environment unchanged, including `HOME`; it never reads `~/.codex/auth.json`. Run `codex` normally first to install/sign in. Default runtime discovery then enables it automatically; use `-runtime` only to override the installed set.
 
 > **Warning:** pican always runs Codex sessions in YOLO mode (`approvalPolicy: never` with `danger-full-access`), equivalent to `codex --yolo`. Model-generated commands can access the whole host filesystem and network without confirmation.
 
 Startup behavior:
 
-- `codex` mode creates `~/.pi/agent/sessions` if absent and exits if its initial Codex catalog sync fails.
-- `both` mode requires the existing sessions directory. If Codex is unavailable, Pi keeps working and the UI reports Codex unavailable; sync retries every minute.
+- Codex executable/auth health is probed independently from catalog freshness. A large catalog can't disable otherwise-working create, resume, or chat operations.
+- Startup gives initial catalog reconciliation 15 seconds, then serves cached projections and immediately continues reconciliation in the background with a longer bound. Sync retries every minute.
 - A Codex executable override is one path via `-codex-command` (preferred) or `PICAN_CODEX_COMMAND`. pican appends `app-server --stdio` itself.
-- Generated auto-start entries invoke pican without `-runtime`, so they remain Pi-only by default. To persist `codex`/`both`, add `-runtime=…` (and optional `-codex-command=…`) to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command.
+- Generated auto-start entries invoke pican without `-runtime`, so they discover the installed set at every launch. Add `-runtime=…` to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command only when you want a fixed subset.
 
 Codex remains authoritative under `~/.codex`. pican creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, export, and share paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
 
