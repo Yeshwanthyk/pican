@@ -28,7 +28,7 @@ func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
 	share.Handle(w, r, share.Dependencies{
 		Runner: runner,
 		Resolve: func(id string) (sessions.Session, error) {
-			resolved, err := sessions.ResolveByID(s.sessionsDir, id)
+			resolved, err := s.resolveSession(id)
 			if err != nil {
 				return sessions.Session{}, err
 			}

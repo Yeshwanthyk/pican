@@ -12,6 +12,7 @@ import (
 
 	"pican/internal/claude"
 	"pican/internal/codex"
+	"pican/internal/opencode"
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
 	"pican/internal/server"
@@ -271,6 +272,43 @@ func codexWorkerFactory(sessionsDir string, command []string, currentServer func
 	}
 }
 
+func openCodeWorkerFactory(supervisor *opencode.Supervisor, service *opencode.Service, currentServer func() *server.Server) workers.Factory {
+	return func(sessionID, sessionPath string) (workers.ChatWorker, error) {
+		return opencode.NewWorker(sessionPath, supervisor, service.RefreshSession, opencode.WorkerCallbacks{
+			Preview: func(preview opencode.Preview) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{
+						Content: preview.Content,
+						Done:    preview.Done,
+						TurnID:  preview.TurnID,
+						ItemID:  preview.ItemID,
+					})
+				}
+			},
+			Status: func(status workers.WorkerStatus) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastWorkerStatus(sessionID, status)
+				}
+			},
+			Projection: func(projection opencode.Projection) {
+				if srv := currentServer(); srv != nil {
+					target := projection.ID
+					if target == "" {
+						target = sessionID
+					}
+					srv.NotifyWorkerUpdate(target, true)
+				}
+			},
+			Error: func(err error) {
+				fmt.Fprintf(os.Stderr, "OpenCode worker failed for %s: %v\n", sessionID, err)
+				if srv := currentServer(); srv != nil {
+					srv.NotifyWorkerUpdate(sessionID, true)
+				}
+			},
+		})
+	}
+}
+
 type claudeService struct {
 	sessionsDir string
 }
@@ -422,10 +460,17 @@ func (s *catalogSyncer) close() {
 	}
 }
 
-func runtimeModels(ctx context.Context, enabled runtimeSet, sessionsDir string, query server.ModelQuery) (json.RawMessage, error) {
+func runtimeModels(ctx context.Context, enabled runtimeSet, sessionsDir string, cache *sessions.Cache, query server.ModelQuery) (json.RawMessage, error) {
 	runtime := query.Runtime
 	if runtime == "" && query.SessionID != "" {
-		if resolved, err := sessions.ResolveByID(sessionsDir, query.SessionID); err == nil {
+		var resolved sessions.ResolvedSession
+		var err error
+		if cache != nil {
+			resolved, err = cache.Resolve(sessionsDir, query.SessionID)
+		} else {
+			resolved, err = sessions.ResolveByID(sessionsDir, query.SessionID)
+		}
+		if err == nil {
 			runtime = resolved.Session.Runtime
 		}
 	}
@@ -512,9 +557,32 @@ func claudeModels(context.Context) ([]json.RawMessage, error) {
 	return models, nil
 }
 
+func openCodeModels(supervisor *opencode.Supervisor, directory string) runtimeModelLoader {
+	return func(ctx context.Context) ([]json.RawMessage, error) {
+		client, err := supervisor.Client()
+		if err != nil {
+			return nil, err
+		}
+		discovered, err := opencode.FetchModels(ctx, client, directory)
+		if err != nil {
+			return nil, err
+		}
+		models := make([]json.RawMessage, 0, len(discovered))
+		for _, model := range discovered {
+			data, err := json.Marshal(model)
+			if err != nil {
+				return nil, err
+			}
+			models = append(models, data)
+		}
+		return models, nil
+	}
+}
+
 func codexCatalog(sessionsDir string, command []string) func(context.Context) (runtimes.CatalogResult, error) {
+	catalog := codex.NewCatalog(sessionsDir, command)
 	return func(ctx context.Context) (runtimes.CatalogResult, error) {
-		result, err := codex.Sync(ctx, sessionsDir, command)
+		result, err := catalog.Sync(ctx)
 		return runtimes.CatalogResult{SessionIDs: result.IDs, Complete: err == nil}, err
 	}
 }
@@ -527,4 +595,20 @@ func codexExecutable(flagValue string) string {
 		return value
 	}
 	return "codex"
+}
+
+func openCodeExecutable(flagValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	if value := os.Getenv("PICAN_OPENCODE_COMMAND"); value != "" {
+		return value
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		installed := filepath.Join(home, ".opencode", "bin", "opencode")
+		if info, statErr := os.Stat(installed); statErr == nil && !info.IsDir() {
+			return installed
+		}
+	}
+	return "opencode"
 }

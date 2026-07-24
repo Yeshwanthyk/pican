@@ -12,13 +12,7 @@ import (
 // resolveSessionCwd resolves a session id to its working directory (the cwd
 // recorded in the session header).
 func (s *Server) resolveSessionCwd(id string) (sessions.ResolvedSession, string, error) {
-	var resolved sessions.ResolvedSession
-	var err error
-	if s.cache != nil {
-		resolved, err = s.cache.Resolve(s.sessionsDir, id)
-	} else {
-		resolved, err = sessions.ResolveByID(s.sessionsDir, id)
-	}
+	resolved, err := s.resolveSession(id)
 	if err != nil {
 		return resolved, "", err
 	}

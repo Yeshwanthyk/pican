@@ -350,6 +350,10 @@ func TestTerminalResumeCommandShellQuotesTrustedDescriptorAndSessionID(t *testin
 			Command: "/Applications/Claude Tool/claude", AvailabilityProbe: available,
 			Catalog: compatibilityCatalog{}, WorkerFactory: compatibilityWorkerFactory,
 		}),
+		runtimes.OpenCode(runtimes.BuiltinOptions{
+			Command: "/Applications/OpenCode Tool/opencode", AvailabilityProbe: available,
+			Catalog: compatibilityCatalog{}, WorkerFactory: compatibilityWorkerFactory,
+		}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -380,5 +384,12 @@ func TestTerminalResumeCommandShellQuotesTrustedDescriptorAndSessionID(t *testin
 	defaultWant := `'/Applications/Claude Tool/claude' --resume 00000000-0000-4000-8000-000000000001`
 	if defaultCommand != defaultWant {
 		t.Fatalf("default-profile Claude command = %q, want %q", defaultCommand, defaultWant)
+	}
+	openCodeCommand := s.terminalResumeCommand(sessions.Session{SessionSummary: sessions.SessionSummary{
+		Runtime: "opencode", NativeID: "ses_abc'; touch /tmp/pwn",
+	}})
+	openCodeWant := `'/Applications/OpenCode Tool/opencode' --session 'ses_abc'\''; touch /tmp/pwn'`
+	if openCodeCommand != openCodeWant {
+		t.Fatalf("OpenCode command = %q, want %q", openCodeCommand, openCodeWant)
 	}
 }

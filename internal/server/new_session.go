@@ -11,7 +11,7 @@ func (s *Server) initialSettingsFromSource(ctx context.Context, sourceSessionID,
 	if s.chatSender == nil || sourceSessionID == "" {
 		return sessions.InitialSettings{}
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, sourceSessionID)
+	resolved, err := s.resolveSession(sourceSessionID)
 	if err != nil || resolved.Session.Runtime != targetRuntime {
 		return sessions.InitialSettings{}
 	}

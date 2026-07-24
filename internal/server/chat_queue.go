@@ -40,7 +40,7 @@ func (s *Server) handleChatQueue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resolveQueueSession(r *http.Request, w http.ResponseWriter) (sessions.ResolvedSession, bool) {
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return sessions.ResolvedSession{}, false
 	}

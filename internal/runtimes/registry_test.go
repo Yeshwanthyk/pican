@@ -106,21 +106,22 @@ func TestRegistrationValidationLocksAdapterInvariants(t *testing.T) {
 	}
 }
 
-func TestBuiltinPiCodexAndClaudeDescriptors(t *testing.T) {
+func TestBuiltinRuntimeDescriptors(t *testing.T) {
 	catalog := fakeCatalog{result: CatalogResult{SessionIDs: []string{"thread-1"}, Complete: true}}
 	registry, err := New(
 		Pi(BuiltinOptions{Command: "/bin/pi", Version: "0.80.10", AvailabilityProbe: available, WorkerFactory: testFactory}),
 		Codex(BuiltinOptions{Command: "/bin/codex", Version: "0.144.5", AvailabilityProbe: available, Catalog: catalog, WorkerFactory: testFactory}),
 		Claude(BuiltinOptions{Command: "/bin/claude", Version: "2.1.215", AvailabilityProbe: available, Catalog: catalog, WorkerFactory: testFactory}),
+		OpenCode(BuiltinOptions{Command: "/bin/opencode", Version: "1.18.4", AvailabilityProbe: available, Catalog: catalog, WorkerFactory: testFactory}),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	registrations := registry.List()
-	if len(registrations) != 3 {
-		t.Fatalf("registrations = %d, want 3", len(registrations))
+	if len(registrations) != 4 {
+		t.Fatalf("registrations = %d, want 4", len(registrations))
 	}
-	pi, codex, claude := registrations[0], registrations[1], registrations[2]
+	pi, codex, claude, opencode := registrations[0], registrations[1], registrations[2], registrations[3]
 	if pi.Descriptor.ID != PiID || pi.Descriptor.Label != "Pi" || pi.Descriptor.Command != "/bin/pi" || pi.Descriptor.Version != "0.80.10" || pi.Descriptor.ProjectionMode != ProjectionAppendOnlyNative || pi.Catalog != nil || pi.WorkerFactory == nil {
 		t.Fatalf("Pi registration = %+v", pi)
 	}
@@ -129,6 +130,9 @@ func TestBuiltinPiCodexAndClaudeDescriptors(t *testing.T) {
 	}
 	if claude.Descriptor.ID != ClaudeID || claude.Descriptor.Label != "Claude" || claude.Descriptor.Command != "/bin/claude" || claude.Descriptor.Version != "2.1.215" || claude.Descriptor.ProjectionMode != ProjectionReplaceable || claude.Catalog == nil || claude.WorkerFactory == nil {
 		t.Fatalf("Claude registration = %+v", claude)
+	}
+	if opencode.Descriptor.ID != OpenCodeID || opencode.Descriptor.Label != "OpenCode" || opencode.Descriptor.Command != "/bin/opencode" || opencode.Descriptor.Version != "1.18.4" || opencode.Descriptor.ProjectionMode != ProjectionReplaceable || opencode.Catalog == nil || opencode.WorkerFactory == nil {
+		t.Fatalf("OpenCode registration = %+v", opencode)
 	}
 
 	wantPi := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Chat: true, Cancel: true, Steer: true, PersistentQueue: true, Images: true, Files: true, ModelListing: true, ModelSwitching: true, ReasoningSelection: true, SlashCommands: true, Subagents: true, InteractiveApprovals: true, UserQuestions: true}
@@ -142,6 +146,10 @@ func TestBuiltinPiCodexAndClaudeDescriptors(t *testing.T) {
 	wantClaude := Capabilities{Create: true, Resume: true, Chat: true, Cancel: true, Images: true, Files: true, ModelListing: true}
 	if got := claude.Descriptor.Capabilities; got != wantClaude {
 		t.Fatalf("Claude capabilities = %+v, want %+v", got, wantClaude)
+	}
+	wantOpenCode := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Delete: true, Chat: true, Cancel: true, ModelListing: true, ModelSwitching: true}
+	if got := opencode.Descriptor.Capabilities; got != wantOpenCode {
+		t.Fatalf("OpenCode capabilities = %+v, want %+v", got, wantOpenCode)
 	}
 
 	result, err := codex.Catalog.Sync(context.Background())

@@ -53,8 +53,19 @@ type workerSnapshotter interface {
 }
 
 type metricsResponse struct {
-	Process processMetrics  `json:"process"`
-	Workers []workerMetrics `json:"workers"`
+	Process      processMetrics      `json:"process"`
+	SessionCache sessionCacheMetrics `json:"session_cache"`
+	Workers      []workerMetrics     `json:"workers"`
+}
+
+type sessionCacheMetrics struct {
+	SummaryParses    int   `json:"summary_parses"`
+	SummaryHits      int   `json:"summary_hits"`
+	SessionParses    int   `json:"session_parses"`
+	SessionHits      int   `json:"session_hits"`
+	SessionEntries   int   `json:"session_entries"`
+	SessionBytes     int64 `json:"session_bytes"`
+	SessionEvictions int   `json:"session_evictions"`
 }
 
 type processMetrics struct {
@@ -143,6 +154,18 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			WatchedFiles:   watched,
 		},
 		Workers: []workerMetrics{},
+	}
+	if s.cache != nil {
+		stats := s.cache.Stats()
+		resp.SessionCache = sessionCacheMetrics{
+			SummaryParses:    stats.SummaryParses,
+			SummaryHits:      stats.SummaryHits,
+			SessionParses:    stats.SessionParses,
+			SessionHits:      stats.SessionHits,
+			SessionEntries:   stats.SessionEntries,
+			SessionBytes:     stats.SessionBytes,
+			SessionEvictions: stats.SessionEvictions,
+		}
 	}
 
 	var snaps []workers.WorkerSnapshot

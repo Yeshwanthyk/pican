@@ -73,6 +73,12 @@ func serverRuntimeRegistry(deps Deps) (*runtimes.Registry, error) {
 		case string(runtimes.CodexID):
 			options.Catalog = compatibilityCatalog{}
 			registrations = append(registrations, runtimes.Codex(options))
+		case string(runtimes.ClaudeID):
+			options.Catalog = compatibilityCatalog{}
+			registrations = append(registrations, runtimes.Claude(options))
+		case string(runtimes.OpenCodeID):
+			options.Catalog = compatibilityCatalog{}
+			registrations = append(registrations, runtimes.OpenCode(options))
 		default:
 			return nil, fmt.Errorf("runtime %q is not supported by the compatibility wiring", id)
 		}
@@ -196,6 +202,8 @@ func builtinRuntimeDescriptor(runtime string) (runtimes.Descriptor, bool) {
 		return runtimes.Codex(options).Descriptor, true
 	case string(runtimes.ClaudeID):
 		return runtimes.Claude(options).Descriptor, true
+	case string(runtimes.OpenCodeID):
+		return runtimes.OpenCode(options).Descriptor, true
 	default:
 		return runtimes.Descriptor{}, false
 	}
@@ -287,6 +295,11 @@ func (s *Server) terminalResumeCommand(session sessions.Session) string {
 			command = "CLAUDE_CONFIG_DIR=" + shellArg(s.claudeHome) + " " + command
 		}
 		return command
+	case string(runtimes.OpenCodeID):
+		if session.NativeID == "" {
+			return ""
+		}
+		return shellArg(descriptor.Command) + " --session " + shellArg(session.NativeID)
 	default:
 		return ""
 	}
@@ -337,13 +350,7 @@ func (s *Server) handleRuntimes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resolveCodexSession(w http.ResponseWriter, id string) (sessions.ResolvedSession, bool) {
-	var resolved sessions.ResolvedSession
-	var err error
-	if s.cache != nil {
-		resolved, err = s.cache.Resolve(s.sessionsDir, id)
-	} else {
-		resolved, err = sessions.ResolveByID(s.sessionsDir, id)
-	}
+	resolved, err := s.resolveSession(id)
 	if resolveOrWriteError(w, err) {
 		return sessions.ResolvedSession{}, false
 	}
@@ -360,6 +367,45 @@ func (s *Server) codexLifecycleReady(w http.ResponseWriter) bool {
 		return false
 	}
 	return true
+}
+
+func (s *Server) resolveOpenCodeSession(w http.ResponseWriter, id string) (sessions.ResolvedSession, bool) {
+	resolved, err := s.resolveSession(id)
+	if resolveOrWriteError(w, err) {
+		return sessions.ResolvedSession{}, false
+	}
+	if resolved.Session.Runtime != string(runtimes.OpenCodeID) || resolved.Session.NativeID == "" || resolved.Session.Project == "" {
+		writeJSONError(w, http.StatusBadRequest, "OpenCode session required")
+		return sessions.ResolvedSession{}, false
+	}
+	return resolved, true
+}
+
+func (s *Server) handleOpenCodeSessionDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, string(runtimes.OpenCodeID), runtimes.CapabilityDelete) {
+		return
+	}
+	if s.openCode == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+		return
+	}
+	resolved, ok := s.resolveOpenCodeSession(w, r.URL.Query().Get("id"))
+	if !ok {
+		return
+	}
+	if err := s.openCode.DeleteSession(r.Context(), resolved.Session.NativeID, resolved.Session.Project); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if s.cache != nil {
+		s.cache.Invalidate(resolved.Session.ID)
+	}
+	s.broadcast(globalSessID, "reload:"+resolved.Session.ID)
+	writeJSON(w, 0, map[string]any{"ok": true})
 }
 
 func (s *Server) handleCodexThreadArchive(w http.ResponseWriter, r *http.Request) {

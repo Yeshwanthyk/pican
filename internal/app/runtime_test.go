@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 
 	"pican/internal/runtimes"
 	"pican/internal/server"
+	"pican/internal/sessions"
 )
 
 func testRuntimeRegistry(t *testing.T, ids ...runtimes.ID) *runtimeRegistry {
@@ -40,7 +42,7 @@ func testRuntimeRegistry(t *testing.T, ids ...runtimes.ID) *runtimeRegistry {
 }
 
 func TestParseRuntimeAndCodexCommand(t *testing.T) {
-	registry := testRuntimeRegistry(t, runtimes.PiID, runtimes.CodexID, runtimes.ClaudeID, "future")
+	registry := testRuntimeRegistry(t, runtimes.PiID, runtimes.CodexID, runtimes.ClaudeID, runtimes.OpenCodeID, "future")
 	tests := []struct {
 		value string
 		want  []string
@@ -49,6 +51,8 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 		{"codex", []string{"codex"}},
 		{"both", []string{"pi", "codex"}},
 		{"claude", []string{"claude"}},
+		{"opencode", []string{"opencode"}},
+		{"opencode,claude,pi", []string{"pi", "claude", "opencode"}},
 		{"claude,pi", []string{"pi", "claude"}},
 		{" CODEX, pi ", []string{"pi", "codex"}},
 		{"pi,pi", []string{"pi"}},
@@ -71,6 +75,22 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 	got := codexCommand("/path with spaces/codex")
 	if len(got) != 3 || got[0] != "/path with spaces/codex" || got[1] != "app-server" || got[2] != "--stdio" {
 		t.Fatalf("argv = %#v", got)
+	}
+}
+
+func TestOpenCodeExecutablePrecedence(t *testing.T) {
+	t.Setenv("PICAN_OPENCODE_COMMAND", "/env/opencode")
+	if got := openCodeExecutable("/flag/opencode"); got != "/flag/opencode" {
+		t.Fatalf("flag command = %q", got)
+	}
+	if got := openCodeExecutable(""); got != "/env/opencode" {
+		t.Fatalf("environment command = %q", got)
+	}
+	if err := os.Unsetenv("PICAN_OPENCODE_COMMAND"); err != nil {
+		t.Fatal(err)
+	}
+	if got := openCodeExecutable(""); got == "" {
+		t.Fatal("default OpenCode command is empty")
 	}
 }
 
@@ -103,14 +123,14 @@ func TestRuntimeModelsDispatchesThroughRegistryAndDegradesAfterSuccess(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{})
+	data, err := runtimeModels(context.Background(), enabled, t.TempDir(), sessions.NewCache(), server.ModelQuery{})
 	if err != nil || string(data) != `{"models":[{"id":"pi-model"}]}` {
 		t.Fatalf("aggregate models = %s, %v", data, err)
 	}
-	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{Runtime: "codex"}); !errors.Is(err, codexErr) {
+	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), sessions.NewCache(), server.ModelQuery{Runtime: "codex"}); !errors.Is(err, codexErr) {
 		t.Fatalf("targeted Codex error = %v, want %v", err, codexErr)
 	}
-	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{Runtime: "future"}); err == nil {
+	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), sessions.NewCache(), server.ModelQuery{Runtime: "future"}); err == nil {
 		t.Fatal("runtime without model-listing capability was accepted")
 	}
 }

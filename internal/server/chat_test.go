@@ -505,6 +505,34 @@ func TestHandleWorkerStatusUsesSessionStatusFile(t *testing.T) {
 	}
 }
 
+func TestReadSessionStatusUsesSummaryCacheOnly(t *testing.T) {
+	root := t.TempDir()
+	sessionsDir := filepath.Join(root, "sessions")
+	writeSessionFile(t, sessionsDir, "test-project", "session.jsonl")
+	statusDir := filepath.Join(root, "session-status")
+	if err := os.MkdirAll(statusDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	status := map[string]any{
+		"state":     "running",
+		"updatedAt": time.Now().UTC().Format(time.RFC3339),
+	}
+	data, _ := json.Marshal(status)
+	if err := os.WriteFile(filepath.Join(statusDir, "session.jsonl"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cache := sessions.NewCache()
+	s := &Server{agentDir: root, sessionsDir: sessionsDir, cache: cache}
+	if got := s.readSessionStatus("session.jsonl"); got == nil || got.State != workers.WorkerStateRunning {
+		t.Fatalf("status = %#v", got)
+	}
+	stats := cache.Stats()
+	if stats.SummaryParses != 1 || stats.SessionParses != 0 || stats.SessionEntries != 0 {
+		t.Fatalf("status read populated full session cache: %#v", stats)
+	}
+}
+
 func TestHandleWorkerStatusIgnoresStaleSessionStatusFile(t *testing.T) {
 	root := t.TempDir()
 	sessionsDir := filepath.Join(root, "sessions")

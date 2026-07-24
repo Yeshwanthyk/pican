@@ -12,7 +12,6 @@ import (
 
 	"pican/internal/chat"
 	"pican/internal/runtimes"
-	"pican/internal/sessions"
 	"pican/internal/workers"
 )
 
@@ -32,7 +31,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -97,7 +96,15 @@ func (s *Server) readSessionStatus(sessionID string) *workers.WorkerStatus {
 	if sessionID == "" {
 		return nil
 	}
-	if resolved, err := sessions.ResolveByID(s.sessionsDir, sessionID); err == nil && s.projectionMode(resolved.Session.Runtime) != runtimes.ProjectionAppendOnlyNative {
+	runtime := ""
+	if s.cache != nil {
+		if summary, err := s.cache.ResolveSummary(s.sessionsDir, sessionID); err == nil {
+			runtime = summary.Runtime
+		}
+	} else if resolved, err := s.resolveSession(sessionID); err == nil {
+		runtime = resolved.Session.Runtime
+	}
+	if runtime != "" && s.projectionMode(runtime) != runtimes.ProjectionAppendOnlyNative {
 		return nil
 	}
 	path := filepath.Join(s.sessionStatusDir(), sessionID)
@@ -127,7 +134,7 @@ func (s *Server) handleCancelChat(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -186,7 +193,7 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -233,7 +240,7 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -268,7 +275,7 @@ func (s *Server) handleSetThinkingLevel(w http.ResponseWriter, r *http.Request) 
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}

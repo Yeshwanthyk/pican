@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"pican/internal/opencode"
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
 	"pican/internal/sessions"
@@ -63,7 +64,7 @@ func (s *Server) maybeAutoTitle(sessID string) {
 	}
 	s.autoTitle.mu.Unlock()
 
-	resolved, err := sessions.ResolveByID(s.sessionsDir, sessID)
+	resolved, err := s.resolveSession(sessID)
 	if err != nil {
 		return
 	}
@@ -127,6 +128,8 @@ func (s *Server) maybeAutoTitle(sessID string) {
 			return
 		}
 		titleErr = s.codex.AutoTitleSession(resolved.Path, title, s.now)
+	case string(runtimes.OpenCodeID):
+		titleErr = opencode.AutoTitleSession(resolved.Path, title, s.now)
 	case string(runtimes.PiID):
 		titleErr = sessions.AutoTitleSession(resolved.Path, title, s.now)
 	default:

@@ -10,6 +10,7 @@ import (
 
 	"pican/internal/chat"
 	"pican/internal/codex"
+	"pican/internal/opencode"
 	"pican/internal/runtimes"
 	"pican/internal/schedules"
 	"pican/internal/sessions"
@@ -116,6 +117,9 @@ func (s *Server) scheduleRuntime(modelProvider string) string {
 	if modelProvider == codex.Provider {
 		return string(runtimes.CodexID)
 	}
+	if modelProvider == opencode.Provider {
+		return string(runtimes.OpenCodeID)
+	}
 	if s.defaultRuntime != "" {
 		return s.defaultRuntime
 	}
@@ -125,9 +129,9 @@ func (s *Server) scheduleRuntime(modelProvider string) string {
 func (s *Server) scheduleCapabilityError(ctx context.Context, sc schedules.Schedule) error {
 	runtime := s.scheduleRuntime(sc.ModelProvider)
 	// Scheduling needs an explicit creation adapter, not merely create/chat
-	// capability flags. Claude scheduling is deferred until its product surface
-	// can select the runtime independently from provider/model selection.
-	if runtime != string(runtimes.PiID) && runtime != string(runtimes.CodexID) {
+	// capability flags. Claude scheduling remains deferred until its product
+	// surface can select the runtime independently from provider/model data.
+	if runtime != string(runtimes.PiID) && runtime != string(runtimes.CodexID) && runtime != string(runtimes.OpenCodeID) {
 		return &runtimeOperationFailure{
 			status:  409,
 			message: s.runtimeLabel(runtime) + " runtime does not support schedules",
@@ -215,6 +219,29 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 			return "", fmt.Errorf("create Codex session: %w", startErr)
 		}
 		filename = projection.ID
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			err := errors.New("OpenCode runtime is unavailable")
+			_ = s.schedules.FailRun(runID, err.Error())
+			return "", err
+		}
+		cwd, pathErr := sessions.PrepareSessionPath(path)
+		if pathErr != nil {
+			_ = s.schedules.FailRun(runID, pathErr.Error())
+			return "", pathErr
+		}
+		model := settings.ModelID
+		if settings.ModelProvider != "" && settings.ModelProvider != opencode.Provider {
+			model = ""
+		}
+		createCtx, cancelCreate := context.WithTimeout(context.Background(), scheduleWorkerTimeout)
+		projection, startErr := s.openCode.StartSession(createCtx, cwd, model)
+		cancelCreate()
+		if startErr != nil {
+			_ = s.schedules.FailRun(runID, startErr.Error())
+			return "", fmt.Errorf("create OpenCode session: %w", startErr)
+		}
+		filename = projection.ID
 	case string(runtimes.PiID):
 		filename, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, settings)
 		if err != nil {
@@ -226,7 +253,7 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 		_ = s.schedules.FailRun(runID, err.Error())
 		return "", err
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, filename)
+	resolved, err := s.resolveSession(filename)
 	if err != nil {
 		_ = s.schedules.FailRun(runID, err.Error())
 		return "", fmt.Errorf("resolve session: %w", err)

@@ -201,7 +201,7 @@ func (s *Server) reapOrphanedBtw(all []sessions.SessionSummary) {
 	}
 	rows.Close()
 	for _, o := range orphans {
-		if resolved, err := sessions.ResolveByID(s.sessionsDir, o.btwID); err == nil {
+		if resolved, err := s.resolveSession(o.btwID); err == nil {
 			_ = os.Remove(resolved.Path)
 		}
 		s.deleteBtwRow(o.btwID)
@@ -219,7 +219,7 @@ func (s *Server) handleGetBtw(w http.ResponseWriter, r *http.Request) {
 	parent := normalizeBtwParent(r.URL.Query().Get("parent"))
 	id := s.getBtwSessionID(parent)
 	if id != "" {
-		if _, err := sessions.ResolveByID(s.sessionsDir, id); err != nil {
+		if _, err := s.resolveSession(id); err != nil {
 			s.deleteBtwRow(id)
 			s.broadcastBtwChanged(parent, "")
 			id = ""
@@ -299,6 +299,22 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+			return
+		}
+		cwd, err := sessions.PrepareSessionPath(path)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		projection, err := s.openCode.StartSession(r.Context(), cwd, "")
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		id = projection.ID
 	default:
 		writeJSONError(w, http.StatusConflict, s.runtimeLabel(runtime)+" runtime does not support create")
 		return
@@ -308,7 +324,7 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 	// Pre-warm a worker so the first chat message lands quickly, mirroring
 	// handleNewSession.
 	if s.chatSender != nil {
-		if resolved, err := sessions.ResolveByID(s.sessionsDir, id); err == nil {
+		if resolved, err := s.resolveSession(id); err == nil {
 			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, sessions.InitialSettings{})
 		}
 	}

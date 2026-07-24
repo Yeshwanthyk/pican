@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"pican/internal/sessions"
 	"pican/internal/workers"
 )
 
@@ -19,7 +18,7 @@ func (s *Server) handlePendingExtensionUI(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("session"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("session"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -51,7 +50,7 @@ func (s *Server) handleRespondExtensionUI(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusBadRequest, "session and id are required")
 		return
 	}
-	resolved, err := sessions.ResolveByID(s.sessionsDir, body.Session)
+	resolved, err := s.resolveSession(body.Session)
 	if resolveOrWriteError(w, err) {
 		return
 	}

@@ -3,9 +3,10 @@ package runtimes
 import "pican/internal/workers"
 
 const (
-	PiID     ID = "pi"
-	CodexID  ID = "codex"
-	ClaudeID ID = "claude"
+	PiID       ID = "pi"
+	CodexID    ID = "codex"
+	ClaudeID   ID = "claude"
+	OpenCodeID ID = "opencode"
 )
 
 // BuiltinOptions supplies startup-owned adapters and probed command metadata.
@@ -62,6 +63,25 @@ func Claude(options BuiltinOptions) Registration {
 			Version:        options.Version,
 			ProjectionMode: ProjectionReplaceable,
 			Capabilities:   ClaudeCapabilities(),
+		},
+		AvailabilityProbe: options.AvailabilityProbe,
+		Catalog:           options.Catalog,
+		WorkerFactory:     options.WorkerFactory,
+	}
+}
+
+// OpenCode returns the supervised HTTP/SSE runtime registration. OpenCode's
+// native database remains authoritative and pican stores only replaceable
+// projections.
+func OpenCode(options BuiltinOptions) Registration {
+	return Registration{
+		Descriptor: Descriptor{
+			ID:             OpenCodeID,
+			Label:          "OpenCode",
+			Command:        options.Command,
+			Version:        options.Version,
+			ProjectionMode: ProjectionReplaceable,
+			Capabilities:   OpenCodeCapabilities(),
 		},
 		AvailabilityProbe: options.AvailabilityProbe,
 		Catalog:           options.Catalog,
@@ -128,5 +148,23 @@ func ClaudeCapabilities() Capabilities {
 		Images:       true,
 		Files:        true,
 		ModelListing: true,
+	}
+}
+
+// OpenCodeCapabilities records only the OpenCode 1.18.4 surfaces exercised by
+// the supported HTTP/SSE adapter. In particular, pican does not approximate
+// steering, queues, attachments, reasoning controls, approvals, or questions.
+func OpenCodeCapabilities() Capabilities {
+	return Capabilities{
+		Create:         true,
+		Resume:         true,
+		Fork:           true,
+		Clone:          true,
+		Rename:         true,
+		Delete:         true,
+		Chat:           true,
+		Cancel:         true,
+		ModelListing:   true,
+		ModelSwitching: true,
 	}
 }

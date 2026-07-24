@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"pican/internal/auth"
+	"pican/internal/sessions"
 	"pican/internal/workers"
 )
 
@@ -97,6 +100,35 @@ func TestMetricsReportsProcessAndWorkers(t *testing.T) {
 	}
 	if !wm.Sampled || wm.RSSBytes != 200<<20 || wm.CPUTimeS != 5 {
 		t.Errorf("worker sampling wrong: %#v", wm)
+	}
+}
+
+func TestMetricsReportsSessionCacheCounters(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "--tmp--project--")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte(`{"type":"session","id":"s","cwd":"/tmp/project"}`+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newMetricsServer(&snapshotSender{}, stubSampler{})
+	s.sessionsDir = root
+	s.cache = sessions.NewCache()
+	if _, err := s.cache.Resolve(root, "s.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.cache.Resolve(root, "s.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := decodeMetrics(t, s)
+	if resp.SessionCache.SessionParses != 1 || resp.SessionCache.SessionHits != 1 {
+		t.Fatalf("session cache metrics = %#v", resp.SessionCache)
+	}
+	if resp.SessionCache.SessionEntries != 1 || resp.SessionCache.SessionBytes == 0 {
+		t.Fatalf("session cache occupancy = %#v", resp.SessionCache)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"pican/internal/agentdir"
 	"pican/internal/claude"
 	"pican/internal/codex"
+	"pican/internal/opencode"
 	"pican/internal/projections"
 	"pican/internal/runtimes"
 	"pican/internal/sessions"
@@ -122,6 +123,26 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+			return
+		}
+		messageID, messageErr := opencode.ResolveMessageID(resolved.Path, body.EntryID)
+		if errors.Is(messageErr, opencode.ErrNoMessageBoundary) {
+			writeJSONError(w, http.StatusConflict, "OpenCode entry has no native message boundary and cannot be forked")
+			return
+		}
+		if messageErr != nil {
+			writeJSONError(w, http.StatusNotFound, messageErr.Error())
+			return
+		}
+		projection, forkErr := s.openCode.ForkSession(r.Context(), resolved.Session.NativeID, resolved.Session.Project, messageID)
+		if forkErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, forkErr.Error())
+			return
+		}
+		id = projection.ID
 	case string(runtimes.PiID):
 		id, err = sessions.ForkSessionFile(s.sessionsDir, resolved.Path, body.EntryID, s.now)
 		if err != nil {
@@ -134,7 +155,7 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.chatSender != nil {
-		if resolved, err := sessions.ResolveByID(s.sessionsDir, id); err == nil {
+		if resolved, err := s.resolveSession(id); err == nil {
 			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, sessions.InitialSettings{})
 		}
 	}
@@ -191,6 +212,17 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+			return
+		}
+		projection, cloneErr := s.openCode.CloneSession(r.Context(), resolved.Session.NativeID, resolved.Session.Project)
+		if cloneErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, cloneErr.Error())
+			return
+		}
+		id = projection.ID
 	case string(runtimes.PiID):
 		id, err = sessions.CloneSessionFile(s.sessionsDir, resolved.Path, leafID, s.now)
 		if err != nil {
@@ -203,7 +235,7 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.chatSender != nil {
-		if resolved, err := sessions.ResolveByID(s.sessionsDir, id); err == nil {
+		if resolved, err := s.resolveSession(id); err == nil {
 			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, sessions.InitialSettings{})
 		}
 	}
@@ -470,7 +502,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		if s.cache != nil {
 			source, resolveErr = s.cache.Resolve(s.sessionsDir, body.SourceSessionID)
 		} else {
-			source, resolveErr = sessions.ResolveByID(s.sessionsDir, body.SourceSessionID)
+			source, resolveErr = s.resolveSession(body.SourceSessionID)
 		}
 		if resolveErr == nil {
 			runtime = source.Session.Runtime
@@ -536,6 +568,26 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+			return
+		}
+		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		if pathErr != nil {
+			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
+			return
+		}
+		model := settings.ModelID
+		if settings.ModelProvider != "" && settings.ModelProvider != opencode.Provider {
+			model = ""
+		}
+		projection, startErr := s.openCode.StartSession(r.Context(), cwd, model)
+		if startErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, startErr.Error())
+			return
+		}
+		id = projection.ID
 	default:
 		writeJSONError(w, http.StatusConflict, s.runtimeLabel(runtime)+" runtime does not support create")
 		return
@@ -546,7 +598,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	// If the request came from an existing session page, copy that session's
 	// current model and thinking level onto the new worker.
 	if s.chatSender != nil {
-		if resolved, err := sessions.ResolveByID(s.sessionsDir, id); err == nil {
+		if resolved, err := s.resolveSession(id); err == nil {
 			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, settings)
 		}
 	}
@@ -573,13 +625,7 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.URL.Query().Get("id")
-	var resolved sessions.ResolvedSession
-	var err error
-	if s.cache != nil {
-		resolved, err = s.cache.Resolve(s.sessionsDir, id)
-	} else {
-		resolved, err = sessions.ResolveByID(s.sessionsDir, id)
-	}
+	resolved, err := s.resolveSession(id)
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -596,6 +642,12 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, renameErr = s.codex.RenameSession(r.Context(), resolved.Session.NativeID, name)
+	case string(runtimes.OpenCodeID):
+		if s.openCode == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
+			return
+		}
+		_, renameErr = s.openCode.RenameSession(r.Context(), resolved.Session.NativeID, resolved.Session.Project, name)
 	case string(runtimes.PiID):
 		renameErr = sessions.RenameSession(resolved.Path, name, s.now)
 	default:
@@ -640,13 +692,7 @@ func (s *Server) handleLabelSessionEntry(w http.ResponseWriter, r *http.Request)
 	}
 
 	id := r.URL.Query().Get("id")
-	var resolved sessions.ResolvedSession
-	var err error
-	if s.cache != nil {
-		resolved, err = s.cache.Resolve(s.sessionsDir, id)
-	} else {
-		resolved, err = sessions.ResolveByID(s.sessionsDir, id)
-	}
+	resolved, err := s.resolveSession(id)
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -712,7 +758,7 @@ func (s *Server) handleAvailableModels(w http.ResponseWriter, r *http.Request) {
 	query := ModelQuery{Runtime: strings.TrimSpace(r.URL.Query().Get("runtime")), SessionID: strings.TrimSpace(r.URL.Query().Get("id"))}
 	modelRuntime := query.Runtime
 	if query.SessionID != "" {
-		resolved, resolveErr := sessions.ResolveByID(s.sessionsDir, query.SessionID)
+		resolved, resolveErr := s.resolveSession(query.SessionID)
 		if resolveOrWriteError(w, resolveErr) {
 			return
 		}

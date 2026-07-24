@@ -23,3 +23,6 @@ website/dist/
 website/.vitepress/cache/
 website/.vitepress/locales.generated.json
 .claude/
+
+# External source references belong outside this repository.
+opensrc/

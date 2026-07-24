@@ -22,6 +22,7 @@ import (
 	"pican/internal/chatqueue"
 	"pican/internal/claude"
 	"pican/internal/codex"
+	"pican/internal/opencode"
 	"pican/internal/render"
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
@@ -64,6 +65,16 @@ type CodexService interface {
 	AutoTitleSession(string, string, func() time.Time) error
 }
 
+type OpenCodeService interface {
+	StartSession(context.Context, string, string) (opencode.Projection, error)
+	RenameSession(context.Context, string, string, string) (opencode.Projection, error)
+	ForkSession(context.Context, string, string, string) (opencode.Projection, error)
+	CloneSession(context.Context, string, string) (opencode.Projection, error)
+	DeleteSession(context.Context, string, string) error
+	RefreshSession(context.Context, string, string) (opencode.Projection, error)
+	AutoTitleSession(string, string, func() time.Time) error
+}
+
 type Deps struct {
 	AgentDir            string
 	SessionsDir         string
@@ -84,6 +95,7 @@ type Deps struct {
 	EnabledRuntimes  []string
 	RuntimeAvailable func(runtime string) (bool, string)
 	Codex            CodexService
+	OpenCode         OpenCodeService
 	Now              func() time.Time
 	// Updater reports current/latest version + changelog. Optional; when nil
 	// the version endpoints are not registered.
@@ -119,6 +131,7 @@ type Server struct {
 	claudeHome          string
 	claude              ClaudeService
 	codex               CodexService
+	openCode            OpenCodeService
 	lastKnown           map[string]struct{} // session ids currently broadcast as running
 	lastKnownMu         sync.Mutex
 	push                *PushManager
@@ -151,6 +164,16 @@ type Server struct {
 	metrics   metricsState
 	autoTitle autoTitleState
 	tasks     tasksWatcherState
+}
+
+// resolveSession is the canonical read path for server code. Tests and legacy
+// embedders may construct a Server without a cache, so retain the uncached
+// fallback for those callers.
+func (s *Server) resolveSession(id string) (sessions.ResolvedSession, error) {
+	if s.cache != nil {
+		return s.cache.Resolve(s.sessionsDir, id)
+	}
+	return sessions.ResolveByID(s.sessionsDir, id)
 }
 
 // metricsState backs the metrics dashboard. startedAt drives process uptime;
@@ -209,6 +232,7 @@ func New(deps Deps) (*Server, error) {
 		claudeHome:          deps.ClaudeHome,
 		claude:              deps.Claude,
 		codex:               deps.Codex,
+		openCode:            deps.OpenCode,
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),
 		db:                  db,
@@ -369,6 +393,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/codex/thread/archive", s.auth.Wrap(s.handleCodexThreadArchive))
 	mux.HandleFunc("/api/codex/thread/unarchive", s.auth.Wrap(s.handleCodexThreadUnarchive))
 	mux.HandleFunc("/api/codex/thread/delete", s.auth.Wrap(s.handleCodexThreadDelete))
+	mux.HandleFunc("/api/opencode/session/delete", s.auth.Wrap(s.handleOpenCodeSessionDelete))
 	mux.HandleFunc("/api/worker-status", s.auth.Wrap(s.handleWorkerStatus))
 	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
 	mux.HandleFunc("/api/extension-ui/pending", s.auth.Wrap(s.handlePendingExtensionUI))

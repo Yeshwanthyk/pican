@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"pican/internal/opencode"
+	"pican/internal/runtimes"
 	"pican/internal/schedules"
 
 	_ "modernc.org/sqlite"
@@ -86,6 +89,45 @@ func TestFireScheduleCreatesSessionAndSends(t *testing.T) {
 	}
 	if runs[0].SessionID != sessionID {
 		t.Errorf("run session = %q, want %q", runs[0].SessionID, sessionID)
+	}
+}
+
+func TestFireScheduleUsesOpenCodeNativeCreationAndModel(t *testing.T) {
+	s, sender := newScheduleTestServer(t)
+	project := t.TempDir()
+	service := &fakeOpenCodeService{root: s.sessionsDir, cwd: project}
+	available := func(context.Context) runtimes.Availability {
+		return runtimes.Availability{Available: true}
+	}
+	registry, err := runtimes.New(runtimes.OpenCode(runtimes.BuiltinOptions{
+		Command: "opencode", AvailabilityProbe: available,
+		Catalog: compatibilityCatalog{}, WorkerFactory: compatibilityWorkerFactory,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.runtimeRegistry = registry
+	s.defaultRuntime = string(runtimes.OpenCodeID)
+	s.openCode = service
+
+	schedule, err := s.schedules.Create(schedules.Schedule{
+		ID: "opencode-schedule", Name: "OpenCode", Instructions: "run",
+		ProjectPath: project, ModelProvider: opencode.Provider,
+		ModelID: "anthropic/claude-sonnet", Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionID, err := s.fireSchedule(schedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sessionID == "" || !service.started || service.model != "anthropic/claude-sonnet" {
+		t.Fatalf("session=%q started=%v model=%q", sessionID, service.started, service.model)
+	}
+	_, _, request := sender.sentInfo()
+	if request.Message != "run" {
+		t.Fatalf("message = %q", request.Message)
 	}
 }
 

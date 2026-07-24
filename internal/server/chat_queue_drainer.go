@@ -8,7 +8,6 @@ import (
 
 	"pican/internal/chat"
 	"pican/internal/runtimes"
-	"pican/internal/sessions"
 	"pican/internal/workers"
 )
 
@@ -134,7 +133,7 @@ func (d *queueDrainer) drainSession(sessionID string) {
 		return
 	}
 	// Resolve the on-disk path so chatSender can spawn the worker if needed.
-	resolved, err := sessions.ResolveByID(d.server.sessionsDir, sessionID)
+	resolved, err := d.server.resolveSession(sessionID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "queue drainer: resolve %s: %v\n", sessionID, err)
 		return
