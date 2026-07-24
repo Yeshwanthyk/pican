@@ -6,8 +6,9 @@ The session pipeline reads JSONL from `~/.pi/agent/sessions`, but the ownership 
 
 - **Pi:** the JSONL file is the native, append-only transcript. Pi supplies conversation entries; pican only creates new files and appends supported local metadata.
 - **Codex:** `~/.codex` is authoritative. pican lists/reads threads through app-server and atomically materializes rebuildable `codex-<thread-id>.jsonl` projections under the matching encoded project directory. Projection refresh preserves local `session_info`, label, model-change, and thinking-level metadata.
+- **Claude:** configured `<claude-home>/projects/*/*.jsonl` files are authoritative and strictly read-only. pican consumes complete records from stable snapshots and atomically materializes `claude-<session-id>.jsonl`; partial scans refresh valid prefixes but never prune.
 
-See [codex-runtime.md](./codex-runtime.md) for the protocol and lifecycle boundary.
+See [codex-runtime.md](./codex-runtime.md) and [claude-runtime.md](./claude-runtime.md) for runtime-specific authority boundaries.
 
 ## Session File Format
 
@@ -16,7 +17,8 @@ The unified parser consumes **JSONL** files (one JSON object per line):
 ```
 ~/.pi/agent/sessions/--project-name--/
 ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl  # native Pi transcript
-└── codex-<thread-id>.jsonl                    # generated Codex projection
+├── codex-<thread-id>.jsonl                    # generated Codex projection
+└── claude-<session-id>.jsonl                  # generated Claude projection
 ```
 
 ### Example JSONL Content
@@ -140,11 +142,13 @@ Browser POST /api/chat?id=<id>
            │         │
            │         ├──▶ Get or create ChatWorker for session
            │         │         ├──▶ Pi: `pi --mode rpc` + `switch_session`
-           │         │         └──▶ Codex: `codex app-server --stdio` + `thread/resume`
+           │         │         ├──▶ Codex: `codex app-server --stdio` + `thread/resume`
+           │         │         └──▶ Claude: installed CLI stream-json + `--session-id`/`--resume`
            │         │
            │         └──▶ worker.Prompt(ctx, chatReq)
            │               ├──▶ Pi: prompt RPC (`steer` while running)
-           │               └──▶ Codex: `turn/start` or `turn/steer`, with text/images
+           │               ├──▶ Codex: `turn/start` or `turn/steer`, with text/images
+           │               └──▶ Claude: one NDJSON user frame; no concurrent steering
            │
            └──▶ Return HTTP 202 {"ok": true, "status": "queued"}
 ```
@@ -231,6 +235,24 @@ short-lived `codex app-server --stdio`
 
 Per-thread failures are recorded without deleting older projections. In `both` mode a failed sync marks Codex unavailable but leaves Pi and cached Codex viewing intact.
 
+## Data Flow: Claude Catalog Sync
+
+```text
+startup, every minute, and debounced native fsnotify
+           │
+           ▼
+configured <claude-home>/projects/*/*.jsonl (read-only)
+           ├── validate UUID filename against record sessionId
+           ├── snapshot initial size; consume newline-terminated records only
+           ├── preserve unknown valid records; mark malformed/tail/race partial
+           └── Materialize through projections.Store
+                 ├── deterministic Claude record/block IDs
+                 ├── preserve pican-local metadata
+                 └── temp write + fsync + rename + directory fsync
+```
+
+Per-file watcher refreshes never prune. A full pass may remove only validated Claude projections from its initial projection snapshot, and only when every native directory and transcript snapshot is complete. CLI/auth availability is probed separately and does not change cached projection readability.
+
 ## Data Flow: Create New Session
 
 ```
@@ -244,6 +266,7 @@ Browser POST /api/new-session
            ├──▶ Validate runtime availability and working path
            ├──▶ Pi: create a fresh native JSONL file with inherited settings
            ├──▶ Codex: `thread/start` with model/effort → `thread/read` → materialize projection
+           ├──▶ Claude: write only a fresh local UUID projection; first prompt creates native state
            ├──▶ Pre-initialize the runtime worker
            └──▶ Return {"ok": true, "id": <session-or-projection filename>}
 ```

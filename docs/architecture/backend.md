@@ -45,6 +45,15 @@ pican/
 │   │   └── git.go              # git branch info, rename, PR URL detection
 │   ├── updater/
 │   │   └── updater.go          # Background version checker + changelog fetch
+│   ├── claude/
+│   │   ├── catalog.go          # Complete/partial native transcript reconciliation
+│   │   ├── transcript.go       # Stable read-only permissive JSONL snapshots
+│   │   ├── projection.go       # Claude record → deterministic pican entries
+│   │   ├── worker.go           # Per-session bidirectional stream-json worker
+│   │   ├── process*.go         # Injectable exec boundary + process-tree cleanup
+│   │   ├── watcher.go          # Native project fsnotify + debounce
+│   │   ├── probe.go            # Bounded installed-CLI version/auth availability
+│   │   └── config.go           # Explicit command/home resolution
 │   ├── codex/
 │   │   ├── client.go           # Concurrent JSONL JSON-RPC app-server client
 │   │   ├── rpc.go              # Thread/turn/model protocol calls
@@ -52,9 +61,11 @@ pican/
 │   │   ├── projection.go       # Atomic Codex → session projection materialization
 │   │   ├── worker.go           # Resumed per-session app-server worker
 │   │   └── types.go            # Stable protocol subset and model mapping
+│   ├── projections/
+│   │   └── store.go            # Runtime-neutral identity locks, preservation, migration, atomic JSONL replacement
 │   ├── runtimes/
 │   │   ├── registry.go         # Ordered descriptors, availability, catalogs, worker dispatch
-│   │   └── builtins.go         # Pi/Codex registrations and explicit capabilities
+│   │   └── builtins.go         # Pi/Codex/Claude registrations and explicit capabilities
 │   ├── rpc/
 │   │   ├── client.go           # JSONL RPC command builders
 │   │   ├── worker.go           # pi --mode rpc subprocess worker
@@ -160,8 +171,8 @@ type Server struct {
 
 `Deps` (passed to `New`) supplies everything wired from `internal/app`: the
 `RenderExportSession` and `RenderAppShell` renderers, `Models`, `Cache`, `Auth`,
-`ChatSender`, the selected startup-owned `RuntimeRegistry`, and the separate
-`CodexService` lifecycle adapter. Legacy runtime fields remain accepted for
+`ChatSender`, the selected startup-owned `RuntimeRegistry`, configured `ClaudeHome`, the narrow
+`ClaudeService` fresh-projection creator, and the separate `CodexService` lifecycle adapter. Legacy runtime fields remain accepted for
 source compatibility. When
 `Updater` is nil the version/update routes are not registered; when
 `RunInstall`/`RunRestart` are nil the corresponding endpoints respond `503`.
@@ -210,7 +221,7 @@ type Session struct {
 
 ### `runtimes.Registry`
 
-The app registers only Pi and Codex in deterministic startup order, then selects an enabled subset from the CLI. OpenCode and Claude are not registered in Wave 1. IDs are open validated strings (`[a-z][a-z0-9-]*`, without trailing or repeated hyphens), so the registry is extensible without making unregistered runtimes usable.
+The app registers Pi, Codex, and Claude in deterministic startup order, then selects an enabled subset from the CLI. OpenCode remains unregistered. IDs are open validated strings (`[a-z][a-z0-9-]*`, without trailing or repeated hyphens), so the registry is extensible without making unregistered runtimes usable.
 
 ```go
 type Registration struct {
@@ -241,11 +252,15 @@ type CatalogResult struct {
 |---|---|
 | Registration order, descriptor, capability declaration, probe/catalog/factory binding | app startup + `runtimes.Registry` |
 | CLI selection and per-runtime model loaders | `internal/app` |
-| Catalog schedule, timeout, completeness downgrade on error, current Codex availability | app-owned `catalogSyncer` |
+| Catalog schedule, timeout, and completeness downgrade on error | app-owned `catalogSyncer` per selected replaceable runtime |
+| Claude native scan, partial-safe pruning, per-file refresh, and debounce | `internal/claude.Catalog` + `Watcher` |
+| Claude CLI/auth availability (independent of cached projection readability) | bounded cached `internal/claude.Probe` |
 | Worker reuse, single-flight creation, crash eviction, cancellation/shutdown, 10-minute reap | `workers.Manager` |
 | Pi append-only transcript and `session_info` metadata | Pi/session pipeline; unchanged |
 | Codex native thread | Codex under `~/.codex` |
-| Codex replaceable projection | Codex adapter under `~/.pi/agent/sessions` |
+| Claude native transcript | configured `<claude-home>/projects/*/*.jsonl`, strictly read-only |
+| Replaceable projection filesystem mechanics | `projections.Store` under `~/.pi/agent/sessions` |
+| Codex item translation and sparse captured tool-turn retention | Codex adapter |
 | Codex archive/delete/unarchive and native rename/fork semantics | separate `CodexService`, not the common registry |
 | Live session/API/SSE behavior | `server.Server` |
 | Static export/share rendering | `internal/ui` export path; no runtime registry or worker dependency |
@@ -253,13 +268,14 @@ type CatalogResult struct {
 Production dispatch is:
 
 ```text
-CLI → app registrations → parse selection → selected runtimes.Registry
+CLI → app Pi/Codex/Claude registrations → parse selection → selected runtimes.Registry
                                       ├─ server.New(RuntimeRegistry)
                                       │    └─ /api/runtimes + projection policy
                                       └─ workers.Manager factory
                                            └─ ParseFile → enabled? → Registry.NewWorker
                                                 ├─ Pi workers.Factory
-                                                └─ Codex workers.Factory
+                                                ├─ Codex workers.Factory
+                                                └─ Claude: installed-CLI stream-json factory
 ```
 
 Tests substitute registrations, probes, catalogs, and factories directly; server tests may also use the legacy `Deps` fields through the compatibility builder. This keeps tests process-free while proving order, validation, availability, completeness, dispatch, API metadata, and projection-mode behavior.
@@ -268,11 +284,19 @@ Tests substitute registrations, probes, catalogs, and factories directly; server
 
 Wave 1 preserves the public Pi/Codex surface while moving internals to the registry:
 
-- CLI `pi`, `codex`, and exact legacy alias `both` still work; comma-separated registered IDs are additive. Selection is case-normalized, deduplicated, and emitted in registration order. Unknown or malformed IDs fail startup, so OpenCode/Claude remain unavailable.
+- CLI `pi`, `codex`, `claude`, and exact legacy alias `both` work; comma-separated registered IDs are additive. `both` remains exactly Pi+Codex. Selection is case-normalized, deduplicated, and emitted in registration order. Unknown or malformed IDs fail startup, so OpenCode remains unavailable.
 - `server.Deps.RuntimeRegistry` is the canonical path. Legacy `EnabledRuntimes` and `RuntimeAvailable` remain source-compatible for existing tests/embedders and are converted to a Pi/Codex-only compatibility registry. Legacy defaulting still prefers Pi; a supplied registry defaults to its first registration. An explicit default outside the registry is rejected.
 - `/api/runtimes` retains `defaultRuntime`, `id`, `available`, optional `reason`, and the existing capabilities object. It adds `label`, `command`, optional `version`, `projectionMode`, and the complete capability set. Entries retain selected registry order; frontend parsing keeps the new metadata optional and falls back to translated/runtime IDs for labels.
-- Missing persisted runtime metadata still means Pi. Persisted Pi/Codex sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
+- Missing persisted runtime metadata still means Pi. Persisted Pi/Codex/Claude sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
 - `ChatWorker` and `workers.Manager` lifecycle contracts are unchanged. Registry dispatch replaces only the hard-coded Pi/Codex factory branch.
+
+### Runtime operation boundary
+
+Runtime-dependent HTTP handlers authorize operations from the selected registry descriptor, never from request-body capability data or frontend state. A declared-but-unsupported operation returns `409` with the stable form `<label> runtime does not support <operation>`; a supported operation whose runtime probe is unavailable returns `503` with the current availability reason. Session-scoped endpoints resolve the persisted session first, so a caller cannot use a conflicting runtime query to select a different model or mutation path.
+
+Create, fork, clone, rename, chat/steer, cancel, persistent queue operations, model listing/switching, effort/reasoning selection, slash commands, file/image attachments, schedules, btw creation, and auto-title all cross this boundary. Session and btw creation dispatch explicitly to Pi, Codex, or Claude; lifecycle mutations remain Pi/Codex-only. Schedules deliberately remain Pi/Codex-only at the Claude gate and fail before persistence for another default runtime. Labels are the sole local exception: Pi remains append-only, Codex uses its adapter, and another runtime may mutate only pican-owned label metadata through an identity-validated replaceable projection store.
+
+`/api/session` additively returns the trusted `runtimeLabel`, complete `capabilities`, `projectionMode`, and a server-built `resumeCommand`. Resume commands are emitted only for known Pi/Codex/Claude argument contracts and every shell argument is quoted by the server. The live frontend uses these fields to remove or disable unsupported actions. Static export still renders only persisted data and does not receive or consult the registry.
 
 ### `workers.Manager`
 
@@ -297,9 +321,17 @@ state, model, plus PID/uptime/idle for workers implementing the optional
 
 ### Runtime workers
 
-`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process, resumes the projection's native thread ID, and communicates with Codex JSON-RPC. Both implement `workers.ChatWorker`, so chat, queueing, cancellation, model/effort changes, status, metrics, and lifecycle management share the server surface.
+`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process and resumes the projection's native thread ID over Codex JSON-RPC. `claude.Worker` owns one installed `claude` bidirectional stream-json process, selecting mutually exclusive fresh `--session-id` or existing `--resume` launch modes from validated projection/native identity. All implement `workers.ChatWorker`; the registry dispatches by the persisted runtime header, and the manager retains single-flight creation, crash eviction, process cleanup, and ten-minute idle reaping. Runtime capabilities still gate unsupported queueing, steering, settings, and commands independently.
 
 The Codex worker consumes ordered app-server notifications, emits preview/status callbacks, and atomically refreshes the projection. It never treats projected JSONL as authoritative conversation state. See [codex-runtime.md](./codex-runtime.md).
+
+### `projections.Store`
+
+`projections.Store` is scoped to one sessions directory and runtime ID. Its authoritative identity key is `(physical sessions root, runtime, native ID)`, so replacement, local metadata mutation, and cwd-driven duplicate migration serialize even when the projection's filepath changes. It validates runtime/native identity against both the filename and session header before discovery, mutation, duplicate deletion, or removal. A corrupt target fails closed rather than being overwritten.
+
+`Store.Replace` canonicalizes cwd, gathers the target plus validated duplicates, reads and deduplicates pican-owned `session_info`, `label`, `model_change`, and `thinking_level_change` entries, invokes the runtime adapter's projection builder under the identity lock, validates the replacement header, atomically commits the JSONL with file and directory fsync, and only then removes revalidated duplicates. Identical bytes are a no-op so file watchers do not emit false reloads. Codex delegates these mechanics to the store while retaining its native metadata extraction, item translation, turn mapping, and sparse captured tool-turn merge inside `internal/codex`.
+
+Claude uses the same projection store but keeps native parsing, translation, and stream-json lifecycle inside `internal/claude`. A complete catalog scan may remove validated Claude projections absent from native membership, except a `claudeFresh` creation intent awaiting its first prompt. Malformed lines, incomplete tails, concurrent appends, per-file failures, and per-file watcher refreshes make the pass partial and prohibit pruning. Unknown valid records retain opaque `claudeRaw`; deterministic entry IDs derive from native session/record/block identity. Live stdout is transient: result handling retries read-only native refresh until the matching `claudeMessageId` is projected, then retires the preview and publishes reload without persisting stdout content.
 
 The Pi worker shape is:
 
@@ -335,7 +367,7 @@ type piRPCWorker struct {
 | `/session` | GET | `handleSession` | Render SPA shell for the session route |
 | `/settings` | GET | `handleSettingsPage` | Render SPA shell for the settings route |
 | `/login` | GET | `handleAppShell` | Render SPA shell for the login route |
-| `/api/session` | GET | `handleApiSession` | JSON session data |
+| `/api/session` | GET | `handleApiSession` | JSON session data, including additive `projectionMode` reconciliation metadata |
 | `/api/sessions` | GET | `handleApiSessions` | JSON list of session summaries |
 | `/api/chat` | POST | `handleChat` | Send chat message (multipart) |
 | `/api/chat/cancel` | POST | `handleCancelChat` | Abort running chat worker |
@@ -432,8 +464,8 @@ Broadcasting is fire-and-forget with a buffered channel (16). If the client is s
 
 Three signals are OR'd together to determine if a session is "running":
 
-1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by terminal Pi; ignored for Codex projections
-2. **In-process runtime worker**: `chatSender.Status(id).State == running`
+1. **session-status file** (`~/.pi/agent/session-status/<id>`): written by terminal Pi; ignored for replaceable Codex/Claude projections
+2. **In-process runtime worker**: `chatSender.Status(id).State == running` (Pi, Codex, or Claude)
 3. **Recent projection/transcript activity**: modtime within the short activity window
 
 Status changes are broadcast as SSE `status-delta` events to `__all__` subscribers. A 1-second sweeper periodically revalidates all known running sessions to clean up stale states.

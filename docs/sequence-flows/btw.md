@@ -1,7 +1,7 @@
 # Sequence Flow: btw scratch-chats
 
 A **btw** ("by the way") is a throwaway, floating chat window attached to a
-session page. It lets you start a quick side conversation with a fresh `pi`
+session page. It lets you start a quick side conversation with a fresh default-runtime
 worker without leaving — or disturbing — the session you're reading. Each btw is
 backed by a real session file on disk, but it is registered in a separate table
 so it can be **hidden from the index** and **reaped when its parent disappears**.
@@ -48,15 +48,17 @@ CREATE TABLE IF NOT EXISTS btw_sessions (
 `handleNewBtw` body: `{ "path": "<cwd>", "parent": "<parent session id>" }`.
 
 1. Default `path` to the user's home directory when omitted.
-2. `CreateSessionFileWithSettings` writes a fresh JSONL session file.
-3. `setBtwSessionID(parent, id)` records it as the active btw for that parent,
+2. Require the default runtime's `create` and `chat` capabilities and current availability.
+3. Dispatch creation explicitly to Pi, Codex, or Claude. The selected default runtime must currently support both create and chat.
+4. The selected adapter writes/materializes the fresh session.
+5. `setBtwSessionID(parent, id)` records it as the active btw for that parent,
    **orphaning the prior active btw** in a single transaction (`active=0` for the
    parent, then upsert the new row `active=1`).
-4. On a real change, **broadcast `btw-changed`** (`{sessionId}`) on the parent's
+6. On a real change, **broadcast `btw-changed`** (`{sessionId}`) on the parent's
    SSE topic so other devices viewing that page re-sync in realtime.
-5. Pre-warm a `pi --mode rpc` worker (mirrors `handleNewSession`) so the first
+7. Pre-warm the selected runtime worker (mirrors `handleNewSession`) so the first
    message lands quickly.
-6. Respond `{"ok": true, "id": id}`.
+8. Respond `{"ok": true, "id": id}`.
 
 From here, chatting in the btw window uses the normal chat path
 (`POST /api/chat`, see [chat.md](./chat.md)) against the btw's session id — a btw

@@ -1,16 +1,16 @@
 # pican
 
-pican is a self-hosted browser UI and installable PWA for native [Pi](https://pi.dev) sessions and [Codex CLI](https://developers.openai.com/codex/cli/) threads.
+pican is a self-hosted browser UI and installable PWA for native [Pi](https://pi.dev) sessions, [Codex CLI](https://developers.openai.com/codex/cli/) threads, and Claude Code sessions.
 
-One server can run Pi, Codex, or both. It keeps each runtime authoritative while presenting a shared session list, transcript viewer, composer, and export surface.
+One server can select any registered runtime combination. It keeps native state authoritative while presenting a shared session list, transcript viewer, chat surface, and export surface.
 
 ## Features
 
-- Unified Pi and Codex session browser
+- Unified Pi, Codex, and Claude session browser
 - Live token streaming, tool calls, reasoning, and status updates
 - Continue sessions with text and image attachments
-- Runtime-scoped model and reasoning-effort controls
-- Steering, queued follow-ups, cancellation, fork/clone, rename, labels, archive, and delete
+- Runtime-scoped model and reasoning-effort controls where supported
+- Capability-driven steering, queues, cancellation, lifecycle actions, and labels
 - Session search, project grouping, pins, schedules, tasks, workflows, subagents, and scratchpads
 - Markdown, syntax highlighting, images, diffs, artifacts, and collapsible tool output
 - Static HTML/JSONL export and GitHub Gist sharing
@@ -41,6 +41,7 @@ See [the installation guide](user-docs/en/install.md) for manual downloads, Wind
 pican                         # Pi runtime, port 31415
 pican -runtime=codex          # Codex only
 pican -runtime=both           # Pi and Codex
+pican -runtime=pi,claude      # Pi + Claude catalog and browser chat
 pican -runtime=both -p 8080   # custom port
 ```
 
@@ -49,21 +50,24 @@ Useful environment variables:
 ```bash
 PICAN_TOKEN=...                       # required for non-loopback binds
 PICAN_CODEX_COMMAND=/path/to/codex    # Codex executable override
+PICAN_CLAUDE_COMMAND=/path/to/claude  # Claude executable override
+PICAN_CLAUDE_HOME=/path/to/.claude    # Claude config/transcript home
 PI_CODING_AGENT_DIR=/path/to/agent    # Pi agent directory override
 ```
 
-The installed Codex CLI owns authentication and thread state under `~/.codex`; pican never reads `auth.json`. Codex sessions currently run with `approvalPolicy: never` and `danger-full-access`, equivalent to `codex --yolo`.
+The installed Codex CLI owns authentication and thread state under `~/.codex`; pican never reads `auth.json`. Codex sessions currently run with `approvalPolicy: never` and `danger-full-access`, equivalent to `codex --yolo`. Claude transcripts under the configured home's `projects/` directory are strictly read-only; pican creates replaceable local projections and runs one installed `claude` stream-json process per active session. Claude browser chat always passes `--dangerously-skip-permissions`; interactive approvals and user questions are not supported.
 
 ## Data
 
 - Pi transcripts: `~/.pi/agent/sessions`
 - Codex state: `~/.codex`
+- Claude state: configured Claude home, default `~/.claude` (read-only)
 - pican data: `~/.pi/agent/pican`
 - pican database: `~/.pi/agent/pican.sqlite`
 - pican memory database: `~/.pi/agent/pican-memory.sqlite`
 - pican config: `~/.config/pican/env`
 
-Codex projections under the Pi sessions directory are local presentation caches. Native Codex thread state remains authoritative.
+Codex and Claude projections under the Pi sessions directory are local presentation caches. Native runtime state remains authoritative.
 
 ## Development
 

@@ -2,7 +2,7 @@
 
 **Thinking about trying pican? Go for it — you'll fall in love.**
 
-pican is a web UI and PWA for [pi](https://pi.dev) sessions and installed Codex CLI threads. One binary can browse, read, and continue either runtime—or both—from any browser.
+pican is a web UI and PWA for [pi](https://pi.dev) sessions, installed Codex CLI threads, and Claude Code sessions. One binary can browse and continue all three while each runtime keeps its native state authoritative.
 
 **pican is built for two kinds of people:**
 
@@ -17,7 +17,7 @@ You're already deep in the flow with pi in your terminal. pican keeps that momen
 
 - **Resume from anywhere** — continue a session from your phone, tablet, or another computer. No SSH, no Termius — just open your browser.
 - **Multi-session dashboard** — kick off work in one session while watching another stream. Search across projects, filter by branch, find what you need fast.
-- **Runtime choice** — use Pi, Codex, or both. Pi remains provider-agnostic; Codex uses your installed CLI and its existing authentication/state.
+- **Runtime choice** — select Pi, Codex, Claude, or a comma-separated combination. Pi remains provider-agnostic; Codex uses its installed CLI/state; Claude native project transcripts remain read-only and authoritative.
 - **Safe remote access** — built-in token auth so you can expose it on your LAN or Tailscale without worry.
 - **Share your work** — export sessions as static snapshots or secret GitHub Gists in one click.
 
@@ -49,7 +49,7 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | 📡 **Live streaming** | Watch runtime responses stream in real time. Follow mode keeps you locked on the latest. |
 | 🌲 **Tree view** | Navigate the projected conversation structure and jump to an entry; Pi retains its native message tree. |
 | 🔀 **Fork sessions** | Fork Pi at an entry; Codex maps the selected projected entry to its containing native turn. |
-| 🔍 **Browse & search** | Browse both runtimes together; Codex badges and native thread IDs make mixed histories searchable. |
+| 🔍 **Browse & search** | Browse Pi, Codex, and Claude histories together with runtime/native identity preserved. |
 | 🌿 **Git integration** | See the current branch and open a GitHub PR right from the session viewer. |
 | 📝 **Scratchpad** | Jot down notes, todos, or quick thoughts alongside your sessions without switching apps. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pican feel like *yours*. |
@@ -64,7 +64,7 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 
 | If you're looking for… | Read |
 |---|---|
-| How to install, configure, enable Codex/both mode, and use pican | [install.md](install.md) |
+| How to install, configure runtimes (including Claude home), and use pican | [install.md](install.md) |
 | Use pican as a personal assistant | [personal-assistant.md](personal-assistant.md) |
 | Keyboard shortcuts reference | [keyboard-shortcuts.md](keyboard-shortcuts.md) |
 | What's coming next | [roadmap.md](roadmap.md) |

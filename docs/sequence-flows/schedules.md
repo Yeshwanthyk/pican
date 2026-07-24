@@ -1,12 +1,13 @@
 # Sequence Flow: Schedules
 
-Schedules run pi automatically on a cadence (or on demand). When a schedule
-fires it creates a **fresh pi session**, sends the schedule's instructions as the
-first message, and lets pi run autonomously. Each firing is recorded so the
+Schedules run the runtime selected by their model provider, or the configured
+default runtime when no provider selects Codex. When a schedule fires it creates
+a **fresh session**, sends the schedule's instructions as the first message, and
+lets that runtime run autonomously. Each firing is recorded so the
 created sessions can be tagged, filtered, and surfaced in a run log — and so a
 schedule-specific push notification can be sent when the run finishes.
 
-Scheduling state lives in SQLite (`pican.sqlite`), not in pi's session files.
+Scheduling state lives in SQLite (`pican.sqlite`), not in session files.
 The `internal/schedules` package owns the store and the cron math; the firing
 loop and the session-creating runner live in `internal/server` because they need
 the chat workers and SSE broadcast.
@@ -19,7 +20,7 @@ the chat workers and SSE broadcast.
 |--------|-------|
 | `id` | UUID |
 | `name`, `instructions` | required |
-| `model_provider`, `model_id`, `thinking_level` | optional → pi defaults |
+| `model_provider`, `model_id`, `thinking_level` | optional → selected runtime defaults |
 | `project_path` | optional → user home dir |
 | `cron_expr` | empty = manual (Run-now only) |
 | `timezone` | IANA name; empty = server local |
@@ -53,6 +54,7 @@ the chat workers and SSE broadcast.
      │    missed past runs are skipped)  │                 │               │
      │                │                  │                 │               │
      │ when now >= next → fireSchedule() │                 │               │
+     │   require create + chat, plus selected model/thinking capabilities  │
      │── RecordRun(running) ────────────▶│                 │               │
      │── SetLastRun ────────────────────▶│                 │               │
      │── CreateSessionFileWithSettings ───────────────────▶│               │
@@ -63,7 +65,7 @@ the chat workers and SSE broadcast.
      │── AttachSession(runID, uuid) ────▶│                 │               │
      │                │                  │                 │               │
      │── EnsureWorker(uuid, path) ───────────────────────▶│               │
-     │── Send(uuid, path, {instructions}) ───────────────▶│─── pi runs ──▶│
+     │── Send(uuid, path, {instructions}) ───────────────▶│ runtime runs ─▶│
      │                │                  │                 │               │
      │  (file watcher sees the new .jsonl → broadcasts `new-session`)     │
      │                │                  │                 │               │
@@ -102,6 +104,8 @@ that elapsed while the process was down are **skipped** rather than replayed.
 
 The `/schedules` page itself is the SPA shell (served by the catch-all index
 route); the Svelte router renders `SchedulesPage.svelte`.
+
+Schedule create/update and Run-now validate the target runtime's trusted registry descriptor. They require `create` and `chat`, and also model switching plus effort/reasoning selection when those settings are present. Unsupported operations return `409`; an unavailable runtime returns `503`. Session creation dispatches explicitly to Pi or Codex. At the Claude gate, a Claude-default schedule is rejected before persistence because runtime selection is still coupled to schedule model/provider data; Claude scheduling remains deferred.
 
 ## Push notifications
 

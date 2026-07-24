@@ -194,7 +194,7 @@ Fresh and resumed argv builders must remain separate and tests must lock that in
 
 ### Configured-home behavior and gaps
 
-`CLAUDE_CONFIG_DIR=<dir>` redirected Claude's config/project storage. A fresh directory was correctly isolated but unauthenticated (`Not logged in`); an invalid inherited `ANTHROPIC_API_KEY` produced streamed `api_retry` events with `401 authentication_failed`. Each configured Claude home therefore needs its own availability/auth probe and disabled reason.
+`CLAUDE_CONFIG_DIR=<dir>` redirected Claude's config/project storage. A fresh directory was correctly isolated but unauthenticated (`Not logged in`); an invalid inherited `ANTHROPIC_API_KEY` produced streamed authentication failures. The installed CLI's `auth status --json` nevertheless reported `loggedIn: true` for any inherited key before that key was validated by a request. Production probes and workers must therefore both remove `ANTHROPIC_API_KEY` and use the configured home's OAuth identity; otherwise availability can pass while the first turn fails or a key can cross explicitly isolated homes. Each configured Claude home needs its own availability/auth probe and disabled reason.
 
 Other boundaries retained from the plan:
 

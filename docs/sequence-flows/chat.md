@@ -1,6 +1,6 @@
 # Sequence Flow: Chat Message
 
-This flow covers a user typing a message (with optional image attachment) in the session page chat composer and sending it through the session's Pi or Codex runtime.
+This flow covers a user typing a message (with optional image attachment) in the session page chat composer and sending it through the session's Pi, Codex, or Claude runtime.
 
 ## Sequence Diagram
 
@@ -145,10 +145,11 @@ lock → reuse healthy worker / evict error worker / join in-flight creation
   → parse session runtime
       → Pi: start `pi --mode rpc`, then switch_session
       → Codex: validate projection, start `codex app-server --stdio`, then thread/resume
+      → Claude: validate projection/native UUID, start installed `claude` stream-json with fresh `--session-id` or existing `--resume`
   → store one worker for the session
 ```
 
-The manager reuses that worker until it fails, the server exits, or it has been idle for 10 minutes. Codex resume uses the projection's native thread ID and refreshes from authoritative thread state; it does not replay the projection.
+The manager reuses that worker until it fails, the server exits, or it has been idle for 10 minutes. Codex resumes from its native thread. Claude resumes from its native UUID and read-only transcript; neither replays the pican projection as authority.
 
 ### 4. Runtime prompt
 
@@ -167,6 +168,8 @@ For Codex, `codex.Worker.Prompt` converts text and attachments to app-server inp
 - `/review` → `review/start` targeting uncommitted changes;
 - `/compact` → `thread/compact/start`.
 
+For Claude, `claude.Worker.Prompt` writes one stream-json user object containing text and base64 image content blocks. The first input triggers and validates `system:init` within a bounded launch timeout; subsequent sequential prompts reuse the process. Concurrent sends are rejected because Claude does not declare `steer`.
+
 ### 5. Response handling
 
 For Pi, the `consume()` goroutine reads JSONL lines from `pi`'s stdout:
@@ -178,6 +181,8 @@ For Pi, the `consume()` goroutine reads JSONL lines from `pi`'s stdout:
 It matches by `id` and delivers to the waiting `pending` channel. The worker then updates its status to `idle`.
 
 Codex uses JSON-RPC responses plus notifications. `turn/started`, item deltas/completions, `turn/completed`, and thread-status notifications update worker state, emit best-effort `chat-preview`, refresh the projection, and trigger canonical `reload` reconciliation.
+
+Claude translates `system:init`, `stream_event`, `assistant`, `result`, and `error` records to worker status/preview callbacks. Unknown valid record types are ignored with bounded metadata-only diagnostics; malformed output or identity mismatch fails the worker. On `result`, the worker waits for the matching native assistant message to reach the read-only transcript projection before retiring the preview and becoming idle.
 
 ### 6. Streaming events
 
@@ -202,7 +207,10 @@ These update `lastStreamActivity` so `Status()` continues to report `running` un
 | Unsupported image type | 415 `{"error": "only image attachments are supported"}` |
 | Session not found | 404 `{"error": "not found"}` |
 | Chat disabled | 409 `{"error": "This session can be viewed, but chat is disabled because its working directory no longer exists."}` |
-| Runtime unavailable | 409 with the session's disabled reason |
+| Runtime does not support the requested chat operation | 409 `<label> runtime does not support <operation>` |
+| Runtime supports the operation but is unavailable | 503 with the registry probe's current reason |
+
+Before parsing or dispatching, the server resolves the persisted session runtime and checks the trusted registry descriptor. Chat requires `chat`; a send against a running worker also requires `steer`; images require `images`; cancel, queue, model/thinking changes, commands, and file references each require their corresponding capability. The composer receives the same complete capability set from `/api/session` and does not offer unsupported paths, but the server remains authoritative for direct requests and stale clients.
 
 Codex workers use `approvalPolicy: "never"`. Server requests for command/file approval are declined, permissions and user-input answers are empty, and MCP elicitation is declined; no approval dialog is exposed in the browser.
 
@@ -212,7 +220,7 @@ After 10 minutes of idle time (no user-initiated actions), the reaper goroutine 
 
 ### 9. Cancelling a Chat
 
-`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt` for the active native turn.
+`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt`; Claude sends a stream-json `control_request` interrupt and kills the process tree only if its bounded acknowledgement deadline expires.
 
 ### 10. Model and effort
 

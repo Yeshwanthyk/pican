@@ -4,17 +4,17 @@
 
 ### Remote control
 
-- Run one binary in Pi, Codex, or dual-runtime mode (`-runtime=pi|codex|both`; default `pi`)
-- Continue Pi sessions or Codex threads from the browser with text or image attachments
+- Run one binary with Pi, Codex, Claude, or a comma-separated combination (`both` remains Pi+Codex; default `pi`)
+- Continue Pi, Codex, or Claude sessions from the browser with text or image attachments
 - Start a brand-new session against any project path, right from the web UI
-- In-browser model switching and thinking-level selector, per session
+- In-browser model switching and thinking-level selection where the session runtime supports them
 - Per-session worker status (idle / running / error) with crashed-worker eviction and 10-minute idle reaping
 - Multiple sessions run in parallel — kick off work in one, watch another stream
 - `PICAN_TOKEN` for safe LAN exposure — required by default for any explicit non-loopback bind
 
 ### Reading sessions
 
-- Browse Pi transcripts and materialized Codex threads together, with runtime badges, filters, search, and branch navigation
+- Browse Pi transcripts and materialized Codex/Claude sessions together, with runtime badges, filters, search, and branch navigation
 - Live incremental updates while pi is still running (via fsnotify; ~ms latency)
 - Follow mode for tailing active sessions
 - Deep links to individual messages
@@ -27,6 +27,7 @@
 - [Go](https://go.dev) 1.25+ (only for building from source)
 - `pi` on your `PATH` when Pi runtime is enabled
 - Codex CLI installed and signed in when Codex runtime is enabled
+- Claude CLI installed and signed in for Claude browser chat, creation, terminal resume, and model availability (cached projections remain readable without it)
 - Optional: `gh` for sharing
 - On Windows: pi needs a bash shell for its shell tool — [Git for Windows](https://git-scm.com/download/win) is enough (see pi's Windows docs)
 
@@ -166,13 +167,22 @@ pican -o
 # Custom port
 pican -p 8080
 
-# Runtime: pi (default), codex, or both
+# Runtime: pi (default), codex, claude, or a comma-separated set
+# "both" remains the Pi+Codex alias
 pican -runtime=both
+pican -runtime=pi,claude
 
 # Explicit Codex executable path (not a shell command)
 pican -runtime=both -codex-command=/absolute/path/to/codex
 # equivalent fallback when the flag is absent:
 PICAN_CODEX_COMMAND=/absolute/path/to/codex pican -runtime=both
+
+# Claude catalog + browser chat with explicit executable/config home
+pican -runtime=claude \
+  -claude-command=/absolute/path/to/claude \
+  -claude-home=/absolute/path/to/.claude
+# Environment fallbacks: PICAN_CLAUDE_COMMAND, PICAN_CLAUDE_HOME,
+# then CLAUDE_CONFIG_DIR for the home.
 
 # Override bind host (loopback is unauthenticated by default)
 pican --host 127.0.0.1
@@ -224,15 +234,25 @@ Existing projections remain viewable, downloadable, exportable, and shareable wh
 
 Codex sessions support text/images, steering an active turn, persistent queues, cancel, model and reasoning effort, `/review`, `/compact`, rename, labels, fork/clone, status/SSE, and `codex resume <thread-id>` copying from the session header. YOLO mode bypasses command/file approvals. Unexpected approval requests are declined defensively; permission and user-input requests receive empty responses, and MCP elicitation is declined.
 
+## Claude runtime
+
+The configured Claude home defaults to `~/.claude`. pican reads `projects/*/*.jsonl` as the authoritative transcript catalog and never rewrites those files. It creates rebuildable `claude-<session-id>.jsonl` projections under the Pi sessions directory for search, viewing, labels, download, export, share, and live external-session discovery.
+
+Command precedence is `-claude-command`, `PICAN_CLAUDE_COMMAND`, then `claude`. Home precedence is `-claude-home`, `PICAN_CLAUDE_HOME`, `CLAUDE_CONFIG_DIR`, then `~/.claude`. For the default home, pican leaves `CLAUDE_CONFIG_DIR` unset so Claude Code uses the native subscription/OAuth profile; non-default homes remain explicitly isolated. pican probes the installed CLI with `--version` and `auth status --json`; missing CLI/auth disables Claude operations without hiding cached projections. Native changes are debounced and reconciled every minute as recovery. Malformed lines or incomplete appends never authorize projection deletion.
+
+Creating a browser session records a fresh UUID projection; the first prompt creates native Claude state, while existing sessions resume their native UUID. Each active session gets one long-lived installed `claude` bidirectional stream-json process. Text and image input, cancellation, terminal resume, and model discovery are supported. Steering, persistent queues, in-session model/effort changes, rename, fork/clone, archive/delete, approvals, and user questions remain unavailable.
+
+> **Warning:** Claude browser workers always launch with `--dangerously-skip-permissions`. Model-generated commands can access the host without confirmation. pican does not expose Claude approval or `AskUserQuestion` dialogs.
+
 ## Browser Chat
 
-Open a session page and use the composer at the bottom to continue that exact Pi or Codex session.
+Open a session page and use the composer at the bottom to continue that exact Pi, Codex, or Claude session.
 
 - `Enter` sends, `Shift+Enter` inserts a newline
 - Drag-and-drop or paste images directly into the composer
 - The model picker and thinking/reasoning-level selector are scoped to the session runtime
-- Each active session gets one dedicated, reusable `pi --mode rpc` or `codex app-server --stdio` worker, so different sessions do not block each other
-- While a turn runs, send can steer immediately or place work in the persistent server-side queue
+- Each active session gets one dedicated, reusable Pi, Codex, or Claude worker, so different sessions do not block each other
+- Steering and persistent queues appear only for runtimes that support them; Claude requires the current turn to finish or be cancelled before the next send
 
 ## Sharing Sessions
 

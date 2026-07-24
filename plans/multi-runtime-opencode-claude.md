@@ -268,6 +268,21 @@ Extract generic atomic projection and preservation logic from `internal/codex` w
 
 Gate: Codex catalog refresh, local metadata preservation, watcher reload, pagination, export, fork, rename, archive/delete safety, and unavailable-runtime viewing tests pass. `make check` passes. Commit separately.
 
+Wave 2 implementation record on `multi-runtime-opencode-claude`:
+
+- Added `internal/projections.Store` as the runtime-neutral owner of safe runtime/native-ID path derivation, canonical cwd handling, keyed identity locking, identity-validated discovery/removal, local metadata mutation and preservation, duplicate migration, and fsync-backed atomic JSONL replacement.
+- Kept Codex native metadata, item translation, turn mapping, and captured sparse tool-turn merge in `internal/codex`; Codex now supplies authoritative entries to the generic store and preserves its existing projection filenames and public behavior.
+- Added additive `projectionMode` to `/api/session` and the embedded session bootstrap. Live reconciliation now uses this field for delta eligibility and same-ID replacement instead of checking `runtime === "codex"`; unknown or absent modes take the conservative full-reconcile path.
+- Did not add `projectionRevision`: Wave 2 has no durable monotonic revision source that advances for both atomic native refreshes and append-style local metadata mutations. Adding a partial or mtime-derived revision would create a misleading freshness contract; projection mode is sufficient for the required reconciliation correction.
+- Added generic store/concurrency tests plus focused server and frontend contract tests. `go test -race ./internal/projections`, targeted Codex/server/UI tests, the focused Vitest bundle, `make build`, and the full `make check` gate passed. E2E was not run. Per the implementation-session instruction, no commit was created.
+
+Task 6 capability-hardening implementation record:
+
+- Added one server-side capability boundary backed by trusted registry descriptors, with stable `409` unsupported-operation responses and `503` current-unavailability responses. Session-scoped model discovery uses the persisted runtime even when a conflicting query parameter is supplied.
+- Guarded create, fork/clone/rename, chat/steer/cancel/queue, model listing/switching, effort/reasoning, slash commands, attachments/file references, schedules, btw, and auto-title. Runtime creation and mutation dispatch now names Pi and Codex explicitly and fails closed for any other registration until an adapter is wired. Replaceable-runtime labels remain pican-local through the identity-validated projection store.
+- Added trusted per-session runtime label, complete capabilities, projection mode, and a server-built shell-quoted Pi/Codex resume command. The live UI carries these fields and gates new-session choices, menus, header/entry actions, composer controls, selectors, queueing, attachments, cancel, and running-worker sends without changing Pi/Codex defaults.
+- Static export remains registry-free. No Claude registration or adapter was added.
+
 ### Wave 3 — OpenCode adapter
 
 Implement child supervision, authenticated HTTP client, SSE reader, catalog, projection translator, worker adapter, models, create/resume, chat, cancellation, and supported lifecycle operations.
@@ -284,6 +299,14 @@ Existing Claude sessions must become viewable, searchable, exportable, and resum
 
 Gate: fixture tests cover discovery, malformed lines, unknown records, cwd fallback, multiple Claude homes, partial scan failure, projection preservation, concurrent file append, and external-session appearance. `make check` passes. Update docs. Commit separately.
 
+Wave 4 implementation record on `multi-runtime-opencode-claude`:
+
+- Registered a catalog-only Claude descriptor with explicit executable/config-home precedence, bounded installed-CLI version/auth probing, terminal resume using the configured `CLAUDE_CONFIG_DIR`, static CLI model aliases, and honest `resume`/`modelListing` capabilities. Browser chat and native lifecycle mutations remain disabled; no stream-json worker was added.
+- Added `internal/claude` stable read-only snapshots over `<claude-home>/projects/*/*.jsonl`, permissive complete-line parsing, filename/record identity validation, cwd fallback, deterministic message/thinking/tool/unknown-record translation, and atomic replaceable projections through `internal/projections.Store`. Native Claude files are never opened for writing.
+- Added complete-vs-partial catalog reconciliation: malformed records, incomplete tails, concurrent appends, unreadable files, or materialization errors may refresh valid prefixes but prohibit pruning. Complete passes prune only validated pre-scan Claude projections absent from authoritative membership.
+- Added startup sync, one-minute recovery, and a 100 ms debounced native watcher. Per-file refresh never prunes; removals/directory changes request full reconciliation. Focused fixtures/tests cover malformed/unknown/incomplete records, deterministic projection, local metadata retention, read-only authority, cwd fallback, multiple homes, concurrent append, partial retention, availability/configuration, and external-session appearance.
+- `go test -race ./internal/claude ./internal/projections`, focused runtime/app/server/UI tests, `make test`, explicit `make build`, and the full `make check` gate passed. E2E and a live Claude catalog acceptance run were not performed; no commit was created.
+
 ### Wave 5 — Claude live worker
 
 Implement the SDK-free stream-json worker, live previews, images, resume, cancellation, status, crash eviction, idle reaping, and file-backed projection convergence.
@@ -291,6 +314,16 @@ Implement the SDK-free stream-json worker, live previews, images, resume, cancel
 Do not add permission UI. Always pass `--dangerously-skip-permissions` and make that security posture explicit in settings/help copy.
 
 Gate: live tests prove fresh start, multiple prompts on one process, external resume, worker reap/resume, pican restart, partial streaming, image input, cancellation during generation, process crash, transcript convergence without duplicate messages, and simultaneous Pi/Codex/OpenCode activity. `make check` passes. Commit separately.
+
+Wave 5 Claude gate record on `multi-runtime-opencode-claude`:
+
+- Added the SDK-free per-session Claude stream-json worker with mutually exclusive fresh/resume argv, unconditional permission bypass, OAuth-home isolation, bounded first-input initialization, text/image framing, UTF-8-safe bounded previews, process-tree cleanup, interrupt control requests, crash/error eviction, ten-minute manager reaping, and native-message-ID projection convergence. Stdout remains transient and native JSONL remains authoritative.
+- Wired Claude create/resume/chat/cancel/model aliases and capability-driven live UI behavior without adding approvals, questions, steering, persistent queues, model switching, lifecycle mutation, or scheduling. Claude-default schedules fail before definition persistence; btw remains a default-runtime feature. OpenCode remains unregistered and unimplemented.
+- Audited the full diff from `c95cee91d5621dc7e4c018ad1938884da557ec96`; corrected stale Claude docs, bounded initialization hangs, conflicting transcript cwd handling, and default-runtime btw gating. No generated build artifacts or unrelated plan changes were retained.
+- Deterministic gates passed: `git diff --check`; the six-package requested race suite (387 Go test/subtest pass events); `make test`; `make check`; and full Playwright E2E at constrained CI concurrency (470 passed, 118 intentionally skipped). `make test` reported 786 frontend, 46 extension, 19 memory, and 660 Go test/subtest pass events, plus the installer acceptance script. Two unconstrained E2E attempts each exposed the pre-existing schedule-editor name-input flake in one browser project; the isolated case and the full constrained run passed.
+- Live Claude acceptance was not run: Claude Code 2.1.215 is installed, but the configured default home reports `loggedIn: false` when probed with the inherited `ANTHROPIC_API_KEY` removed, matching production behavior. This logged-out OAuth home is the sole live blocker. No commit was created.
+
+Stop at this Claude gate. Wave 6 and OpenCode implementation remain deferred.
 
 ### Wave 6 — Product hardening and final verification
 

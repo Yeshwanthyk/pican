@@ -1,6 +1,6 @@
 # Sequence Flow: Viewing a Session
 
-This flow covers a user opening either a native Pi transcript or a materialized Codex thread projection.
+This flow covers a user opening a native Pi transcript or a materialized Codex/Claude projection.
 
 ## Sequence Diagram
 
@@ -28,7 +28,7 @@ Browser ── GET /events?id=abc ──────▶ Server (SSE)
 GET /api/session?id=<session-id>
 ```
 
-The route normalizes `runtime`, `nativeId`, and the projected/native session UUID from the API/header, builds the renderer payload, and mounts the session UI. Codex pages retain the runtime when creating siblings and copy `codex resume <nativeId>` for terminal resume; Pi pages copy `pi --session <sessionUUID>`.
+The route normalizes `runtime`, `nativeId`, and the projected/native session UUID from the API/header, builds the renderer payload, and mounts the session UI. Codex pages copy `codex resume <nativeId>`; Pi pages copy `pi --session <sessionUUID>`; Claude pages copy a server-built `claude --resume <nativeId>` command for the native default profile, or prefix `CLAUDE_CONFIG_DIR=<configured-home>` for a non-default isolated profile, and expose browser chat only while the installed CLI is authenticated.
 
 `SessionContent` derives render items from the active root-to-leaf path. Consecutive tool-only activity stays as individual entries through four tool calls; longer runs render inside a collapsed native `<details>` while preserving the original entry components and `entry-<id>` anchors. Navigation opens ancestor details before scrolling to a nested anchor.
 
@@ -81,8 +81,12 @@ Security: `filepath.Base(id) != id` prevents path traversal.
   "chatDisabledReason": "",
   "model": "...",
   "modelProvider": "...",
-  "runtime": "pi|codex",
-  "nativeId": "<Codex thread id, when applicable>"
+  "runtime": "pi|codex|claude",
+  "nativeId": "<native session id, when applicable>",
+  "runtimeLabel": "Pi|Codex|Claude|configured label",
+  "capabilities": { "chat": true, "rename": true },
+  "projectionMode": "append-only-native|replaceable-projection",
+  "resumeCommand": "server-built safe terminal command, or empty"
 }
 ```
 
@@ -102,7 +106,7 @@ The server:
 2. Sends `:ok\n\n` (SSE comment to confirm connection)
 3. Blocks reading from `client.ch` or `r.Context().Done()`
 
-When a Pi transcript append or atomic Codex projection replacement changes the file, the watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, reconciles canonical entries, and clears temporary chat preview. Codex worker callbacks also request reload directly after projection updates.
+When a Pi transcript append or atomic Codex/Claude projection replacement changes the file, the session-directory watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, and reconciles canonical entries. Codex worker callbacks also request reload directly; Claude native changes first pass through its separate read-only debounced catalog watcher, which atomically replaces the derived projection.
 
 ## Rename Flow
 
@@ -113,8 +117,8 @@ POST /api/rename-session?id=<session-id>
 { "name": "New title" }
 ```
 
-For Pi, the server appends a `session_info` line, preserving the append-only transcript rule. For Codex, it calls `thread/name/set` on the authoritative thread and atomically refreshes the projection; local projection metadata remains preserved.
+For Pi, the server appends a `session_info` line, preserving the append-only transcript rule. For Codex, it calls `thread/name/set` on the authoritative thread and atomically refreshes the projection; local projection metadata remains preserved. Claude does not declare rename support in this phase, so the action is absent and direct requests return `409`.
 
 ## Runtime unavailable / cached viewing
 
-Availability is applied after parsing. If Codex is unavailable, an existing projection still loads through the normal cache and renderer, including download, export, and share. Chat and runtime-dependent mutations are disabled with the current reason until periodic sync recovers. This does not mean the browser works without the pican HTTP server: the service worker intentionally does not cache session pages or JSON.
+Availability and trusted capabilities are applied after parsing. If a runtime is unavailable or does not support chat, an existing projection still loads through the normal cache and renderer, including download, export, and share. The live UI gates runtime-dependent actions using the server-provided capability set; the server independently returns `409` for unsupported operations and `503` for supported operations whose runtime is unavailable. This does not mean the browser works without the pican HTTP server: the service worker intentionally does not cache session pages or JSON.
