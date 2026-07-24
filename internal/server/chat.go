@@ -36,7 +36,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
-	s.applyRuntimeAvailability(&resolved.Session.SessionSummary)
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityChat) {
+		return
+	}
 	if !resolved.Session.ChatAvailable {
 		writeJSONError(w, http.StatusConflict, resolved.Session.ChatDisabledReason)
 		return
@@ -57,12 +59,19 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if len(chatReq.Images) > 0 && !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityImages) {
+		return
+	}
 	if s.chatSender == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
 	}
 	sessionID := resolved.Session.ID
 	sessionPath := resolved.Path
+	if s.chatSender.Status(sessionID).State == workers.WorkerStateRunning &&
+		!s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilitySteer) {
+		return
+	}
 	go func() {
 		if err := s.chatSender.Send(context.Background(), sessionID, sessionPath, chatReq); err != nil {
 			fmt.Fprintf(os.Stderr, "chat send failed for %s: %v\n", sessionID, err)
@@ -122,6 +131,9 @@ func (s *Server) handleCancelChat(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityCancel) {
+		return
+	}
 	if s.chatSender == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
@@ -178,15 +190,14 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilitySlashCommands) {
+		return
+	}
 	if s.chatSender == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
 	}
 	sessionID := resolved.Session.ID
-	if available, _ := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSON(w, 0, map[string]any{"commands": []workers.SlashCommand{}, "workerReady": false})
-		return
-	}
 	if r.URL.Query().Get("load") == "1" {
 		if err := s.chatSender.EnsureWorker(r.Context(), sessionID, resolved.Path); err != nil {
 			fmt.Fprintf(os.Stderr, "commands: ensure worker failed for %s: %v\n", sessionID, err)
@@ -226,6 +237,9 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityModelSwitching) {
+		return
+	}
 	var body struct {
 		Provider string `json:"provider"`
 		ModelID  string `json:"modelId"`
@@ -236,10 +250,6 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Provider == "" || body.ModelID == "" {
 		writeJSONError(w, http.StatusBadRequest, "provider and modelId required")
-		return
-	}
-	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
 		return
 	}
 	if s.chatSender == nil {
@@ -262,6 +272,9 @@ func (s *Server) handleSetThinkingLevel(w http.ResponseWriter, r *http.Request) 
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	if !s.requireThinkingCapability(w, r, resolved.Session.Runtime) {
+		return
+	}
 	var body struct {
 		Level string `json:"level"`
 	}
@@ -271,10 +284,6 @@ func (s *Server) handleSetThinkingLevel(w http.ResponseWriter, r *http.Request) 
 	}
 	if body.Level == "" {
 		writeJSONError(w, http.StatusBadRequest, "level required")
-		return
-	}
-	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
 		return
 	}
 	if s.chatSender == nil {

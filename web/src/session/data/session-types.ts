@@ -65,6 +65,10 @@ export interface SessionPayload extends UnknownRecord {
   total?: number | null;
   from?: number | null;
   truncated?: boolean | null;
+  projectionMode?: string | null;
+  runtimeLabel?: string | null;
+  resumeCommand?: string | null;
+  capabilities?: UnknownRecord | null;
 }
 
 export interface SessionDataShape extends SessionPayload {

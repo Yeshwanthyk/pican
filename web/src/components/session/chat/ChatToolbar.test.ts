@@ -2,6 +2,7 @@ import { afterEach, assert, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/svelte";
 import ChatToolbar from "./ChatToolbar.svelte";
 import { ChatToolbarState } from "./chat-toolbar-state.svelte.js";
+import { defaultRuntimeCapabilities } from "../../../lib/runtime-capabilities";
 
 function byId(elementId: string): HTMLElement {
   const element = document.getElementById(elementId);
@@ -62,5 +63,24 @@ describe("ChatToolbar", () => {
     expect(byId("pi-chat-cancel").style.display).toBe("none");
     expect(byId("pi-chat-queue").style.display).toBe("none");
     expect(byId("pi-chat-send").textContent).toBe("Send");
+  });
+
+  it("omits unsupported runtime controls and prevents steering", () => {
+    const toolbar = new ChatToolbarState();
+    toolbar.setStatus("running", "running");
+    render(ChatToolbar, {
+      props: {
+        chatAvailable: true,
+        toolbar,
+        capabilities: { ...defaultRuntimeCapabilities("future"), chat: true },
+      },
+    });
+
+    expect(document.querySelector("#pi-chat-attach")).toBeNull();
+    expect(document.querySelector("#pi-chat-thinking-label")).toBeNull();
+    expect(document.querySelector("#pi-chat-model-label")).toBeNull();
+    expect(document.querySelector("#pi-chat-cancel")).toBeNull();
+    expect(document.querySelector("#pi-chat-queue")).toBeNull();
+    expect(byId("pi-chat-send").style.display).toBe("none");
   });
 });

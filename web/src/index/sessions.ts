@@ -2,14 +2,12 @@ import { effects } from "../shared/api.js";
 import type { FetchLike } from "../lib/http";
 import { runPromise } from "../lib/runtime";
 import { NewSessionResponseSchema, RuntimesResponseSchema } from "../lib/schema";
-import type {
-  RecentLocations,
-  RuntimeCapabilities,
-  RuntimesResponse,
-  Session,
-  SessionList,
-} from "../lib/schema";
+import type { RecentLocations, RuntimesResponse, Session, SessionList } from "../lib/schema";
 import { t } from "../shared/strings.js";
+import {
+  normalizeRuntimeCapabilities,
+  type CompleteRuntimeCapabilities,
+} from "../lib/runtime-capabilities";
 
 export interface NormalizedSession {
   id: string;
@@ -42,7 +40,7 @@ export interface NormalizedRuntime {
   readonly available: boolean;
   readonly reason: string;
   readonly projectionMode: string;
-  readonly capabilities: Readonly<Required<RuntimeCapabilities>>;
+  readonly capabilities: CompleteRuntimeCapabilities;
 }
 
 export interface NormalizedRuntimesResponse {
@@ -214,33 +212,6 @@ export function sessionSearchText(session: SessionSearch = {}): string {
   return `${session.name || ""} ${session.project || ""} ${sessionModelLabel(session)} ${session.sessionUUID || ""} ${session.runtime || "pi"} ${session.nativeId || ""}`.trim();
 }
 
-const normalizeRuntimeCapabilities = (
-  capabilities: RuntimeCapabilities = {},
-): Readonly<Required<RuntimeCapabilities>> => ({
-  create: capabilities.create === true,
-  resume: capabilities.resume === true,
-  fork: capabilities.fork === true,
-  clone: capabilities.clone === true,
-  rename: capabilities.rename === true,
-  archive: capabilities.archive === true,
-  unarchive: capabilities.unarchive === true,
-  delete: capabilities.delete === true,
-  chat: capabilities.chat === true,
-  cancel: capabilities.cancel === true,
-  steer: capabilities.steer === true,
-  persistentQueue: capabilities.persistentQueue === true,
-  images: capabilities.images === true,
-  files: capabilities.files === true,
-  modelListing: capabilities.modelListing === true,
-  modelSwitching: capabilities.modelSwitching === true,
-  effortSelection: capabilities.effortSelection === true,
-  reasoningSelection: capabilities.reasoningSelection === true,
-  slashCommands: capabilities.slashCommands === true,
-  subagents: capabilities.subagents === true,
-  interactiveApprovals: capabilities.interactiveApprovals === true,
-  userQuestions: capabilities.userQuestions === true,
-});
-
 const runtimeLabel = (id: string, label: string | undefined): string => {
   const key = `runtime.${id}`;
   const translated = t(key);
@@ -259,7 +230,7 @@ export function normalizeRuntimesResponse(raw: RuntimesResponse = {}): Normalize
         available: entry?.available !== false,
         reason: String(entry?.reason || "").trim(),
         projectionMode: String(entry?.projectionMode || "").trim(),
-        capabilities: normalizeRuntimeCapabilities(entry?.capabilities),
+        capabilities: normalizeRuntimeCapabilities(entry?.capabilities, id),
       };
     })
     .filter((entry) => entry.id);
@@ -272,17 +243,19 @@ export function normalizeRuntimesResponse(raw: RuntimesResponse = {}): Normalize
           available: true,
           reason: "",
           projectionMode: "",
-          capabilities: normalizeRuntimeCapabilities(),
+          capabilities: normalizeRuntimeCapabilities(undefined, "pi"),
         },
       ];
   const requestedDefault = String(raw.defaultRuntime || "pi")
     .trim()
     .toLowerCase();
   const defaultEntry = normalizedRuntimes.find(
-    (entry) => entry.id === requestedDefault && entry.available,
+    (entry) => entry.id === requestedDefault && entry.available && entry.capabilities.create,
   );
   const selectedRuntime =
-    defaultEntry?.id || normalizedRuntimes.find((entry) => entry.available)?.id || "";
+    defaultEntry?.id ||
+    normalizedRuntimes.find((entry) => entry.available && entry.capabilities.create)?.id ||
+    "";
   return {
     defaultRuntime: requestedDefault || "pi",
     runtimes: normalizedRuntimes,

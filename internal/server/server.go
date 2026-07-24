@@ -20,6 +20,7 @@ import (
 	"pican/internal/agentdir"
 	"pican/internal/auth"
 	"pican/internal/chatqueue"
+	"pican/internal/claude"
 	"pican/internal/codex"
 	"pican/internal/render"
 	"pican/internal/rpc"
@@ -44,6 +45,10 @@ const globalSessID = "__all__"
 type ModelQuery struct {
 	Runtime   string
 	SessionID string
+}
+
+type ClaudeService interface {
+	StartSession(string, string) (claude.Projection, error)
 }
 
 type CodexService interface {
@@ -74,6 +79,8 @@ type Deps struct {
 	// below remain accepted so existing embedders can migrate independently.
 	RuntimeRegistry  *runtimes.Registry
 	DefaultRuntime   string
+	ClaudeHome       string
+	Claude           ClaudeService
 	EnabledRuntimes  []string
 	RuntimeAvailable func(runtime string) (bool, string)
 	Codex            CodexService
@@ -109,6 +116,8 @@ type Server struct {
 	modelsFor           func(ctx context.Context, query ModelQuery) (json.RawMessage, error)
 	defaultRuntime      string
 	runtimeRegistry     *runtimes.Registry
+	claudeHome          string
+	claude              ClaudeService
 	codex               CodexService
 	lastKnown           map[string]struct{} // session ids currently broadcast as running
 	lastKnownMu         sync.Mutex
@@ -197,6 +206,8 @@ func New(deps Deps) (*Server, error) {
 		models:              deps.Models,
 		modelsFor:           deps.ModelsFor,
 		defaultRuntime:      deps.DefaultRuntime,
+		claudeHome:          deps.ClaudeHome,
+		claude:              deps.Claude,
 		codex:               deps.Codex,
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),

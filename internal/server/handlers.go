@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"pican/internal/agentdir"
+	"pican/internal/claude"
 	"pican/internal/codex"
+	"pican/internal/projections"
 	"pican/internal/runtimes"
 	"pican/internal/sessions"
 	"pican/internal/ui"
@@ -94,13 +96,13 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityFork) {
 		return
 	}
 
 	var id string
-	if resolved.Session.Runtime == "codex" {
+	switch resolved.Session.Runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -120,12 +122,15 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
-	} else {
+	case string(runtimes.PiID):
 		id, err = sessions.ForkSessionFile(s.sessionsDir, resolved.Path, body.EntryID, s.now)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	default:
+		writeJSONError(w, http.StatusConflict, s.runtimeLabel(resolved.Session.Runtime)+" runtime does not support fork")
+		return
 	}
 
 	if s.chatSender != nil {
@@ -154,6 +159,9 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityClone) {
+		return
+	}
 
 	leafID := body.LeafID
 	if leafID == "" {
@@ -165,18 +173,14 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if leafID == "" && resolved.Session.Runtime != "codex" {
+	if leafID == "" && resolved.Session.Runtime == string(runtimes.PiID) {
 		writeJSONError(w, http.StatusBadRequest, "no leaf entry available")
 		return
 	}
 
-	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
-		return
-	}
-
 	var id string
-	if resolved.Session.Runtime == "codex" {
+	switch resolved.Session.Runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -187,12 +191,15 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
-	} else {
+	case string(runtimes.PiID):
 		id, err = sessions.CloneSessionFile(s.sessionsDir, resolved.Path, leafID, s.now)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	default:
+		writeJSONError(w, http.StatusConflict, s.runtimeLabel(resolved.Session.Runtime)+" runtime does not support clone")
+		return
 	}
 
 	if s.chatSender != nil {
@@ -361,8 +368,7 @@ func (s *Server) handleApiSession(w http.ResponseWriter, r *http.Request) {
 		entries, total, from = paginatedEntries(resolved.Session.Entries)
 	}
 
-	s.applyRuntimeAvailability(&resolved.Session.SessionSummary)
-	resp := sessionResponseMap(resolved.Session, entries, total, from)
+	resp := s.sessionResponseMap(resolved.Session, entries, total, from)
 	if isDeltaRequest {
 		resp["deltaOk"] = deltaOk
 	}
@@ -387,7 +393,9 @@ func paginatedEntries(entries []map[string]any) (out []map[string]any, total, fr
 
 // sessionResponseMap is the JSON shape the SPA consumes for a session, shared by
 // the /api/session endpoint and the bootstrap embedded in the page shell.
-func sessionResponseMap(session sessions.Session, entries []map[string]any, total, from int) map[string]any {
+func (s *Server) sessionResponseMap(session sessions.Session, entries []map[string]any, total, from int) map[string]any {
+	s.applyRuntimeAvailability(&session.SessionSummary)
+	descriptor, _ := s.runtimeDescriptor(session.Runtime)
 	return map[string]any{
 		"header":             session.Header,
 		"entries":            entries,
@@ -399,7 +407,11 @@ func sessionResponseMap(session sessions.Session, entries []map[string]any, tota
 		"model":              session.Model,
 		"modelProvider":      session.ModelProvider,
 		"runtime":            session.Runtime,
+		"runtimeLabel":       s.runtimeLabel(session.Runtime),
+		"capabilities":       descriptor.Capabilities,
 		"nativeId":           session.NativeID,
+		"projectionMode":     s.projectionMode(session.Runtime),
+		"resumeCommand":      s.terminalResumeCommand(session),
 	}
 }
 
@@ -416,7 +428,7 @@ func (s *Server) sessionBootstrap(id string) string {
 		return ""
 	}
 	entries, total, from := paginatedEntries(resolved.Session.Entries)
-	data := sessionResponseMap(resolved.Session, entries, total, from)
+	data := s.sessionResponseMap(resolved.Session, entries, total, from)
 
 	scratchpad := ""
 	if cwd, _ := resolved.Session.Header["cwd"].(string); cwd != "" {
@@ -470,19 +482,15 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			runtime = "pi"
 		}
 	}
-	if !s.runtimeEnabled(runtime) {
-		writeJSONError(w, http.StatusBadRequest, "runtime must be an enabled runtime")
-		return
-	}
-	if available, reason := s.runtimeStatus(runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
+	if !s.requireRuntimeCapability(w, r, runtime, runtimes.CapabilityCreate) {
 		return
 	}
 
 	settings := s.initialSettingsFromSource(r.Context(), body.SourceSessionID, runtime)
 	var id string
 	var err error
-	if runtime == "codex" {
+	switch runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -502,12 +510,35 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
-	} else {
+	case string(runtimes.PiID):
 		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, body.Path, settings)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	case string(runtimes.ClaudeID):
+		if s.claude == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Claude runtime is unavailable")
+			return
+		}
+		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		if pathErr != nil {
+			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
+			return
+		}
+		model := settings.ModelID
+		if settings.ModelProvider != "" && settings.ModelProvider != claude.Provider {
+			model = ""
+		}
+		projection, startErr := s.claude.StartSession(cwd, model)
+		if startErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, startErr.Error())
+			return
+		}
+		id = projection.ID
+	default:
+		writeJSONError(w, http.StatusConflict, s.runtimeLabel(runtime)+" runtime does not support create")
+		return
 	}
 
 	// Pre-initialize a worker so the session page can read default model and
@@ -553,20 +584,23 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if available, reason := s.runtimeStatus(resolved.Session.Runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityRename) {
 		return
 	}
 
 	var renameErr error
-	if resolved.Session.Runtime == "codex" {
+	switch resolved.Session.Runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
 		}
 		_, renameErr = s.codex.RenameSession(r.Context(), resolved.Session.NativeID, name)
-	} else {
+	case string(runtimes.PiID):
 		renameErr = sessions.RenameSession(resolved.Path, name, s.now)
+	default:
+		writeJSONError(w, http.StatusConflict, s.runtimeLabel(resolved.Session.Runtime)+" runtime does not support rename")
+		return
 	}
 	if renameErr != nil {
 		err := renameErr
@@ -619,10 +653,26 @@ func (s *Server) handleLabelSessionEntry(w http.ResponseWriter, r *http.Request)
 
 	label := strings.TrimSpace(body.Label)
 	var labelErr error
-	if resolved.Session.Runtime == "codex" && s.codex != nil {
+	switch resolved.Session.Runtime {
+	case string(runtimes.CodexID):
+		if s.codex == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
+			return
+		}
 		labelErr = s.codex.LabelSessionEntry(resolved.Path, entryID, label, s.now)
-	} else {
+	case string(runtimes.PiID):
 		labelErr = sessions.LabelSessionEntry(resolved.Path, entryID, label, s.now)
+	default:
+		if s.projectionMode(resolved.Session.Runtime) != runtimes.ProjectionReplaceable {
+			writeJSONError(w, http.StatusConflict, s.runtimeLabel(resolved.Session.Runtime)+" runtime does not support labels")
+			return
+		}
+		store, storeErr := projections.NewStore(s.sessionsDir, resolved.Session.Runtime)
+		if storeErr != nil {
+			writeJSONError(w, http.StatusConflict, s.runtimeLabel(resolved.Session.Runtime)+" runtime does not support labels")
+			return
+		}
+		labelErr = store.Label(resolved.Path, entryID, label, s.now)
 	}
 	if labelErr != nil {
 		err := labelErr
@@ -660,12 +710,30 @@ func (s *Server) handleAvailableModels(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	query := ModelQuery{Runtime: strings.TrimSpace(r.URL.Query().Get("runtime")), SessionID: strings.TrimSpace(r.URL.Query().Get("id"))}
+	modelRuntime := query.Runtime
+	if query.SessionID != "" {
+		resolved, resolveErr := sessions.ResolveByID(s.sessionsDir, query.SessionID)
+		if resolveOrWriteError(w, resolveErr) {
+			return
+		}
+		modelRuntime = resolved.Session.Runtime
+		query.Runtime = modelRuntime
+	}
+	if modelRuntime == "" {
+		modelRuntime = s.defaultRuntime
+	}
+	if !s.requireRuntimeCapability(w, r, modelRuntime, runtimes.CapabilityModelListing) {
+		return
+	}
 	var data json.RawMessage
 	var err error
 	if s.modelsFor != nil {
 		data, err = s.modelsFor(ctx, query)
-	} else {
+	} else if s.models != nil {
 		data, err = s.models(ctx)
+	} else {
+		writeJSONError(w, http.StatusServiceUnavailable, "model listing is unavailable")
+		return
 	}
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

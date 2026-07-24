@@ -6,6 +6,11 @@ import { runPromise, runSync } from "../lib/runtime";
 import type { SessionEntry, SessionMessage, UnknownRecord } from "../session/data/session-types";
 import { decodeBase64JSON } from "../session/data/session-data";
 import { t } from "../shared/strings";
+import { RuntimeCapabilitiesSchema } from "../lib/schema";
+import {
+  normalizeRuntimeCapabilities,
+  type CompleteRuntimeCapabilities,
+} from "../lib/runtime-capabilities";
 import { consumeSessionPrefetch } from "./session-prefetch";
 
 interface TextDecoderConstructor {
@@ -53,6 +58,10 @@ const SessionPageDataSchema = Schema.StructWithRest(
     Model: Schema.optionalKey(Schema.String),
     modelProvider: Schema.optionalKey(Schema.String),
     ModelProvider: Schema.optionalKey(Schema.String),
+    projectionMode: Schema.optionalKey(Schema.String),
+    runtimeLabel: Schema.optionalKey(Schema.String),
+    resumeCommand: Schema.optionalKey(Schema.String),
+    capabilities: Schema.optionalKey(RuntimeCapabilitiesSchema),
   }),
   [UnknownRecordSchema],
 );
@@ -75,6 +84,10 @@ export interface SessionPageState {
   readonly sessionId: string;
   readonly title: string;
   readonly runtime: string;
+  readonly runtimeLabel: string;
+  readonly capabilities: CompleteRuntimeCapabilities;
+  readonly projectionMode: string;
+  readonly resumeCommand: string;
   readonly nativeId: string;
   readonly sessionUUID: string;
   readonly entries: ReadonlyArray<SessionEntry>;
@@ -205,6 +218,7 @@ export function buildSessionPageState({
     : [];
   const header = data.header ?? {};
   const { runtime, nativeId, sessionUUID } = normalizeSessionRuntime(data, header);
+  const capabilities = normalizeRuntimeCapabilities(data.capabilities, runtime);
   const normalizedHeader: UnknownRecord = { ...header, runtime };
   if (nativeId) normalizedHeader.nativeId = nativeId;
   const cwd = typeof header.cwd === "string" ? header.cwd : "";
@@ -224,6 +238,11 @@ export function buildSessionPageState({
     sessionId,
     title,
     runtime,
+    runtimeLabel:
+      data.runtimeLabel || (runtime === "pi" ? "Pi" : runtime === "codex" ? "Codex" : runtime),
+    capabilities,
+    projectionMode: data.projectionMode || "",
+    resumeCommand: data.resumeCommand || "",
     nativeId,
     sessionUUID,
     entries,
@@ -244,6 +263,10 @@ export function buildSessionPageState({
         total,
         from,
         truncated: entries.length < total,
+        projectionMode: data.projectionMode,
+        runtimeLabel: data.runtimeLabel,
+        resumeCommand: data.resumeCommand,
+        capabilities,
       },
       { btoaImpl, TextEncoderImpl },
     ),

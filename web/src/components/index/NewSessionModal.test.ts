@@ -36,7 +36,12 @@ describe("NewSessionModal runtimes", () => {
           defaultRuntime: "custom-runtime",
           runtimes: [
             { id: "pi", label: "Backend Pi", available: true },
-            { id: "custom-runtime", label: "Custom Runtime", available: true },
+            {
+              id: "custom-runtime",
+              label: "Custom Runtime",
+              available: true,
+              capabilities: { create: true },
+            },
           ],
         }),
       },
@@ -48,6 +53,52 @@ describe("NewSessionModal runtimes", () => {
       "true",
     );
     expect(screen.queryByText("runtime.custom-runtime")).not.toBeInTheDocument();
+  });
+
+  it("shows but disables a runtime without create capability", async () => {
+    render(NewSessionModal, {
+      props: {
+        open: true,
+        fetchRuntimes: async () => ({
+          defaultRuntime: "future",
+          runtimes: [
+            { id: "future", label: "Future", available: true, capabilities: { create: false } },
+          ],
+        }),
+      },
+    });
+
+    const future = await screen.findByRole("radio", { name: /Future/ });
+    expect(future).toBeDisabled();
+    expect(future).toHaveTextContent("Doesn't support creating sessions");
+    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+  });
+
+  it("shows the no-permission-prompt warning for Claude creation", async () => {
+    render(NewSessionModal, {
+      props: {
+        open: true,
+        fetchRuntimes: async () => ({
+          defaultRuntime: "claude",
+          runtimes: [
+            { id: "pi", label: "Pi", available: true, capabilities: { create: true } },
+            {
+              id: "claude",
+              label: "Claude",
+              available: true,
+              capabilities: { create: true },
+            },
+          ],
+        }),
+      },
+    });
+
+    expect(
+      await screen.findByText("Claude runs without permission prompts and can access your system."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "Claude" }).querySelector(".runtime-segment-mark"),
+    ).toHaveAttribute("src", "/claude-icon.svg");
   });
 
   it("supports radio-group arrow keys while skipping unavailable runtimes", async () => {

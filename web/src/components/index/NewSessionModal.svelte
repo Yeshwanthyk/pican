@@ -57,6 +57,7 @@
   let runtimeGeneration = 0;
 
   const pathLike = $derived(isPathLikeQuery(path));
+  const selectedRuntime = $derived(runtimes.find((option) => option.id === runtime));
   const visibleEntries = $derived(
     pathLike
       ? withParentEntry(browsedEntries, parentPath)
@@ -247,7 +248,7 @@
         <button type="button" class="recent-chip" onclick={() => chooseRecent(loc)}>{loc}</button>
       {/each}
     </div>
-    {#if runtimes.length > 1 || runtimes.some((option) => !option.available)}
+    {#if runtimes.length > 1 || runtimes.some((option) => !option.available || !option.capabilities.create)}
       <fieldset class="runtime-selector">
         <legend>{t('index.runtimeLabel')}</legend>
         <div class="runtime-segments" role="radiogroup" aria-label={t('index.runtimeLabel')}>
@@ -259,10 +260,14 @@
               role="radio"
               aria-checked={runtime === option.id}
               tabindex={runtime === option.id ? 0 : -1}
-              disabled={!option.available}
-              title={!option.available ? option.reason || t('index.runtimeUnavailable') : undefined}
+              disabled={!option.available || !option.capabilities.create}
+              title={!option.available
+                ? option.reason || t('index.runtimeUnavailable')
+                : !option.capabilities.create
+                  ? t('index.runtimeCreateUnsupported')
+                  : undefined}
               onclick={() => {
-                if (option.available) runtime = option.id;
+                if (option.available && option.capabilities.create) runtime = option.id;
               }}
               onkeydown={handleRuntimeKeydown}
             >
@@ -276,6 +281,13 @@
                     alt=""
                     aria-hidden="true"
                   />
+                {:else if option.id === 'claude'}
+                  <img
+                    class="runtime-segment-mark"
+                    src="/claude-icon.svg"
+                    alt=""
+                    aria-hidden="true"
+                  />
                 {/if}
                 <span>{option.label}</span>
               </span>
@@ -285,11 +297,16 @@
                     ? t('index.runtimeUnavailableReason', { reason: option.reason })
                     : t('index.runtimeUnavailable')}</small
                 >
+              {:else if !option.capabilities.create}
+                <small>{t('index.runtimeCreateUnsupported')}</small>
               {/if}
             </button>
           {/each}
         </div>
       </fieldset>
+    {/if}
+    {#if selectedRuntime?.id === 'claude' && selectedRuntime.available && selectedRuntime.capabilities.create}
+      <p class="new-session-runtime-warning">{t('index.claudePermissionsWarning')}</p>
     {/if}
     <div class="dir-input-wrap">
       <input

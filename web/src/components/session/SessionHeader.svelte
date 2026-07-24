@@ -19,14 +19,19 @@
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
   import { openTree } from '../../session/session-modals.svelte.js';
-  import { sessionResumeCommand } from '../../session/session-resume.js';
+  import {
+    defaultRuntimeCapabilities,
+    type CompleteRuntimeCapabilities,
+  } from '../../lib/runtime-capabilities.js';
   let {
     title = 'Session',
     cwd = '',
     sessionId = '',
     runtime = 'pi',
+    runtimeLabel = '',
+    capabilities = defaultRuntimeCapabilities('pi'),
+    resumeCommand = '',
     nativeId = '',
-    sessionUUID = '',
     chatAvailable = true,
     workerStatus = { state: 'idle' },
   }: {
@@ -34,29 +39,25 @@
     cwd?: string;
     sessionId?: string;
     runtime?: string;
+    runtimeLabel?: string;
+    capabilities?: CompleteRuntimeCapabilities;
+    resumeCommand?: string;
     nativeId?: string;
-    sessionUUID?: string;
     chatAvailable?: boolean;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
   } = $props();
 
-  function bodySessionUUID(): string {
-    const resumeSessionArg =
-      typeof document !== 'undefined' ? document.body.dataset.sessionUuid || '' : '';
-    return resumeSessionArg;
-  }
-
-  const resumeCommand = $derived(
-    sessionResumeCommand({
-      runtime,
-      nativeId,
-      sessionUUID: sessionUUID || bodySessionUUID(),
-    }),
+  const safeResumeCommand = $derived(capabilities.resume ? resumeCommand : '');
+  const displayRuntimeLabel = $derived(
+    runtimeLabel ||
+      (runtime === 'pi' ? t('runtime.pi') : runtime === 'codex' ? t('runtime.codex') : runtime),
   );
   const runtimeMark = $derived(
     runtime === 'codex'
       ? { src: '/codex-icon.svg', label: t('runtime.codex') }
-      : { src: '/pi-icon.svg', label: t('runtime.pi') },
+      : runtime === 'pi'
+        ? { src: '/pi-icon.svg', label: t('runtime.pi') }
+        : { src: '', label: displayRuntimeLabel },
   );
 
   // The title prop seeds the shared store (and re-seeds it on session switch);
@@ -66,10 +67,10 @@
   $effect(() => {
     if (!sessionTitle.name) return;
     document.title =
-      runtime === 'codex'
+      runtime !== 'pi'
         ? t('session.runtimePageTitle', {
             title: sessionTitle.name,
-            runtime: t('runtime.codex'),
+            runtime: displayRuntimeLabel,
           })
         : sessionTitle.name;
   });
@@ -98,11 +99,11 @@
     const newBtn = newElement instanceof HTMLButtonElement ? newElement : null;
 
     const onResume = (): void => {
-      if (!resumeCommand) {
+      if (!safeResumeCommand) {
         showToast(t('session.resumeUnavailable'));
         return;
       }
-      void copyText(resumeCommand, () => showResumeCopiedNotice(resumeCommand));
+      void copyText(safeResumeCommand, () => showResumeCopiedNotice(safeResumeCommand));
     };
 
     const onNew = (): void => {
@@ -110,6 +111,7 @@
         newSessionToast(t('session.noWorkingDirectory'));
         return;
       }
+      if (!capabilities.create) return;
       if (!newBtn) return;
       const originalHTML = newBtn.innerHTML;
       newBtn.innerHTML = '<span class="working-dots"></span>';
@@ -153,11 +155,12 @@
   >
   <button
     id="resume-btn"
-    title={resumeCommand
-      ? t('session.copyResumeCommand', { command: resumeCommand })
+    disabled={!safeResumeCommand}
+    title={safeResumeCommand
+      ? t('session.copyResumeCommand', { command: safeResumeCommand })
       : t('session.resumeUnavailable')}>Terminal</button
   >
-  <button id="new-btn" title="New Session">Session</button>
+  <button id="new-btn" title="New Session" disabled={!capabilities.create}>Session</button>
   <button id="share-btn" title="Share session as GitHub Gist">Share</button>
 </div>
 
@@ -191,7 +194,14 @@
         ? t('session.nativeIdTitle', { id: nativeId })
         : runtimeMark.label}
     >
-      <img class="session-header-runtime-mark" src={runtimeMark.src} alt="" aria-hidden="true" />
+      {#if runtimeMark.src}<img
+          class="session-header-runtime-mark"
+          src={runtimeMark.src}
+          alt=""
+          aria-hidden="true"
+        />{:else}<span class="session-header-runtime-mark" aria-hidden="true"
+          >{runtimeMark.label.slice(0, 1).toUpperCase()}</span
+        >{/if}
     </span>
     <span class="session-header-title-text">{sessionTitle.name || title}</span>
     {#if workerStatus.state === 'error'}
@@ -208,15 +218,15 @@
     >
   </button>
   <div class="session-header-right">
-    <button
-      id="new-session-header-btn"
-      class="session-header-new"
-      title={`${t('index.newSession')} (⌘T)`}
-      aria-label={t('session.newSession')}
-      >{@html icon(Plus, { size: 14 })}<span class="session-header-new-label"
-        >{t('session.new')}</span
-      ></button
-    >
+    {#if capabilities.create}<button
+        id="new-session-header-btn"
+        class="session-header-new"
+        title={`${t('index.newSession')} (⌘T)`}
+        aria-label={t('session.newSession')}
+        >{@html icon(Plus, { size: 14 })}<span class="session-header-new-label"
+          >{t('session.new')}</span
+        ></button
+      >{/if}
     <button
       id="shortcuts-help-btn"
       class="session-header-shortcuts-help"

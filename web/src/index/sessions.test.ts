@@ -58,7 +58,7 @@ describe("index sessions helpers", () => {
         { id: "codex", label: "Codex", available: true, reason: "" },
       ],
     });
-    expect(normalized.runtimes[0]?.capabilities.chat).toBe(false);
+    expect(normalized.runtimes[0]?.capabilities.chat).toBe(true);
     expect(normalizeRuntimesResponse()).toMatchObject({
       defaultRuntime: "pi",
       selectedRuntime: "pi",
@@ -93,6 +93,17 @@ describe("index sessions helpers", () => {
       ],
     });
     expect(Object.keys(normalized.runtimes[0]?.capabilities ?? {})).toHaveLength(22);
+  });
+
+  it("does not select an available runtime that cannot create sessions", () => {
+    const normalized = normalizeRuntimesResponse({
+      defaultRuntime: "future",
+      runtimes: [
+        { id: "future", available: true, capabilities: { chat: true, create: false } },
+        { id: "pi", available: true },
+      ],
+    });
+    expect(normalized.selectedRuntime).toBe("pi");
   });
 
   it("includes the selected runtime when creating a session", async () => {

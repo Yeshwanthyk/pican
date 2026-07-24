@@ -43,8 +43,22 @@
     loadForkEntries,
     renameSession,
   } from '../../session/session-menu-actions.js';
+  import {
+    defaultRuntimeCapabilities,
+    type CompleteRuntimeCapabilities,
+  } from '../../lib/runtime-capabilities.js';
 
-  let { sessionId = '', cwd = '' }: { sessionId?: string; cwd?: string } = $props();
+  let {
+    sessionId = '',
+    cwd = '',
+    capabilities = defaultRuntimeCapabilities('pi'),
+    resumeCommand = '',
+  }: {
+    sessionId?: string;
+    cwd?: string;
+    capabilities?: CompleteRuntimeCapabilities;
+    resumeCommand?: string;
+  } = $props();
 
   interface MenuLabelItem {
     readonly icon: IconNode;
@@ -110,6 +124,16 @@
     { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle' },
     { action: 'subagents', icon: Layers, label: 'subagents.navTitle' },
   ];
+  const visiblePrimaryItems = $derived(
+    primaryItems.filter((item) => {
+      if (item.action === 'rename') return capabilities.rename;
+      if (item.action === 'fork') return capabilities.fork;
+      if (item.action === 'clone') return capabilities.clone;
+      if (item.action === 'terminal') return capabilities.resume && !!resumeCommand;
+      if (item.action === 'subagents') return capabilities.subagents;
+      return true;
+    }),
+  );
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
   const footerItems: readonly FooterItem[] = [
@@ -337,7 +361,7 @@
 
 {#snippet menuBody(itemClass: string, sectionClass: string, desktop: boolean)}
   <div class={sectionClass}>
-    {#each primaryItems as item (item.action)}
+    {#each visiblePrimaryItems as item (item.action)}
       <button class={itemClass} type="button" data-action={item.action}
         >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
       >

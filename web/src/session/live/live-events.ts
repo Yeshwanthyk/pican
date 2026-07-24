@@ -52,7 +52,7 @@ class BrowserEventSource implements EventSourceLike {
 
 interface ReloadModel {
   readonly truncated?: boolean;
-  readonly header?: UnknownRecord | null;
+  readonly projectionMode?: string;
   readonly entries: ReadonlyArray<SessionEntry>;
 }
 
@@ -86,8 +86,23 @@ export function createSessionEventSource(
 }
 
 export function getReloadEntryCount(model: ReloadModel | null | undefined): number | null {
-  if (!model || model.truncated || model.header?.runtime === "codex") return null;
+  if (!model || model.truncated || model.projectionMode !== "append-only-native") return null;
   return model.entries.length;
+}
+
+export function shouldReplaceProjectionEntries(projectionMode: unknown): boolean {
+  return projectionMode !== "append-only-native";
+}
+
+export function projectionContainsPreview(
+  entries: ReadonlyArray<SessionEntry>,
+  previewItemId: unknown,
+): boolean {
+  return (
+    typeof previewItemId === "string" &&
+    previewItemId !== "" &&
+    entries.some((entry) => entry.claudeMessageId === previewItemId)
+  );
 }
 
 export async function handleSessionReload({
@@ -113,7 +128,7 @@ export async function handleSessionReload({
   readonly sessionId: string;
   readonly fetchImpl?: FetchImpl;
   readonly entryState: EntryState;
-  readonly clearChatPreview?: () => void;
+  readonly clearChatPreview?: (entries: ReadonlyArray<SessionEntry>) => void;
   readonly appendEntry?: (entry: SessionEntry, entries: SessionEntry[]) => boolean;
   readonly upsertEntry?: (entry: SessionEntry, entries: SessionEntry[]) => void;
   readonly refreshEntriesAffectedByToolResult?: (
@@ -216,7 +231,7 @@ export async function handleSessionReload({
   // entries have been appended/upserted (imperative) or merged into the model
   // (reactive). Clearing earlier creates a visible blank/flicker when a cold
   // worker finally writes the real message.
-  clearChatPreview();
+  clearChatPreview(entries);
 
   if (newCount > 0) {
     updateStats(entries);

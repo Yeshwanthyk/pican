@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -234,6 +235,73 @@ func TestManagerReapsIdleWorkersBeyondTTL(t *testing.T) {
 	}
 }
 
+type pendingSendReapable struct {
+	started chan struct{}
+	release chan struct{}
+	mu      sync.Mutex
+	closed  bool
+}
+
+func (w *pendingSendReapable) Prompt(context.Context, chat.Request) error {
+	close(w.started)
+	<-w.release
+	return nil
+}
+func (w *pendingSendReapable) SetModel(context.Context, string, string) error { return nil }
+func (w *pendingSendReapable) SetThinkingLevel(context.Context, string) error { return nil }
+func (w *pendingSendReapable) Abort(context.Context) error                    { return nil }
+func (w *pendingSendReapable) GetState(context.Context) (WorkerStatus, error) {
+	return w.Status(), nil
+}
+func (w *pendingSendReapable) GetCommands(context.Context) ([]SlashCommand, error) { return nil, nil }
+func (w *pendingSendReapable) Status() WorkerStatus {
+	return WorkerStatus{State: WorkerStateIdle}
+}
+func (w *pendingSendReapable) Close() error {
+	w.mu.Lock()
+	w.closed = true
+	w.mu.Unlock()
+	return nil
+}
+func (w *pendingSendReapable) IdleSince(time.Time) time.Duration { return time.Hour }
+func (w *pendingSendReapable) isClosed() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.closed
+}
+
+func TestManagerDoesNotReapWorkerReservedByAcceptedSend(t *testing.T) {
+	worker := &pendingSendReapable{started: make(chan struct{}), release: make(chan struct{})}
+	manager := NewManagerWithTTL(func(string, string) (ChatWorker, error) { return worker, nil }, time.Minute)
+	defer func() {
+		select {
+		case <-worker.release:
+		default:
+			close(worker.release)
+		}
+		_ = manager.Close()
+	}()
+	if err := manager.EnsureWorker(context.Background(), "a.jsonl", "/tmp/a.jsonl"); err != nil {
+		t.Fatal(err)
+	}
+	sendDone := make(chan error, 1)
+	go func() {
+		sendDone <- manager.Send(context.Background(), "a.jsonl", "/tmp/a.jsonl", chat.Request{Message: "hi"})
+	}()
+	<-worker.started
+	manager.reapOnce(time.Now())
+	if worker.isClosed() {
+		t.Fatal("idle reaper closed a worker with an accepted send")
+	}
+	if got := manager.Snapshot(); len(got) != 1 {
+		t.Fatalf("reserved worker was evicted: %+v", got)
+	}
+	close(worker.release)
+	if err := <-sendDone; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestManagerKeepsFreshWorker(t *testing.T) {
 	w := &reapableWorker{idleFor: time.Second}
 	manager := NewManagerWithTTL(func(string, string) (ChatWorker, error) { return w, nil }, time.Minute)
@@ -391,6 +459,14 @@ func TestBusyWorkerUsesSteeringCommand(t *testing.T) {
 	}
 	if worker.prompts[0]["streamingBehavior"] != "steer" {
 		t.Fatalf("streamingBehavior = %v, want steer", worker.prompts[0]["streamingBehavior"])
+	}
+}
+
+func TestManagerRejectsNilWorkerFromFactory(t *testing.T) {
+	manager := NewManager(func(string, string) (ChatWorker, error) { return nil, nil })
+	defer manager.Close()
+	if err := manager.EnsureWorker(context.Background(), "a.jsonl", "/tmp/a.jsonl"); err == nil || !strings.Contains(err.Error(), "nil worker") {
+		t.Fatalf("EnsureWorker error = %v", err)
 	}
 }
 

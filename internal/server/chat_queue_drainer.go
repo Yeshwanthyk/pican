@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pican/internal/chat"
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 	"pican/internal/workers"
 )
@@ -136,6 +137,12 @@ func (d *queueDrainer) drainSession(sessionID string) {
 	resolved, err := sessions.ResolveByID(d.server.sessionsDir, sessionID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "queue drainer: resolve %s: %v\n", sessionID, err)
+		return
+	}
+	if err := d.server.runtimeCapabilityError(context.Background(), resolved.Session.Runtime, runtimes.CapabilityPersistentQueue); err != nil {
+		return
+	}
+	if err := d.server.runtimeCapabilityError(context.Background(), resolved.Session.Runtime, runtimes.CapabilityChat); err != nil {
 		return
 	}
 	d.server.applyRuntimeAvailability(&resolved.Session.SessionSummary)

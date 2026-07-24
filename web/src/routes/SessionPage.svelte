@@ -20,6 +20,10 @@
   import { resetSessionRuntimeContext } from '../session/session-runtime-context';
   import { t } from '../shared/strings';
   import { errorMessage, settle } from '../components/shared/ui-effect';
+  import {
+    defaultRuntimeCapabilities,
+    type CompleteRuntimeCapabilities,
+  } from '../lib/runtime-capabilities';
 
   // The reactive session model (docs/dev/svelte-migration-plan.md): created once
   // and provided via context so descendant components read from it. Hydrated
@@ -67,8 +71,11 @@
   let chatDisabledReason = $state('');
   let modelLabel = $state('');
   let runtime = $state('pi');
+  let runtimeLabel = $state('Pi');
+  let capabilities = $state<CompleteRuntimeCapabilities>(defaultRuntimeCapabilities('pi'));
+  let projectionMode = $state('');
+  let resumeCommand = $state('');
   let nativeId = $state('');
-  let sessionUUID = $state('');
   let dataEl = $state<HTMLScriptElement | null>(null);
 
   onMount(() => {
@@ -103,11 +110,14 @@
         sessionId = state.sessionId;
         title = state.title;
         runtime = state.runtime;
+        runtimeLabel = state.runtimeLabel;
+        capabilities = state.capabilities;
+        projectionMode = state.projectionMode;
+        resumeCommand = state.resumeCommand;
         nativeId = state.nativeId;
-        sessionUUID = state.sessionUUID;
         document.title =
-          runtime === 'codex'
-            ? t('session.runtimePageTitle', { title, runtime: t('runtime.codex') })
+          runtime !== 'pi'
+            ? t('session.runtimePageTitle', { title, runtime: runtimeLabel || runtime })
             : title;
         if (document.body) {
           document.body.dataset.runtime = runtime;
@@ -192,8 +202,11 @@
     {chatDisabledReason}
     {modelLabel}
     {runtime}
+    {runtimeLabel}
+    {capabilities}
+    {projectionMode}
+    {resumeCommand}
     {nativeId}
-    {sessionUUID}
     bind:dataEl
   />
 {/if}

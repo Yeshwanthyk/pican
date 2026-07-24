@@ -735,6 +735,12 @@ body.modal-sheet-open { overflow: hidden; }
     color: var(--muted);
     font-size: 11px;
 }
+.new-session-runtime-warning {
+    margin: -6px 0 12px;
+    color: var(--warning);
+    font-size: 11px;
+    line-height: 1.4;
+}
 .runtime-segments {
     display: flex;
     gap: 4px;

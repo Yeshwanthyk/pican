@@ -38,12 +38,14 @@
     live = false,
     modelLabel = '',
     sessionId = '',
+    canFork = true,
   }: {
     entry: SessionEntryData;
     model?: EntryModel | null;
     live?: boolean;
     modelLabel?: string;
     sessionId?: string;
+    canFork?: boolean;
   } = $props();
 
   const ts = $derived(formatTimestamp(entry.timestamp));
@@ -124,8 +126,10 @@
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
 
 {#snippet actions(id: string)}
-  {#if live}<button class="fork-btn" data-entry-id={id} title={t('session.forkFromMessage')}
-      >{@html icon(GitFork, { size: 13 })}</button
+  {#if live && canFork}<button
+      class="fork-btn"
+      data-entry-id={id}
+      title={t('session.forkFromMessage')}>{@html icon(GitFork, { size: 13 })}</button
     >{/if}
   {#if live}<button
       class="label-btn"

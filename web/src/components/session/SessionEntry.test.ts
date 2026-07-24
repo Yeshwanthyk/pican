@@ -20,6 +20,15 @@ describe("SessionEntry", () => {
     expect(node?.querySelector(".user-who")?.textContent).toContain("YOU");
   });
 
+  it("hides fork while keeping pican-local labels available", () => {
+    const entry = { id: "u", type: "message", message: { role: "user", content: "hello" } };
+    const { container } = render(SessionEntry, {
+      props: { entry, model: model([entry]), live: true, canFork: false },
+    });
+    expect(container.querySelector(".fork-btn")).toBeNull();
+    expect(container.querySelector(".label-btn")).not.toBeNull();
+  });
+
   it("renders an assistant message", () => {
     const entry = {
       id: "a",

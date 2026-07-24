@@ -26,6 +26,7 @@
     live?: boolean;
     modelLabel?: string;
     sessionId?: string;
+    canFork?: boolean;
   }
 
   let {
@@ -34,6 +35,7 @@
     live = false,
     modelLabel = '',
     sessionId = '',
+    canFork = true,
   }: Props = $props();
 
   let containerEl = $state<HTMLDivElement | null>(null);
@@ -68,7 +70,7 @@
         {sessionId}
       />
     {:else}
-      <SessionEntry entry={item.entry} {model} {live} {modelLabel} {sessionId} />
+      <SessionEntry entry={item.entry} {model} {live} {modelLabel} {sessionId} {canFork} />
     {/if}
   {/each}
   {#if model.workerStatus?.state === 'error'}

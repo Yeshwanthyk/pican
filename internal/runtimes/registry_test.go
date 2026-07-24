@@ -106,34 +106,42 @@ func TestRegistrationValidationLocksAdapterInvariants(t *testing.T) {
 	}
 }
 
-func TestBuiltinPiAndCodexDescriptors(t *testing.T) {
+func TestBuiltinPiCodexAndClaudeDescriptors(t *testing.T) {
 	catalog := fakeCatalog{result: CatalogResult{SessionIDs: []string{"thread-1"}, Complete: true}}
 	registry, err := New(
 		Pi(BuiltinOptions{Command: "/bin/pi", Version: "0.80.10", AvailabilityProbe: available, WorkerFactory: testFactory}),
 		Codex(BuiltinOptions{Command: "/bin/codex", Version: "0.144.5", AvailabilityProbe: available, Catalog: catalog, WorkerFactory: testFactory}),
+		Claude(BuiltinOptions{Command: "/bin/claude", Version: "2.1.215", AvailabilityProbe: available, Catalog: catalog, WorkerFactory: testFactory}),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	registrations := registry.List()
-	if len(registrations) != 2 {
-		t.Fatalf("registrations = %d, want 2", len(registrations))
+	if len(registrations) != 3 {
+		t.Fatalf("registrations = %d, want 3", len(registrations))
 	}
-	pi, codex := registrations[0], registrations[1]
+	pi, codex, claude := registrations[0], registrations[1], registrations[2]
 	if pi.Descriptor.ID != PiID || pi.Descriptor.Label != "Pi" || pi.Descriptor.Command != "/bin/pi" || pi.Descriptor.Version != "0.80.10" || pi.Descriptor.ProjectionMode != ProjectionAppendOnlyNative || pi.Catalog != nil || pi.WorkerFactory == nil {
 		t.Fatalf("Pi registration = %+v", pi)
 	}
 	if codex.Descriptor.ID != CodexID || codex.Descriptor.Label != "Codex" || codex.Descriptor.Command != "/bin/codex" || codex.Descriptor.Version != "0.144.5" || codex.Descriptor.ProjectionMode != ProjectionReplaceable || codex.Catalog == nil || codex.WorkerFactory == nil {
 		t.Fatalf("Codex registration = %+v", codex)
 	}
+	if claude.Descriptor.ID != ClaudeID || claude.Descriptor.Label != "Claude" || claude.Descriptor.Command != "/bin/claude" || claude.Descriptor.Version != "2.1.215" || claude.Descriptor.ProjectionMode != ProjectionReplaceable || claude.Catalog == nil || claude.WorkerFactory == nil {
+		t.Fatalf("Claude registration = %+v", claude)
+	}
 
-	wantPi := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Chat: true, Cancel: true, Steer: true, PersistentQueue: true, Images: true, ModelListing: true, ModelSwitching: true, ReasoningSelection: true, SlashCommands: true, Subagents: true, InteractiveApprovals: true, UserQuestions: true}
-	wantCodex := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Archive: true, Unarchive: true, Delete: true, Chat: true, Cancel: true, Steer: true, PersistentQueue: true, Images: true, ModelListing: true, ModelSwitching: true, EffortSelection: true, ReasoningSelection: true, SlashCommands: true}
+	wantPi := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Chat: true, Cancel: true, Steer: true, PersistentQueue: true, Images: true, Files: true, ModelListing: true, ModelSwitching: true, ReasoningSelection: true, SlashCommands: true, Subagents: true, InteractiveApprovals: true, UserQuestions: true}
+	wantCodex := Capabilities{Create: true, Resume: true, Fork: true, Clone: true, Rename: true, Archive: true, Unarchive: true, Delete: true, Chat: true, Cancel: true, Steer: true, PersistentQueue: true, Images: true, Files: true, ModelListing: true, ModelSwitching: true, EffortSelection: true, ReasoningSelection: true, SlashCommands: true}
 	if got := pi.Descriptor.Capabilities; got != wantPi {
 		t.Fatalf("Pi capabilities = %+v, want %+v", got, wantPi)
 	}
 	if got := codex.Descriptor.Capabilities; got != wantCodex {
 		t.Fatalf("Codex capabilities = %+v, want %+v", got, wantCodex)
+	}
+	wantClaude := Capabilities{Create: true, Resume: true, Chat: true, Cancel: true, Images: true, Files: true, ModelListing: true}
+	if got := claude.Descriptor.Capabilities; got != wantClaude {
+		t.Fatalf("Claude capabilities = %+v, want %+v", got, wantClaude)
 	}
 
 	result, err := codex.Catalog.Sync(context.Background())
@@ -183,13 +191,38 @@ func TestDescriptorJSONContainsCompleteMetadata(t *testing.T) {
 		`"projectionMode":"replaceable-projection"`, `"create":true`, `"resume":true`,
 		`"fork":true`, `"clone":true`, `"rename":true`, `"archive":true`, `"unarchive":true`,
 		`"delete":true`, `"chat":true`, `"cancel":true`, `"steer":true`, `"persistentQueue":true`,
-		`"images":true`, `"files":false`, `"modelListing":true`, `"modelSwitching":true`,
+		`"images":true`, `"files":true`, `"modelListing":true`, `"modelSwitching":true`,
 		`"effortSelection":true`, `"reasoningSelection":true`, `"slashCommands":true`,
 		`"subagents":false`, `"interactiveApprovals":false`, `"userQuestions":false`,
 	} {
 		if !strings.Contains(string(data), field) {
 			t.Fatalf("descriptor JSON %s missing %s", data, field)
 		}
+	}
+}
+
+func TestCapabilitiesSupportsEveryServerOperation(t *testing.T) {
+	capabilities := Capabilities{
+		Create: true, Resume: true, Fork: true, Clone: true, Rename: true,
+		Archive: true, Unarchive: true, Delete: true, Chat: true, Cancel: true,
+		Steer: true, PersistentQueue: true, Images: true, Files: true,
+		ModelListing: true, ModelSwitching: true, EffortSelection: true,
+		ReasoningSelection: true, SlashCommands: true, Subagents: true,
+	}
+	for _, capability := range []Capability{
+		CapabilityCreate, CapabilityResume, CapabilityFork, CapabilityClone,
+		CapabilityRename, CapabilityArchive, CapabilityUnarchive, CapabilityDelete,
+		CapabilityChat, CapabilityCancel, CapabilitySteer, CapabilityPersistentQueue,
+		CapabilityImages, CapabilityFiles, CapabilityModelListing,
+		CapabilityModelSwitching, CapabilityEffortSelection,
+		CapabilityReasoningSelection, CapabilitySlashCommands, CapabilitySubagents,
+	} {
+		if !capabilities.Supports(capability) {
+			t.Fatalf("Supports(%q) = false", capability)
+		}
+	}
+	if (Capabilities{}).Supports("unknown") {
+		t.Fatal("unknown capability must fail closed")
 	}
 }
 

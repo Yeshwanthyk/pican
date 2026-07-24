@@ -26,6 +26,7 @@
   } from '../../session/session-modals.svelte.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import type { WorkerProcessStatus } from '../../session/data/session-types.js';
+  import { defaultRuntimeCapabilities } from '../../lib/runtime-capabilities.js';
 
   let {
     sessionModel,
@@ -38,8 +39,11 @@
     chatDisabledReason = '',
     modelLabel = '',
     runtime = 'pi',
+    runtimeLabel = 'Pi',
+    capabilities = defaultRuntimeCapabilities('pi'),
+    projectionMode = '',
+    resumeCommand = '',
     nativeId = '',
-    sessionUUID = '',
     dataEl = $bindable(null),
   } = $props();
 
@@ -91,14 +95,16 @@
   {cwd}
   {sessionId}
   {runtime}
+  {runtimeLabel}
+  {capabilities}
+  {resumeCommand}
   {nativeId}
-  {sessionUUID}
   {chatAvailable}
   {workerStatus}
 />
 <PinnedSessionSwitcher {sessionId} />
 
-<CommandMenu {sessionId} {cwd} />
+<CommandMenu {sessionId} {cwd} {capabilities} {resumeCommand} />
 
 <!-- Live reload (SSE) mounts before <ChatComposer> so its optimistic
      "message sent" listener is attached before the user can send. -->
@@ -116,6 +122,7 @@
           live
           {modelLabel}
           {sessionId}
+          canFork={capabilities.fork}
         />
       </div>
     </main>
@@ -125,9 +132,8 @@
       {chatDisabledReason}
       {cwd}
       {modelLabel}
-      {runtime}
-      {nativeId}
-      {sessionUUID}
+      {capabilities}
+      {resumeCommand}
       {workerStatus}
     />
   </div>
@@ -158,6 +164,7 @@
   id="session-data"
   type="application/json"
   data-runtime={runtime}
+  data-projection-mode={projectionMode || undefined}
   data-native-id={nativeId || undefined}
   bind:this={dataEl}
 ></svelte:element>

@@ -157,6 +157,11 @@ func (m *Manager) reapOnce(now time.Time) {
 	m.mu.Lock()
 	var dead []ChatWorker
 	for id, w := range m.workers {
+		// Send reserves the session before worker lookup/Prompt. Do not close an
+		// idle worker in the accepted-send window before Prompt marks it running.
+		if m.pendingSends[id] > 0 {
+			continue
+		}
 		reaper, ok := w.(idleReportable)
 		if !ok {
 			continue
@@ -394,6 +399,9 @@ func (m *Manager) workerFor(sessionID, sessionPath string) (ChatWorker, error) {
 		m.mu.Unlock()
 
 		worker, err := m.factory(sessionID, sessionPath)
+		if err == nil && worker == nil {
+			err = errors.New("worker factory returned nil worker")
+		}
 
 		m.mu.Lock()
 		if m.closed {

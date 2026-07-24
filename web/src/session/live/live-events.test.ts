@@ -4,6 +4,8 @@ import {
   getReloadEntryCount,
   getSessionIdFromLocation,
   handleSessionReload,
+  projectionContainsPreview,
+  shouldReplaceProjectionEntries,
   wireSessionEvents,
   type EventSourceLike,
   type SessionEvent,
@@ -17,14 +19,30 @@ describe("live events", () => {
     expect(EventSourceImpl).toHaveBeenCalledWith("/events?id=a%20b");
   });
 
-  it("disables count deltas for replaceable Codex projections", () => {
-    expect(getReloadEntryCount({ header: { runtime: "pi" }, entries: [{ id: "a" }] })).toBe(1);
+  it("uses projection mode for deltas and same-id replacement policy", () => {
     expect(
-      getReloadEntryCount({ header: { runtime: "codex" }, entries: [{ id: "a" }] }),
+      getReloadEntryCount({ projectionMode: "append-only-native", entries: [{ id: "a" }] }),
+    ).toBe(1);
+    expect(
+      getReloadEntryCount({ projectionMode: "replaceable-projection", entries: [{ id: "a" }] }),
     ).toBeNull();
     expect(
-      getReloadEntryCount({ header: { runtime: "pi" }, entries: [], truncated: true }),
+      getReloadEntryCount({ projectionMode: "append-only-native", entries: [], truncated: true }),
     ).toBeNull();
+    expect(shouldReplaceProjectionEntries("append-only-native")).toBe(false);
+    expect(shouldReplaceProjectionEntries("replaceable-projection")).toBe(true);
+    expect(shouldReplaceProjectionEntries(undefined)).toBe(true);
+  });
+
+  it("matches a Claude preview only after its native message reaches the projection", () => {
+    const entries = [
+      { id: "user" },
+      { id: "assistant", claudeMessageId: "msg-authoritative" },
+      { id: "duplicate-text", message: { role: "assistant", content: "same text" } },
+    ];
+    expect(projectionContainsPreview(entries, "msg-authoritative")).toBe(true);
+    expect(projectionContainsPreview(entries, "different-message")).toBe(false);
+    expect(projectionContainsPreview(entries, undefined)).toBe(false);
   });
 
   it("waits for reactive rendering before clearing the streaming preview", async () => {

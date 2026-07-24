@@ -40,7 +40,7 @@ describe("chat composer runner", () => {
     });
 
     const { container } = render(ChatComposer, {
-      props: { chatAvailable: false, runtime: "pi", sessionUUID: "session-uuid" },
+      props: { chatAvailable: false, resumeCommand: "pi --session session-uuid" },
     });
     const resume = screen.getByRole("button", {
       name: "view only · resume in terminal: pi --session session-uuid",
@@ -55,7 +55,7 @@ describe("chat composer runner", () => {
     });
   });
 
-  it("disables the existing composer when the worker is down", () => {
+  it("keeps the composer usable so the next send can replace a crashed worker", () => {
     const { container } = render(ChatComposer, {
       props: {
         chatAvailable: true,
@@ -63,10 +63,8 @@ describe("chat composer runner", () => {
       },
     });
 
-    expect(container.querySelector("#pi-chat-message")).toBeDisabled();
-    expect(container.querySelector(".pi-chat-disabled-notice")).toHaveTextContent(
-      "restart the worker to continue…",
-    );
+    expect(container.querySelector("#pi-chat-message")).toBeEnabled();
+    expect(container.querySelector(".pi-chat-disabled-notice")).not.toBeInTheDocument();
   });
 
   it("returns without composer form", () => {

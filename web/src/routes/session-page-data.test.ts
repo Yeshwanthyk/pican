@@ -46,6 +46,7 @@ describe("session-page-data", () => {
       normalizeSessionRuntime({
         runtime: "codex",
         nativeId: "thread-1",
+        projectionMode: "replaceable-projection",
         header: { id: "projection-id" },
       }),
     ).toEqual({ runtime: "codex", nativeId: "thread-1", sessionUUID: "projection-id" });
@@ -70,6 +71,7 @@ describe("session-page-data", () => {
         modelProvider: "anthropic",
         runtime: "codex",
         nativeId: "thread-1",
+        projectionMode: "replaceable-projection",
       },
     });
 
@@ -87,6 +89,7 @@ describe("session-page-data", () => {
       total: 5,
       from: 3,
       truncated: true,
+      projectionMode: "replaceable-projection",
       header: { cwd: "/tmp/project", runtime: "codex", nativeId: "thread-1" },
     });
   });

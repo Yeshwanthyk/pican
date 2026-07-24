@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 )
 
@@ -252,12 +253,14 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 	if runtime == "" {
 		runtime = "pi"
 	}
-	if available, reason := s.runtimeStatus(runtime); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
-		return
+	for _, capability := range []runtimes.Capability{runtimes.CapabilityCreate, runtimes.CapabilityChat} {
+		if !s.requireRuntimeCapability(w, r, runtime, capability) {
+			return
+		}
 	}
 	var id string
-	if runtime == "codex" {
+	switch runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
@@ -273,13 +276,32 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = projection.ID
-	} else {
+	case string(runtimes.PiID):
 		var err error
 		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, sessions.InitialSettings{})
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+	case string(runtimes.ClaudeID):
+		if s.claude == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "Claude runtime is unavailable")
+			return
+		}
+		cwd, err := sessions.PrepareSessionPath(path)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		projection, err := s.claude.StartSession(cwd, "")
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		id = projection.ID
+	default:
+		writeJSONError(w, http.StatusConflict, s.runtimeLabel(runtime)+" runtime does not support create")
+		return
 	}
 	s.setBtwSessionID(body.Parent, id)
 

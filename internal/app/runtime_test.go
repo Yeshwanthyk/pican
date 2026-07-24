@@ -40,7 +40,7 @@ func testRuntimeRegistry(t *testing.T, ids ...runtimes.ID) *runtimeRegistry {
 }
 
 func TestParseRuntimeAndCodexCommand(t *testing.T) {
-	registry := testRuntimeRegistry(t, runtimes.PiID, runtimes.CodexID, "future")
+	registry := testRuntimeRegistry(t, runtimes.PiID, runtimes.CodexID, runtimes.ClaudeID, "future")
 	tests := []struct {
 		value string
 		want  []string
@@ -48,6 +48,8 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 		{"pi", []string{"pi"}},
 		{"codex", []string{"codex"}},
 		{"both", []string{"pi", "codex"}},
+		{"claude", []string{"claude"}},
+		{"claude,pi", []string{"pi", "claude"}},
 		{" CODEX, pi ", []string{"pi", "codex"}},
 		{"pi,pi", []string{"pi"}},
 		{"future,pi", []string{"pi", "future"}},
@@ -63,6 +65,9 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 			t.Fatalf("parseRuntime(%q) accepted invalid input", value)
 		}
 	}
+	if !runtimeSelectionIncludes(" PI, CLAUDE ", runtimes.ClaudeID) || runtimeSelectionIncludes("both", runtimes.ClaudeID) {
+		t.Fatal("runtimeSelectionIncludes did not preserve the exact both alias")
+	}
 	got := codexCommand("/path with spaces/codex")
 	if len(got) != 3 || got[0] != "/path with spaces/codex" || got[1] != "app-server" || got[2] != "--stdio" {
 		t.Fatalf("argv = %#v", got)
@@ -71,24 +76,30 @@ func TestParseRuntimeAndCodexCommand(t *testing.T) {
 
 func TestRuntimeModelsDispatchesThroughRegistryAndDegradesAfterSuccess(t *testing.T) {
 	codexErr := errors.New("codex unavailable")
+	piRegistration := testRuntimeRegistry(t, runtimes.PiID).registry.List()[0]
+	piRegistration.Descriptor.Capabilities.ModelListing = true
+	codexRegistration := testRuntimeRegistry(t, runtimes.CodexID).registry.List()[0]
+	codexRegistration.Descriptor.Capabilities.ModelListing = true
+	futureRegistration := testRuntimeRegistry(t, "future").registry.List()[0]
 	registry, err := newRuntimeRegistry(
 		applicationRuntime{
-			registration: testRuntimeRegistry(t, runtimes.PiID).registry.List()[0],
+			registration: piRegistration,
 			models: func(context.Context) ([]json.RawMessage, error) {
 				return []json.RawMessage{json.RawMessage(`{"id":"pi-model"}`)}, nil
 			},
 		},
 		applicationRuntime{
-			registration: testRuntimeRegistry(t, runtimes.CodexID).registry.List()[0],
+			registration: codexRegistration,
 			models: func(context.Context) ([]json.RawMessage, error) {
 				return nil, codexErr
 			},
 		},
+		applicationRuntime{registration: futureRegistration},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	enabled, err := parseRuntime("both", registry)
+	enabled, err := parseRuntime("pi,codex,future", registry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +111,7 @@ func TestRuntimeModelsDispatchesThroughRegistryAndDegradesAfterSuccess(t *testin
 		t.Fatalf("targeted Codex error = %v, want %v", err, codexErr)
 	}
 	if _, err := runtimeModels(context.Background(), enabled, t.TempDir(), server.ModelQuery{Runtime: "future"}); err == nil {
-		t.Fatal("unknown runtime model query accepted")
+		t.Fatal("runtime without model-listing capability was accepted")
 	}
 }
 

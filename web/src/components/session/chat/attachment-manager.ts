@@ -27,6 +27,8 @@ export function setupAttachmentManager({
   attachButton,
   attachmentList,
   updateSendEnabled = () => {},
+  allowImages = true,
+  allowFiles = true,
 }: {
   readonly documentImpl?: Document;
   readonly windowImpl?: AttachmentWindow;
@@ -35,6 +37,8 @@ export function setupAttachmentManager({
   readonly attachButton?: HTMLButtonElement | null;
   readonly attachmentList?: HTMLElement | null;
   readonly updateSendEnabled?: () => void;
+  readonly allowImages?: boolean;
+  readonly allowFiles?: boolean;
 } = {}) {
   const objectUrls = new WeakMap<File, string>();
   let selectedFiles: File[] = [];
@@ -155,6 +159,7 @@ export function setupAttachmentManager({
   }
 
   function addFiles(files: Iterable<File> = []): boolean {
+    if (!allowImages) return false;
     const seen = new Set(selectedFiles.map(fileKey));
     let added = false;
     for (const file of files) {
@@ -207,6 +212,7 @@ export function setupAttachmentManager({
   });
 
   windowImpl.addEventListener("pi-chat-attach-text", (event: Event) => {
+    if (!allowFiles) return;
     const detail = (event as CustomEvent<unknown>).detail;
     if (!isTextAttachmentEventDetail(detail)) return;
     const original = detail.original.trim();

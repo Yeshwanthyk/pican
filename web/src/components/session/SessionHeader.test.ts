@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/svelte";
 import SessionHeader from "./SessionHeader.svelte";
+import { defaultRuntimeCapabilities } from "../../lib/runtime-capabilities";
 
 const originalClipboard = navigator.clipboard;
 
@@ -25,14 +26,14 @@ describe("SessionHeader runtime commands", () => {
     );
   });
 
-  it("copies the legacy Pi resume command from the session UUID", async () => {
+  it("copies the server-provided Pi resume command", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
     const { container } = render(SessionHeader, {
-      props: { title: "Pi session", sessionUUID: "pi-uuid", runtime: "pi" },
+      props: { title: "Pi session", runtime: "pi", resumeCommand: "pi --session pi-uuid" },
     });
 
     const resume = container.querySelector("#resume-btn");
@@ -50,9 +51,9 @@ describe("SessionHeader runtime commands", () => {
     const { container } = render(SessionHeader, {
       props: {
         title: "Codex session",
-        sessionUUID: "projection-id",
         runtime: "codex",
         nativeId: "thread-123",
+        resumeCommand: "codex resume thread-123",
       },
     });
 
@@ -69,6 +70,21 @@ describe("SessionHeader runtime commands", () => {
     expect(document.title).toBe("Codex session · Codex");
     resume?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("codex resume thread-123"));
+  });
+
+  it("hides runtime actions that the descriptor does not support", () => {
+    const { container } = render(SessionHeader, {
+      props: {
+        title: "Future session",
+        runtime: "future",
+        runtimeLabel: "Future",
+        capabilities: defaultRuntimeCapabilities("future"),
+      },
+    });
+
+    expect(container.querySelector("#new-session-header-btn")).toBeNull();
+    expect(container.querySelector<HTMLButtonElement>("#resume-btn")).toBeDisabled();
+    expect(container.querySelector(".session-header-runtime")?.textContent).toContain("F");
   });
 
   it("preserves runtime when starting a sibling session", async () => {

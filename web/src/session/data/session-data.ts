@@ -68,6 +68,10 @@ const normalizePayload = (value: UnknownRecord): SessionPayload => {
     total: typeof value.total === "number" ? value.total : undefined,
     from: typeof value.from === "number" ? value.from : undefined,
     truncated: typeof value.truncated === "boolean" ? value.truncated : undefined,
+    projectionMode: typeof value.projectionMode === "string" ? value.projectionMode : undefined,
+    runtimeLabel: typeof value.runtimeLabel === "string" ? value.runtimeLabel : undefined,
+    resumeCommand: typeof value.resumeCommand === "string" ? value.resumeCommand : undefined,
+    capabilities: isUnknownRecord(value.capabilities) ? value.capabilities : undefined,
   };
 };
 
@@ -176,6 +180,7 @@ export function createSessionDataModel(
     total,
     from,
     truncated,
+    projectionMode: payload.projectionMode,
     ...buildSessionLookups(entries),
   } satisfies SessionDataShape & {
     readonly payload: SessionPayload;

@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -100,6 +101,10 @@ func (s *Server) handleApiSchedules(w http.ResponseWriter, r *http.Request) {
 		}
 		sc := schedules.Schedule{ID: uuid.NewString(), Enabled: true}
 		in.apply(&sc)
+		if err := s.scheduleCapabilityError(r.Context(), sc); err != nil {
+			writeRuntimeOperationError(w, err)
+			return
+		}
 		created, err := s.schedules.Create(sc)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
@@ -148,6 +153,10 @@ func (s *Server) handleApiSchedule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		in.apply(&existing)
+		if err := s.scheduleCapabilityError(r.Context(), existing); err != nil {
+			writeRuntimeOperationError(w, err)
+			return
+		}
 		updated, err := s.schedules.Update(existing)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
@@ -193,6 +202,11 @@ func (s *Server) handleApiScheduleRun(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID, err := s.fireSchedule(sc)
 	if err != nil {
+		var runtimeFailure *runtimeOperationFailure
+		if errors.As(err, &runtimeFailure) {
+			writeRuntimeOperationError(w, err)
+			return
+		}
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

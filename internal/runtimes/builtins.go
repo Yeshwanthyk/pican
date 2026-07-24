@@ -3,8 +3,9 @@ package runtimes
 import "pican/internal/workers"
 
 const (
-	PiID    ID = "pi"
-	CodexID ID = "codex"
+	PiID     ID = "pi"
+	CodexID  ID = "codex"
+	ClaudeID ID = "claude"
 )
 
 // BuiltinOptions supplies startup-owned adapters and probed command metadata.
@@ -50,6 +51,24 @@ func Codex(options BuiltinOptions) Registration {
 	}
 }
 
+// Claude returns the filesystem-backed catalog plus installed-CLI stream-json
+// worker registration. Native transcripts remain authoritative.
+func Claude(options BuiltinOptions) Registration {
+	return Registration{
+		Descriptor: Descriptor{
+			ID:             ClaudeID,
+			Label:          "Claude",
+			Command:        options.Command,
+			Version:        options.Version,
+			ProjectionMode: ProjectionReplaceable,
+			Capabilities:   ClaudeCapabilities(),
+		},
+		AvailabilityProbe: options.AvailabilityProbe,
+		Catalog:           options.Catalog,
+		WorkerFactory:     options.WorkerFactory,
+	}
+}
+
 // PiCapabilities describes the currently observable Pi surface.
 func PiCapabilities() Capabilities {
 	return Capabilities{
@@ -63,6 +82,7 @@ func PiCapabilities() Capabilities {
 		Steer:                true,
 		PersistentQueue:      true,
 		Images:               true,
+		Files:                true,
 		ModelListing:         true,
 		ModelSwitching:       true,
 		ReasoningSelection:   true,
@@ -90,10 +110,23 @@ func CodexCapabilities() Capabilities {
 		Steer:              true,
 		PersistentQueue:    true,
 		Images:             true,
+		Files:              true,
 		ModelListing:       true,
 		ModelSwitching:     true,
 		EffortSelection:    true,
 		ReasoningSelection: true,
 		SlashCommands:      true,
+	}
+}
+
+func ClaudeCapabilities() Capabilities {
+	return Capabilities{
+		Create:       true,
+		Resume:       true,
+		Chat:         true,
+		Cancel:       true,
+		Images:       true,
+		Files:        true,
+		ModelListing: true,
 	}
 }

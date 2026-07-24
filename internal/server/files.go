@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pican/internal/files"
+	"pican/internal/runtimes"
 )
 
 // fileWalkTTL is how long a bounded directory walk is reused before the next
@@ -76,8 +77,11 @@ func (s *Server) handleApiFiles(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	_, cwd, err := s.resolveSessionCwd(r.URL.Query().Get("id"))
+	resolved, cwd, err := s.resolveSessionCwd(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityFiles) {
 		return
 	}
 

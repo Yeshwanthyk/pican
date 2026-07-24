@@ -10,6 +10,7 @@ import (
 
 	"pican/internal/chat"
 	"pican/internal/codex"
+	"pican/internal/runtimes"
 	"pican/internal/schedules"
 	"pican/internal/sessions"
 )
@@ -111,9 +112,48 @@ func (s *Server) scheduleNameForSession(sessionID string) (string, bool) {
 	return s.schedules.ScheduleNameForSession(sessionID)
 }
 
-// fireSchedule creates a fresh pi session for the schedule, records the run, and
-// sends the instructions as the first message so pi runs autonomously. Returns
-// the created session's UUID. Used by both the timer and the Run-now endpoint.
+func (s *Server) scheduleRuntime(modelProvider string) string {
+	if modelProvider == codex.Provider {
+		return string(runtimes.CodexID)
+	}
+	if s.defaultRuntime != "" {
+		return s.defaultRuntime
+	}
+	return string(runtimes.PiID)
+}
+
+func (s *Server) scheduleCapabilityError(ctx context.Context, sc schedules.Schedule) error {
+	runtime := s.scheduleRuntime(sc.ModelProvider)
+	// Scheduling needs an explicit creation adapter, not merely create/chat
+	// capability flags. Claude scheduling is deferred until its product surface
+	// can select the runtime independently from provider/model selection.
+	if runtime != string(runtimes.PiID) && runtime != string(runtimes.CodexID) {
+		return &runtimeOperationFailure{
+			status:  409,
+			message: s.runtimeLabel(runtime) + " runtime does not support schedules",
+		}
+	}
+	for _, capability := range []runtimes.Capability{runtimes.CapabilityCreate, runtimes.CapabilityChat} {
+		if err := s.runtimeCapabilityError(ctx, runtime, capability); err != nil {
+			return err
+		}
+	}
+	if sc.ModelID != "" {
+		if err := s.runtimeCapabilityError(ctx, runtime, runtimes.CapabilityModelSwitching); err != nil {
+			return err
+		}
+	}
+	if sc.ThinkingLevel != "" {
+		if err := s.runtimeThinkingCapabilityError(ctx, runtime); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// fireSchedule creates a fresh session for the schedule's selected runtime,
+// records the run, and sends the instructions as the first message. Returns the
+// created session's UUID. Used by both the timer and the Run-now endpoint.
 func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 	if s.schedules == nil {
 		return "", errors.New("schedules unavailable")
@@ -144,20 +184,15 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 		ModelID:       sc.ModelID,
 		ThinkingLevel: sc.ThinkingLevel,
 	}
-	runtime := s.defaultRuntime
-	if runtime == "" {
-		runtime = "pi"
-	}
-	if sc.ModelProvider == codex.Provider && s.runtimeEnabled("codex") {
-		runtime = "codex"
-	}
-	if available, reason := s.runtimeStatus(runtime); !available {
-		err := errors.New(reason)
+	runtime := s.scheduleRuntime(sc.ModelProvider)
+	if capabilityErr := s.scheduleCapabilityError(context.Background(), sc); capabilityErr != nil {
+		err := capabilityErr
 		_ = s.schedules.FailRun(runID, err.Error())
 		return "", err
 	}
 	var filename string
-	if runtime == "codex" {
+	switch runtime {
+	case string(runtimes.CodexID):
 		if s.codex == nil {
 			err := errors.New("Codex runtime is unavailable")
 			_ = s.schedules.FailRun(runID, err.Error())
@@ -180,12 +215,16 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 			return "", fmt.Errorf("create Codex session: %w", startErr)
 		}
 		filename = projection.ID
-	} else {
+	case string(runtimes.PiID):
 		filename, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, settings)
 		if err != nil {
 			_ = s.schedules.FailRun(runID, err.Error())
 			return "", fmt.Errorf("create session: %w", err)
 		}
+	default:
+		err = &runtimeOperationFailure{status: 409, message: s.runtimeLabel(runtime) + " runtime does not support create"}
+		_ = s.schedules.FailRun(runID, err.Error())
+		return "", err
 	}
 	resolved, err := sessions.ResolveByID(s.sessionsDir, filename)
 	if err != nil {

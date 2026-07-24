@@ -81,6 +81,81 @@ type Capabilities struct {
 	UserQuestions        bool `json:"userQuestions"`
 }
 
+// Capability names one operation enforced at server boundaries. Keep these
+// values stable: they are used in public unsupported-operation responses.
+type Capability string
+
+const (
+	CapabilityCreate             Capability = "create"
+	CapabilityResume             Capability = "resume"
+	CapabilityFork               Capability = "fork"
+	CapabilityClone              Capability = "clone"
+	CapabilityRename             Capability = "rename"
+	CapabilityArchive            Capability = "archive"
+	CapabilityUnarchive          Capability = "unarchive"
+	CapabilityDelete             Capability = "delete"
+	CapabilityChat               Capability = "chat"
+	CapabilityCancel             Capability = "cancel"
+	CapabilitySteer              Capability = "steer"
+	CapabilityPersistentQueue    Capability = "persistent queue"
+	CapabilityImages             Capability = "image attachments"
+	CapabilityFiles              Capability = "file references"
+	CapabilityModelListing       Capability = "model listing"
+	CapabilityModelSwitching     Capability = "model switching"
+	CapabilityEffortSelection    Capability = "effort selection"
+	CapabilityReasoningSelection Capability = "reasoning selection"
+	CapabilitySlashCommands      Capability = "slash commands"
+	CapabilitySubagents          Capability = "subagents"
+)
+
+// Supports is the single mapping from a named operation to descriptor data.
+func (c Capabilities) Supports(capability Capability) bool {
+	switch capability {
+	case CapabilityCreate:
+		return c.Create
+	case CapabilityResume:
+		return c.Resume
+	case CapabilityFork:
+		return c.Fork
+	case CapabilityClone:
+		return c.Clone
+	case CapabilityRename:
+		return c.Rename
+	case CapabilityArchive:
+		return c.Archive
+	case CapabilityUnarchive:
+		return c.Unarchive
+	case CapabilityDelete:
+		return c.Delete
+	case CapabilityChat:
+		return c.Chat
+	case CapabilityCancel:
+		return c.Cancel
+	case CapabilitySteer:
+		return c.Steer
+	case CapabilityPersistentQueue:
+		return c.PersistentQueue
+	case CapabilityImages:
+		return c.Images
+	case CapabilityFiles:
+		return c.Files
+	case CapabilityModelListing:
+		return c.ModelListing
+	case CapabilityModelSwitching:
+		return c.ModelSwitching
+	case CapabilityEffortSelection:
+		return c.EffortSelection
+	case CapabilityReasoningSelection:
+		return c.ReasoningSelection
+	case CapabilitySlashCommands:
+		return c.SlashCommands
+	case CapabilitySubagents:
+		return c.Subagents
+	default:
+		return false
+	}
+}
+
 // Descriptor is stable, serializable runtime metadata. Command is the native
 // executable name or configured path; Version is the probed native version.
 type Descriptor struct {

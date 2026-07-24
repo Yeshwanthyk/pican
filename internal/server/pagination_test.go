@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,35 @@ import (
 
 	"pican/internal/sessions"
 )
+
+func TestSessionBootstrapIncludesProjectionMode(t *testing.T) {
+	s := newTestServer(t)
+	path := writeSessionFile(t, s.sessionsDir, "proj", "codex.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"cwd":`, `"runtime":"codex","nativeId":"native","modelProvider":"openai-codex","cwd":`, 1))
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	encoded := s.sessionBootstrap("codex.jsonl")
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bootstrap struct {
+		Data struct {
+			ProjectionMode string `json:"projectionMode"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &bootstrap); err != nil {
+		t.Fatal(err)
+	}
+	if bootstrap.Data.ProjectionMode != "replaceable-projection" {
+		t.Fatalf("bootstrap projectionMode = %q, want replaceable-projection", bootstrap.Data.ProjectionMode)
+	}
+}
 
 // writeSessionWithNMessages scaffolds a session JSONL with `n` message
 // entries (plus the leading session header line — so total entries in the
@@ -164,10 +194,11 @@ func TestHandleApiSession_InvalidParamsReturnFull(t *testing.T) {
 }
 
 type deltaResponse struct {
-	Entries []map[string]any `json:"entries"`
-	Total   int              `json:"total"`
-	From    int              `json:"from"`
-	DeltaOk bool             `json:"deltaOk"`
+	Entries        []map[string]any `json:"entries"`
+	Total          int              `json:"total"`
+	From           int              `json:"from"`
+	DeltaOk        bool             `json:"deltaOk"`
+	ProjectionMode string           `json:"projectionMode"`
 }
 
 func TestHandleApiSession_AfterCountReturnsDelta(t *testing.T) {
@@ -191,6 +222,9 @@ func TestHandleApiSession_AfterCountReturnsDelta(t *testing.T) {
 	}
 	if !resp.DeltaOk {
 		t.Fatal("deltaOk = false, want true")
+	}
+	if resp.ProjectionMode != "append-only-native" {
+		t.Fatalf("projectionMode = %q, want append-only-native", resp.ProjectionMode)
 	}
 	if resp.From != 15 {
 		t.Errorf("from = %d, want 15", resp.From)
@@ -239,6 +273,9 @@ func TestHandleApiSession_CodexAfterCountForcesFullReconcile(t *testing.T) {
 	}
 	if resp.DeltaOk {
 		t.Fatal("deltaOk = true, want false for replaceable Codex projection")
+	}
+	if resp.ProjectionMode != "replaceable-projection" {
+		t.Fatalf("projectionMode = %q, want replaceable-projection", resp.ProjectionMode)
 	}
 	if resp.From != 0 || len(resp.Entries) != totalEntries {
 		t.Fatalf("from=%d entries=%d, want full %d-entry reconcile", resp.From, len(resp.Entries), totalEntries)

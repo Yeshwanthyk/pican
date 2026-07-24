@@ -7,12 +7,23 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"pican/internal/runtimes"
 	"pican/internal/sessions"
 	"pican/internal/workers"
 )
+
+var safeShellArg = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+type runtimeOperationFailure struct {
+	status  int
+	message string
+}
+
+func (e *runtimeOperationFailure) Error() string { return e.message }
 
 type compatibilityCatalog struct{}
 
@@ -104,6 +115,78 @@ func (s *Server) runtimeStatus(runtime string) (bool, string) {
 	return status.Available, status.Reason
 }
 
+func (s *Server) runtimeCapabilityError(ctx context.Context, runtime string, capability runtimes.Capability) error {
+	descriptor, ok := s.runtimeDescriptor(runtime)
+	if !ok || !descriptor.Capabilities.Supports(capability) {
+		label := runtime
+		if ok {
+			label = descriptor.Label
+		}
+		return &runtimeOperationFailure{
+			status:  http.StatusConflict,
+			message: fmt.Sprintf("%s runtime does not support %s", label, capability),
+		}
+	}
+	if s.runtimeRegistry == nil {
+		if runtime == string(runtimes.PiID) {
+			return nil
+		}
+		return &runtimeOperationFailure{status: http.StatusServiceUnavailable, message: descriptor.Label + " runtime is unavailable"}
+	}
+	availability, err := s.runtimeRegistry.Availability(ctx, runtime)
+	if err != nil {
+		return &runtimeOperationFailure{status: http.StatusServiceUnavailable, message: descriptor.Label + " runtime is unavailable"}
+	}
+	if !availability.Available {
+		reason := strings.TrimSpace(availability.Reason)
+		if reason == "" {
+			reason = descriptor.Label + " runtime is unavailable"
+		}
+		return &runtimeOperationFailure{status: http.StatusServiceUnavailable, message: reason}
+	}
+	return nil
+}
+
+func (s *Server) requireRuntimeCapability(w http.ResponseWriter, r *http.Request, runtime string, capability runtimes.Capability) bool {
+	if err := s.runtimeCapabilityError(r.Context(), runtime, capability); err != nil {
+		writeRuntimeOperationError(w, err)
+		return false
+	}
+	return true
+}
+
+func writeRuntimeOperationError(w http.ResponseWriter, err error) {
+	failure := new(runtimeOperationFailure)
+	if errors.As(err, &failure) {
+		writeJSONError(w, failure.status, failure.message)
+		return
+	}
+	writeJSONError(w, http.StatusConflict, err.Error())
+}
+
+func (s *Server) requireThinkingCapability(w http.ResponseWriter, r *http.Request, runtime string) bool {
+	if err := s.runtimeThinkingCapabilityError(r.Context(), runtime); err != nil {
+		writeRuntimeOperationError(w, err)
+		return false
+	}
+	return true
+}
+
+func (s *Server) runtimeThinkingCapabilityError(ctx context.Context, runtime string) error {
+	descriptor, ok := s.runtimeDescriptor(runtime)
+	if ok && descriptor.Capabilities.EffortSelection {
+		return s.runtimeCapabilityError(ctx, runtime, runtimes.CapabilityEffortSelection)
+	}
+	if ok && descriptor.Capabilities.ReasoningSelection {
+		return s.runtimeCapabilityError(ctx, runtime, runtimes.CapabilityReasoningSelection)
+	}
+	label := runtime
+	if ok {
+		label = descriptor.Label
+	}
+	return &runtimeOperationFailure{status: http.StatusConflict, message: label + " runtime does not support effort or reasoning selection"}
+}
+
 func builtinRuntimeDescriptor(runtime string) (runtimes.Descriptor, bool) {
 	options := runtimes.BuiltinOptions{Command: runtime}
 	switch runtime {
@@ -111,6 +194,8 @@ func builtinRuntimeDescriptor(runtime string) (runtimes.Descriptor, bool) {
 		return runtimes.Pi(options).Descriptor, true
 	case string(runtimes.CodexID):
 		return runtimes.Codex(options).Descriptor, true
+	case string(runtimes.ClaudeID):
+		return runtimes.Claude(options).Descriptor, true
 	default:
 		return runtimes.Descriptor{}, false
 	}
@@ -142,6 +227,16 @@ func (s *Server) applyRuntimeAvailability(summary *sessions.SessionSummary) {
 	if summary.Runtime == "" {
 		summary.Runtime = "pi"
 	}
+	descriptor, known := s.runtimeDescriptor(summary.Runtime)
+	if !known || !descriptor.Capabilities.Chat {
+		summary.ChatAvailable = false
+		label := summary.Runtime
+		if known {
+			label = descriptor.Label
+		}
+		summary.ChatDisabledReason = label + " runtime does not support chat."
+		return
+	}
 	available, reason := s.runtimeStatus(summary.Runtime)
 	if available || !summary.ChatAvailable {
 		return
@@ -151,6 +246,58 @@ func (s *Server) applyRuntimeAvailability(summary *sessions.SessionSummary) {
 		reason = summary.Runtime + " runtime is unavailable"
 	}
 	summary.ChatDisabledReason = "This session can be viewed, but chat is disabled because " + reason + "."
+}
+
+func (s *Server) runtimeLabel(runtime string) string {
+	if descriptor, ok := s.runtimeDescriptor(runtime); ok {
+		return descriptor.Label
+	}
+	return runtime
+}
+
+func shellArg(value string) string {
+	if value != "" && safeShellArg.MatchString(value) {
+		return value
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func (s *Server) terminalResumeCommand(session sessions.Session) string {
+	descriptor, ok := s.runtimeDescriptor(session.Runtime)
+	if !ok || !descriptor.Capabilities.Resume {
+		return ""
+	}
+	switch session.Runtime {
+	case string(runtimes.PiID):
+		if session.SessionUUID == "" {
+			return ""
+		}
+		return shellArg(descriptor.Command) + " --session " + shellArg(session.SessionUUID)
+	case string(runtimes.CodexID):
+		if session.NativeID == "" {
+			return ""
+		}
+		return shellArg(descriptor.Command) + " resume " + shellArg(session.NativeID)
+	case string(runtimes.ClaudeID):
+		if session.NativeID == "" {
+			return ""
+		}
+		command := shellArg(descriptor.Command) + " --resume " + shellArg(session.NativeID)
+		if s.claudeHome != "" && !isDefaultClaudeHome(s.claudeHome) {
+			command = "CLAUDE_CONFIG_DIR=" + shellArg(s.claudeHome) + " " + command
+		}
+		return command
+	default:
+		return ""
+	}
+}
+
+func isDefaultClaudeHome(home string) bool {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	return filepath.Clean(home) == filepath.Join(userHome, ".claude")
 }
 
 func (s *Server) handleRuntimes(w http.ResponseWriter, r *http.Request) {
@@ -212,18 +359,15 @@ func (s *Server) codexLifecycleReady(w http.ResponseWriter) bool {
 		writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 		return false
 	}
-	if available, reason := s.runtimeStatus("codex"); !available {
-		writeJSONError(w, http.StatusServiceUnavailable, reason)
-		return false
-	}
 	return true
 }
 
 func (s *Server) handleCodexThreadArchive(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || !s.codexLifecycleReady(w) {
-		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		}
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, string(runtimes.CodexID), runtimes.CapabilityArchive) || !s.codexLifecycleReady(w) {
 		return
 	}
 	resolved, ok := s.resolveCodexSession(w, r.URL.Query().Get("id"))
@@ -239,10 +383,11 @@ func (s *Server) handleCodexThreadArchive(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleCodexThreadDelete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || !s.codexLifecycleReady(w) {
-		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		}
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, string(runtimes.CodexID), runtimes.CapabilityDelete) || !s.codexLifecycleReady(w) {
 		return
 	}
 	resolved, ok := s.resolveCodexSession(w, r.URL.Query().Get("id"))
@@ -258,10 +403,11 @@ func (s *Server) handleCodexThreadDelete(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleCodexThreadUnarchive(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || !s.codexLifecycleReady(w) {
-		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		}
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, string(runtimes.CodexID), runtimes.CapabilityUnarchive) || !s.codexLifecycleReady(w) {
 		return
 	}
 	var body struct {

@@ -221,7 +221,9 @@ describe("SessionContent", () => {
 
     const marker = container.querySelector(".plain-state--worker-down");
     expect(marker?.textContent).toContain("worker exited (23) — stream ended here");
-    expect(marker?.textContent).toContain("restart from the ⋯ menu · transcript is saved");
+    expect(marker?.textContent).toContain(
+      "send your next message to restart the worker · transcript is saved",
+    );
     expect(container.querySelector("#messages-list")?.lastElementChild).toBe(marker);
   });
 });

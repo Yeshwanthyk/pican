@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"pican/internal/rpc"
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 )
 
@@ -66,6 +67,9 @@ func (s *Server) maybeAutoTitle(sessID string) {
 	if err != nil {
 		return
 	}
+	if err := s.runtimeCapabilityError(context.Background(), resolved.Session.Runtime, runtimes.CapabilityRename); err != nil {
+		return
+	}
 	inputs, err := sessions.ReadTitleInputs(resolved.Path)
 	if err != nil || inputs.UserMsgCount == 0 || strings.TrimSpace(inputs.FirstUserText) == "" {
 		return
@@ -117,10 +121,16 @@ func (s *Server) maybeAutoTitle(sessID string) {
 		return
 	}
 	var titleErr error
-	if resolved.Session.Runtime == "codex" && s.codex != nil {
+	switch resolved.Session.Runtime {
+	case string(runtimes.CodexID):
+		if s.codex == nil {
+			return
+		}
 		titleErr = s.codex.AutoTitleSession(resolved.Path, title, s.now)
-	} else {
+	case string(runtimes.PiID):
 		titleErr = sessions.AutoTitleSession(resolved.Path, title, s.now)
+	default:
+		return
 	}
 	if titleErr != nil {
 		err := titleErr

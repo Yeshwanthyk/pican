@@ -28,6 +28,25 @@ func TestCodexIconIsServed(t *testing.T) {
 	}
 }
 
+func TestClaudeIconIsServed(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterPWAHandlers(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/claude-icon.svg", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/svg+xml" {
+		t.Fatalf("Content-Type = %q, want image/svg+xml", got)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "<title>Claude</title>") || !strings.Contains(body, "#D97757") {
+		t.Fatalf("unexpected Claude icon: %q", body)
+	}
+}
+
 func TestAppIconIsServedAndInstalled(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterPWAHandlers(mux)

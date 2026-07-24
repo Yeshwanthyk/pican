@@ -21,6 +21,7 @@ export default {
   // ── Runtimes ──
   "runtime.pi": "Pi",
   "runtime.codex": "Codex",
+  "runtime.claude": "Claude",
 
   // ── Sessions index ──
   "index.title": "pican",
@@ -67,6 +68,9 @@ export default {
   "index.runtimeLabel": "Runtime",
   "index.runtimeUnavailable": "Unavailable",
   "index.runtimeUnavailableReason": "Unavailable — {reason}",
+  "index.runtimeCreateUnsupported": "Doesn't support creating sessions",
+  "index.claudePermissionsWarning":
+    "Claude runs without permission prompts and can access your system.",
   "index.runtimeBadgeTitle": "Codex runtime",
   "index.sessionPathPlaceholder": "/path/to/project or ~/project",
   "index.pathWillBeCreated": "New folder — will be created on first run",
@@ -298,7 +302,7 @@ export default {
   "session.viewOnlyResume": "view only · resume in terminal: {command}",
   "session.workerDown": "worker down",
   "session.workerExited": "worker exited ({code}) — stream ended here",
-  "session.workerExitedHint": "restart from the ⋯ menu · transcript is saved",
+  "session.workerExitedHint": "send your next message to restart the worker · transcript is saved",
   "session.noWorkingDirectory": "No working directory available for this session",
   "session.nativeIdTitle": "Codex thread {id}",
   "session.filterDefault": "Default",
@@ -421,7 +425,7 @@ export default {
   "composer.cancel": "Cancel",
   "composer.idle": "idle",
   "composer.unavailable": "unavailable",
-  "composer.restartWorker": "restart the worker to continue…",
+  "composer.restartWorker": "send a message to restart the worker…",
   "composer.attachPhotos": "Attach photos",
   "composer.attachmentText": "Selected text",
   "composer.viewAttachment": "View selected text",

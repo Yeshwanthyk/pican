@@ -15,6 +15,7 @@ import (
 
 	"pican/internal/agentdir"
 	"pican/internal/auth"
+	"pican/internal/claude"
 	"pican/internal/frontend"
 	"pican/internal/runtimes"
 	"pican/internal/server"
@@ -36,8 +37,10 @@ func Main(version string) {
 	open := flag.Bool("o", false, "auto-open browser")
 	insecure := flag.Bool("insecure", false, "allow non-loopback bind without "+tokenEnvVar+" (DANGEROUS)")
 	showVersion := flag.Bool("version", false, "print version and exit")
-	runtimeFlag := flag.String("runtime", "pi", "agent runtimes: pi, codex, both, or a comma-separated list")
+	runtimeFlag := flag.String("runtime", "pi", "agent runtimes: pi, codex, claude, both, or a comma-separated list")
 	codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
+	claudeCommandFlag := flag.String("claude-command", "", "path to the Claude executable")
+	claudeHomeFlag := flag.String("claude-home", "", "Claude config home containing projects/")
 	flag.Parse()
 
 	if *showVersion {
@@ -47,6 +50,12 @@ func Main(version string) {
 
 	codexPath := codexExecutable(*codexCommandFlag)
 	codexArgv := codexCommand(codexPath)
+	claudePath := claude.ResolveCommand(*claudeCommandFlag)
+	claudeHome, err := claude.ResolveHome(*claudeHomeFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "resolve Claude home: %v\n", err)
+		os.Exit(2)
+	}
 
 	agentDir := agentdir.Path()
 	if err := seedSoundsDir(agentDir); err != nil {
@@ -56,7 +65,19 @@ func Main(version string) {
 
 	var srv *server.Server
 	currentServer := func() *server.Server { return srv }
-	catalog := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 15*time.Second, time.Minute)
+	codexCatalogSyncer := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 15*time.Second, time.Minute)
+	claudeCatalog, err := claude.NewCatalog(claudeHome, sessionsDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initialize Claude catalog: %v\n", err)
+		os.Exit(1)
+	}
+	claudeCatalogSyncer := newCatalogSyncer("Claude", claudeCatalog.Sync, 15*time.Second, time.Minute)
+	claudeProbe := claude.NewProbe(claudePath, claudeHome, 30*time.Second)
+	if runtimeSelectionIncludes(*runtimeFlag, runtimes.ClaudeID) {
+		probeCtx, probeCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = claudeProbe.Refresh(probeCtx)
+		probeCancel()
+	}
 	registry, err := newRuntimeRegistry(
 		applicationRuntime{
 			registration: runtimes.Pi(runtimes.BuiltinOptions{
@@ -69,11 +90,21 @@ func Main(version string) {
 		applicationRuntime{
 			registration: runtimes.Codex(runtimes.BuiltinOptions{
 				Command:           codexPath,
-				AvailabilityProbe: catalog.availability,
-				Catalog:           catalog,
+				AvailabilityProbe: codexCatalogSyncer.availability,
+				Catalog:           codexCatalogSyncer,
 				WorkerFactory:     codexWorkerFactory(sessionsDir, codexArgv, currentServer),
 			}),
 			models: codexModels(codexArgv),
+		},
+		applicationRuntime{
+			registration: runtimes.Claude(runtimes.BuiltinOptions{
+				Command:           claudePath,
+				Version:           claudeProbe.Version(),
+				AvailabilityProbe: claudeProbe.Availability,
+				Catalog:           claudeCatalogSyncer,
+				WorkerFactory:     claudeWorkerFactory(claudePath, claudeHome, claudeCatalog, currentServer),
+			}),
+			models: claudeModels,
 		},
 	)
 	if err != nil {
@@ -122,6 +153,16 @@ func Main(version string) {
 		}
 	}
 
+	var claudeWatcher *claude.Watcher
+	if enabledRuntimes.enables(string(runtimes.ClaudeID)) {
+		claudeWatcher, err = claudeCatalog.Watch(100*time.Millisecond, func(err error) {
+			fmt.Fprintf(os.Stderr, "Claude transcript watcher: %v\n", err)
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Claude transcript watcher unavailable; periodic sync remains active: %v\n", err)
+		}
+	}
+
 	bindHost := chooseBindHost(*hostOverride)
 	token := os.Getenv(tokenEnvVar)
 	tokenRequired := token == "" && !isLoopbackHost(bindHost) && !*insecure
@@ -167,6 +208,13 @@ func Main(version string) {
 		},
 		RuntimeRegistry: enabledRegistry,
 		DefaultRuntime:  enabledRuntimes.defaultRuntime(),
+		ClaudeHome:      claudeHome,
+		Claude: func() server.ClaudeService {
+			if !enabledRuntimes.enables(string(runtimes.ClaudeID)) {
+				return nil
+			}
+			return claudeService{sessionsDir: sessionsDir}
+		}(),
 		Codex: func() server.CodexService {
 			if !enabledRuntimes.enables(string(runtimes.CodexID)) {
 				return nil
@@ -274,6 +322,9 @@ func Main(version string) {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
+		if claudeWatcher != nil {
+			_ = claudeWatcher.Close()
+		}
 		for _, catalog := range activeCatalogs {
 			catalog.close()
 		}

@@ -348,6 +348,26 @@ describe("BtwPopup", () => {
     );
   });
 
+  it("does not expose cancel when that runtime capability is absent", async () => {
+    const fetchImpl = router({ btw: { sessionId: "sess-1.jsonl" } });
+    setupEnv({ fetchImpl });
+    render(BtwPopup, { props: { canCancel: false } });
+
+    byId("pi-btw-button").click();
+    await settle();
+    query<HTMLInputElement>("#pi-btw-input").value = "go";
+    byId("pi-btw-form").dispatchEvent(new Event("submit"));
+    await settle();
+
+    const send = byId("pi-btw-send");
+    expect(send.style.display).toBe("none");
+    send.click();
+    await settle();
+    expect(fetchImpl.mock.calls.some((c) => String(c[0]).startsWith("/api/chat/cancel"))).toBe(
+      false,
+    );
+  });
+
   it.each(["pacman", "comet"])("uses the %s activity indicator while working", async (style) => {
     localStorage.setItem("pican:spinner-style", style);
     const fetchImpl = router({ btw: { sessionId: "sess-1.jsonl" } });
@@ -415,6 +435,18 @@ describe("BtwPopup", () => {
     render(BtwPopup);
     await settle();
     expect(query<HTMLElement>(".pi-btw-window").hidden).toBe(true);
+  });
+
+  it("does not auto-reopen or fetch when btw is unsupported", async () => {
+    localStorage.setItem("pican:btw:window", JSON.stringify({ open: true }));
+    const fetchImpl = router();
+    setupEnv({ fetchImpl });
+    render(BtwPopup, { props: { enabled: false } });
+    await settle();
+
+    expect(byId("pi-btw-button").hidden).toBe(true);
+    expect(query<HTMLElement>(".pi-btw-window").hidden).toBe(true);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("toggles closed on a second button click", async () => {

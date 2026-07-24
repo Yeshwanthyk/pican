@@ -270,10 +270,16 @@ describe("SessionDataModel", () => {
 
   it("builds a reactive model from an embedded payload via fromPayload", () => {
     const m = SessionDataModel.fromPayload(
-      { header: {}, entries, leafId: "leaf" },
+      {
+        header: {},
+        entries,
+        leafId: "leaf",
+        projectionMode: "replaceable-projection",
+      },
       new URLSearchParams("targetId=mid"),
     );
     expect(m.currentLeafId).toBe("leaf");
     expect(m.currentTargetId).toBe("mid");
+    expect(m.projectionMode).toBe("replaceable-projection");
   });
 });

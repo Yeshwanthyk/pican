@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"pican/internal/claude"
 	"pican/internal/codex"
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
@@ -52,6 +53,19 @@ type runtimeSet struct {
 	registry *runtimeRegistry
 	ordered  []runtimes.ID
 	enabled  map[runtimes.ID]struct{}
+}
+
+func runtimeSelectionIncludes(value string, target runtimes.ID) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "both" {
+		normalized = "pi,codex"
+	}
+	for _, part := range strings.Split(normalized, ",") {
+		if strings.TrimSpace(part) == string(target) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseRuntime(value string, registry *runtimeRegistry) (runtimeSet, error) {
@@ -172,6 +186,41 @@ func piWorkerFactory(currentServer func() *server.Server) workers.Factory {
 	}
 }
 
+func claudeWorkerFactory(command, home string, catalog *claude.Catalog, currentServer func() *server.Server) workers.Factory {
+	return func(sessionID, sessionPath string) (workers.ChatWorker, error) {
+		return claude.NewWorker(sessionPath, command, home, catalog, claude.Callbacks{
+			Preview: func(preview claude.Preview) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastChatPreview(sessionID, rpc.StreamPreview{
+						Content: preview.Content, Done: preview.Done,
+						TurnID: preview.TurnID, ItemID: preview.ItemID,
+					})
+				}
+			},
+			Status: func(status workers.WorkerStatus) {
+				if srv := currentServer(); srv != nil {
+					srv.BroadcastWorkerStatus(sessionID, status)
+				}
+			},
+			Projection: func(projection claude.Projection) {
+				if srv := currentServer(); srv != nil {
+					target := projection.ID
+					if target == "" {
+						target = sessionID
+					}
+					srv.NotifyWorkerUpdate(target, true)
+				}
+			},
+			Error: func(err error) {
+				fmt.Fprintf(os.Stderr, "Claude worker failed for %s: %v\n", sessionID, err)
+			},
+			Unknown: func(recordType string) {
+				fmt.Fprintf(os.Stderr, "Claude worker ignored stream-json record %q for %s\n", recordType, sessionID)
+			},
+		})
+	}
+}
+
 func codexWorkerFactory(sessionsDir string, command []string, currentServer func() *server.Server) workers.Factory {
 	return func(sessionID, sessionPath string) (workers.ChatWorker, error) {
 		parsed, err := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
@@ -220,6 +269,14 @@ func codexWorkerFactory(sessionsDir string, command []string, currentServer func
 			},
 		})
 	}
+}
+
+type claudeService struct {
+	sessionsDir string
+}
+
+func (c claudeService) StartSession(cwd, model string) (claude.Projection, error) {
+	return claude.CreateSessionProjection(c.sessionsDir, cwd, model)
 }
 
 type codexService struct {
@@ -375,6 +432,12 @@ func runtimeModels(ctx context.Context, enabled runtimeSet, sessionsDir string, 
 	if runtime != "" && !enabled.enables(runtime) {
 		return nil, fmt.Errorf("runtime %q is not enabled", runtime)
 	}
+	if runtime != "" {
+		registration, ok := enabled.registry.registry.Lookup(runtimes.ID(runtime))
+		if !ok || !registration.Descriptor.Capabilities.ModelListing {
+			return nil, fmt.Errorf("runtime %q does not support model discovery", runtime)
+		}
+	}
 
 	ids := enabled.ordered
 	if runtime != "" {
@@ -383,6 +446,10 @@ func runtimeModels(ctx context.Context, enabled runtimeSet, sessionsDir string, 
 	var models []json.RawMessage
 	discoveredAnyRuntime := false
 	for _, id := range ids {
+		registration, ok := enabled.registry.registry.Lookup(id)
+		if !ok || !registration.Descriptor.Capabilities.ModelListing {
+			continue
+		}
 		loader := enabled.registry.models[id]
 		if loader == nil {
 			return nil, fmt.Errorf("runtime %q does not support model discovery", id)
@@ -430,6 +497,19 @@ func codexModels(command []string) runtimeModelLoader {
 		}
 		return models, nil
 	}
+}
+
+func claudeModels(context.Context) ([]json.RawMessage, error) {
+	discovered := claude.Models()
+	models := make([]json.RawMessage, 0, len(discovered))
+	for _, model := range discovered {
+		data, err := json.Marshal(model)
+		if err != nil {
+			return nil, err
+		}
+		models = append(models, data)
+	}
+	return models, nil
 }
 
 func codexCatalog(sessionsDir string, command []string) func(context.Context) (runtimes.CatalogResult, error) {

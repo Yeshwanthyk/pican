@@ -49,12 +49,14 @@ describe("SessionCard ticker row", () => {
     expect(screen.getByText("1.2k tok · $0.25")).toBeInTheDocument();
   });
 
-  it("renders the Pi runtime mark", () => {
-    const { container } = render(SessionCard, { props: { session: session() } });
-    expect(container.querySelector(".session-ticker-runtime-mark")).toHaveAttribute(
-      "src",
-      "/pi-icon.svg",
-    );
+  it.each([
+    ["pi", "/pi-icon.svg"],
+    ["claude", "/claude-icon.svg"],
+  ])("renders the %s runtime mark", (runtime, src) => {
+    const { container } = render(SessionCard, {
+      props: { session: session({ runtime }) },
+    });
+    expect(container.querySelector(".session-ticker-runtime-mark")).toHaveAttribute("src", src);
   });
 
   it("renders running and waiting status lines with distinct semantics", () => {

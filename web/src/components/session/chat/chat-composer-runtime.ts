@@ -29,6 +29,10 @@ import { setupChatSubmission } from "./chat-submit.js";
 import { setupSteerQueue } from "./steer-queue.js";
 import { QueueStore } from "./queue-store.svelte.js";
 import type { QueueApi } from "./queue-api.js";
+import {
+  defaultRuntimeCapabilities,
+  type CompleteRuntimeCapabilities,
+} from "../../../lib/runtime-capabilities.js";
 import { createChatSelectorLoaders } from "./selector-loaders.js";
 import type { ChatApiLike, ChatApiResponse } from "./selector-loaders.js";
 
@@ -76,6 +80,7 @@ interface ChatComposerRuntimeOptions {
   readonly queueStore?: QueueStore;
   readonly queueApi?: QueueApi | null;
   readonly getLiveEntries?: (() => readonly SessionEntry[]) | null;
+  readonly capabilities?: CompleteRuntimeCapabilities;
 }
 
 export function runChatComposer({
@@ -103,6 +108,7 @@ export function runChatComposer({
   queueStore = new QueueStore(),
   queueApi = null,
   getLiveEntries = null,
+  capabilities = defaultRuntimeCapabilities("pi"),
 }: ChatComposerRuntimeOptions = {}) {
   const document = documentImpl;
   const window = documentImpl.defaultView ?? globalThis.window;
@@ -150,7 +156,9 @@ export function runChatComposer({
     getKnownModelLabel: () => toolbar.knownModelLabel,
     positionPopover: () => positionPopover(),
   });
-  const updateContextUsage = () => contextUsage.update();
+  const updateContextUsage = () => {
+    if (capabilities.modelListing) contextUsage.update();
+  };
   toolbar.updateContextUsage = updateContextUsage;
 
   function isMobileTextInputMode(): boolean {
@@ -220,6 +228,7 @@ export function runChatComposer({
       textarea,
       sendButton,
       getAttachments: () => attachments ?? { hasAttachments: () => false },
+      canSend: () => !toolbar.isRunning || capabilities.steer,
     });
     const updateSendEnabled = sendState.updateSendEnabled;
 
@@ -231,6 +240,8 @@ export function runChatComposer({
       attachButton,
       attachmentList,
       updateSendEnabled,
+      allowImages: capabilities.images,
+      allowFiles: capabilities.files,
     });
 
     const textareaControls = setupTextareaControls({
@@ -277,25 +288,30 @@ export function runChatComposer({
       updateSendEnabled,
       FormDataImpl: FormData,
       CustomEventImpl: CustomEvent,
+      canSend: () => !toolbar.isRunning || capabilities.steer,
     });
 
-    setupAskQuestionHandlers({
-      documentImpl: document,
-      sendChatMessage: submission.sendChatMessage,
-    });
+    if (capabilities.userQuestions) {
+      setupAskQuestionHandlers({
+        documentImpl: document,
+        sendChatMessage: submission.sendChatMessage,
+      });
+    }
 
-    setupSteerQueue({
-      windowImpl: window,
-      store: queueStore,
-      queueButton,
-      textarea,
-      attachments,
-      sendChatMessage: submission.sendChatMessage,
-      autoResizeTextarea,
-      updateSendEnabled,
-      queueApi,
-      getLiveEntries,
-    });
+    if (capabilities.persistentQueue) {
+      setupSteerQueue({
+        windowImpl: window,
+        store: queueStore,
+        queueButton,
+        textarea,
+        attachments,
+        sendChatMessage: submission.sendChatMessage,
+        autoResizeTextarea,
+        updateSendEnabled,
+        queueApi,
+        getLiveEntries,
+      });
+    }
 
     const workerStatus = setupWorkerStatusPolling({
       windowImpl: window,
@@ -342,10 +358,16 @@ export function runChatComposer({
     setupCwdCopy({ documentImpl: document, windowImpl: window });
     if (!setupPiChatComposer()) return;
 
-    _modelSelectorApi = selectorLoaders.loadModelSelector();
-    _thinkingSelectorApi = selectorLoaders.loadThinkingSelector() || null;
-    _slashSelectorApi = selectorLoaders.loadSlashSelector();
-    _mentionSelectorApi = selectorLoaders.loadMentionSelector();
+    _modelSelectorApi =
+      capabilities.modelListing && capabilities.modelSwitching
+        ? selectorLoaders.loadModelSelector()
+        : null;
+    _thinkingSelectorApi =
+      capabilities.effortSelection || capabilities.reasoningSelection
+        ? selectorLoaders.loadThinkingSelector() || null
+        : null;
+    _slashSelectorApi = capabilities.slashCommands ? selectorLoaders.loadSlashSelector() : null;
+    _mentionSelectorApi = capabilities.files ? selectorLoaders.loadMentionSelector() : null;
   }
 
   if (document.readyState === "loading") {

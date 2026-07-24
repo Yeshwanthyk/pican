@@ -24,6 +24,8 @@
     getReloadEntryCount,
     getSessionIdFromLocation,
     handleSessionReload,
+    projectionContainsPreview,
+    shouldReplaceProjectionEntries,
   } from '../../session/live/live-events.js';
   import { setupSessionLiveConnection } from '../../session/live/live-connection.js';
   import { createFollowScrollController } from '../../session/live/live-follow.js';
@@ -145,13 +147,17 @@
     // ── Streaming chat preview ─────────────────────────────────────────────────
     const CHAT_PREVIEW_STATE: ChatPreviewState = { chatPreviewEl: null, pendingUserEl: null };
 
-    function clearChatPreview(): void {
+    function clearChatPreview(entries: ReadonlyArray<SessionEntry> = []): void {
       const statusEl = documentImpl.getElementById('pi-chat-status');
       const isChatRunning = statusEl && statusEl.classList.contains('running');
       const hasDoneClass =
         CHAT_PREVIEW_STATE.chatPreviewEl &&
         CHAT_PREVIEW_STATE.chatPreviewEl.classList.contains('done');
-      const keepAssistant = !!(isChatRunning && !hasDoneClass);
+      const authoritativeClaudeMessage = projectionContainsPreview(
+        entries,
+        CHAT_PREVIEW_STATE.previewItemId,
+      );
+      const keepAssistant = !!(isChatRunning && !hasDoneClass && !authoritativeClaudeMessage);
       return clearChatPreviewState(CHAT_PREVIEW_STATE, { keepAssistant });
     }
     function finishChatPreview(): void {
@@ -212,7 +218,7 @@
               onReloaded: async (data) => {
                 reconcileEntries(data.entries, {
                   isDelta: data.isDelta,
-                  replaceExisting: model?.header.runtime === 'codex',
+                  replaceExisting: shouldReplaceProjectionEntries(data.projectionMode),
                 });
                 await tick();
               },

@@ -29,7 +29,12 @@
   } from './btw-events.js';
   import { btwContentText, createBtwMarkdownRenderer, renderBtwEntryParts } from './btw-render.js';
 
-  let { cwd = '', parentId = '' }: { cwd?: string; parentId?: string } = $props();
+  let {
+    cwd = '',
+    parentId = '',
+    enabled = true,
+    canCancel = true,
+  }: { cwd?: string; parentId?: string; enabled?: boolean; canCancel?: boolean } = $props();
 
   const TranscriptResponse = Schema.Struct({
     entries: Schema.optionalKey(Schema.Array(Schema.Unknown)),
@@ -215,7 +220,7 @@
   }
 
   function cancel(): void {
-    if (!sessionId) return;
+    if (!sessionId || !canCancel) return;
     void runPromise(
       Http.post('/api/chat/cancel?id=' + encodeURIComponent(sessionId), undefined, Schema.Unknown),
     ).then(
@@ -350,8 +355,9 @@
     submitMessage();
   }
   function onSend(): void {
-    if (running) cancel();
-    else submitMessage();
+    if (running) {
+      if (canCancel) cancel();
+    } else submitMessage();
   }
 
   // Changes whenever the visible transcript does, so the auto-scroll effect can
@@ -382,11 +388,12 @@
     bodyEl?.addEventListener('scroll', onBodyScroll);
 
     btnEl = document.getElementById('pi-btw-button');
+    if (btnEl) btnEl.hidden = !enabled;
     const onBtnClick = (e: MouseEvent): void => {
       e.preventDefault();
       toggle();
     };
-    if (btnEl) {
+    if (btnEl && enabled) {
       btnEl.setAttribute('aria-haspopup', 'dialog');
       btnEl.setAttribute('aria-expanded', 'false');
       btnEl.addEventListener('click', onBtnClick);
@@ -400,7 +407,7 @@
 
     // Auto-reopen if it was open before a reload — but not on mobile.
     const initialGeom = loadGeom();
-    if (initialGeom && initialGeom.open && !isMobile()) openWindow();
+    if (enabled && initialGeom && initialGeom.open && !isMobile()) openWindow();
 
     return () => {
       unsubscribe();
@@ -479,6 +486,7 @@
       class="pi-btw-send"
       id="pi-btw-send"
       class:cancel={running}
+      style:display={running && !canCancel ? 'none' : ''}
       aria-label={running ? t('composer.cancel') : t('composer.send')}
       title={running ? t('btw.stop') : t('composer.send')}
       onclick={onSend}

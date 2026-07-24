@@ -33,6 +33,7 @@ interface SubmissionOptions {
   readonly updateSendEnabled?: () => void;
   readonly FormDataImpl?: typeof FormData;
   readonly CustomEventImpl?: typeof CustomEvent;
+  readonly canSend?: () => boolean;
 }
 
 class SubmissionError extends Schema.TaggedErrorClass<SubmissionError>()("SubmissionError", {
@@ -73,6 +74,7 @@ export function setupChatSubmission({
   updateSendEnabled = () => {},
   FormDataImpl = FormData,
   CustomEventImpl = CustomEvent,
+  canSend = () => true,
 }: SubmissionOptions) {
   let refreshWorkerStatus = async (): Promise<void> => {};
 
@@ -132,6 +134,7 @@ export function setupChatSubmission({
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (!canSend()) return;
     const typed = textarea.value.trim();
     const filesToSend = attachments.files().slice();
     const textAttachmentsToSend = attachments.textAttachments().slice();

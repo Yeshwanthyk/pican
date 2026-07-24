@@ -33,9 +33,11 @@
   const runtimeMark = $derived(
     session.runtime === 'codex'
       ? { src: '/codex-icon.svg', label: t('runtime.codex') }
-      : session.runtime === 'pi'
-        ? { src: '/pi-icon.svg', label: t('runtime.pi') }
-        : null,
+      : session.runtime === 'claude'
+        ? { src: '/claude-icon.svg', label: t('runtime.claude') }
+        : session.runtime === 'pi'
+          ? { src: '/pi-icon.svg', label: t('runtime.pi') }
+          : null,
   );
   const search = $derived(sessionSearchText(session));
   const metrics = $derived(formatSessionMetrics(session));

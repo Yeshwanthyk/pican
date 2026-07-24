@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"pican/internal/chatqueue"
+	"pican/internal/runtimes"
 	"pican/internal/sessions"
 )
 
@@ -23,10 +24,6 @@ import (
 // tick.
 
 func (s *Server) handleChatQueue(w http.ResponseWriter, r *http.Request) {
-	if s.chatQueue == nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "chat queue unavailable")
-		return
-	}
 	switch r.Method {
 	case http.MethodGet:
 		s.handleChatQueueGet(w, r)
@@ -42,20 +39,27 @@ func (s *Server) handleChatQueue(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) resolveQueueSession(r *http.Request, w http.ResponseWriter) (string, bool) {
+func (s *Server) resolveQueueSession(r *http.Request, w http.ResponseWriter) (sessions.ResolvedSession, bool) {
 	resolved, err := sessions.ResolveByID(s.sessionsDir, r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
-		return "", false
+		return sessions.ResolvedSession{}, false
 	}
-	return resolved.Session.ID, true
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityPersistentQueue) {
+		return sessions.ResolvedSession{}, false
+	}
+	return resolved, true
 }
 
 func (s *Server) handleChatQueueGet(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := s.resolveQueueSession(r, w)
+	resolved, ok := s.resolveQueueSession(r, w)
 	if !ok {
 		return
 	}
-	snap, err := s.chatQueue.List(sessionID)
+	if s.chatQueue == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat queue unavailable")
+		return
+	}
+	snap, err := s.chatQueue.List(resolved.Session.ID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "list queue: "+err.Error())
 		return
@@ -67,8 +71,12 @@ func (s *Server) handleChatQueueGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChatQueuePost(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := s.resolveQueueSession(r, w)
+	resolved, ok := s.resolveQueueSession(r, w)
 	if !ok {
+		return
+	}
+	if s.chatQueue == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat queue unavailable")
 		return
 	}
 	var body struct {
@@ -88,18 +96,22 @@ func (s *Server) handleChatQueuePost(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(displayText) == "" {
 		displayText = message
 	}
-	item, err := s.chatQueue.Add(sessionID, message, displayText)
+	item, err := s.chatQueue.Add(resolved.Session.ID, message, displayText)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "add queue item: "+err.Error())
 		return
 	}
-	s.notifyQueueChanged(sessionID)
+	s.notifyQueueChanged(resolved.Session.ID)
 	writeJSON(w, http.StatusCreated, item)
 }
 
 func (s *Server) handleChatQueueDelete(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := s.resolveQueueSession(r, w)
+	resolved, ok := s.resolveQueueSession(r, w)
 	if !ok {
+		return
+	}
+	if s.chatQueue == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat queue unavailable")
 		return
 	}
 	posStr := r.URL.Query().Get("position")
@@ -112,7 +124,7 @@ func (s *Server) handleChatQueueDelete(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "position must be an integer")
 		return
 	}
-	removed, err := s.chatQueue.Remove(sessionID, pos)
+	removed, err := s.chatQueue.Remove(resolved.Session.ID, pos)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "remove queue item: "+err.Error())
 		return
@@ -121,13 +133,17 @@ func (s *Server) handleChatQueueDelete(w http.ResponseWriter, r *http.Request) {
 	// this row (racing the browser's "send now"/"edit" delete). The caller
 	// must not also dispatch the message locally in that case, or it sends
 	// twice — see steer-queue.js's sendNow/edit.
-	s.notifyQueueChanged(sessionID)
+	s.notifyQueueChanged(resolved.Session.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": removed})
 }
 
 func (s *Server) handleChatQueuePatch(w http.ResponseWriter, r *http.Request) {
-	sessionID, ok := s.resolveQueueSession(r, w)
+	resolved, ok := s.resolveQueueSession(r, w)
 	if !ok {
+		return
+	}
+	if s.chatQueue == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "chat queue unavailable")
 		return
 	}
 	var body struct {
@@ -141,11 +157,11 @@ func (s *Server) handleChatQueuePatch(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "paused is required")
 		return
 	}
-	if err := s.chatQueue.SetPaused(sessionID, *body.Paused); err != nil {
+	if err := s.chatQueue.SetPaused(resolved.Session.ID, *body.Paused); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "set paused: "+err.Error())
 		return
 	}
-	s.notifyQueueChanged(sessionID)
+	s.notifyQueueChanged(resolved.Session.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "paused": *body.Paused})
 }
 

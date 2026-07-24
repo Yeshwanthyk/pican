@@ -34,7 +34,10 @@
   import { reducePendingExtensionUI, type ExtensionRequest } from './chat/extension-ui-state.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
-  import { sessionResumeCommand } from '../../session/session-resume.js';
+  import {
+    defaultRuntimeCapabilities,
+    type CompleteRuntimeCapabilities,
+  } from '../../lib/runtime-capabilities.js';
 
   let {
     sessionId = '',
@@ -42,9 +45,8 @@
     chatDisabledReason = '',
     cwd = '',
     modelLabel = '',
-    runtime = 'pi',
-    nativeId = '',
-    sessionUUID = '',
+    capabilities = defaultRuntimeCapabilities('pi'),
+    resumeCommand = '',
     workerStatus = { state: 'idle' },
   }: {
     sessionId?: string;
@@ -52,22 +54,22 @@
     chatDisabledReason?: string;
     cwd?: string;
     modelLabel?: string;
-    runtime?: string;
-    nativeId?: string;
-    sessionUUID?: string;
+    capabilities?: CompleteRuntimeCapabilities;
+    resumeCommand?: string;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
   } = $props();
 
   const workerDown = $derived(workerStatus.state === 'error');
-  const composerAvailable = $derived(chatAvailable && !workerDown);
-  const composerDisabledReason = $derived(
-    workerDown ? t('composer.restartWorker') : chatDisabledReason,
-  );
-  const resumeCommand = $derived(sessionResumeCommand({ runtime, nativeId, sessionUUID }));
+  const effectiveChatAvailable = $derived(chatAvailable && capabilities.chat);
+  // An errored worker is evicted by the manager on the next send. Keep the
+  // composer usable so that recovery path is reachable without restarting pican.
+  const composerAvailable = $derived(effectiveChatAvailable);
+  const composerDisabledReason = $derived(chatDisabledReason);
+  const safeResumeCommand = $derived(capabilities.resume ? resumeCommand : '');
 
   async function copyResumeCommand(): Promise<void> {
-    if (!resumeCommand) return;
-    const copied = await copyToClipboard(resumeCommand);
+    if (!safeResumeCommand) return;
+    const copied = await copyToClipboard(safeResumeCommand);
     showToast(copied ? t('common.copied') : t('common.copyFailed'));
   }
 
@@ -113,10 +115,12 @@
   // backend drainer) stay in sync.
   const queueApi = (() =>
     sessionId
-      ? createQueueApi({
-          sessionId,
-          fetchImpl: typeof window !== 'undefined' ? window.fetch.bind(window) : undefined,
-        })
+      ? capabilities.persistentQueue
+        ? createQueueApi({
+            sessionId,
+            fetchImpl: typeof window !== 'undefined' ? window.fetch.bind(window) : undefined,
+          })
+        : null
       : null)();
   const queueStore = new QueueStore({ api: queueApi });
   let pendingExtensionUI = $state<ExtensionRequest[]>([]);
@@ -132,7 +136,7 @@
   // both are ready before this onMount. <LiveReload> mounts first, so its
   // pi-chat-message-sent listener is attached before the user can send. Live-only.
   onMount(() => {
-    if (!chatAvailable) return;
+    if (!effectiveChatAvailable) return;
     const target = window;
     const runtime = getSessionRuntime();
     const model = isSessionRuntimeModel(runtime.model) ? runtime.model : null;
@@ -168,13 +172,14 @@
       toolbar,
       queueStore,
       queueApi,
+      capabilities,
     });
 
     // Initial hydration from the server-side queue + subscribe to SSE 'queue'
     // events so changes from the autonomous drainer (or another tab) show up
     // immediately. The EventSource is shared with <LiveReload> — both attach
     // their own listeners.
-    void queueStore.refresh?.();
+    if (capabilities.persistentQueue) void queueStore.refresh?.();
     const onQueueEvent = (): void => {
       void queueStore.refresh?.();
     };
@@ -208,23 +213,25 @@
         },
       );
     };
-    target.addEventListener('pi-queue-event', onQueueEvent);
+    if (capabilities.persistentQueue) target.addEventListener('pi-queue-event', onQueueEvent);
     target.addEventListener('pi-extension-ui-request', onExtensionRequest);
     target.addEventListener('pi-extension-ui-resolved', onExtensionResolved);
     target.addEventListener('pi-extension-notify', onExtensionNotify);
-    void runPromise(
-      Http.get(
-        '/api/extension-ui/pending?session=' + encodeURIComponent(sessionId),
-        PendingExtensionResponse,
-      ),
-    ).then(
-      (data) => {
-        for (const request of data.requests ?? []) {
-          onExtensionRequest(new CustomEvent('pi-extension-ui-request', { detail: request }));
-        }
-      },
-      () => undefined,
-    );
+    if (capabilities.interactiveApprovals || capabilities.userQuestions) {
+      void runPromise(
+        Http.get(
+          '/api/extension-ui/pending?session=' + encodeURIComponent(sessionId),
+          PendingExtensionResponse,
+        ),
+      ).then(
+        (data) => {
+          for (const request of data.requests ?? []) {
+            onExtensionRequest(new CustomEvent('pi-extension-ui-request', { detail: request }));
+          }
+        },
+        () => undefined,
+      );
+    }
     return () => {
       composerRuntime?.dispose?.();
       target.removeEventListener('pi-queue-event', onQueueEvent);
@@ -235,14 +242,15 @@
   });
 </script>
 
-{#if !chatAvailable}
+{#if !effectiveChatAvailable}
   <div class="pi-chat-composer pi-chat-composer--view-only">
     <button
       type="button"
       class="plain-state plain-state--view-only"
-      title={t('session.copyResumeCommand', { command: resumeCommand })}
-      disabled={!resumeCommand}
-      onclick={copyResumeCommand}>{t('session.viewOnlyResume', { command: resumeCommand })}</button
+      title={t('session.copyResumeCommand', { command: safeResumeCommand })}
+      disabled={!safeResumeCommand}
+      onclick={copyResumeCommand}
+      >{t('session.viewOnlyResume', { command: safeResumeCommand })}</button
     >
   </div>
 {:else}<form
@@ -259,16 +267,16 @@
       accept="image/*"
       multiple
       hidden
-      disabled={!composerAvailable}
+      disabled={!composerAvailable || !capabilities.images}
     />
-    {#if !workerDown && pendingExtensionUI.length > 0}
+    {#if !workerDown && (capabilities.interactiveApprovals || capabilities.userQuestions) && pendingExtensionUI.length > 0}
       <div class="extension-ui-stack">
         {#each pendingExtensionUI as request (request.id)}
           <ExtensionUiCard {request} {sessionId} onResolved={resolveExtensionUI} />
         {/each}
       </div>
     {/if}
-    {#if !workerDown}<QueuePanel store={queueStore} />{/if}
+    {#if !workerDown && capabilities.persistentQueue}<QueuePanel store={queueStore} />{/if}
     <div class="pi-chat-shell composer-collapsed">
       <ChatExpandButton chatAvailable={composerAvailable} />
       {#if cwd}<div class="pi-chat-toolbar pi-chat-cwd-bar">
@@ -286,8 +294,13 @@
         disabled={!composerAvailable}
       ></textarea>
       <div id="pi-chat-attachments" class="pi-chat-attachments"></div>
-      <ChatSelectorPopups />
-      <ChatToolbar chatAvailable={composerAvailable} {toolbar} {modelLabel} />
+      <ChatSelectorPopups
+        showModels={capabilities.modelListing && capabilities.modelSwitching}
+        showThinking={capabilities.effortSelection || capabilities.reasoningSelection}
+        showCommands={capabilities.slashCommands}
+        showFiles={capabilities.files}
+      />
+      <ChatToolbar chatAvailable={composerAvailable} {toolbar} {modelLabel} {capabilities} />
       <ContextUsage popover={true} />
     </div>
     <TextAttachmentModal />

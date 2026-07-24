@@ -72,6 +72,7 @@ export class SessionDataModel {
   total = $state(0);
   from = $state(0);
   truncated = $state(false);
+  projectionMode = $state("");
   workerStatus = $state<WorkerProcessStatus>({ state: "idle" });
 
   // Stable, in-place-mutated reactive lookup Maps (see header comment).
@@ -128,6 +129,7 @@ export class SessionDataModel {
       total: payload?.total,
       from: payload?.from,
       truncated: payload?.truncated,
+      projectionMode: payload?.projectionMode,
     });
   }
 
@@ -160,6 +162,7 @@ export class SessionDataModel {
         : this.entries.length;
     this.from = typeof data.from === "number" && Number.isInteger(data.from) ? data.from : 0;
     this.truncated = Boolean(data.truncated) || this.from > 0 || this.entries.length < this.total;
+    this.projectionMode = typeof data.projectionMode === "string" ? data.projectionMode : "";
     this.urlLeafId = data.urlLeafId ?? null;
     this.urlTargetId = data.urlTargetId ?? null;
 
