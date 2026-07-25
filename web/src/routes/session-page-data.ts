@@ -63,6 +63,10 @@ const SessionPageDataSchema = Schema.StructWithRest(
     runtimeLabel: Schema.optionalKey(Schema.String),
     resumeCommand: Schema.optionalKey(Schema.String),
     capabilities: Schema.optionalKey(RuntimeCapabilitiesSchema),
+    archived: Schema.optionalKey(Schema.Boolean),
+    Archived: Schema.optionalKey(Schema.Boolean),
+    waitingQuestion: Schema.optionalKey(Schema.String),
+    WaitingQuestion: Schema.optionalKey(Schema.String),
   }),
   [UnknownRecordSchema],
 );
@@ -98,6 +102,8 @@ export interface SessionPageState {
   readonly chatDisabledReason: string;
   readonly modelLabel: string;
   readonly payloadBase64: string;
+  readonly archived: boolean;
+  readonly waiting: boolean;
 }
 
 interface LooseSessionEntry extends UnknownRecord {
@@ -270,6 +276,8 @@ export function buildSessionPageState({
       },
       { btoaImpl, TextEncoderImpl },
     ),
+    archived: data.archived ?? data.Archived ?? false,
+    waiting: Boolean(data.waitingQuestion || data.WaitingQuestion),
   };
 }
 

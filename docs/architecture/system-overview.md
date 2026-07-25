@@ -15,7 +15,7 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 | Live Updates | Server-Sent Events (SSE) |
 | Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI; supervised authenticated HTTP/SSE via `opencode serve` |
 | Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under `~/.pi/agent/sessions`; Codex, Claude, and OpenCode retain native authority |
-| Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, project visibility prefs, server-backed user settings, and the btw scratch-chat registry |
+| Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, tracked-project metadata, session pins/local archive, server-backed user settings, and the btw scratch-chat registry |
 | Auth | Token cookie/query/header (optional on localhost) |
 
 ## Component Diagram
@@ -50,6 +50,8 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   GET  /settings      →  handleSettingsPage (SPA shell)                  │
 │   GET  /api/session   →  handleApiSession  (JSON)                        │
 │   GET  /api/sessions  →  handleApiSessions (JSON list)                   │
+│   GET/POST /api/projects → tracked/discovered project metadata           │
+│   POST /api/archives  →  local session archive/restore                   │
 │   POST /api/chat      →  handleChat        (multipart or JSON)           │
 │   POST /api/chat/cancel → handleCancelChat                               │
 │   POST /api/set-model →  handleSetModel                                  │
@@ -117,7 +119,7 @@ App startup owns an ordered `runtimes.Registry`. It registers Pi, Codex, Claude,
 
 Each registration binds a serializable descriptor (`id`, label, command/version, projection mode, explicit capabilities) to an availability probe, optional catalog adapter, and optional `workers.Factory`. Registration validation enforces the important ownership invariants: a chat-capable runtime has a worker factory, and a replaceable-projection runtime has a catalog. Native lifecycle APIs that do not form a truthful common contract remain runtime-specific; Codex archive/delete/unarchive and native rename/fork still use the separate Codex service.
 
-The selected registry is the server's runtime source of truth. `/api/runtimes` returns selected registrations in startup order with current availability. Runtime-dependent handlers resolve the persisted session runtime, check its trusted descriptor capability, then check current availability before dispatch. Unsupported operations return `409`; supported operations on an unavailable runtime return `503`. Native mutation paths fail closed unless their runtime adapter declares and implements the operation. OpenCode declares create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching; archive, steering, queues, effort/reasoning, attachments, commands, subagent UI, approvals, and questions remain disabled.
+The selected registry is the server's runtime source of truth. `/api/runtimes` returns selected registrations in startup order with current availability. Runtime-dependent handlers resolve the persisted session runtime, check its trusted descriptor capability, then check current availability before dispatch. Unsupported operations return `409`; supported operations on an unavailable runtime return `503`. Native mutation paths fail closed unless their runtime adapter declares and implements the operation. OpenCode declares create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching; native archive, steering, queues, effort/reasoning, attachments, commands, subagent UI, approvals, and questions remain disabled. Runtime-neutral local Archive is pican-owned curation outside the runtime registry.
 
 The worker manager still owns one-worker-per-session lifecycle and delegates only construction: it parses the trusted session runtime, rejects disabled runtimes, then calls `Registry.NewWorker`. Projection mode controls backend status-file and pagination behavior and is included additively in both `/api/session` and the embedded session bootstrap alongside runtime label, complete capabilities, and the server-built terminal resume command. The live frontend uses capabilities to gate mutation and composer controls, and projection mode for delta eligibility and same-ID replacement: `append-only-native` may use `afterCount` and preserve known entry objects, while `replaceable-projection` forces a full snapshot and replaces known objects whose stable IDs now carry newer content or status. Unknown modes take the conservative replaceable path. This does not alter the static export path, which renders only the persisted session snapshot and has no registry, worker, API, or SSE behavior.
 
@@ -168,26 +170,33 @@ name, while pican itself continues listening only on localhost.
     └── push-subs.json      ← web-push subscriptions (when push enabled)
 ```
 
-## Project Visibility
+## Tracked Projects and Session Curation
 
-Project filtering is an **opt-in master switch**, stored in the `app_settings`
-SQLite table (`project_filter_enabled`, default **off**). Per-project enable
-state lives in the `project_prefs` table. Both are server-side, so they sync
-across devices. See `internal/server/projects.go`.
+The default index is a bounded tracked-project view, not the full native
+catalog. An enabled `project_prefs` row with `source='registered'` means the
+user explicitly tracks that persisted absolute project path. Automatically
+discovered rows and the legacy project-filter setting remain readable for
+compatibility, but they do not select projects for the focused home.
 
-- **Filter off (default):** every session shows; new sessions (web- or
-  terminal-created) appear immediately, exactly like before the feature existed.
-- **Filter on:** the index only renders sessions whose project is **enabled** —
-  an allowlist. Projects discovered after the table is first seeded default to
-  hidden, so one-off folders stay out of view.
-- **First seed** (empty `project_prefs`): every discovered project is enabled, so
-  turning the filter on doesn't blank the homepage.
-- **Registering** a folder path (`action: register`) pre-approves it so sessions
-  that later land there show immediately, even before any session exists.
-- Filtering is applied server-side in both `handleIndex` and `handleApiSessions`
-  (no client flash) and is a no-op while the master switch is off. Manage via the
-  index menu → **Manage Projects** (search, select/deselect-all, register, and the
-  filter switch), backed by `GET/POST /api/projects`.
+`GET /api/sessions` exposes explicit live-app scopes:
+
+- `view=home` returns Now, ordered pins, and at most six recent unarchived
+  sessions per tracked project;
+- `view=all` returns the paginated unarchived native catalog;
+- `view=archived` returns the paginated locally archived catalog;
+- `project=<path>` returns the complete paginated view for one exact persisted
+  project path.
+
+Now includes running and waiting sessions even when their project is untracked.
+Pins also bypass project tracking. Typed command-palette search uses
+`view=all`, so untracked terminal-created sessions remain discoverable.
+
+Session pins and archive state are pican-owned SQLite curation metadata.
+Archiving never invokes a runtime-native archive API and never deletes or
+rewrites native sessions or projections. A session cannot be both pinned and
+archived: archiving removes its pin, while pinning restores it. Running or
+waiting sessions cannot be archived. Direct viewing/export remains available
+because archive controls navigation, not session authority.
 
 ## Startup Order
 

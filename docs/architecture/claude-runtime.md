@@ -82,7 +82,7 @@ CLAUDE_CONFIG_DIR=<configured-home> claude auth status --json
 
 A missing executable or logged-out home disables only Claude operations; cached projections remain viewable/exportable. Model discovery exposes the CLI aliases `sonnet`, `opus`, and `haiku`.
 
-Enabled capabilities are create, resume, chat, cancel, image input, cwd-local file references, and model listing. Interactive approvals, user questions, steering, persistent queues, model/effort switching, slash commands, subagents, rename, archive/delete, fork, and clone remain unsupported rather than being emulated.
+Enabled capabilities are create, resume, chat, cancel, image input, cwd-local file references, and model listing. Interactive approvals, user questions, steering, persistent queues, model/effort switching, slash commands, subagents, rename, native archive/delete, fork, and clone remain unsupported rather than being emulated. Pican's local Archive action only curates navigation.
 
 ## Rendering and export
 

@@ -39,6 +39,7 @@ describe("createStatusEvents", () => {
     const onMessage = vi.fn(() => calls.push("message"));
     const onWorkflowUpdate = vi.fn();
     const onTasksUpdate = vi.fn();
+    const onCurationUpdate = vi.fn();
     const sub = createStatusEvents({
       EventSourceImpl: FakeEventSource,
       onSnapshot,
@@ -46,6 +47,7 @@ describe("createStatusEvents", () => {
       onMessage,
       onWorkflowUpdate,
       onTasksUpdate,
+      onCurationUpdate,
     });
     sub.connect();
     const eventSource = FakeEventSource.instances[0];
@@ -61,6 +63,7 @@ describe("createStatusEvents", () => {
     eventSource?.emit("message", "new-session");
     eventSource?.emit("workflows-updated", '{"runId":"wf_123456abcdef"}');
     eventSource?.emit("tasks-updated", '{"project":"/repo"}');
+    eventSource?.emit("curation-updated", '{"ok":true}');
     expect(onSnapshot).toHaveBeenCalledWith({
       ids: ["a.jsonl"],
       statuses: { "a.jsonl": { model: "m", modelProvider: "p" } },
@@ -75,6 +78,7 @@ describe("createStatusEvents", () => {
     expect(onMessage).toHaveBeenCalledWith("new-session");
     expect(onWorkflowUpdate).toHaveBeenCalledWith({ runId: "wf_123456abcdef" });
     expect(onTasksUpdate).toHaveBeenCalledWith({ project: "/repo" });
+    expect(onCurationUpdate).toHaveBeenCalledTimes(1);
     expect(calls).toEqual(["snapshot", "delta", "message"]);
   });
 

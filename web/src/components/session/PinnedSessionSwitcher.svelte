@@ -29,7 +29,7 @@
     const result = await settle(() =>
       Promise.all([
         runPromise(effects.sessions.pins),
-        runPromise(effects.sessions.list({ limit: 1 })),
+        runPromise(effects.sessions.list({ limit: 1, view: 'all' })),
       ]),
     );
     if (result.ok) {

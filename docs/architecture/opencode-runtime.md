@@ -48,7 +48,7 @@ opencode --session <native-session-id>
 
 using the configured command path.
 
-Archive/unarchive, steering a running response, persistent queues, attachments/file references, effort/reasoning selection, slash commands, subagent UI, approvals, and user questions are disabled. The live UI omits those controls from the server-provided capability set, and direct or stale-client requests fail closed with the runtime-specific unsupported-operation reason.
+Native archive/unarchive, steering a running response, persistent queues, attachments/file references, effort/reasoning selection, slash commands, subagent UI, approvals, and user questions are disabled. The live UI omits those runtime controls from the server-provided capability set, and direct or stale-client requests fail closed with the runtime-specific unsupported-operation reason. Pican's runtime-neutral local Archive action is separate curation metadata and never calls OpenCode.
 
 OpenCode may expose command, agent, child, and other metadata through its API, but pican does not claim a UI capability until that complete interaction has been proven.
 

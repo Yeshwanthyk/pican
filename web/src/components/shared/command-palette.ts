@@ -2,8 +2,7 @@ import { Effect } from "effect";
 import type { FetchLike } from "../../lib/http";
 import * as Http from "../../lib/http";
 import { SessionListSchema } from "../../lib/schema";
-import { runPromise, runSync } from "../../lib/runtime";
-import { getSessionRuntime } from "../../session/session-runtime-context";
+import { runPromise } from "../../lib/runtime";
 import type { SessionPaletteApi } from "../../shared/command-palette-runtime";
 
 declare global {
@@ -42,9 +41,6 @@ const numberField = (session: PaletteSessionInput, ...keys: ReadonlyArray<string
   }
   return 0;
 };
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 export function normalizePaletteSession(session: PaletteSessionInput): PaletteSession {
   const id = stringField(session, "id", "ID");
   const title = stringField(session, "title", "Name", "name", "ID", "id") || "Session";
@@ -96,34 +92,21 @@ export function sessionsFromCards(
   });
 }
 
-export function defaultSessionPaletteCwd(): string {
-  return runSync(
-    Effect.try({
-      try: () => {
-        const model = getSessionRuntime().model;
-        const header = isRecord(model) && isRecord(model.header) ? model.header : {};
-        return typeof header.cwd === "string" ? header.cwd : "";
-      },
-      catch: () => "session runtime unavailable",
-    }).pipe(Effect.catch(() => Effect.succeed(""))),
-  );
-}
-
 export function fetchPaletteSessions({
   fetchImpl = globalThis.fetch,
-  getCwd = defaultSessionPaletteCwd,
   query = "",
   limit = 50,
+  view = "home",
 }: {
   readonly fetchImpl?: FetchLike;
-  readonly getCwd?: () => string;
   readonly query?: string;
   readonly limit?: number;
+  readonly view?: "home" | "all" | "archived";
 } = {}): Promise<ReadonlyArray<PaletteSessionInput>> {
   const params = new URLSearchParams();
-  const cwd = getCwd();
-  if (cwd) params.set("project", cwd);
-  if (query) params.set("q", query);
+  const trimmedQuery = query.trim();
+  params.set("view", view === "archived" ? "archived" : trimmedQuery ? "all" : "home");
+  if (trimmedQuery) params.set("q", trimmedQuery);
   if (Number.isFinite(limit) && limit > 0) params.set("limit", String(limit));
   const suffix = params.toString();
   return runPromise(

@@ -67,6 +67,8 @@ describe("session-page-data", () => {
         total: 5,
         from: 3,
         chatAvailable: false,
+        archived: true,
+        waitingQuestion: "Choose a deployment target",
         model: "sonnet",
         modelProvider: "anthropic",
         runtime: "codex",
@@ -83,6 +85,8 @@ describe("session-page-data", () => {
     expect(state.modelLabel).toBe("sonnet @ anthropic");
     expect(state.runtime).toBe("codex");
     expect(state.nativeId).toBe("thread-1");
+    expect(state.archived).toBe(true);
+    expect(state.waiting).toBe(true);
     expect(decodePayload(state.payloadBase64)).toMatchObject({
       name: "Title",
       leafId: "b",

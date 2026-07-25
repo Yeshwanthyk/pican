@@ -40,6 +40,7 @@ export interface StatusEventsOptions {
   readonly onReload?: (reload: { readonly id: string }) => void;
   readonly onWorkflowUpdate?: (payload: { readonly runId: string }) => void;
   readonly onTasksUpdate?: (payload: { readonly project: string }) => void;
+  readonly onCurationUpdate?: () => void;
   readonly onReconnect?: () => void;
 }
 
@@ -55,6 +56,7 @@ export function createStatusEvents({
   onReload = () => undefined,
   onWorkflowUpdate = () => undefined,
   onTasksUpdate = () => undefined,
+  onCurationUpdate = () => undefined,
   onReconnect = () => undefined,
 }: StatusEventsOptions = {}) {
   let stream: LegacyEventSource | null = null;
@@ -125,6 +127,12 @@ export function createStatusEvents({
         parse("tasks-updated", (event as MessageEvent<string>).data),
       );
       if (parsed?.type === "tasks-updated") onTasksUpdate(parsed.data);
+    });
+    eventSource.addEventListener("curation-updated", (event) => {
+      const parsed = Option.getOrUndefined(
+        parse("curation-updated", (event as MessageEvent<string>).data),
+      );
+      if (parsed?.type === "curation-updated") onCurationUpdate();
     });
 
     if (windowImpl.addEventListener) {

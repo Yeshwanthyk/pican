@@ -44,6 +44,9 @@
     projectionMode = '',
     resumeCommand = '',
     nativeId = '',
+    archived = false,
+    waiting = false,
+    onArchiveChange = null,
     dataEl = $bindable(null),
   } = $props();
 
@@ -52,6 +55,7 @@
     (sessionModel.workerStatus ?? { state: 'idle' }) as WorkerProcessStatus,
   );
   const workerDown = $derived(workerStatus.state === 'error');
+  const running = $derived(workerStatus.state === 'running');
 
   // Restore the diff sheet from `?diff=open` on first load. Must seed
   // sessionModals.diff before the sync $effect runs, or that effect would see
@@ -104,7 +108,16 @@
 />
 <PinnedSessionSwitcher {sessionId} />
 
-<CommandMenu {sessionId} {cwd} {capabilities} {resumeCommand} />
+<CommandMenu
+  {sessionId}
+  {cwd}
+  {capabilities}
+  {resumeCommand}
+  {archived}
+  {running}
+  {waiting}
+  {onArchiveChange}
+/>
 
 <!-- Live reload (SSE) mounts before <ChatComposer> so its optimistic
      "message sent" listener is attached before the user can send. -->

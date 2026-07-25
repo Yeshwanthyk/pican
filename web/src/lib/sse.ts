@@ -14,6 +14,7 @@ export type StatusEvent =
   | { readonly type: "status-delta"; readonly data: typeof StatusDeltaSchema.Type }
   | { readonly type: "workflows-updated"; readonly data: typeof WorkflowUpdatedSchema.Type }
   | { readonly type: "tasks-updated"; readonly data: typeof TasksUpdatedSchema.Type }
+  | { readonly type: "curation-updated"; readonly data: { readonly ok: boolean } }
   | { readonly type: "reconnect" };
 
 export interface EventSourceLike {
@@ -28,6 +29,9 @@ const decodeSnapshot = Schema.decodeUnknownEffect(Schema.fromJsonString(StatusSn
 const decodeDelta = Schema.decodeUnknownEffect(Schema.fromJsonString(StatusDeltaSchema));
 const decodeWorkflow = Schema.decodeUnknownEffect(Schema.fromJsonString(WorkflowUpdatedSchema));
 const decodeTasks = Schema.decodeUnknownEffect(Schema.fromJsonString(TasksUpdatedSchema));
+const decodeCuration = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Struct({ ok: Schema.Boolean })),
+);
 
 const parseJsonEvent = <A>(
   type: StatusEvent["type"],
@@ -47,6 +51,7 @@ export const parseStatusEvent = (
   if (type === "status-delta") return parseJsonEvent(type, data, decodeDelta);
   if (type === "workflows-updated") return parseJsonEvent(type, data, decodeWorkflow);
   if (type === "tasks-updated") return parseJsonEvent(type, data, decodeTasks);
+  if (type === "curation-updated") return parseJsonEvent(type, data, decodeCuration);
   if (data === "reload") return Effect.succeed({ type: "reload", id: "" });
   if (data.startsWith("reload:")) {
     return Effect.succeed({ type: "reload", id: data.slice("reload:".length) });
@@ -78,8 +83,14 @@ export const statusEvents = (
             );
           };
           eventSource.onmessage = (event) => emitParsed("message", event);
-          ["status-snapshot", "status-delta", "workflows-updated", "tasks-updated"].forEach(
-            (type) => eventSource.addEventListener(type, (event) => emitParsed(type, event)),
+          [
+            "status-snapshot",
+            "status-delta",
+            "workflows-updated",
+            "tasks-updated",
+            "curation-updated",
+          ].forEach((type) =>
+            eventSource.addEventListener(type, (event) => emitParsed(type, event)),
           );
           eventSource.addEventListener("open", () => {
             if (everConnected) Queue.offerUnsafe(queue, { type: "reconnect" });

@@ -11,11 +11,6 @@
   import { openSessionPalette, refreshSessionPalette } from '../shared/command-palette-runtime.js';
   import { setupKeyboardNav } from '../shared/keyboard-nav.js';
   import { toggleTheme, syncThemeIcons } from '../shared/theme.js';
-  import {
-    configureSettingsSync,
-    hydrateSettings,
-    writeSetting,
-  } from '../shared/settings-store.js';
   import { navigate } from '../shared/navigation.js';
   import { t } from '../shared/strings.js';
   import { describeError } from '../lib/errors';
@@ -31,12 +26,13 @@
     defaultFetchRecent,
     defaultFetchSessions,
     defaultUpdateProject,
-    layoutStorageKey,
     normalizeRecentLocations,
     normalizeSession,
+    projectDisplayName,
     shouldRefetchOnReload,
     type NormalizedSession,
     type RunningStatus,
+    type SessionView,
   } from '../index/sessions.js';
   import {
     defaultFetchPeers,
@@ -46,14 +42,18 @@
   } from '../index/peers.js';
 
   const PAGE_SIZE = 100;
-  type Layout = 'timeline' | 'projects';
+
+  interface Props {
+    readonly view?: SessionView;
+    readonly project?: string;
+  }
+
+  let { view = 'home', project = '' }: Props = $props();
 
   let sessions = $state<NormalizedSession[]>([]);
   let total = $state(0);
   let loadingMore = $state(false);
   let loading = $state(true);
-  let layoutReady = $state(false);
-  let layout = $state<Layout>('timeline');
   const runningSessionIds = new SvelteSet<string>();
   const runningStatuses = new SvelteMap<string, RunningStatus>();
   let newSessionOpen = $state(false);
@@ -66,7 +66,6 @@
   let menuOpen = $state(false);
   let projectsOpen = $state(false);
   let projects = $state<Project[]>([]);
-  let projectsFilterEnabled = $state(false);
   let projectsBusy = $state(false);
   let projectsError = $state('');
   let refreshInflight = false;
@@ -75,12 +74,22 @@
   let peersRefreshInflight = false;
   let schedules = $state<Schedule[]>([]);
 
-  const defaultProject = $derived(recentLocations[0] || t('index.defaultProject'));
+  const selectedProject = $derived(projects.find((candidate) => candidate.path === project));
+  const projectName = $derived(projectDisplayName(project));
+  const trackedProjectCount = $derived(projects.filter((candidate) => candidate.tracked).length);
+  const shownCount = $derived(sessions.length);
 
-  const totalSessionsLabel = $derived(
-    total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total }),
-  );
-  const hasMore = $derived(sessions.length < total);
+  const summaryLabel = $derived.by(() => {
+    if (project) {
+      const count = selectedProject?.sessionCount ?? total;
+      return count === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count });
+    }
+    if (view === 'home') {
+      return t('index.projectsShown', { projects: trackedProjectCount, shown: shownCount });
+    }
+    return total === 1 ? t('index.sessionCountOne') : t('index.sessionsCount', { count: total });
+  });
+  const hasMore = $derived(view !== 'home' && sessions.length < total);
   const waitingSessions = $derived(sessions.filter((session) => session.waitingQuestion));
   const waitingIds = $derived(new Set(waitingSessions.map((session) => session.id)));
   const waitingCount = $derived(waitingSessions.length);
@@ -125,7 +134,8 @@
     if (refreshInflight || newSessionOpen) return;
     refreshInflight = true;
     const limit = preserveWindow ? Math.max(PAGE_SIZE, sessions.length) : PAGE_SIZE;
-    const result = await settle(() => defaultFetchSessions({ limit }));
+    const query = project ? { project, limit } : view === 'home' ? { view } : { view, limit };
+    const result = await settle(() => defaultFetchSessions(query));
     if (result.ok) {
       sessions = (result.value.sessions || []).map(normalizeSession);
       total = result.value.total ?? sessions.length;
@@ -135,14 +145,17 @@
     // Keep the existing list if a soft refresh fails.
     refreshInflight = false;
     loading = false;
-    layoutReady = true;
   }
 
   async function loadMore() {
     if (loadingMore || refreshInflight) return;
     loadingMore = true;
     const result = await settle(() =>
-      defaultFetchSessions({ limit: PAGE_SIZE, offset: sessions.length }),
+      defaultFetchSessions({
+        limit: PAGE_SIZE,
+        offset: sessions.length,
+        ...(project ? { project } : { view }),
+      }),
     );
     if (result.ok) {
       const more = (result.value.sessions || []).map(normalizeSession);
@@ -233,16 +246,11 @@
     return true;
   }
 
-  function setLayout(nextLayout: string): void {
-    layout = nextLayout === 'projects' ? 'projects' : 'timeline';
-    writeSetting(layoutStorageKey, layout, { storage: localStorage });
-  }
-
   async function openNewSessionModal() {
     closeMenu();
     projectsOpen = false;
     newSessionOpen = true;
-    newSessionPath = '';
+    newSessionPath = project;
     newSessionDropdownOpen = false;
     newSessionRuntime = 'pi';
     newSessionError = '';
@@ -294,7 +302,6 @@
     const result = await settle(defaultFetchProjects);
     if (result.ok) {
       projects = Array.isArray(result.value.projects) ? result.value.projects : [];
-      projectsFilterEnabled = !!result.value.filterEnabled;
     } else {
       projectsError = describeError(result.error.cause) || t('index.failedLoadProjects');
     }
@@ -319,8 +326,8 @@
     projectsError = '';
     const result = await settle(() => defaultUpdateProject(path, action));
     if (result.ok) {
-      await refreshSessions();
       await refreshProjectsList();
+      await refreshSessions();
     } else {
       projectsError = describeError(result.error.cause) || t('index.failedUpdateProject');
     }
@@ -334,19 +341,7 @@
   onMount(() => {
     const previousTitle = document.title;
     document.title = t('common.productName');
-    configureSettingsSync({ fetchImpl: window.fetch.bind(window) });
     setupKeyboardNav({ windowImpl: window, documentImpl: document });
-
-    layout = recoverSync(
-      () => (localStorage.getItem(layoutStorageKey) === 'projects' ? 'projects' : 'timeline'),
-      'timeline' as Layout,
-    );
-    ignoreFailure(async () => {
-      const settings = await hydrateSettings({ storage: localStorage });
-      if (!settings) return;
-      const serverLayout = settings[layoutStorageKey] === 'projects' ? 'projects' : 'timeline';
-      if (serverLayout !== layout) setLayout(serverLayout);
-    });
 
     const statusEvents = createStatusEvents({
       onSnapshot: (snapshot) => setRunningSessions(snapshot),
@@ -360,6 +355,10 @@
         if (message === 'new-session') refreshSessions({ preserveWindow: true });
       },
       onReload: handleReload,
+      onCurationUpdate: () => {
+        refreshProjectsList();
+        refreshSessions({ preserveWindow: true });
+      },
       // Catch up on reconnect (network blip, or tab resumed via pageshow):
       // without this the list stays stale until an unrelated broadcast
       // happens to arrive.
@@ -405,6 +404,7 @@
     window.addEventListener('click', click);
 
     refreshSessions();
+    refreshProjectsList();
     ignoreFailure(async () => {
       const recent = await defaultFetchRecent();
       recentLocations = normalizeRecentLocations(recent).slice(0, 10);
@@ -424,42 +424,47 @@
 </script>
 
 <IndexHeader
-  {layout}
-  {totalSessionsLabel}
+  {view}
+  {project}
+  {projectName}
+  {summaryLabel}
   {runningCount}
   {waitingCount}
   {menuOpen}
   onSearch={openPalette}
   onNewSession={openNewSessionModal}
+  onAddProject={openProjectsModal}
   onToggleMenu={toggleMenu}
-  onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
 />
 
 <HomeMenu
   open={menuOpen}
-  {layout}
   onClose={closeMenu}
   onNewSession={openNewSessionModal}
   onManageProjects={openProjectsModal}
-  onLayoutChange={setLayout}
   onSchedules={() => navigate('/schedules')}
 />
 
-<CommandPalette onNewSession={openNewSessionModal} navigate={(url: string) => navigate(url)} />
+<CommandPalette
+  {view}
+  onNewSession={openNewSessionModal}
+  navigate={(url: string) => navigate(url)}
+/>
 
 <main class="home-layout">
   <SessionsList
     {sessions}
-    {layout}
+    {projects}
+    {view}
+    {project}
     {runningSessionIds}
     {runningStatuses}
     {loading}
-    {layoutReady}
     {hasMore}
     {loadingMore}
     onLoadMore={loadMore}
-    {defaultProject}
+    onAddProject={openProjectsModal}
   />
   <HomeRail
     {waitingSessions}
@@ -511,13 +516,9 @@
 <ProjectsModal
   open={projectsOpen}
   {projects}
-  filterEnabled={projectsFilterEnabled}
   error={projectsError}
   busy={projectsBusy}
   onClose={closeProjectsModal}
-  onToggleProject={(path, enabled) => updateProject(path, enabled ? 'enable' : 'disable')}
-  onToggleAll={(enabled) => updateProject('', enabled ? 'enable-all' : 'disable-all')}
-  onToggleFilter={(enabled) => updateProject('', enabled ? 'enable-filter' : 'disable-filter')}
-  onRegister={(path) => updateProject(path, 'register')}
-  onRemove={(path) => updateProject(path, 'remove')}
+  onTrack={(path) => updateProject(path, 'track')}
+  onUntrack={(path) => updateProject(path, 'untrack')}
 />

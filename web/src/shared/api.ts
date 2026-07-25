@@ -9,6 +9,7 @@ import {
   GitInfoSchema,
   GitRenameResponseSchema,
   ModelListSchema,
+  MutationResponseSchema,
   NewSessionResponseSchema,
   OkResponseSchema,
   PeerListSchema,
@@ -113,13 +114,21 @@ export const effects = {
   del: Http.del,
   sessions: {
     list: (
-      values: { readonly limit?: number; readonly offset?: number; readonly query?: string } = {},
+      values: {
+        readonly limit?: number;
+        readonly offset?: number;
+        readonly query?: string;
+        readonly view?: "home" | "all" | "archived";
+        readonly project?: string;
+      } = {},
     ) =>
       Http.get(
         query("/api/sessions", {
           limit: values.limit === undefined ? undefined : String(values.limit),
           offset: values.offset === undefined ? undefined : String(values.offset),
           q: values.query,
+          project: values.project,
+          view: values.project ? undefined : values.view,
         }),
         SessionListSchema,
       ),
@@ -132,6 +141,8 @@ export const effects = {
       Http.post("/api/projects", { path, action }, ProjectMutationResponseSchema),
     updatePin: (sessionId: string, pinned: boolean) =>
       Http.post("/api/pins", { sessionId, pinned }, PinMutationResponseSchema),
+    updateArchive: (sessionId: string, archived: boolean) =>
+      Http.post("/api/archives", { sessionId, archived }, MutationResponseSchema),
     pins: Http.get("/api/pins", PinListSchema),
   },
   schedules: {

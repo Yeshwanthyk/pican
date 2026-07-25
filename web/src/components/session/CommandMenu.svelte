@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import { Match, Schema } from 'effect';
   import type { IconNode } from 'lucide';
+  import { Archive, ArchiveRestore } from 'lucide';
   import CommandPalette from '../shared/CommandPalette.svelte';
   import { t } from '../../shared/strings.js';
   import {
@@ -47,17 +48,28 @@
     defaultRuntimeCapabilities,
     type CompleteRuntimeCapabilities,
   } from '../../lib/runtime-capabilities.js';
+  import { defaultUpdateArchive } from '../../index/sessions.js';
+  import { describeError } from '../../lib/errors.js';
+  import { settle } from '../shared/ui-effect.js';
 
   let {
     sessionId = '',
     cwd = '',
     capabilities = defaultRuntimeCapabilities('pi'),
     resumeCommand = '',
+    archived = false,
+    running = false,
+    waiting = false,
+    onArchiveChange = null,
   }: {
     sessionId?: string;
     cwd?: string;
     capabilities?: CompleteRuntimeCapabilities;
     resumeCommand?: string;
+    archived?: boolean;
+    running?: boolean;
+    waiting?: boolean;
+    onArchiveChange?: ((archived: boolean) => void) | null;
   } = $props();
 
   interface MenuLabelItem {
@@ -68,6 +80,8 @@
   interface PrimaryItem extends MenuLabelItem {
     readonly action: string;
     readonly kbd?: string;
+    readonly disabled?: boolean;
+    readonly title?: string;
   }
 
   type FooterItem =
@@ -99,6 +113,7 @@
     'workflows',
     'tasks',
     'subagents',
+    'archive',
   ]);
   type MenuAction = typeof MenuActionSchema.Type;
   const isMenuAction = Schema.is(MenuActionSchema);
@@ -124,8 +139,18 @@
     { action: 'tasks', icon: ListChecks, label: 'tasks.navTitle' },
     { action: 'subagents', icon: Layers, label: 'subagents.navTitle' },
   ];
-  const visiblePrimaryItems = $derived(
-    primaryItems.filter((item) => {
+  const archiveDisabledReason = $derived(
+    archived
+      ? ''
+      : waiting
+        ? t('session.archiveDisabledWaiting')
+        : running
+          ? t('session.archiveDisabledRunning')
+          : '',
+  );
+  let archiveBusy = $state(false);
+  const visiblePrimaryItems = $derived([
+    ...primaryItems.filter((item) => {
       if (item.action === 'rename') return capabilities.rename;
       if (item.action === 'fork') return capabilities.fork;
       if (item.action === 'clone') return capabilities.clone;
@@ -133,7 +158,14 @@
       if (item.action === 'subagents') return capabilities.subagents;
       return true;
     }),
-  );
+    {
+      action: 'archive',
+      icon: archived ? ArchiveRestore : Archive,
+      label: archived ? 'session.restoreCurrent' : 'session.archiveCurrent',
+      disabled: archiveBusy || Boolean(archiveDisabledReason),
+      title: archiveDisabledReason,
+    },
+  ]);
 
   // Footer links/rows. desktopOnly items (the version row) are dropped on mobile.
   const footerItems: readonly FooterItem[] = [
@@ -303,6 +335,21 @@
           closeMenu();
           navigate('/subagents?session=' + encodeURIComponent(sessionId));
         }),
+        Match.when('archive', () => {
+          if (archiveBusy || archiveDisabledReason || !sessionId) return;
+          closeMenu();
+          const next = !archived;
+          archiveBusy = true;
+          void settle(() => defaultUpdateArchive(sessionId, next)).then((result) => {
+            archiveBusy = false;
+            if (!result.ok) {
+              toast(describeError(result.error.cause) || t('session.archiveUpdateFailed'));
+              return;
+            }
+            onArchiveChange?.(next);
+            if (next) navigate('/');
+          });
+        }),
         Match.exhaustive,
       );
     }
@@ -362,7 +409,12 @@
 {#snippet menuBody(itemClass: string, sectionClass: string, desktop: boolean)}
   <div class={sectionClass}>
     {#each visiblePrimaryItems as item (item.action)}
-      <button class={itemClass} type="button" data-action={item.action}
+      <button
+        class={itemClass}
+        type="button"
+        data-action={item.action}
+        disabled={item.disabled}
+        title={item.title || undefined}
         >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
       >
     {/each}

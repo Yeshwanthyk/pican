@@ -111,6 +111,47 @@ describe("App", () => {
     expect(document.querySelector(".session-header-title")?.textContent).toBe("Settings");
   });
 
+  it("remounts SessionsPage when its scope or project query changes", async () => {
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/sessions")) {
+        return Promise.resolve(Response.json({ sessions: [], total: 0 }));
+      }
+      if (url === "/api/projects") return Promise.resolve(Response.json({ projects: [] }));
+      if (url === "/api/recent-locations") {
+        return Promise.resolve(Response.json({ locations: [] }));
+      }
+      if (url === "/api/peers") return Promise.resolve(Response.json({ peers: [] }));
+      if (url === "/api/schedules") return Promise.resolve(Response.json({ schedules: [] }));
+      return Promise.resolve(Response.json({}));
+    });
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+    window.history.pushState({}, "", "/?view=all");
+    mounted = mountApp({ props: { path: "/", search: "?view=all" } });
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes("/api/sessions?limit=100&view=all"),
+        ),
+      ).toBe(true);
+    });
+
+    fetchSpy.mockClear();
+    window.history.pushState({}, "", "/?project=%2Frepo");
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes("/api/sessions?limit=100&project=%2Frepo"),
+        ),
+      ).toBe(true);
+    });
+  });
+
   it("swaps views on browser back/forward (popstate)", async () => {
     document.body.innerHTML = '<div id="app"></div>';
     window.history.pushState({}, "", "/");

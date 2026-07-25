@@ -76,6 +76,8 @@
   let projectionMode = $state('');
   let resumeCommand = $state('');
   let nativeId = $state('');
+  let archived = $state(false);
+  let waiting = $state(false);
   let dataEl = $state<HTMLScriptElement | null>(null);
 
   onMount(() => {
@@ -115,6 +117,8 @@
         projectionMode = state.projectionMode;
         resumeCommand = state.resumeCommand;
         nativeId = state.nativeId;
+        archived = state.archived;
+        waiting = state.waiting;
         document.title =
           runtime !== 'pi'
             ? t('session.runtimePageTitle', { title, runtime: runtimeLabel || runtime })
@@ -207,6 +211,9 @@
     {projectionMode}
     {resumeCommand}
     {nativeId}
+    {archived}
+    {waiting}
+    onArchiveChange={(next: boolean) => (archived = next)}
     bind:dataEl
   />
 {/if}

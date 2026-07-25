@@ -31,6 +31,12 @@
   // ?id= only at mount. Within-session navigation never changes the URL, so this
   // stays stable while reading a session.
   const sessionId = $derived(new URLSearchParams(search).get('id') || '');
+  const homeProject = $derived(new URLSearchParams(search).get('project') || '');
+  const homeView = $derived.by(() => {
+    const value = new URLSearchParams(search).get('view');
+    return value === 'all' || value === 'archived' ? value : 'home';
+  });
+  const homeNavigationKey = $derived(homeProject ? `project:${homeProject}` : `view:${homeView}`);
   const workflowRunId = $derived(new URLSearchParams(search).get('runId') || '');
   const workflowSession = $derived(new URLSearchParams(search).get('session') || '');
   const tasksProject = $derived(new URLSearchParams(search).get('project') || '');
@@ -77,7 +83,9 @@
 </script>
 
 {#if path === '/'}
-  <SessionsPage />
+  {#key homeNavigationKey}
+    <SessionsPage view={homeView} project={homeProject} />
+  {/key}
 {:else if path === '/session'}
   {#key sessionId}
     <SessionPage />

@@ -12,6 +12,10 @@ describe("SSE parsing", () => {
     await expect(
       runPromise(parseStatusEvent("status-delta", '{"id":"s.jsonl","running":true,"model":"gpt"}')),
     ).resolves.toMatchObject({ type: "status-delta", data: { id: "s.jsonl" } });
+    await expect(runPromise(parseStatusEvent("curation-updated", '{"ok":true}'))).resolves.toEqual({
+      type: "curation-updated",
+      data: { ok: true },
+    });
   });
 
   it("maps malformed typed payloads to SseError", async () => {

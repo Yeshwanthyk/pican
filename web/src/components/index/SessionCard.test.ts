@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import SessionCard from "./SessionCard.svelte";
 import { normalizeSession } from "../../index/sessions.js";
 import type { NormalizedSession } from "../../index/sessions.js";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function session(overrides: Partial<NormalizedSession> = {}): NormalizedSession {
   return normalizeSession({
@@ -95,5 +97,63 @@ describe("SessionCard ticker row", () => {
     });
     expect(waiting.container.querySelector(".session-ticker-row--waiting")).toBeInTheDocument();
     expect(screen.getByText("waiting 2m — Ship it?")).toBeInTheDocument();
+  });
+
+  it("disables archive with a precise running or waiting reason", () => {
+    const running = render(SessionCard, {
+      props: { session: session(), running: true },
+    });
+    expect(screen.getByRole("button", { name: "Archive session" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Archive session" })).toHaveAttribute(
+      "title",
+      "Stop this session before archiving it.",
+    );
+    running.unmount();
+
+    render(SessionCard, {
+      props: { session: session({ waitingQuestion: "Ship it?" }), running: true },
+    });
+    expect(screen.getByRole("button", { name: "Archive session" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Archive session" })).toHaveAttribute(
+      "title",
+      "Answer this session before archiving it.",
+    );
+  });
+
+  it("optimistically archives and restores through the local archive endpoint", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const value = session();
+    const { rerender } = render(SessionCard, { props: { session: value } });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Archive session" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Restore session" })).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Restore session" })).not.toBeDisabled(),
+    );
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/archives",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ sessionId: "session.jsonl", archived: true }),
+      }),
+    );
+
+    await rerender({ session: value });
+    await fireEvent.click(screen.getByRole("button", { name: "Restore session" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Archive session" })).toBeInTheDocument(),
+    );
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/archives",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ sessionId: "session.jsonl", archived: false }),
+      }),
+    );
   });
 });

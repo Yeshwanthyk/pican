@@ -13,7 +13,7 @@ describe("PinnedSessionSwitcher", () => {
           JSON.stringify({ pins: ["second.jsonl", "third.jsonl", "first.jsonl"] }),
         );
       }
-      if (url === "/api/sessions?limit=1") {
+      if (url === "/api/sessions?limit=1&view=all") {
         return new Response(
           JSON.stringify({
             sessions: [

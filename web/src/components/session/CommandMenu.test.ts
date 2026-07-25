@@ -15,6 +15,7 @@ beforeEach(() => {
   btn.id = "command-menu-btn";
   document.body.appendChild(btn);
   sessionTitle.name = "Old";
+  window.history.replaceState({}, "", "/session?id=session.jsonl");
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn(
@@ -35,6 +36,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   resetSessionModals();
   setSessionPaletteApi(null);
 });
@@ -93,5 +95,60 @@ describe("CommandMenu", () => {
     expect(document.querySelectorAll('[data-action="workflows"]')).toHaveLength(2);
     expect(document.querySelectorAll('[data-action="tasks"]')).toHaveLength(2);
     expect(document.querySelectorAll('[data-action="subagents"]')).toHaveLength(2);
+  });
+
+  it("always shows the local archive action independent of runtime capabilities", () => {
+    render(CommandMenu, { props: { sessionId: "session.jsonl" } });
+
+    expect(document.querySelectorAll('[data-action="archive"]')).toHaveLength(2);
+    expect(document.querySelector('[data-action="archive"]')).toHaveTextContent(
+      "Archive this session",
+    );
+  });
+
+  it.each([
+    [{ running: true }, "Stop this session before archiving it."],
+    [{ waiting: true }, "Answer this session before archiving it."],
+  ])("disables archive while active with the precise reason", (activity, reason) => {
+    render(CommandMenu, { props: { sessionId: "session.jsonl", ...activity } });
+
+    const archive = document.querySelector<HTMLButtonElement>('[data-action="archive"]');
+    expect(archive).toBeDisabled();
+    expect(archive).toHaveAttribute("title", reason);
+  });
+
+  it("archives through pican and navigates home only after success", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(CommandMenu, { props: { sessionId: "session.jsonl" } });
+    await tick();
+
+    await fireEvent.click(document.querySelector('[data-action="archive"]') ?? document.body);
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/archives",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ sessionId: "session.jsonl", archived: true }),
+      }),
+    );
+  });
+
+  it("restores in place and propagates the new local state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))),
+    );
+    const onArchiveChange = vi.fn();
+    render(CommandMenu, {
+      props: { sessionId: "session.jsonl", archived: true, onArchiveChange },
+    });
+    await tick();
+
+    await fireEvent.click(document.querySelector('[data-action="archive"]') ?? document.body);
+    await waitFor(() => expect(onArchiveChange).toHaveBeenCalledWith(false));
+    expect(window.location.pathname).toBe("/session");
   });
 });

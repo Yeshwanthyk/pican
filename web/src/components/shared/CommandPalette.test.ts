@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/svelte";
 import CommandPalette from "./CommandPalette.svelte";
 import {
+  fetchPaletteSessions,
   filterPaletteSessions,
   normalizePaletteSession,
   prioritizePinnedPaletteSessions,
@@ -106,5 +107,34 @@ describe("CommandPalette", () => {
     await fireEvent.keyDown(window, { key: "Escape" });
     expect(input).toHaveValue("");
     expect(onQueryChange).toHaveBeenLastCalledWith("");
+  });
+
+  it("uses focused home for an empty query and global all for typed search", async () => {
+    const urls: string[] = [];
+    const fetchImpl = async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return new Response(JSON.stringify({ sessions: [], total: 0 }));
+    };
+
+    await fetchPaletteSessions({ fetchImpl, query: "" });
+    await fetchPaletteSessions({ fetchImpl, query: " needle " });
+
+    expect(urls).toEqual([
+      "/api/sessions?view=home&limit=50",
+      "/api/sessions?view=all&q=needle&limit=50",
+    ]);
+    expect(urls.every((url) => !url.includes("project="))).toBe(true);
+  });
+
+  it("keeps typed search inside the explicit archived view", async () => {
+    const urls: string[] = [];
+    const fetchImpl = async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return new Response(JSON.stringify({ sessions: [], total: 0 }));
+    };
+
+    await fetchPaletteSessions({ fetchImpl, query: "old", view: "archived" });
+
+    expect(urls).toEqual(["/api/sessions?view=archived&q=old&limit=50"]);
   });
 });

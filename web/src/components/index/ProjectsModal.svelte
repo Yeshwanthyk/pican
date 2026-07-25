@@ -9,29 +9,21 @@
   interface Props {
     open?: boolean;
     projects?: ReadonlyArray<Project>;
-    filterEnabled?: boolean;
     error?: string;
     busy?: boolean;
     onClose?: () => void;
-    onToggleProject?: (path: string, enabled: boolean) => MaybePromise;
-    onToggleAll?: (enabled: boolean) => MaybePromise;
-    onToggleFilter?: (enabled: boolean) => MaybePromise;
-    onRegister?: (path: string) => MaybePromise;
-    onRemove?: (path: string) => MaybePromise;
+    onTrack?: (path: string) => MaybePromise;
+    onUntrack?: (path: string) => MaybePromise;
   }
 
   let {
     open = false,
     projects = [],
-    filterEnabled = false,
     error = '',
     busy = false,
     onClose = () => {},
-    onToggleProject = async () => {},
-    onToggleAll = async () => {},
-    onToggleFilter = async () => {},
-    onRegister = async () => {},
-    onRemove = async () => {},
+    onTrack = async () => {},
+    onUntrack = async () => {},
   }: Props = $props();
 
   let query = $state('');
@@ -46,12 +38,11 @@
           .includes(query.trim().toLowerCase()),
     ),
   );
-  const allEnabled = $derived(projects.length > 0 && projects.every((p) => p.enabled));
 
-  async function registerProject() {
+  async function trackPath() {
     const path = addPath.trim();
     if (!path) return;
-    await onRegister(path);
+    await onTrack(path);
     addPath = '';
   }
 </script>
@@ -78,84 +69,48 @@
         onclick={onClose}
       >
         <span aria-hidden="true">{@html icon(ArrowLeft, { size: 16 })}</span>
-        <span>{t('index.manageProjectsTitle')}</span>
+        <span>{t('index.manageTrackedProjects')}</span>
       </button>
     </div>
-    <h2>{t('index.manageProjectsTitle')}</h2>
-    <label class="projects-filter-switch">
-      <span class="projects-filter-text">
-        <span class="projects-filter-title">{t('index.filterProjects')}</span>
-        <span class="projects-filter-desc" id="projectsFilterDesc"
-          >{filterEnabled ? t('index.filterOnDesc') : t('index.filterOffDesc')}</span
-        >
-      </span>
-      <span class="switch"
-        ><input
-          type="checkbox"
-          id="projectsFilterToggle"
-          checked={filterEnabled}
-          disabled={busy}
-          onchange={(e) => onToggleFilter(e.currentTarget.checked)}
-        /><span class="switch-slider"></span></span
-      >
-    </label>
-    <div class="projects-config" id="projectsConfig" class:filter-off={!filterEnabled}>
-      <div class="projects-toolbar">
-        <input
-          type="search"
-          id="projectsSearch"
-          class="projects-search"
-          placeholder={t('index.searchProjects')}
-          autocomplete="off"
-          bind:value={query}
-        />
-        <button
-          class="projects-bulk-btn"
-          id="projectsToggleAllBtn"
-          type="button"
-          disabled={busy || projects.length === 0}
-          data-target={allEnabled ? 'disable' : 'enable'}
-          onclick={() => onToggleAll(!allEnabled)}
-          >{allEnabled ? t('index.deselectAll') : t('index.selectAll')}</button
-        >
-      </div>
-      <div class="projects-list" id="projectsList" data-projects-list>
-        {#if projects.length === 0}
-          <div class="projects-empty">{t('index.noProjectsFound')}</div>
-        {:else if visibleProjects.length === 0}
-          <div class="projects-empty" data-projects-no-results>{t('index.noProjectsMatch')}</div>
-        {:else}
-          {#each visibleProjects as project (project.path)}
-            <div class="project-row" data-path={project.path}>
-              <input
-                type="checkbox"
-                checked={!!project.enabled}
-                disabled={busy}
-                onchange={(e) => onToggleProject(project.path, e.currentTarget.checked)}
-              />
-              <button
-                type="button"
-                class="project-row-name"
-                disabled={busy}
-                onclick={() => onToggleProject(project.path, !project.enabled)}
-                ><bdi>{project.path}</bdi></button
-              >
-              <span class="project-row-count">{sessionsCountLabel(project.sessionCount || 0)}</span>
-              {#if project.source === 'registered'}
-                <button
-                  type="button"
-                  class="project-row-remove"
-                  disabled={busy}
-                  onclick={() => onRemove(project.path)}>{t('index.removeProject')}</button
-                >
-              {/if}
-            </div>
-          {/each}
-        {/if}
-      </div>
+    <h2>{t('index.manageTrackedProjects')}</h2>
+    <p class="projects-modal-intro">{t('index.trackedProjectsHint')}</p>
+    <div class="projects-toolbar">
+      <input
+        type="search"
+        id="projectsSearch"
+        class="projects-search"
+        placeholder={t('index.searchProjects')}
+        autocomplete="off"
+        bind:value={query}
+      />
+    </div>
+    <div class="projects-list" id="projectsList" data-projects-list>
+      {#if projects.length === 0}
+        <div class="projects-empty">{t('index.noProjectsFound')}</div>
+      {:else if visibleProjects.length === 0}
+        <div class="projects-empty" data-projects-no-results>{t('index.noProjectsMatch')}</div>
+      {:else}
+        {#each visibleProjects as project (project.path)}
+          <div class="project-row" data-path={project.path}>
+            <button
+              type="button"
+              class="project-track-toggle"
+              class:project-track-toggle--tracked={!!project.tracked}
+              disabled={busy}
+              aria-pressed={!!project.tracked}
+              onclick={() => (project.tracked ? onUntrack(project.path) : onTrack(project.path))}
+              >{project.tracked
+                ? t('index.removeTrackedProject')
+                : t('index.addTrackedProject')}</button
+            >
+            <div class="project-row-name" title={project.path}><bdi>{project.path}</bdi></div>
+            <span class="project-row-count">{sessionsCountLabel(project.sessionCount || 0)}</span>
+          </div>
+        {/each}
+      {/if}
     </div>
     <div class="projects-footer">
-      <label class="projects-footer-label" for="projectsAddPath">{t('index.registerFolder')}</label>
+      <label class="projects-footer-label" for="projectsAddPath">{t('index.addProjectPath')}</label>
       <input
         type="text"
         id="projectsAddPath"
@@ -164,7 +119,7 @@
         onkeydown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            registerProject();
+            trackPath();
           }
         }}
       />
@@ -178,7 +133,7 @@
           id="projectsAddBtn"
           type="button"
           disabled={busy || !addPath.trim()}
-          onclick={registerProject}>{t('common.add')}</button
+          onclick={trackPath}>{t('index.addProject')}</button
         >
       </div>
     </div>

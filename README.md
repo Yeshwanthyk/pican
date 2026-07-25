@@ -61,7 +61,7 @@ PI_CODING_AGENT_DIR=/path/to/agent    # Pi agent directory override
 
 The installed Codex CLI owns authentication and thread state under `~/.codex`; pican never reads `auth.json`. Codex sessions currently run with `approvalPolicy: never` and `danger-full-access`, equivalent to `codex --yolo`. Claude transcripts under the configured home's `projects/` directory are strictly read-only; pican creates replaceable local projections and runs one installed `claude` stream-json process per active session. Claude browser chat always passes `--dangerously-skip-permissions`; interactive approvals and user questions are not supported.
 
-OpenCode runs as one pican-supervised child bound to an ephemeral loopback port with a generated Basic Auth password. Native OpenCode state remains authoritative; pican's projections are rebuildable. OpenCode supports create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching. Unsupported controls such as archives, steering, queues, attachments, effort, approvals, and questions stay absent and fail closed.
+OpenCode runs as one pican-supervised child bound to an ephemeral loopback port with a generated Basic Auth password. Native OpenCode state remains authoritative; pican's projections are rebuildable. OpenCode supports create/resume, rename, fork/clone, delete, chat/cancel, and model listing/switching. Runtime-native archive, steering, queues, attachments, effort, approvals, and questions stay absent and fail closed. Pican's separate local Archive action only curates navigation and never mutates OpenCode state.
 
 ## Data
 

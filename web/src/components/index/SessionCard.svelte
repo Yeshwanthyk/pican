@@ -6,8 +6,10 @@
   import { showToast } from '../../shared/toast.js';
   import { describeError } from '../../lib/errors';
   import { runtimeDisplay } from '../../lib/runtime-display';
+  import { Archive, ArchiveRestore } from 'lucide';
   import { settle } from '../shared/ui-effect';
   import {
+    defaultUpdateArchive,
     defaultUpdatePin,
     formatElapsed,
     formatRelativeTime,
@@ -35,6 +37,10 @@
   const search = $derived(sessionSearchText(session));
   const metrics = $derived(formatSessionMetrics(session));
   const waiting = $derived(Boolean(session.waitingQuestion));
+  let archived = $state(false);
+  $effect(() => {
+    archived = session.archived;
+  });
   const statusElapsed = $derived(
     formatElapsed(
       waiting
@@ -44,8 +50,19 @@
     ),
   );
   const pinLabel = $derived(session.pinned ? t('index.unpinSession') : t('index.pinSession'));
+  const archiveLabel = $derived(archived ? t('index.restoreSession') : t('index.archiveSession'));
+  const archiveDisabledReason = $derived(
+    archived
+      ? ''
+      : waiting
+        ? t('index.archiveDisabledWaiting')
+        : running
+          ? t('index.archiveDisabledRunning')
+          : '',
+  );
 
   let pinBusy = $state(false);
+  let archiveBusy = $state(false);
 
   function startPrefetch() {
     if (session.id) prefetchSession(session.id);
@@ -64,6 +81,23 @@
       showToast(describeError(result.error.cause) || t('index.networkError'));
     }
     pinBusy = false;
+  }
+
+  async function toggleArchive(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (archiveBusy || archiveDisabledReason || !session.id) return;
+    const next = !archived;
+    archived = next;
+    session.archived = next;
+    archiveBusy = true;
+    const result = await settle(() => defaultUpdateArchive(session.id, next));
+    if (!result.ok) {
+      archived = !next;
+      session.archived = !next;
+      showToast(describeError(result.error.cause) || t('index.archiveUpdateFailed'));
+    }
+    archiveBusy = false;
   }
 </script>
 
@@ -142,6 +176,17 @@
       </span>
     </div>
   </a>
+  <button
+    class="session-ticker-pin"
+    type="button"
+    aria-label={archiveLabel}
+    title={archiveDisabledReason || archiveLabel}
+    disabled={archiveBusy || Boolean(archiveDisabledReason)}
+    style:right="40px"
+    onclick={toggleArchive}
+  >
+    {@html icon(archived ? ArchiveRestore : Archive, { size: 14 })}
+  </button>
   <button
     class="session-ticker-pin"
     class:session-ticker-pin--pinned={session.pinned}

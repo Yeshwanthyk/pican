@@ -4,7 +4,6 @@
   import { icon, X } from '../../shared/icons';
   import { t } from '../../shared/strings';
   import {
-    defaultSessionPaletteCwd,
     fetchPaletteSessions,
     filterPaletteSessions,
     normalizePaletteSession,
@@ -25,7 +24,7 @@
     readonly loadSessions?:
       | ((options: LoadOptions) => PromiseLike<ReadonlyArray<PaletteSessionInput>>)
       | null;
-    readonly getCwd?: () => string;
+    readonly view?: 'home' | 'all' | 'archived';
     readonly onOpen?: (() => void) | null;
     readonly onClose?: (() => void) | null;
     readonly onQueryChange?: ((query: string) => void) | null;
@@ -39,7 +38,7 @@
   let {
     limit = 8,
     loadSessions = null,
-    getCwd = () => defaultSessionPaletteCwd(),
+    view = 'home',
     onOpen = null,
     onClose = null,
     onQueryChange = null,
@@ -95,7 +94,7 @@
     error = '';
     const loader =
       loadSessions ||
-      (() => fetchPaletteSessions({ fetchImpl: effectiveFetch, getCwd, query, limit: 50 }));
+      (() => fetchPaletteSessions({ fetchImpl: effectiveFetch, query, limit: 50, view }));
     const result = await settle(() =>
       loader({ query, documentImpl: document, windowImpl: window }),
     );

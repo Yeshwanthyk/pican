@@ -7,6 +7,7 @@ import {
   formatSessionMetrics,
   groupSessionsByDate,
   groupSessionsByProject,
+  groupTrackedProjectSessions,
   normalizeRuntimesResponse,
   normalizeSession,
   sessionModelLabel,
@@ -14,6 +15,7 @@ import {
   splitPinnedSessions,
   splitHomeSessions,
   shouldRefetchOnReload,
+  sessionsURL,
 } from "./sessions.js";
 
 describe("index sessions helpers", () => {
@@ -162,6 +164,34 @@ describe("index sessions helpers", () => {
     ]);
     expect(groups.map((g) => g.project)).toEqual(["a", "b"]);
     expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["1", "3"]);
+  });
+
+  it("builds bounded groups for every explicitly tracked project", () => {
+    const sessions = Array.from({ length: 8 }, (_, index) => ({
+      id: `a-${index}`,
+      project: "/a",
+      lastActivity: new Date(Date.UTC(2026, 6, 24, 12, index)).toISOString(),
+    }));
+    const groups = groupTrackedProjectSessions(sessions, [
+      { path: "/a", tracked: true, sessionCount: 80 },
+      { path: "/quiet", tracked: true, sessionCount: 0 },
+      { path: "/hidden", tracked: false, sessionCount: 5 },
+    ]);
+
+    expect(groups.map((group) => group.project)).toEqual(["/a", "/quiet"]);
+    expect(groups[0]?.sessions).toHaveLength(6);
+    expect(groups[0]?.total).toBe(80);
+    expect(groups[1]?.sessions).toEqual([]);
+  });
+
+  it("builds explicit scoped session URLs with project precedence", () => {
+    expect(sessionsURL({ view: "home" })).toBe("/api/sessions?view=home");
+    expect(sessionsURL({ view: "all", limit: 100, offset: 100 })).toBe(
+      "/api/sessions?limit=100&offset=100&view=all",
+    );
+    expect(sessionsURL({ view: "archived", project: "/repo with space" })).toBe(
+      "/api/sessions?project=%2Frepo+with+space",
+    );
   });
 
   it("buckets timestamps by recency relative to now", () => {

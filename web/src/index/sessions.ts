@@ -1,7 +1,12 @@
 import { effects } from "../shared/api.js";
 import type { FetchLike } from "../lib/http";
 import { runPromise } from "../lib/runtime";
-import { NewSessionResponseSchema, RuntimesResponseSchema } from "../lib/schema";
+import {
+  NewSessionResponseSchema,
+  RuntimesResponseSchema,
+  SessionListSchema,
+  MutationResponseSchema,
+} from "../lib/schema";
 import type { RecentLocations, RuntimesResponse, Session, SessionList } from "../lib/schema";
 import { t } from "../shared/strings.js";
 import {
@@ -32,6 +37,7 @@ export interface NormalizedSession {
   waitingQuestion: string;
   waitingSince: string;
   waitingOptions: string[];
+  archived: boolean;
 }
 
 export interface NormalizedRuntime {
@@ -76,9 +82,6 @@ interface SessionMetrics {
   readonly costTotal?: number | null;
 }
 
-export const layoutStorageKey = "pican:view-layout";
-export const collapsedProjectsStorageKey = "pican:collapsed-projects";
-
 export const sessionsCountLabel = (n: number): string =>
   n === 1 ? t("index.sessionCountOne") : t("index.sessionsCount", { count: n });
 
@@ -106,6 +109,7 @@ export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession 
     waitingQuestion: raw.waitingQuestion || raw.WaitingQuestion || "",
     waitingSince: raw.waitingSince || raw.WaitingSince || "",
     waitingOptions: [...(raw.waitingOptions || raw.WaitingOptions || [])],
+    archived: raw.archived ?? raw.Archived ?? false,
   };
 }
 
@@ -321,6 +325,53 @@ export interface ProjectSessionGroup<T> {
   readonly index: number;
 }
 
+export interface TrackedProjectGroup<T> {
+  readonly project: string;
+  readonly sessions: T[];
+  readonly total: number;
+  readonly latest: number;
+}
+
+export function groupTrackedProjectSessions<
+  T extends SessionActivity & { readonly project?: string },
+>(
+  sessions: ReadonlyArray<T>,
+  projects: ReadonlyArray<{
+    readonly path: string;
+    readonly tracked?: boolean;
+    readonly sessionCount?: number;
+  }>,
+): Array<TrackedProjectGroup<T>> {
+  const sessionsByProject = new Map<string, T[]>();
+  for (const session of sessions) {
+    const project = session.project || "";
+    const group = sessionsByProject.get(project) || [];
+    group.push(session);
+    sessionsByProject.set(project, group);
+  }
+
+  return projects
+    .filter((project) => project.tracked)
+    .map((project) => {
+      const projectSessions = [...(sessionsByProject.get(project.path) || [])]
+        .sort((a, b) => activityMs(b) - activityMs(a))
+        .slice(0, 6);
+      return {
+        project: project.path,
+        sessions: projectSessions,
+        total: project.sessionCount || 0,
+        latest:
+          projectSessions.length > 0 ? activityMs(projectSessions[0]) : Number.NEGATIVE_INFINITY,
+      };
+    })
+    .sort((a, b) => b.latest - a.latest || a.project.localeCompare(b.project));
+}
+
+export function projectDisplayName(path: string): string {
+  const normalized = path.replace(/\/+$/, "");
+  return normalized.slice(normalized.lastIndexOf("/") + 1) || path;
+}
+
 export function groupSessionsByProject<T extends SessionActivity & { readonly project?: string }>(
   sessions: ReadonlyArray<T> = [],
 ): Array<ProjectSessionGroup<T>> {
@@ -393,10 +444,29 @@ export function groupSessionsByDate<T extends SessionActivity>(
     });
 }
 
-export function defaultFetchSessions(
-  values: { readonly limit?: number; readonly offset?: number; readonly query?: string } = {},
-): Promise<SessionList> {
-  return runPromise(effects.sessions.list(values));
+export type SessionView = "home" | "all" | "archived";
+
+export interface SessionQuery {
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly query?: string;
+  readonly view?: SessionView;
+  readonly project?: string;
+}
+
+export function sessionsURL(values: SessionQuery = {}): string {
+  const params = new URLSearchParams();
+  if (values.limit !== undefined) params.set("limit", String(values.limit));
+  if (values.offset !== undefined) params.set("offset", String(values.offset));
+  if (values.query) params.set("q", values.query);
+  if (values.project) params.set("project", values.project);
+  else if (values.view) params.set("view", values.view);
+  const encoded = params.toString();
+  return encoded ? `/api/sessions?${encoded}` : "/api/sessions";
+}
+
+export function defaultFetchSessions(values: SessionQuery = {}): Promise<SessionList> {
+  return runPromise(effects.get(sessionsURL(values), SessionListSchema));
 }
 export function defaultFetchRecent(): Promise<RecentLocations> {
   return runPromise(effects.sessions.recentLocations);
@@ -438,4 +508,7 @@ export function defaultUpdateProject(path: string, action: string) {
 }
 export function defaultUpdatePin(sessionId: string, pinned: boolean) {
   return runPromise(effects.sessions.updatePin(sessionId, pinned));
+}
+export function defaultUpdateArchive(sessionId: string, archived: boolean) {
+  return runPromise(effects.post("/api/archives", { sessionId, archived }, MutationResponseSchema));
 }

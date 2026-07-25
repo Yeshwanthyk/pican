@@ -59,6 +59,8 @@ export const SessionSchema = Schema.Struct({
   WaitingSince: optionalNullableString,
   waitingOptions: Schema.optionalKey(Schema.Array(Schema.String)),
   WaitingOptions: Schema.optionalKey(Schema.Array(Schema.String)),
+  archived: optionalNullableBoolean,
+  Archived: optionalNullableBoolean,
   host: optionalNullableString,
   hostUrl: optionalNullableString,
   header: Schema.optionalKey(UnknownRecord),
@@ -80,6 +82,7 @@ export const ProjectSchema = Schema.Struct({
   enabled: Schema.Boolean,
   sessionCount: Schema.Number,
   source: Schema.String,
+  tracked: Schema.optionalKey(Schema.Boolean),
 });
 export type Project = typeof ProjectSchema.Type;
 export const ProjectListSchema = Schema.Struct({

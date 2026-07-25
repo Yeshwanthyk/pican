@@ -1,34 +1,48 @@
 <script lang="ts">
-  import { icon, MoreHorizontal, CalendarClock } from '../../shared/icons.js';
+  import { icon, ArrowLeft, CalendarClock, MoreHorizontal } from '../../shared/icons.js';
+  import { handleNavClick } from '../../shared/navigation.js';
   import { t } from '../../shared/strings.js';
-
-  type Layout = 'timeline' | 'projects';
+  import type { SessionView } from '../../index/sessions.js';
 
   interface Props {
-    layout?: Layout;
-    totalSessionsLabel?: string;
+    view?: SessionView;
+    project?: string;
+    projectName?: string;
+    summaryLabel?: string;
     runningCount?: number;
     waitingCount?: number;
     menuOpen?: boolean;
     onSearch?: () => void;
     onNewSession?: () => void;
+    onAddProject?: () => void;
     onToggleMenu?: () => void;
-    onLayoutChange?: (layout: Layout) => void;
     onSchedules?: () => void;
   }
 
   let {
-    layout = 'timeline',
-    totalSessionsLabel = t('index.sessionsCount', { count: 0 }),
+    view = 'home',
+    project = '',
+    projectName = '',
+    summaryLabel = '',
     runningCount = 0,
     waitingCount = 0,
     menuOpen = false,
     onSearch = () => {},
     onNewSession = () => {},
+    onAddProject = () => {},
     onToggleMenu = () => {},
-    onLayoutChange = () => {},
     onSchedules = () => {},
   }: Props = $props();
+
+  const scopes: ReadonlyArray<{
+    readonly view: SessionView;
+    readonly href: string;
+    readonly key: string;
+  }> = [
+    { view: 'home', href: '/', key: 'index.scopeProjects' },
+    { view: 'all', href: '/?view=all', key: 'index.scopeAll' },
+    { view: 'archived', href: '/?view=archived', key: 'index.scopeArchived' },
+  ];
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG -->
@@ -37,10 +51,21 @@
   <div class="header-inner">
     <div class="header-identity">
       <img class="pi-logo-mark" src="/app-icon.png" alt="" aria-hidden="true" />
-      <span class="header-title-desktop">{t('index.title')}</span>
-      <span class="header-title-mobile">{t('index.mobileTitle')}</span>
+      {#if project}
+        <a
+          class="project-back"
+          href="/"
+          aria-label={t('index.backToProjects')}
+          onclick={(event) => handleNavClick(event, '/')}>{@html icon(ArrowLeft, { size: 15 })}</a
+        >
+        <span class="header-project-name">{projectName}</span>
+        <span class="header-project-path" title={project}>{project}</span>
+      {:else}
+        <span class="header-title-desktop">{t('index.title')}</span>
+        <span class="header-title-mobile">{t('index.mobileTitle')}</span>
+      {/if}
       <div class="workspace-stats" data-total-count>
-        <span>{totalSessionsLabel}</span>
+        {#if summaryLabel}<span>{summaryLabel}</span>{/if}
         {#if runningCount > 0}
           <span class="workspace-stat-running"
             >{t('index.runningCount', { count: runningCount })}</span
@@ -55,20 +80,22 @@
       </div>
     </div>
     <div class="header-actions">
-      <div class="layout-toggle" aria-label={t('index.sessionLayout')}>
-        <button
-          type="button"
-          data-layout-btn="timeline"
-          aria-pressed={layout === 'timeline'}
-          onclick={() => onLayoutChange('timeline')}>{t('index.layoutTimeline')}</button
-        >
-        <button
-          type="button"
-          data-layout-btn="projects"
-          aria-pressed={layout === 'projects'}
-          onclick={() => onLayoutChange('projects')}>{t('index.layoutProjects')}</button
-        >
-      </div>
+      {#if !project}
+        <nav class="scope-toggle" aria-label={t('index.sessionScope')}>
+          {#each scopes as scope}
+            <a
+              href={scope.href}
+              aria-current={view === scope.view ? 'page' : undefined}
+              onclick={(event) => handleNavClick(event, scope.href)}>{t(scope.key)}</a
+            >
+          {/each}
+        </nav>
+        {#if view === 'home'}
+          <button class="header-add-project" type="button" onclick={onAddProject}
+            >{t('index.addProject')}</button
+          >
+        {/if}
+      {/if}
       <button
         class="nav-search-btn"
         id="open-search"

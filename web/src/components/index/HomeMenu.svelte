@@ -5,7 +5,9 @@
     SquarePen,
     FolderGit2,
     CalendarClock,
+    Layers,
     ListTree,
+    Snowflake,
     Settings,
     Tag,
   } from '../../shared/icons.js';
@@ -17,8 +19,6 @@
     onClose?: () => void;
     onNewSession?: () => void;
     onManageProjects?: () => void;
-    layout?: 'timeline' | 'projects';
-    onLayoutChange?: (layout: 'timeline' | 'projects') => void;
     onSchedules?: () => void;
   }
 
@@ -27,10 +27,14 @@
     onClose = () => {},
     onNewSession = () => {},
     onManageProjects = () => {},
-    layout = 'timeline',
-    onLayoutChange = () => {},
     onSchedules = () => {},
   }: Props = $props();
+
+  const scopes = [
+    { href: '/', label: 'index.scopeProjects', icon: Layers },
+    { href: '/?view=all', label: 'index.scopeAll', icon: ListTree },
+    { href: '/?view=archived', label: 'index.scopeArchived', icon: Snowflake },
+  ] as const;
 
   function handleBackdropClick(e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
@@ -38,7 +42,7 @@
   }
 </script>
 
-<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
+<!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG -->
 
 <div
   id="web-menu-backdrop"
@@ -64,6 +68,21 @@
   onclick={(e) => e.stopPropagation()}
   onkeydown={() => {}}
 >
+  <div class="web-menu-section web-menu-scopes">
+    {#each scopes as scope}
+      <a
+        class="web-menu-item"
+        href={scope.href}
+        role="menuitem"
+        onclick={(event) => {
+          onClose();
+          handleNavClick(event, scope.href);
+        }}
+        ><span class="menu-item-label">{@html icon(scope.icon, { size: 15 })}{t(scope.label)}</span
+        ></a
+      >
+    {/each}
+  </div>
   <div class="web-menu-section">
     <button
       class="web-menu-item"
@@ -89,22 +108,7 @@
         onManageProjects();
       }}
       ><span class="menu-item-label"
-        >{@html icon(FolderGit2, { size: 15 })}{t('index.manageProjects')}</span
-      ></button
-    >
-    <button
-      class="web-menu-item"
-      type="button"
-      data-layout-menu-btn
-      role="menuitem"
-      onclick={() => {
-        onClose();
-        onLayoutChange(layout === 'timeline' ? 'projects' : 'timeline');
-      }}
-      ><span class="menu-item-label"
-        >{@html icon(ListTree, { size: 15 })}{layout === 'timeline'
-          ? t('index.layoutProjects')
-          : t('index.layoutTimeline')}</span
+        >{@html icon(FolderGit2, { size: 15 })}{t('index.addRemoveProjects')}</span
       ></button
     >
     <button
