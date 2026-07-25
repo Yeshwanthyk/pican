@@ -46,7 +46,7 @@ describe("SessionsList focused home", () => {
     );
   });
 
-  it("preserves a session row when live state moves it into Now", async () => {
+  it("preserves a tracked session row in its project when live state changes", async () => {
     const project = "/Users/example/live";
     const value = normalizeSession({
       id: "live-session",
@@ -77,18 +77,19 @@ describe("SessionsList focused home", () => {
       runningSessionIds: new Set(["live-session"]),
     });
 
-    const movedRow = container.querySelector<HTMLElement>(
-      '[data-bucket="now"] .session-ticker-row',
+    const stableRow = container.querySelector<HTMLElement>(
+      `[data-project="${project}"] .session-ticker-row`,
     );
-    expect(movedRow).toBe(row);
+    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBeNull();
+    expect(stableRow).toBe(row);
     expect(
-      within(movedRow as HTMLElement).getByRole("button", {
+      within(stableRow as HTMLElement).getByRole("button", {
         name: "More session actions",
       }),
     ).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("preserves a session row when waiting metadata moves it into Now", async () => {
+  it("preserves a tracked session row in its project when waiting metadata changes", async () => {
     const project = "/Users/example/waiting";
     const value = normalizeSession({
       id: "waiting-session",
@@ -117,6 +118,7 @@ describe("SessionsList focused home", () => {
       ],
     });
 
-    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBe(row);
+    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBeNull();
+    expect(container.querySelector(`[data-project="${project}"] .session-ticker-row`)).toBe(row);
   });
 });

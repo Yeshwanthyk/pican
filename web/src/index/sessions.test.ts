@@ -302,6 +302,30 @@ describe("index sessions helpers", () => {
     expect(split.pinned.map((session) => session.id)).toEqual(["running-pin", "waiting-pin"]);
   });
 
+  it("keeps running and waiting sessions inside tracked projects", () => {
+    const split = splitHomeSessions(
+      [
+        {
+          id: "running-tracked",
+          project: "/tracked",
+          lastActivity: "2024-01-04T00:00:00Z",
+        },
+        {
+          id: "waiting-tracked",
+          project: "/tracked",
+          waitingQuestion: "Ship?",
+          lastActivity: "2024-01-03T00:00:00Z",
+        },
+      ],
+      new Set(["running-tracked"]),
+      new Set(["/tracked"]),
+    );
+
+    expect(split.live).toEqual([]);
+    expect(split.waiting).toEqual([]);
+    expect(split.rest.map((session) => session.id)).toEqual(["running-tracked", "waiting-tracked"]);
+  });
+
   it("preserves known home rows across refreshes and prepends genuinely new sessions", () => {
     const previous = [
       { id: "a", lastActivity: "2024-01-01T00:00:00Z" },

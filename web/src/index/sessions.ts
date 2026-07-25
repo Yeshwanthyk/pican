@@ -139,15 +139,21 @@ export function stabilizeHomeSessionOrder<T extends { readonly id: string }>(
 export function splitHomeSessions<
   T extends SessionActivity & {
     readonly id: string;
+    readonly project?: string;
     readonly pinned?: boolean;
     readonly waitingQuestion?: string;
   },
->(sessions: ReadonlyArray<T>, runningIds: ReadonlySet<string>): HomeSessionSplit<T> {
+>(
+  sessions: ReadonlyArray<T>,
+  runningIds: ReadonlySet<string>,
+  trackedProjects: ReadonlySet<string> = new Set(),
+): HomeSessionSplit<T> {
   const live: T[] = [];
   const waiting: T[] = [];
   const lower: T[] = [];
   for (const session of sessions) {
     if (session.pinned) lower.push(session);
+    else if (trackedProjects.has(session.project || "")) lower.push(session);
     else if (session.waitingQuestion) waiting.push(session);
     else if (runningIds.has(session.id)) live.push(session);
     else lower.push(session);

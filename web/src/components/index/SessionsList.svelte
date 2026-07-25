@@ -83,10 +83,11 @@
   let now = $state(Date.now());
 
   const isHome = $derived(!project && view === 'home');
-  const split = $derived(splitHomeSessions(sessions, runningSessionIds));
+  const trackedProjects = $derived(projects.filter((candidate) => candidate.tracked));
+  const trackedProjectPaths = $derived(new Set(trackedProjects.map((candidate) => candidate.path)));
+  const split = $derived(splitHomeSessions(sessions, runningSessionIds, trackedProjectPaths));
   const nowSessions = $derived([...split.live, ...split.waiting]);
   const pinnedSessions = $derived(split.pinned);
-  const trackedProjects = $derived(projects.filter((candidate) => candidate.tracked));
   const projectGroups = $derived(groupTrackedProjectSessions(split.rest, projects));
   const timelineGroups = $derived(groupSessionsByDate(isHome ? [] : sessions, now));
   const homeFeed = $derived.by(() => {
