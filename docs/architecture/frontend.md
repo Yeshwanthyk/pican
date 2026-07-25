@@ -82,17 +82,17 @@ The old runners/renderers have been replaced by Svelte components plus focused h
 
 The index + settings Phase 4 migration is complete: those routes are Svelte-orchestrated too, with only pure/API helpers left outside components.
 
-Pinned sessions are also available directly from the live session header. The
-centered title opens `PinnedSessionSwitcher.svelte`: an anchored popover on
-desktop and a bottom sheet on mobile. The optional pinned-session tabs setting
-adds a compact strip below the desktop header and status-aware chips below the
-mobile composer, including a temporary guest tab for the current unpinned
-session. All three surfaces consume one `SessionShell`-owned
-`PinnedTabsModel`, whose bounded `GET /api/sessions?view=home` snapshot already
-contains every unarchived pin in stable SQLite pin order. When tabs are enabled,
-that model owns one global status subscription for running state and refreshes
-the bounded snapshot after relevant throttled reloads, curation changes, and
-reconnects; when disabled, the header switcher loads lazily and opens no
+The optional pinned-session tabs setting adds a compact strip below the desktop
+header and status-aware chips below the mobile composer, including a temporary
+guest tab for the current unpinned session. Both projections consume one
+`SessionShell`-owned `PinnedTabsModel`, whose bounded
+`GET /api/sessions?view=home` snapshot contains every unarchived pin in stable
+SQLite pin order. While enabled, tabs/chips are the only pinned-session
+navigation: the header renders static runtime, title, and shortened working
+directory context, and the legacy `PinnedSessionSwitcher.svelte` is not
+mounted. Mobile keeps Tree out of both the fixed header and action sheet;
+desktop retains it for branch navigation. When tabs are disabled, the centered
+header title keeps the lazy anchored popover/mobile bottom sheet and opens no
 persistent global stream. Pin mutations update optimistically, reconcile from
 the native pican curation state, and roll back on failure. The command palette
 remains the broader session-search path.

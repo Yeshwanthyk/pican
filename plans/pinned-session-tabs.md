@@ -134,8 +134,10 @@ Capacity:
 - the current pinned session must remain visible even if it falls outside the
   first eight pins; replace the last visible inactive pin, then retain server
   pin order among the visible set; and
-- the centered header title continues to open the complete pinned-session
-  switcher for overflow. Do not add a second overflow menu.
+- while tabs are enabled, the centered header becomes non-interactive session
+  context: runtime, current title, and shortened working directory. Tabs own
+  pinned-session navigation; do not preserve the old title-triggered switcher
+  as a duplicate path.
 
 ### 3.2 Mobile chips (≤900px, session page only)
 
@@ -184,14 +186,18 @@ Capacity:
 
 - preserve the active/guest chip's 136px minimum before adding idle chips;
 - a small component-local `ResizeObserver` computes
-  `floor((rowWidth - activeMinimum) / 45)` and clamps the ordered idle pins;
+  `floor((rowWidth - activeMinimum - createSlot) / 45)` and clamps the ordered
+  idle pins;
 - the current session is always present; and
-- overflow stays reachable through the header's existing bottom sheet. Do not
-  add horizontal scrolling or a second mobile menu.
+- the row ends with a 40px `+` chip when the runtime can create sessions.
+
+The active chip owns the explicit Pin/Unpin action. Do not add horizontal
+scrolling, a title-triggered bottom sheet, or another pinned-session navigation
+surface. The existing session search remains available from the command menu.
 
 ### 3.3 States and edge cases
 
-- Zero pins: show only the guest tab/chip and desktop `+`.
+- Zero pins: show only the guest tab/chip and the runtime-gated `+`.
 - Feature off: render no new strip/chips and preserve every existing layout
   offset. The header's current pinned-session switcher still works.
 - Missing/orphaned pin: omit it because `view=home` returns only resolvable
@@ -247,10 +253,16 @@ Capacity:
   5 model with explicit `start()`, `load()`, mutation, and `dispose()` methods.
 - Construct/dispose it with `SessionShell`; never retain it across a
   session-page remount.
-- Refactor `PinnedSessionSwitcher.svelte` to consume the same instance. Keep
-  its anchored desktop popover, mobile bottom sheet, search action, and current
-  pin/unpin action visually unchanged.
+- Refactor `PinnedSessionSwitcher.svelte` to consume the same instance.
+  Feature-off sessions keep its anchored desktop popover/mobile bottom sheet,
+  search action, and current pin/unpin action. Feature-on sessions do not mount
+  it: the desktop tabs and mobile chips are the sole pinned navigation.
 - Replace its false `limit=1` test fixture with a truthful `view=home` payload.
+
+On mobile, reduce the fixed header to a back affordance, a two-line context
+block (session title plus shortened working directory), and session actions.
+Hide the Tree shortcut there and omit Tree from the mobile command sheet;
+desktop keeps Tree for branch-heavy sessions.
 
 ### 5.3 Desktop strip and offsets
 
@@ -272,6 +284,8 @@ Capacity:
 - Add `web/src/components/session/PinnedChips.svelte` at both resolved
   `ChatComposer` mount points from §3.2.
 - Pass the shared model and current-session fallback presentation explicitly.
+- Pass the current runtime's create capability so the row can own the mobile
+  new-session action.
 - Let the current composer height observer include the added row; do not add a
   second keyboard/visual-viewport controller.
 - Hide chips above 900px with the existing breakpoint.
