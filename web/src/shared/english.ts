@@ -26,7 +26,6 @@ export default {
 
   // ── Sessions index ──
   "index.title": "pican",
-  "index.mobileTitle": "π sessions",
   "index.searchSessions": "Search sessions...",
   "index.sessionsCount": "{count} sessions",
   "index.sessionCountOne": "1 session",

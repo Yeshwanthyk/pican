@@ -62,7 +62,6 @@
         <span class="header-project-path" title={project}>{project}</span>
       {:else}
         <span class="header-title-desktop">{t('index.title')}</span>
-        <span class="header-title-mobile">{t('index.mobileTitle')}</span>
       {/if}
       <div class="workspace-stats" data-total-count>
         {#if summaryLabel}<span>{summaryLabel}</span>{/if}

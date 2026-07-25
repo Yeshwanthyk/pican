@@ -37,6 +37,35 @@
     onAddProject?: () => void;
   }
 
+  type HomeFeedItem =
+    | {
+        readonly kind: 'section';
+        readonly key: string;
+        readonly bucket: 'now' | 'pinned';
+        readonly label: string;
+        readonly count: number;
+        readonly spaced: boolean;
+      }
+    | {
+        readonly kind: 'project';
+        readonly key: string;
+        readonly project: string;
+        readonly total: number;
+        readonly spaced: boolean;
+      }
+    | {
+        readonly kind: 'empty-project';
+        readonly key: string;
+        readonly project: string;
+      }
+    | {
+        readonly kind: 'session';
+        readonly key: string;
+        readonly bucket?: 'now' | 'pinned';
+        readonly project?: string;
+        readonly session: NormalizedSession;
+      };
+
   let {
     sessions = [],
     projects = [],
@@ -60,6 +89,56 @@
   const trackedProjects = $derived(projects.filter((candidate) => candidate.tracked));
   const projectGroups = $derived(groupTrackedProjectSessions(split.rest, projects));
   const timelineGroups = $derived(groupSessionsByDate(isHome ? [] : sessions, now));
+  const homeFeed = $derived.by(() => {
+    const items: HomeFeedItem[] = [];
+    const addSection = (
+      bucket: 'now' | 'pinned',
+      label: string,
+      groupedSessions: ReadonlyArray<NormalizedSession>,
+    ) => {
+      if (groupedSessions.length === 0) return;
+      items.push({
+        kind: 'section',
+        key: `section:${bucket}`,
+        bucket,
+        label,
+        count: groupedSessions.length,
+        spaced: items.length > 0,
+      });
+      for (const session of groupedSessions) {
+        items.push({ kind: 'session', key: `session:${session.id}`, bucket, session });
+      }
+    };
+
+    addSection('now', t('index.now'), nowSessions);
+    addSection('pinned', t('index.pinned'), pinnedSessions);
+    for (const group of projectGroups) {
+      items.push({
+        kind: 'project',
+        key: `project:${group.project}`,
+        project: group.project,
+        total: group.total,
+        spaced: items.length > 0,
+      });
+      if (group.sessions.length === 0) {
+        items.push({
+          kind: 'empty-project',
+          key: `project-empty:${group.project}`,
+          project: group.project,
+        });
+        continue;
+      }
+      for (const session of group.sessions) {
+        items.push({
+          kind: 'session',
+          key: `session:${session.id}`,
+          project: group.project,
+          session,
+        });
+      }
+    }
+    return items;
+  });
 
   onMount(() => {
     const timer = setInterval(() => {
@@ -82,42 +161,55 @@
       <div class="plain-state-hint">{t('index.loadingSessionsHint')}</div>
     </div>
   {:else if isHome}
-    {#if nowSessions.length > 0}
-      <section class="timeline-section timeline-section--now" data-bucket="now">
-        <div class="date-separator">
-          <span class="date-separator-label">{t('index.now')}</span>
-          <span class="date-separator-count">{sessionsCountLabel(nowSessions.length)}</span>
-        </div>
-        <div class="session-grid">
-          {#each nowSessions as session (session.id)}
+    <div class="home-feed" data-home-feed>
+      {#each homeFeed as item (item.key)}
+        {#if item.kind === 'section'}
+          <div
+            class="date-separator home-feed-heading"
+            class:home-feed-heading--spaced={item.spaced}
+            data-bucket={item.bucket}
+          >
+            <span class="date-separator-label">{item.label}</span>
+            <span class="date-separator-count">{sessionsCountLabel(item.count)}</span>
+          </div>
+        {:else if item.kind === 'project'}
+          <div
+            class="project-toggle project-toggle--static home-feed-heading"
+            class:home-feed-heading--spaced={item.spaced}
+            data-project={item.project}
+          >
+            <a
+              class="project-name"
+              href={'/?project=' + encodeURIComponent(item.project)}
+              title={item.project}
+              onclick={(event) =>
+                handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
+              >{item.project}</a
+            >
+            <a
+              class="project-count project-view-all"
+              href={'/?project=' + encodeURIComponent(item.project)}
+              onclick={(event) =>
+                handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
+              >{t('index.viewAllCount', { count: item.total })}</a
+            >
+          </div>
+        {:else if item.kind === 'empty-project'}
+          <div class="project-empty-preview" data-project={item.project}>
+            {t('index.noProjectSessions')}
+          </div>
+        {:else}
+          <div class="home-feed-session" data-bucket={item.bucket} data-project={item.project}>
             <SessionCard
-              {session}
-              running={runningSessionIds.has(session.id)}
-              runningStatus={runningStatuses.get(session.id)}
+              session={item.session}
+              running={runningSessionIds.has(item.session.id)}
+              runningStatus={runningStatuses.get(item.session.id)}
               {now}
             />
-          {/each}
-        </div>
-      </section>
-    {/if}
-    {#if pinnedSessions.length > 0}
-      <section class="timeline-section" data-bucket="pinned">
-        <div class="date-separator">
-          <span class="date-separator-label">{t('index.pinned')}</span>
-          <span class="date-separator-count">{sessionsCountLabel(pinnedSessions.length)}</span>
-        </div>
-        <div class="session-grid">
-          {#each pinnedSessions as session (session.id)}
-            <SessionCard
-              {session}
-              running={runningSessionIds.has(session.id)}
-              runningStatus={runningStatuses.get(session.id)}
-              {now}
-            />
-          {/each}
-        </div>
-      </section>
-    {/if}
+          </div>
+        {/if}
+      {/each}
+    </div>
     {#if trackedProjects.length === 0}
       <div class="empty-state plain-state tracked-projects-empty" data-empty="tracked-projects">
         <div class="plain-state-line">{t('index.noTrackedProjects')}</div>
@@ -131,42 +223,6 @@
           >{t('index.addProject')}</button
         >
       </div>
-    {:else}
-      {#each projectGroups as group (group.project)}
-        <section class="project-group" data-project={group.project}>
-          <div class="project-toggle project-toggle--static">
-            <a
-              class="project-name"
-              href={'/?project=' + encodeURIComponent(group.project)}
-              title={group.project}
-              onclick={(event) =>
-                handleNavClick(event, '/?project=' + encodeURIComponent(group.project))}
-              >{group.project}</a
-            >
-            <a
-              class="project-count project-view-all"
-              href={'/?project=' + encodeURIComponent(group.project)}
-              onclick={(event) =>
-                handleNavClick(event, '/?project=' + encodeURIComponent(group.project))}
-              >{t('index.viewAllCount', { count: group.total })}</a
-            >
-          </div>
-          {#if group.sessions.length > 0}
-            <div class="session-grid">
-              {#each group.sessions as session (session.id)}
-                <SessionCard
-                  {session}
-                  running={runningSessionIds.has(session.id)}
-                  runningStatus={runningStatuses.get(session.id)}
-                  {now}
-                />
-              {/each}
-            </div>
-          {:else}
-            <div class="project-empty-preview">{t('index.noProjectSessions')}</div>
-          {/if}
-        </section>
-      {/each}
     {/if}
   {:else if sessions.length === 0}
     <div class="empty-state plain-state" data-empty={project ? 'project' : view}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/svelte";
+import { fireEvent, render, within } from "@testing-library/svelte";
 import { normalizeSession } from "../../index/sessions";
 import SessionsList from "./SessionsList.svelte";
 
@@ -34,11 +34,89 @@ describe("SessionsList focused home", () => {
       },
     });
 
-    const group = container.querySelector(`[data-project="${project}"]`);
-    expect(group?.querySelectorAll(".session-ticker-row")).toHaveLength(6);
-    expect(group?.querySelector(".project-view-all")).toHaveAttribute(
+    const heading = container.querySelector(`.home-feed-heading[data-project="${project}"]`);
+    expect(
+      container.querySelectorAll(
+        `.home-feed-session[data-project="${project}"] .session-ticker-row`,
+      ),
+    ).toHaveLength(6);
+    expect(heading?.querySelector(".project-view-all")).toHaveAttribute(
       "href",
       "/?project=%2FUsers%2Fexample%2Fnoisy",
     );
+  });
+
+  it("preserves a session row when live state moves it into Now", async () => {
+    const project = "/Users/example/live";
+    const value = normalizeSession({
+      id: "live-session",
+      project,
+      lastActivity: "2026-07-25T12:00:00Z",
+    });
+    const props = {
+      sessions: [value],
+      projects: [
+        { path: project, enabled: true, tracked: true, source: "registered", sessionCount: 1 },
+      ],
+      loading: false,
+      view: "home" as const,
+      runningSessionIds: new Set<string>(),
+    };
+    const { container, rerender } = render(SessionsList, { props });
+    const row = container.querySelector<HTMLElement>(".session-ticker-row");
+    expect(row).not.toBeNull();
+
+    const more = within(row as HTMLElement).getByRole("button", {
+      name: "More session actions",
+    });
+    await fireEvent.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+
+    await rerender({
+      ...props,
+      runningSessionIds: new Set(["live-session"]),
+    });
+
+    const movedRow = container.querySelector<HTMLElement>(
+      '[data-bucket="now"] .session-ticker-row',
+    );
+    expect(movedRow).toBe(row);
+    expect(
+      within(movedRow as HTMLElement).getByRole("button", {
+        name: "More session actions",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("preserves a session row when waiting metadata moves it into Now", async () => {
+    const project = "/Users/example/waiting";
+    const value = normalizeSession({
+      id: "waiting-session",
+      project,
+      lastActivity: "2026-07-25T12:00:00Z",
+    });
+    const props = {
+      sessions: [value],
+      projects: [
+        { path: project, enabled: true, tracked: true, source: "registered", sessionCount: 1 },
+      ],
+      loading: false,
+      view: "home" as const,
+    };
+    const { container, rerender } = render(SessionsList, { props });
+    const row = container.querySelector<HTMLElement>(".session-ticker-row");
+
+    await rerender({
+      ...props,
+      sessions: [
+        normalizeSession({
+          ...value,
+          waitingQuestion: "Ship it?",
+          waitingSince: "2026-07-25T12:01:00Z",
+        }),
+      ],
+    });
+
+    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBe(row);
   });
 });

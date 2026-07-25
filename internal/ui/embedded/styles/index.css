@@ -1464,7 +1464,6 @@ body.modal-sheet-open { overflow: hidden; }
 }
 .header-identity .pi-logo-mark { width: 24px; height: 24px; border-radius: 4px; }
 .header-title-desktop { font-size: 14px; letter-spacing: -0.015em; }
-.header-title-mobile { display: none; }
 .workspace-stats {
     display: flex;
     align-items: center;
@@ -1617,6 +1616,13 @@ body.modal-sheet-open { overflow: hidden; }
     flex-direction: column;
     gap: 0;
 }
+.home-feed {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.home-feed-heading--spaced { margin-top: 30px; }
+.home-feed-session { min-width: 0; }
 .session-ticker-row {
     position: relative;
     min-width: 0;
@@ -1819,7 +1825,6 @@ body.modal-sheet-open { overflow: hidden; }
         display: block;
         flex: none;
     }
-    .header-title-mobile { display: inline; flex: none; font-size: 13px; }
     .header-project-name { max-width: 34vw; flex: none; }
     .header-project-path { flex: 1 1 auto; max-width: none; }
     .workspace-stats { min-width: 0; overflow: hidden; font-size: 10.5px; }
@@ -1829,6 +1834,7 @@ body.modal-sheet-open { overflow: hidden; }
     .home-rail { display: none; }
     .timeline-section,
     .project-group { margin-bottom: 24px; }
+    .home-feed-heading--spaced { margin-top: 24px; }
     .session-ticker-link { min-height: 82px; padding: 13px 52px 12px 2px; }
     .session-ticker-title { font-size: 13.5px; }
     .session-ticker-action--desktop { display: none; }
