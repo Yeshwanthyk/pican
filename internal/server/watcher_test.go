@@ -80,6 +80,59 @@ func TestFsnotifyHandlesAtomicRenameReplacement(t *testing.T) {
 	}
 }
 
+func TestFsnotifyCreateForKnownProjectionDoesNotBroadcastNewSession(t *testing.T) {
+	root := t.TempDir()
+	sessionPath := filepath.Join(root, "session.jsonl")
+	if err := os.WriteFile(sessionPath, []byte("replacement\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		sessionsDir: root,
+		fileMod:     map[string]time.Time{"session.jsonl": time.Now()},
+		lastKnown:   make(map[string]struct{}),
+	}
+	client := s.addClient(globalSessID)
+	defer s.removeClient(client)
+	debum := newDebouncer(time.Hour)
+	defer debum.stop()
+
+	s.handleFsEvent(nil, fsnotify.Event{Name: sessionPath, Op: fsnotify.Create}, debum)
+
+	select {
+	case msg := <-client.ch:
+		t.Fatalf("known projection replacement broadcast %q", msg)
+	case <-time.After(20 * time.Millisecond):
+	}
+}
+
+func TestFsnotifyCreateForUnknownSessionBroadcastsNewSession(t *testing.T) {
+	root := t.TempDir()
+	sessionPath := filepath.Join(root, "session.jsonl")
+	if err := os.WriteFile(sessionPath, []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		sessionsDir: root,
+		fileMod:     make(map[string]time.Time),
+		lastKnown:   make(map[string]struct{}),
+	}
+	client := s.addClient(globalSessID)
+	defer s.removeClient(client)
+	debum := newDebouncer(time.Hour)
+	defer debum.stop()
+
+	s.handleFsEvent(nil, fsnotify.Event{Name: sessionPath, Op: fsnotify.Create}, debum)
+
+	select {
+	case msg := <-client.ch:
+		if msg != "new-session" {
+			t.Fatalf("broadcast = %q, want new-session", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected new-session broadcast")
+	}
+}
+
 func TestPollingFallbackBroadcastsOnAppend(t *testing.T) {
 	root := t.TempDir()
 	projectDir := filepath.Join(root, "--tmp--project--")
