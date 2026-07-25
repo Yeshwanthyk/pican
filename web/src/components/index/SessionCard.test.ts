@@ -134,6 +134,10 @@ describe("SessionCard ticker row", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Pin session" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Archive session" })).toBeInTheDocument();
+
+    await fireEvent.click(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   it("optimistically archives and restores through the local archive endpoint", async () => {

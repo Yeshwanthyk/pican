@@ -64,13 +64,15 @@
   let pinBusy = $state(false);
   let archiveBusy = $state(false);
   let mobileMenuOpen = $state(false);
+  let mobileActions = $state<HTMLDivElement | null>(null);
   const mobileMenuId = $derived(
     `session-actions-${(session.id || 'session').replace(/[^a-zA-Z0-9_-]/g, '-')}`,
   );
 
   $effect(() => {
     if (!mobileMenuOpen) return;
-    const close = () => {
+    const close = (event: MouseEvent) => {
+      if (mobileActions?.contains(event.target as Node)) return;
       mobileMenuOpen = false;
     };
     document.addEventListener('click', close);
@@ -85,6 +87,7 @@
     event.preventDefault();
     event.stopPropagation();
     if (pinBusy || !session.id) return;
+    mobileMenuOpen = false;
     const next = !session.pinned;
     session.pinned = next;
     pinBusy = true;
@@ -94,13 +97,13 @@
       showToast(describeError(result.error.cause) || t('index.networkError'));
     }
     pinBusy = false;
-    mobileMenuOpen = false;
   }
 
   async function toggleArchive(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (archiveBusy || archiveDisabledReason || !session.id) return;
+    mobileMenuOpen = false;
     const next = !archived;
     archived = next;
     session.archived = next;
@@ -112,7 +115,6 @@
       showToast(describeError(result.error.cause) || t('index.archiveUpdateFailed'));
     }
     archiveBusy = false;
-    mobileMenuOpen = false;
   }
 </script>
 
@@ -218,6 +220,7 @@
     {@html icon(session.pinned ? PinOff : Pin, { size: 14 })}
   </button>
   <div
+    bind:this={mobileActions}
     class="session-ticker-mobile-actions"
     class:session-ticker-mobile-actions--open={mobileMenuOpen}
   >
