@@ -12,6 +12,7 @@ import {
   normalizeSession,
   sessionModelLabel,
   sessionSearchText,
+  stabilizeHomeSessionOrder,
   splitPinnedSessions,
   splitHomeSessions,
   shouldRefetchOnReload,
@@ -184,6 +185,24 @@ describe("index sessions helpers", () => {
     expect(groups[1]?.sessions).toEqual([]);
   });
 
+  it("keeps tracked project and session order stable while activity timestamps change", () => {
+    const projects = [
+      { path: "/a", tracked: true, sessionCount: 2 },
+      { path: "/b", tracked: true, sessionCount: 1 },
+    ];
+    const groups = groupTrackedProjectSessions(
+      [
+        { id: "a-old", project: "/a", lastActivity: "2024-01-01T00:00:00Z" },
+        { id: "a-new", project: "/a", lastActivity: "2024-01-03T00:00:00Z" },
+        { id: "b", project: "/b", lastActivity: "2024-01-04T00:00:00Z" },
+      ],
+      projects,
+    );
+
+    expect(groups.map((group) => group.project)).toEqual(["/a", "/b"]);
+    expect(groups[0]?.sessions.map((session) => session.id)).toEqual(["a-old", "a-new"]);
+  });
+
   it("builds explicit scoped session URLs with project precedence", () => {
     expect(sessionsURL({ view: "home" })).toBe("/api/sessions?view=home");
     expect(sessionsURL({ view: "all", limit: 100, offset: 100 })).toBe(
@@ -241,10 +260,10 @@ describe("index sessions helpers", () => {
     const split = splitHomeSessions(
       [
         { id: "idle", pinned: false, lastActivity: "2024-01-01T00:00:00Z" },
-        { id: "live", pinned: true, lastActivity: "2024-01-04T00:00:00Z" },
+        { id: "live", pinned: false, lastActivity: "2024-01-04T00:00:00Z" },
         {
           id: "waiting",
-          pinned: true,
+          pinned: false,
           waitingQuestion: "Ship?",
           lastActivity: "2024-01-03T00:00:00Z",
         },
@@ -256,6 +275,49 @@ describe("index sessions helpers", () => {
     expect(split.waiting.map((session) => session.id)).toEqual(["waiting"]);
     expect(split.pinned.map((session) => session.id)).toEqual(["pinned"]);
     expect(split.rest.map((session) => session.id)).toEqual(["idle"]);
+  });
+
+  it("keeps pinned sessions in Pinned while they are running or waiting", () => {
+    const split = splitHomeSessions(
+      [
+        {
+          id: "running-pin",
+          pinned: true,
+          pinOrder: 1,
+          lastActivity: "2024-01-04T00:00:00Z",
+        },
+        {
+          id: "waiting-pin",
+          pinned: true,
+          pinOrder: 2,
+          waitingQuestion: "Ship?",
+          lastActivity: "2024-01-03T00:00:00Z",
+        },
+      ],
+      new Set(["running-pin"]),
+    );
+
+    expect(split.live).toEqual([]);
+    expect(split.waiting).toEqual([]);
+    expect(split.pinned.map((session) => session.id)).toEqual(["running-pin", "waiting-pin"]);
+  });
+
+  it("preserves known home rows across refreshes and prepends genuinely new sessions", () => {
+    const previous = [
+      { id: "a", lastActivity: "2024-01-01T00:00:00Z" },
+      { id: "b", lastActivity: "2024-01-02T00:00:00Z" },
+    ];
+    const incoming = [
+      { id: "new", lastActivity: "2024-01-04T00:00:00Z" },
+      { id: "b", lastActivity: "2024-01-05T00:00:00Z" },
+      { id: "a", lastActivity: "2024-01-03T00:00:00Z" },
+    ];
+
+    expect(stabilizeHomeSessionOrder(previous, incoming).map((session) => session.id)).toEqual([
+      "new",
+      "a",
+      "b",
+    ]);
   });
 
   it("damps reload refetches for known sessions but not new ones", () => {

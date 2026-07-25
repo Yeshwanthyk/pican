@@ -120,6 +120,22 @@ export interface HomeSessionSplit<T> {
   readonly rest: T[];
 }
 
+export function stabilizeHomeSessionOrder<T extends { readonly id: string }>(
+  previous: ReadonlyArray<T>,
+  incoming: ReadonlyArray<T>,
+): T[] {
+  if (previous.length === 0) return [...incoming];
+
+  const incomingByID = new Map(incoming.map((session) => [session.id, session]));
+  const previousIDs = new Set(previous.map((session) => session.id));
+  const fresh = incoming.filter((session) => !previousIDs.has(session.id));
+  const retained = previous.flatMap((session) => {
+    const replacement = incomingByID.get(session.id);
+    return replacement ? [replacement] : [];
+  });
+  return [...fresh, ...retained];
+}
+
 export function splitHomeSessions<
   T extends SessionActivity & {
     readonly id: string;
@@ -131,12 +147,11 @@ export function splitHomeSessions<
   const waiting: T[] = [];
   const lower: T[] = [];
   for (const session of sessions) {
-    if (session.waitingQuestion) waiting.push(session);
+    if (session.pinned) lower.push(session);
+    else if (session.waitingQuestion) waiting.push(session);
     else if (runningIds.has(session.id)) live.push(session);
     else lower.push(session);
   }
-  live.sort((a, b) => activityMs(b) - activityMs(a));
-  waiting.sort((a, b) => activityMs(b) - activityMs(a));
   const { pinned, rest } = splitPinnedSessions(lower);
   return { live, waiting, pinned, rest };
 }
@@ -353,18 +368,17 @@ export function groupTrackedProjectSessions<
   return projects
     .filter((project) => project.tracked)
     .map((project) => {
-      const projectSessions = [...(sessionsByProject.get(project.path) || [])]
-        .sort((a, b) => activityMs(b) - activityMs(a))
-        .slice(0, 6);
+      const projectSessions = [...(sessionsByProject.get(project.path) || [])].slice(0, 6);
       return {
         project: project.path,
         sessions: projectSessions,
         total: project.sessionCount || 0,
-        latest:
-          projectSessions.length > 0 ? activityMs(projectSessions[0]) : Number.NEGATIVE_INFINITY,
+        latest: projectSessions.reduce(
+          (latest, session) => Math.max(latest, activityMs(session)),
+          Number.NEGATIVE_INFINITY,
+        ),
       };
-    })
-    .sort((a, b) => b.latest - a.latest || a.project.localeCompare(b.project));
+    });
 }
 
 export function projectDisplayName(path: string): string {

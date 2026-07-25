@@ -30,6 +30,7 @@
     normalizeSession,
     projectDisplayName,
     shouldRefetchOnReload,
+    stabilizeHomeSessionOrder,
     type NormalizedSession,
     type RunningStatus,
     type SessionView,
@@ -137,7 +138,9 @@
     const query = project ? { project, limit } : view === 'home' ? { view } : { view, limit };
     const result = await settle(() => defaultFetchSessions(query));
     if (result.ok) {
-      sessions = (result.value.sessions || []).map(normalizeSession);
+      const incoming = (result.value.sessions || []).map(normalizeSession);
+      sessions =
+        view === 'home' && !project ? stabilizeHomeSessionOrder(sessions, incoming) : incoming;
       total = result.value.total ?? sessions.length;
       await tick();
       refreshSessionPalette();
