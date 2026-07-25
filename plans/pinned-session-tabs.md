@@ -1,142 +1,354 @@
 # pican: pinned session tabs
 
-Branch at planning time: `multi-runtime-opencode-claude` at `97dc080`. Re-check branch/HEAD before starting; other plans (`redesign-effect-ts.md`, `multi-runtime-opencode-claude.md`) may have moved the frontend. Do not revert unrelated changes.
+Rebased planning snapshot: `multi-runtime-opencode-claude` at `0a6e79b` on
+2026-07-24. Preserve all existing runtime, performance/cache, focused-home, and
+archive work. `plans/prototypes/` is unrelated user work: do not edit, move,
+stage, or commit it.
 
 ## 0. Outcome
 
-An opt-in quick-switch surface for pinned sessions so the user can hop between active sessions in one gesture, on desktop and mobile. The design was converged through 7 rounds of live prototype grilling; every visual and behavioral decision below is a **user verdict, not a suggestion** — implement exactly, do not re-litigate.
+Add an opt-in quick-switch surface for pinned sessions so the user can hop
+between active sessions in one gesture on desktop and mobile.
 
-Primary usage is mobile. Polish matters, but UX-first: thumb reach and one-tap switching beat desktop convention wherever they conflict.
+Primary usage is mobile. Thumb reach and one-tap switching win over desktop
+convention wherever they conflict. The seven placement/anatomy verdicts remain
+the product direction; the implementation details below are rebased onto the
+current focused Projects home, pican-local Archive, four runtimes, and current
+Svelte session shell.
 
-Prototype (primary source, throwaway): `plans/prototypes/pinned-tabs-round1.html` — final state shows the locked design; commit it to a throwaway branch per the prototype skill, don't ship it.
-
-## 1. Locked design decisions (the 7 verdicts)
+## 1. Locked design decisions
 
 | Round | Question | Verdict |
 |---|---|---|
-| R1 | Where do tabs live? | **Strip** under header on desktop (>900px); **dock** at the bottom on mobile (≤900px) |
-| R2 | Tab anatomy | **Browser-style** tabs on the desktop strip; **Live** (status-forward) tiles on mobile |
-| R3 | Mobile overflow with many pins | **Squeeze**: active chip wide, all others collapse to fixed icon chips; never scrolls |
-| R4 | Mobile dock ↔ composer join | **Tight**: bare chips row directly under the composer input, same stack, 6px gap, no container |
-| R5 | Mobile home page | **List only**: no chips on home; the existing Pinned list section is the surface there |
+| R1 | Where do tabs live? | **Strip** under the header on desktop (>900px); **dock** at the bottom on mobile (≤900px) |
+| R2 | Tab anatomy | **Browser-style** tabs on the desktop strip; **Live** status-forward tiles on mobile |
+| R3 | Mobile overflow with many pins | **Squeeze**: active chip stays readable, other visible pins collapse to fixed icon chips, and overflow remains in the existing pinned-session sheet; never scroll |
+| R4 | Mobile dock ↔ composer join | **Tight**: bare chips row directly below the composer shell, same stack, 6px gap, no separate panel |
+| R5 | Mobile home page | **List only**: no chips on home; the focused home's existing Pinned section remains the surface there |
 | R6 | Desktop home page | **Session only**: no strip on home; strip exists only on the session page |
-| R7 | Current session not pinned | **Guest tab**: temporary dashed/italic tab for the current session with an inline ○ pin action; evaporates on leave |
+| R7 | Current session not pinned | **Guest tab**: temporary dashed/italic active tab with an explicit Pin action; evaporates on leave |
 
-Consequences worth spelling out:
+Consequences:
 
-- Tabs are **session-page chrome only**. Home (mobile + desktop) is untouched except for whatever already exists.
-- There is always an active tab on the session page: either the pinned tab you're in, or the guest tab.
-- No horizontal scrolling anywhere in the tab surfaces. Desktop strip shrinks tabs (browser-style `flex: 0 1 190px; min-width: 48px`); mobile squeezes to icon chips.
-- The feature is **opt-in** via a setting (default off), since it adds 36px of chrome on desktop and a chip row on mobile.
+- Tabs are session-page chrome only. Do not change the Projects, All Sessions,
+  Archived, project-detail, desktop rail, or mobile thumb-bar home UI.
+- There is always an active tab/chip on the session page: either the current
+  pinned session or a guest representation of the current unpinned session.
+- No tab surface scrolls horizontally. Both viewports cap visible pins and keep
+  the complete ordered set in the existing `PinnedSessionSwitcher`.
+- The feature is opt-in and defaults off because it adds 36px of desktop chrome
+  and one 40px mobile row.
+- Pin/unpin actions use the existing `Pin`/`PinOff` icon vocabulary. Do not use
+  `×` for unpinning or `○` for pinning; those imply close/selection rather than
+  the curation action that actually occurs.
 
-## 2. Visual spec
+## 2. Integration contract
 
-All colors/sizes via existing tokens in `internal/ui/embedded/styles/theme.css`. No new hex values. Fonts, radii, and blur treatments must match the existing header/thumb-bar exactly.
+### 2.1 Current product boundaries
 
-### 2.1 Desktop strip (>900px, session page only)
+- The default `view=home` response is the bounded source for the tab model. It
+  includes every unarchived pin plus Now and at most six sessions per tracked
+  project. Do not query or render the thousands-session All view to resolve
+  pins.
+- Pin and Archive are mutually exclusive pican-local curation states. Pinning
+  an archived session atomically restores it; archiving a pinned session
+  atomically unpins it.
+- Pi, Codex, Claude, and OpenCode all use the same tab components. Render marks
+  through `runtimeDisplay()` so icon-backed runtimes and the OpenCode initial
+  fallback stay consistent with the rest of the UI.
+- Static export/share remains unchanged and must not import the store, global
+  status stream, settings, or tab/chip components.
 
-Mount: directly below `.session-header-bar` inside the fixed header stack (see §4.2 for offset math).
+### 2.2 Shared session-page model
+
+Create one session-page-owned model instance, not an app-global curation store
+or module singleton. `SessionShell` owns it and passes it explicitly to
+`PinnedSessionSwitcher`, `PinnedTabsStrip`, and `PinnedChips`.
+
+The model:
+
+- fetches only `GET /api/sessions?view=home`;
+- normalizes the response, filters `pinned === true`, and sorts by `pinOrder`;
+- stores the running ID/status snapshot separately from session summaries;
+- loads eagerly and opens one `__all__` status connection only while the tabs
+  feature is enabled;
+- when the feature is off, loads lazily when `PinnedSessionSwitcher` opens and
+  does not keep a global status connection alive;
+- applies `status-snapshot` and `status-delta` to running state immediately;
+- refetches the bounded home summaries after a relevant `reload:<id>`, using
+  the existing five-second known-ID throttle rather than refetching per token;
+- refetches immediately on `curation-updated` and on reconnect; and
+- updates optimistically for pin/unpin, then rolls back and toasts on failure.
+
+This replaces the currently broken `/api/pins` +
+`/api/sessions?limit=1&view=all` join in `PinnedSessionSwitcher`. Do not extend
+the backend or add an IDs query for this slice.
+
+## 3. Visual spec
+
+Use existing tokens from `internal/ui/embedded/styles/theme.css`; add no hex
+values. Match the current session header, popover, composer, focus ring, and
+reduced-motion vocabulary.
+
+### 3.1 Desktop strip (>900px, session page only)
+
+Mount a fixed sibling directly after `.session-header-bar`, positioned at
+`top: 52px`.
 
 Bar:
-- height `36px`, padding `0 10px`, `display: flex; align-items: flex-end; gap: 1px`
-- background `var(--chrome-bg)`, `border-bottom: 1px solid var(--dim)`
-- no scrollbar; tabs shrink instead (`overflow: hidden` as safety, but layout must not overflow with ≤8 pins)
 
-Tab (browser anatomy):
+- `height: 36px; padding: 0 10px; display: flex; align-items: flex-end; gap: 1px`
+- `background: var(--chrome-bg); border-bottom: 1px solid var(--dim)`
+- no scrollbar and no silently clipped interactive item
+
+Tab:
+
 - `height: 31px; padding: 0 8px 0 10px; flex: 0 1 190px; min-width: 48px; gap: 6px`
 - `border-radius: 8px 8px 0 0`, `font-size: 11.5px`, color `var(--muted)`
-- contents, in order: runtime glyph (15px, existing `/pi-icon.svg` / `/codex-icon.svg` mark treatment), status dot (6px: `var(--accent)` pulsing when running, `var(--attention)` when waiting, transparent when idle), title (ellipsized), close/unpin `×` (hidden, `display: inline` on tab hover; hover style: `color var(--text)`, bg `color-mix(in srgb, var(--dim) 80%, transparent)`)
-- hover: `background: color-mix(in srgb, var(--surface-2) 70%, transparent)`
-- active: `color: var(--text); background: var(--body-bg); border: 1px solid var(--dim); border-bottom: 0` plus a 1px `::after` strip in `var(--body-bg)` covering the bar's bottom border, so the tab visually merges into the page (Chromium effect)
-- after the last tab: a `+` button (`font-size: 15px`, `var(--muted)`) that triggers the existing new-session flow (`#new-session-header-btn` behavior)
+- runtime mark from `runtimeDisplay()` at 15px
+- status dot at 6px: accent/pulsing while running, attention while waiting,
+  transparent while idle
+- ellipsized title
+- `PinOff` action hidden until hover or keyboard focus, with an accessible
+  "Unpin session" label; it unpins and never closes, cancels, archives, or
+  deletes the session
+- hover background:
+  `color-mix(in srgb, var(--surface-2) 70%, transparent)`
+- active tab:
+  `color: var(--text); background: var(--body-bg); border: 1px solid var(--dim); border-bottom: 0`,
+  plus a 1px body-background strip covering the bar border
+- after the session tabs, a `+` button invokes the existing
+  `#new-session-header-btn` behavior and obeys the current runtime's `create`
+  capability
 
-Guest tab (current session unpinned):
-- same geometry, `font-style: italic`, `border: 1px dashed var(--muted); border-bottom: 0` when active
-- instead of `×`, an inline `○` pin button; hover `color: var(--accent)`; clicking POSTs pin → tab converts in place to a normal pinned tab (drop italic/dash, gets `×`)
-- always rendered last (after pinned tabs, before `+`)
+Guest tab:
 
-### 2.2 Mobile chips (≤900px, session page only)
+- same geometry with `font-style: italic` and a dashed active border
+- trailing `Pin` action with an accessible "Pin session" label
+- pinning converts the guest in place to a normal pinned tab
+- always appears after the visible ordered pins and before `+`
 
-Mount: inside the composer stack, **below** the input (`order: 2; margin-top: 6px`) — the Tight join. No container, no border, no background around the row; chips sit on the composer's existing bottom gradient. The chips row scrolls/lifts together with the composer (keyboard open included, see §4.4).
+Capacity:
 
-Row: `display: flex; align-items: center; gap: 5px; min-width: 0`.
+- render at most eight session tabs, counting the guest if present;
+- the current pinned session must remain visible even if it falls outside the
+  first eight pins; replace the last visible inactive pin, then retain server
+  pin order among the visible set; and
+- the centered header title continues to open the complete pinned-session
+  switcher for overflow. Do not add a second overflow menu.
 
-Idle chip (not active):
+### 3.2 Mobile chips (≤900px, session page only)
+
+Mount `PinnedChips` in `ChatComposer.svelte`:
+
+- normal chat branch: directly after `.pi-chat-shell` and before
+  `TextAttachmentModal`/`GitFooter`;
+- view-only branch: inside `.pi-chat-composer--view-only`, after its resume
+  action; and
+- never use `order: 2`: the current composer is `display: block`, so that rule
+  has no effect.
+
+The row shares the existing `var(--body-bg)` composer surface. It has no
+separate container, border, blur, or background:
+`display: flex; align-items: center; gap: 5px; min-width: 0; margin-top: 6px`.
+Because it remains inside the composer's bottom stack, the existing visual
+viewport and composer-height handling moves it with the iOS keyboard.
+
+Idle chip:
+
 - fixed `40 × 40px`, `border-radius: 9px`
-- `border: 1px solid color-mix(in srgb, var(--dim) 80%, transparent)`, `background: color-mix(in srgb, var(--surface) 70%, transparent)`
-- centered runtime glyph `17px`; status dot `6px` absolutely positioned `top: 3px; right: 3px`
-- waiting: border becomes `color-mix(in srgb, var(--attention) 55%, transparent)` — the amber ring is the "needs you" signal and must be visible without any text
+- token-based dim border and surface background
+- centered runtime mark at 17px
+- status dot at 6px in the top-right corner
+- waiting changes the border to the attention color so it remains recognizable
+  without text
 
-Active chip (the session you're in — Live anatomy):
-- `flex: 1 1 auto` (absorbs all remaining row width), `height: 40px`, `padding: 0 11px`, `justify-content: flex-start; gap: 8px`
-- `background: var(--surface-2); border-color: var(--dim)`
-- contents: glyph, inline status dot, then a two-line block (`line-height 1.25`): title `10.5px var(--text)` ellipsized, activity caption `9px` ellipsized
-- activity caption text + color: running → current activity (e.g. `⚡ Bash — grep pins`) in `var(--accent)`; waiting → `awaiting your answer` in `var(--attention)`; idle → `idle · <age>` in `var(--muted)`. Source the caption from the same fields the home list uses (`currentActivity`, waiting state, `lastActivity`).
-- width transition `flex-basis .16s ease` when the active chip changes; respect `prefers-reduced-motion` (disable transition and dot pulse)
+Active chip:
 
-Guest chip: active-chip geometry with `border-style: dashed; font-style: italic`; long-press or a trailing ○ glyph pins (use a small `○` button inside the chip, 24px hit area minimum — actual hit target padded to ≥40px via padding/pseudo-element).
+- `flex: 1 1 auto; min-width: 136px; height: 40px; padding: 0 11px`
+- current surface/border tokens, runtime mark, inline status dot, and a
+  two-line ellipsized title/activity block
+- running caption uses the latest known `currentActivity`, waiting says
+  "awaiting your answer", and idle uses `idle · <age>` when a summary is
+  available
+- an unpinned current session absent from `view=home` falls back to the
+  `SessionShell` title/runtime/waiting/worker state and the caption `idle`; do
+  not add a backend field just to synthesize an age
+- width transition is 160ms ease-out and is disabled with reduced motion
 
-Capacity: with 40px chips + 5px gaps, a 390px viewport fits the active chip + ~6 idle chips. Do not scroll: beyond that, clamp — render the first N idle chips that fit plus the active/guest chip; overflow pins remain reachable via the existing `PinnedSessionSwitcher` popover (title tap), which stays untouched.
+Guest chip uses active geometry, dashed/italic treatment, and an explicit
+trailing `Pin` action with a 40px touch target. Do not use long-press as the
+only action.
 
-### 2.3 States and edge cases
+Capacity:
 
-- 0 pins + current session pinned-nothing: strip shows only guest tab + `+`; chips show only guest chip. Surface still appears (it's how you pin your first session from inside it).
-- Feature off (default): nothing renders; all existing offsets unchanged.
-- Static export (`web/src/export`): never render tabs. Live-only chrome, same rule as `SessionHeader`.
-- Pinned session that no longer exists (stale pin): omit it (the `/api/sessions` join already drops unknown ids).
-- `×` on desktop unpins (POST `/api/pins` remove) — it does not close/kill anything. Optimistic removal, toast on failure, matching `SessionCard.svelte`'s optimistic pin pattern.
+- preserve the active/guest chip's 136px minimum before adding idle chips;
+- a small component-local `ResizeObserver` computes
+  `floor((rowWidth - activeMinimum) / 45)` and clamps the ordered idle pins;
+- the current session is always present; and
+- overflow stays reachable through the header's existing bottom sheet. Do not
+  add horizontal scrolling or a second mobile menu.
 
-## 3. Behavior spec
+### 3.3 States and edge cases
 
-- Tap/click a tab or chip → `navigate('/session?id=' + encodeURIComponent(id))` (existing client-side nav; App.svelte remounts the session tree).
-- **Prefetch**: call `prefetchSession(id)` (web/src/routes/session-prefetch.ts) on `pointerenter` and `touchstart`/`pointerdown` for every tab/chip, exactly like `SessionCard.svelte` does. This is mandatory — it's what makes switching feel instant.
-- Active detection: current `sessionId` prop (already available in `SessionShell`/`SessionHeader`).
-- Ordering: server pin order (`pinOrder`, oldest-pin first) — same as `/api/pins`. Guest last.
-- Live status: subscribe to the same global SSE status events the home page uses to refresh summaries; a lightweight shared store (§4.3) keeps captions/dots current without each surface refetching.
-- Keyboard (desktop): `⌘1…⌘8` jump to pin N; `⌘⇧[` / `⌘⇧]` cycle. Register in the session page shortcuts layer and document in the ⌘/ shortcuts sheet. Skip if a conflicting binding already exists — check `CommandMenu`/shortcut registry first and prefer non-conflicting alternates (`Alt+1…`) over breaking existing bindings.
-- Guest pin action: POST to `/api/pins` (same call as `SessionCard`), optimistic UI (guest converts immediately), rollback + toast on failure.
+- Zero pins: show only the guest tab/chip and desktop `+`.
+- Feature off: render no new strip/chips and preserve every existing layout
+  offset. The header's current pinned-session switcher still works.
+- Missing/orphaned pin: omit it because `view=home` returns only resolvable
+  summaries.
+- Archive mutation: `curation-updated` removes the now-unpinned session from all
+  tab surfaces. Archiving the current session keeps the existing navigation to
+  `/`.
+- Pinning an archived current session: update the session page's local
+  `archived` state to false through the existing `onArchiveChange` path so the
+  Command Menu immediately changes from Restore to Archive.
+- View-only session: tabs/chips remain usable; runtime chat capability does not
+  gate navigation or pinning.
+- Static export: never render or import this live-only chrome.
 
-## 4. Implementation
+## 4. Behavior
 
-### 4.1 Setting (opt-in)
+- Click/tap a tab or chip:
+  `navigate('/session?id=' + encodeURIComponent(id))`. `App.svelte` already
+  remounts `SessionPage` when the ID changes.
+- Prefetch every destination with `prefetchSession(id)` on the exact existing
+  `SessionCard` events: `pointerenter`, `mousedown`, and `touchstart`.
+- Active detection uses the current `sessionId`.
+- Ordering uses ascending server `pinOrder`; guest is last.
+- Status dots update immediately from snapshot/delta. Captions, waiting state,
+  and activity timestamps update from throttled bounded-summary refetches
+  because the SSE status payload does not contain those fields.
+- Do not add pinned-tab keyboard shortcuts in this slice. `⌘1…8` and
+  `⌘⇧[`/`]` are browser-owned on normal web surfaces. Existing `⌘K`, the header
+  switcher, and one-click tabs already cover desktop navigation without a
+  browser/PWA-only shortcut layer.
 
-- Key: `sessionTabs` (values `"off"` default / `"on"`), added to `SERVER_SETTING_KEYS` in `web/src/shared/settings-store.ts` **and** `settingDefaults` in `internal/server/settings.go` (both allowlists required for server sync).
-- UI: a toggle in `web/src/components/settings/SessionDisplayDefaultsSettings.svelte` (Session Display section) labeled "Pinned session tabs" with help text "Show pinned sessions as tabs inside a session for quick switching."
+## 5. Implementation
 
-### 4.2 Desktop strip mount + offsets
+### 5.1 Setting and hydration
 
-- New component `web/src/components/session/PinnedTabsStrip.svelte`, rendered in `SessionShell.svelte` directly after `SessionHeader` (the seam where `PinnedSessionSwitcher` already mounts).
-- The session layout hard-codes a 52px header offset (`internal/ui/embedded/styles/session.css` ~line 3215) and mobile reserves `52px + safe-area-inset-top` (~line 3306). When tabs are on, desktop content offset becomes `88px` (52 + 36). Implement by setting a class on the shell root (e.g. `.has-session-tabs`) and overriding the offset custom-property/rules in `session.css` — do not fork the layout. Mobile offsets are untouched (chips live in the composer, not the header).
-- WCO/PWA mode: the strip renders below the draggable title bar and must be `app-region: no-drag` (children of `:root.wco .session-header-bar` already handle this pattern — mirror it).
+- Key: `pican:v1:session-tabs`, value `"true"`/`"false"`, default `"false"`.
+- Add it to `SERVER_SETTING_KEYS` in `web/src/shared/settings-store.ts` and
+  `settingDefaults` in `internal/server/settings.go`.
+- Add the toggle to
+  `web/src/components/settings/SessionDisplayDefaultsSettings.svelte`, using
+  `t()` strings: label "Pinned session tabs"; help text "Show pinned sessions
+  inside a session for quick switching."
+- `SessionPage` owns the reactive enabled value, reads local storage for first
+  paint, and passes it to `SessionShell`.
+- Reuse the settings hydration already started by
+  `startSessionPageRuntime()`: add one optional completion callback so
+  `SessionPage` rereads the key when server hydration finishes. Do not issue a
+  second `/api/settings` request or introduce a global settings store.
 
-### 4.3 Shared pins store
+### 5.2 Model and existing switcher
 
-- New `web/src/session/pinned-tabs-store.svelte.ts` (Svelte 5 runes store): holds `NormalizedSession[]` for pins, fetches `/api/pins` + `/api/sessions` join on session-page mount (reuse the join logic currently inside `PinnedSessionSwitcher.svelte` — extract it, don't duplicate), refreshes on the global SSE status/reload events (same events `SessionsPage.svelte` subscribes to) and on pin/unpin mutations.
-- Both `PinnedTabsStrip` and the mobile chips consume this store. `PinnedSessionSwitcher` should be refactored to consume it too (single source of truth), but its UI stays as-is.
+- Add `web/src/session/pinned-tabs-model.svelte.ts` as a factory-created Svelte
+  5 model with explicit `start()`, `load()`, mutation, and `dispose()` methods.
+- Construct/dispose it with `SessionShell`; never retain it across a
+  session-page remount.
+- Refactor `PinnedSessionSwitcher.svelte` to consume the same instance. Keep
+  its anchored desktop popover, mobile bottom sheet, search action, and current
+  pin/unpin action visually unchanged.
+- Replace its false `limit=1` test fixture with a truthful `view=home` payload.
 
-### 4.4 Mobile chips mount
+### 5.3 Desktop strip and offsets
 
-- New component `web/src/components/session/PinnedChips.svelte`, rendered inside the composer stack in `ChatComposer.svelte` (or `SessionShell` if the composer stack lives there — locate the sticky bottom wrapper and place chips as its last child, `order` below the input). It must live inside the same fixed/sticky element as the input so iOS keyboard handling (the visual-viewport pinning in session.css ~line 3229) moves them together.
-- Hidden at >900px via the existing mobile media query breakpoint (900px, matching session.css).
-- Export build must tree-shake it out: gate on the same live-only condition that excludes the header/composer from exports.
+- Add `web/src/components/session/PinnedTabsStrip.svelte` after
+  `SessionHeader` in `SessionShell`.
+- Toggle a session-page body class while enabled and clean it up on unmount.
+- Define one desktop-only custom property:
+  `--session-header-offset: 52px`, overridden to `88px` when enabled.
+- Apply that property to every current desktop header-dependent seam:
+  `#app` margin/height and the expanded right sidebar top/height. Do not patch
+  one consumer while leaving another at 52px.
+- Keep all mobile header/safe-area math explicitly at the existing 52px; chips
+  live at the bottom, not under the mobile header.
+- Give the strip its own WCO/PWA `app-region: no-drag` rule; the current rule
+  covers header descendants only.
 
-### 4.5 CSS
+### 5.4 Mobile chips
 
-- All styles in `internal/ui/embedded/styles/session.css` (project convention: global CSS, no scoped styles). New sections: `/* Pinned session tabs (desktop strip) */` and `/* Pinned session chips (mobile) */`. Use only theme tokens; copy exact values from §2.
-- `prefers-reduced-motion`: kill dot pulse and chip width transition.
+- Add `web/src/components/session/PinnedChips.svelte` at both resolved
+  `ChatComposer` mount points from §3.2.
+- Pass the shared model and current-session fallback presentation explicitly.
+- Let the current composer height observer include the added row; do not add a
+  second keyboard/visual-viewport controller.
+- Hide chips above 900px with the existing breakpoint.
 
-### 4.6 Backend
+### 5.5 CSS, strings, and documentation
 
-None. `/api/pins` (GET/POST), `pinned`/`pinOrder` on summaries, and SSE status events already exist. Only the settings allowlist entry from §4.1.
+- Put styles in `internal/ui/embedded/styles/session.css` using the existing
+  global CSS convention.
+- Add every user-facing label/caption through
+  `web/src/shared/english.ts`/`t()`.
+- Disable dot pulse and width transitions under
+  `prefers-reduced-motion: reduce`.
+- After implementation, update `docs/architecture/frontend.md` to replace its
+  stale `/api/pins` + `/api/sessions` join description with the session-owned,
+  bounded `view=home` model and its curation/status refresh behavior.
 
-## 5. Waves and gates
+### 5.6 Backend
 
-**Wave 1 — store + setting.** Extract pin-list join into `pinned-tabs-store`, refactor `PinnedSessionSwitcher` onto it, add the `sessionTabs` setting (both allowlists + settings UI). Gate: existing switcher behaves identically (manual check), settings round-trips through server, `npm test` in `web/` passes.
+No new endpoint, table, runtime capability, projection field, or native
+lifecycle action. The only backend change is the settings allowlist/default
+entry. Existing `/api/sessions?view=home`, `/api/pins` mutation,
+`curation-updated`, status SSE, and archive transaction are sufficient.
 
-**Wave 2 — desktop strip.** `PinnedTabsStrip` + strip CSS + 88px offset wiring + guest tab + prefetch + unpin + `+`. Gate: with setting on at >900px, strip matches §2.1 pixel-for-pixel against the prototype; with setting off, zero layout change; WCO mode drag regions intact.
+## 6. Waves and gates
 
-**Wave 3 — mobile chips.** `PinnedChips` + chips CSS + Tight join in the composer stack + squeeze behavior + guest chip. Gate: on a real phone (or 390px + touch emulation): no horizontal scroll at 7 pins, active chip caption live-updates, keyboard open keeps chips attached to the input, amber waiting ring visible.
+**Wave 1 — truthful model + setting.** Add the setting/hydration callback,
+extract the session-owned model, and refactor `PinnedSessionSwitcher` from the
+broken `limit=1` join to `view=home`.
 
-**Wave 4 — behavior polish.** Prefetch on hover/touchstart verified (network tab), keyboard shortcuts, SSE-driven status updates on both surfaces, reduced-motion. Gate: switching between two warm sessions feels instant (< ~300ms perceived); e2e smoke (`e2e/`) covering: enable setting → pin two sessions → switch via tab → guest tab pin.
+Gate:
 
-Commit per wave. After the final gate, move the prototype file to a throwaway branch and note the verdict table in the commit message.
+- a multi-pin fixture returns every pin in `pinOrder`;
+- archived/orphaned sessions do not appear;
+- existing switcher UI and search behavior remain unchanged;
+- feature-off opening is lazy and creates no persistent global SSE connection;
+- enabled/disabled values survive cold server hydration; and
+- focused frontend tests pass.
+
+**Wave 2 — desktop strip.** Add `PinnedTabsStrip`, guest state, Pin/PinOff
+actions, prefetch, capability-gated `+`, eight-tab cap, and unified 88px offset.
+
+Gate:
+
+- setting off causes zero layout change;
+- current session remains visible with more than eight pins;
+- transcript and expanded right sidebar share the same offset;
+- keyboard focus exposes the unpin action and labels it precisely; and
+- WCO drag regions remain usable.
+
+**Wave 3 — mobile chips.** Add the Tight composer join in both composer
+branches, active fallback presentation, minimum-width capacity calculation, and
+guest Pin action.
+
+Gate:
+
+- 390px and 320px widths have no horizontal overflow;
+- active/guest text retains its minimum width;
+- overflow pins remain in the existing bottom sheet;
+- view-only sessions still render and switch pins;
+- keyboard open keeps the chips attached to the composer; and
+- waiting attention state is visible without text.
+
+**Wave 4 — live behavior and product integration.** Finish snapshot/delta
+updates, throttled relevant reloads, curation/reconnect refresh, archive
+coordination, optimistic rollback, accessibility, reduced motion, docs, and
+E2E coverage.
+
+Gate:
+
+- pinning an archived direct session restores it and updates Command Menu state;
+- archiving a pin removes it everywhere and current-session archive still
+  navigates home;
+- Pi, Codex, Claude, and OpenCode marks render through `runtimeDisplay()`;
+- prefetch fires on hover/mouse/touch before navigation;
+- switching between warm sessions feels immediate;
+- static export has no tab/chip/store/status imports; and
+- E2E smoke covers enable → pin two → switch → guest pin → archive/restore.
+
+Commit implementation in logical wave-sized blocks. Do not touch
+`plans/prototypes/` during implementation or verification.
