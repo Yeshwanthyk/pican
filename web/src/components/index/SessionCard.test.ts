@@ -120,6 +120,22 @@ describe("SessionCard ticker row", () => {
     );
   });
 
+  it("keeps narrow session actions behind one labeled menu trigger", async () => {
+    render(SessionCard, {
+      props: { session: session() },
+    });
+
+    const trigger = screen.getByRole("button", { name: "More session actions" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Pin session" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Archive session" })).toBeInTheDocument();
+  });
+
   it("optimistically archives and restores through the local archive endpoint", async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),

@@ -112,6 +112,7 @@ export default {
   "index.unpinSession": "Unpin session",
   "index.archiveSession": "Archive session",
   "index.restoreSession": "Restore session",
+  "index.moreSessionActions": "More session actions",
   "index.archiveDisabledRunning": "Stop this session before archiving it.",
   "index.archiveDisabledWaiting": "Answer this session before archiving it.",
   "index.archiveUpdateFailed": "Couldn’t update this session’s archive state.",

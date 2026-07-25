@@ -2,7 +2,7 @@
   import { t } from '../../shared/strings.js';
   import { handleNavClick } from '../../shared/navigation.js';
   import { prefetchSession } from '../../routes/session-prefetch.js';
-  import { icon, Pin, PinOff } from '../../shared/icons.js';
+  import { icon, MoreHorizontal, Pin, PinOff } from '../../shared/icons.js';
   import { showToast } from '../../shared/toast.js';
   import { describeError } from '../../lib/errors';
   import { runtimeDisplay } from '../../lib/runtime-display';
@@ -63,6 +63,19 @@
 
   let pinBusy = $state(false);
   let archiveBusy = $state(false);
+  let mobileMenuOpen = $state(false);
+  const mobileMenuId = $derived(
+    `session-actions-${(session.id || 'session').replace(/[^a-zA-Z0-9_-]/g, '-')}`,
+  );
+
+  $effect(() => {
+    if (!mobileMenuOpen) return;
+    const close = () => {
+      mobileMenuOpen = false;
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  });
 
   function startPrefetch() {
     if (session.id) prefetchSession(session.id);
@@ -81,6 +94,7 @@
       showToast(describeError(result.error.cause) || t('index.networkError'));
     }
     pinBusy = false;
+    mobileMenuOpen = false;
   }
 
   async function toggleArchive(event: MouseEvent) {
@@ -98,6 +112,7 @@
       showToast(describeError(result.error.cause) || t('index.archiveUpdateFailed'));
     }
     archiveBusy = false;
+    mobileMenuOpen = false;
   }
 </script>
 
@@ -169,7 +184,10 @@
           >{/if}
       </span>
       <span class="session-ticker-metrics">
-        {#if metrics}<span>{metrics}</span><span aria-hidden="true">·</span>{/if}
+        {#if metrics}
+          <span class="session-ticker-metric-values">{metrics}</span>
+          <span class="session-ticker-metric-separator" aria-hidden="true">·</span>
+        {/if}
         <span data-timestamp={session.lastActivity} title={session.lastActivity}
           >{formatRelativeTime(session.lastActivity, now)}</span
         >
@@ -177,7 +195,7 @@
     </div>
   </a>
   <button
-    class="session-ticker-pin"
+    class="session-ticker-pin session-ticker-action--desktop"
     type="button"
     aria-label={archiveLabel}
     title={archiveDisabledReason || archiveLabel}
@@ -188,7 +206,7 @@
     {@html icon(archived ? ArchiveRestore : Archive, { size: 14 })}
   </button>
   <button
-    class="session-ticker-pin"
+    class="session-ticker-pin session-ticker-action--desktop"
     class:session-ticker-pin--pinned={session.pinned}
     type="button"
     aria-label={pinLabel}
@@ -199,4 +217,43 @@
   >
     {@html icon(session.pinned ? PinOff : Pin, { size: 14 })}
   </button>
+  <div
+    class="session-ticker-mobile-actions"
+    class:session-ticker-mobile-actions--open={mobileMenuOpen}
+  >
+    <button
+      class="session-ticker-more"
+      type="button"
+      aria-label={t('index.moreSessionActions')}
+      aria-haspopup="menu"
+      aria-expanded={mobileMenuOpen}
+      aria-controls={mobileMenuId}
+      onclick={() => {
+        mobileMenuOpen = !mobileMenuOpen;
+      }}
+    >
+      {@html icon(MoreHorizontal, { size: 17 })}
+    </button>
+    {#if mobileMenuOpen}
+      <div id={mobileMenuId} class="session-ticker-action-menu" role="menu">
+        <button type="button" role="menuitem" disabled={pinBusy} onclick={togglePin}>
+          <span>{@html icon(session.pinned ? PinOff : Pin, { size: 15 })}</span>
+          <span>{pinLabel}</span>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          title={archiveDisabledReason || archiveLabel}
+          disabled={archiveBusy || Boolean(archiveDisabledReason)}
+          onclick={toggleArchive}
+        >
+          <span>{@html icon(archived ? ArchiveRestore : Archive, { size: 15 })}</span>
+          <span>{archiveLabel}</span>
+          {#if archiveDisabledReason}
+            <span class="session-ticker-action-reason">{archiveDisabledReason}</span>
+          {/if}
+        </button>
+      </div>
+    {/if}
+  </div>
 </div>
