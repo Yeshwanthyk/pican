@@ -151,6 +151,7 @@ body {
   color: var(--text);
   background: var(--body-bg);
   min-height: 100vh;
+  --session-content-offset: 52px;
 }
 
 body.pi-sheet-open {
@@ -174,8 +175,8 @@ body.pi-sheet-open {
 #app {
   display: flex;
   align-items: stretch;
-  height: calc(100vh - 52px);
-  margin-top: 52px;
+  height: calc(100vh - var(--session-content-offset));
+  margin-top: var(--session-content-offset);
   /* Chrome shell behind the resizer gutters so no body-bg slivers show
          beside the darker composer / sidebars. The content column re-lights
          itself with --body-bg below. */
@@ -769,13 +770,13 @@ body.right-sidebar-expanded .right-sidebar-backdrop {
 
 body.right-sidebar-expanded .right-sidebar {
   position: fixed;
-  top: 52px;
+  top: var(--session-content-offset);
   right: 0;
   bottom: 0;
   width: min(640px, 90vw) !important;
   min-width: min(640px, 90vw) !important;
   max-width: min(640px, 90vw) !important;
-  height: calc(100vh - 52px);
+  height: calc(100vh - var(--session-content-offset));
   z-index: 198;
   border-left: 1px solid var(--dim);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
@@ -1437,10 +1438,197 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   cursor: default;
 }
 
+.pinned-tabs-strip {
+  display: none;
+}
+
+.pinned-tabs-list {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.pinned-tab {
+  position: relative;
+  height: 31px;
+  min-width: 48px;
+  max-width: 190px;
+  display: flex;
+  flex: 0 1 190px;
+  align-items: center;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.pinned-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+.pinned-tab--active {
+  color: var(--text);
+  background: var(--body-bg);
+  border-color: var(--dim);
+}
+
+.pinned-tab--active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--body-bg);
+}
+
+.pinned-tab--guest {
+  font-style: italic;
+  border-color: var(--muted);
+  border-style: dashed;
+}
+
+.pinned-tab > a {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 0 9px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pinned-tab > a:focus-visible,
+.pinned-tab-pin:focus-visible,
+.pinned-tabs-new:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: -2px;
+}
+
+.pinned-tab-runtime {
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.pinned-tab-status {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: transparent;
+  border-radius: 999px;
+}
+
+.pinned-tab--running .pinned-tab-status {
+  background: var(--accent);
+  animation: pinned-tab-pulse 1.6s ease-in-out infinite;
+}
+
+.pinned-tab--waiting .pinned-tab-status {
+  background: var(--attention);
+}
+
+.pinned-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinned-tab-pin,
+.pinned-tabs-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--muted);
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.pinned-tab-pin {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-right: 2px;
+  opacity: 0;
+  border-radius: 5px;
+}
+
+.pinned-tab:hover .pinned-tab-pin,
+.pinned-tab:focus-within .pinned-tab-pin {
+  opacity: 1;
+}
+
+.pinned-tab-pin:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--dim) 80%, transparent);
+}
+
+.pinned-tab-pin--guest:hover {
+  color: var(--accent);
+}
+
+.pinned-tab-pin:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pinned-tabs-new {
+  width: 30px;
+  height: 31px;
+  flex: none;
+  margin-left: 3px;
+  border-radius: 6px;
+}
+
+.pinned-tabs-new:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+@keyframes pinned-tab-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pinned-session-switcher,
-  .session-header-title-chevron {
+  .session-header-title-chevron,
+  .pinned-tab {
     transition: none;
+  }
+
+  .pinned-tab--running .pinned-tab-status {
+    animation: none;
   }
 }
 
@@ -3219,10 +3407,31 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     overflow: hidden;
   }
 
+  body.pican-session-page.has-session-tabs {
+    --session-content-offset: 88px;
+  }
+
   #app {
-    height: calc(100vh - 52px);
-    margin-top: 52px;
+    height: calc(100vh - var(--session-content-offset));
+    margin-top: var(--session-content-offset);
     overflow: hidden;
+  }
+
+  .pinned-tabs-strip {
+    position: fixed;
+    z-index: 100;
+    top: 52px;
+    right: 0;
+    left: 0;
+    height: 36px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: var(--chrome-bg);
+    border-bottom: 1px solid var(--dim);
   }
 }
 

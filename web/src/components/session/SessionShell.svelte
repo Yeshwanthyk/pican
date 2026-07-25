@@ -18,6 +18,7 @@
   import SessionTree from './SessionTree.svelte';
   import ShareDialog from './ShareDialog.svelte';
   import PinnedSessionSwitcher from './PinnedSessionSwitcher.svelte';
+  import PinnedTabsStrip from './PinnedTabsStrip.svelte';
   import { normalizeSession } from '../../index/sessions.js';
   import { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte.js';
   import {
@@ -137,6 +138,16 @@
   {workerStatus}
 />
 <PinnedSessionSwitcher model={pinnedTabs} {currentSession} {onArchiveChange} />
+{#if sessionTabsEnabled}
+  <PinnedTabsStrip
+    model={pinnedTabs}
+    {currentSession}
+    currentRunning={running}
+    currentWaiting={waiting}
+    canCreate={capabilities.create}
+    {onArchiveChange}
+  />
+{/if}
 
 <CommandMenu
   {sessionId}
