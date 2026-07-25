@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 import type { StatusEventsOptions } from "../shared/status-events";
 import { normalizeSession } from "../index/sessions";
 import {
@@ -80,9 +81,7 @@ describe("PinnedTabsModel", () => {
   });
 
   it("rolls an optimistic pin back when persistence fails", async () => {
-    const updatePin = vi.fn(async () => {
-      throw new Error("offline");
-    });
+    const updatePin = vi.fn(() => Effect.runPromise(Effect.fail("offline")));
     const model = new PinnedTabsModel("guest", {
       fetchHome: async () => ({ sessions: [] }),
       updatePin,
@@ -94,5 +93,34 @@ describe("PinnedTabsModel", () => {
     expect(await pending).toBe(false);
     expect(model.isPinned("guest")).toBe(false);
     expect(updatePin).toHaveBeenCalledWith("guest", true);
+  });
+
+  it("refreshes only relevant reloads and catches up on curation or reconnect", async () => {
+    let statusOptions: StatusEventsOptions | undefined;
+    const fetchHome = vi.fn(async () => ({ sessions: [raw("current"), raw("other")] }));
+    const model = new PinnedTabsModel("current", {
+      fetchHome,
+      createEvents: (options) => {
+        statusOptions = options;
+        return { connect: vi.fn(), cleanup: vi.fn() };
+      },
+    });
+    model.start();
+    await model.load();
+    expect(fetchHome).toHaveBeenCalledTimes(1);
+
+    statusOptions?.onReload?.({ id: "unrelated" });
+    await Promise.resolve();
+    expect(fetchHome).toHaveBeenCalledTimes(1);
+
+    statusOptions?.onReload?.({ id: "current" });
+    await Promise.resolve();
+    expect(fetchHome).toHaveBeenCalledTimes(2);
+
+    statusOptions?.onCurationUpdate?.();
+    await vi.waitFor(() => expect(fetchHome).toHaveBeenCalledTimes(3));
+
+    statusOptions?.onReconnect?.();
+    await vi.waitFor(() => expect(fetchHome).toHaveBeenCalledTimes(4));
   });
 });

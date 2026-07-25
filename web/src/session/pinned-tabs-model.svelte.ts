@@ -105,6 +105,10 @@ export class PinnedTabsModel {
     return this.busyIds.has(sessionId);
   }
 
+  start(): void {
+    this.setEnabled(true);
+  }
+
   setEnabled(enabled: boolean): void {
     if (enabled === this.#enabled) return;
     this.#enabled = enabled;
@@ -138,8 +142,8 @@ export class PinnedTabsModel {
     return this.#pendingLoad;
   }
 
-  async setPinned(session: NormalizedSession, pinned: boolean): Promise<boolean> {
-    if (!session.id || this.busyIds.has(session.id)) return false;
+  setPinned(session: NormalizedSession, pinned: boolean): Promise<boolean> {
+    if (!session.id || this.busyIds.has(session.id)) return Promise.resolve(false);
     const previous = [...this.sessions];
     this.busyIds.add(session.id);
     if (pinned) {
@@ -155,16 +159,17 @@ export class PinnedTabsModel {
       this.sessions = this.sessions.filter((item) => item.id !== session.id);
     }
 
-    try {
-      await this.#updatePin(session.id, pinned);
-      await this.load();
-      return true;
-    } catch {
-      this.sessions = previous;
-      return false;
-    } finally {
-      this.busyIds.delete(session.id);
-    }
+    return this.#updatePin(session.id, pinned)
+      .then(
+        () => this.load().then(() => true),
+        () => {
+          this.sessions = previous;
+          return false;
+        },
+      )
+      .finally(() => {
+        this.busyIds.delete(session.id);
+      });
   }
 
   dispose(): void {

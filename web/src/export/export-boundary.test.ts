@@ -15,9 +15,12 @@ const forbidden: ReadonlyArray<string> = [
   "session/chat/",
   "session/live/",
   "session/session-globals.ts",
+  "session/pinned-tabs-model.svelte.ts",
   "components/session/chat/",
   "components/session/ChatComposer.svelte",
   "components/session/LiveReload.svelte",
+  "components/session/PinnedChips.svelte",
+  "components/session/PinnedTabsStrip.svelte",
 ];
 
 function normalize(file: string): string {

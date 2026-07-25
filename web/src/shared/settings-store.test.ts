@@ -85,6 +85,7 @@ describe("hydrateSettings", () => {
     expect(result?.["pican-theme"]).toBe("nord");
     expect(storage.getItem("pican-theme")).toBe("nord");
     expect(storage.getItem("pican:spinner-style")).toBe("x");
+    expect(storage.getItem("pican:v1:session-tabs")).toBe("x");
   });
 
   it("returns null and leaves storage untouched on failure", async () => {

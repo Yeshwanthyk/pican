@@ -72,7 +72,7 @@ export async function startServer(): Promise<StartedServer> {
   const port = await findFreePort();
   const baseURL = `http://127.0.0.1:${port}`;
 
-  const child = spawn(BINARY, ["-p", String(port), "-host", "127.0.0.1"], {
+  const child = spawn(BINARY, ["-p", String(port), "-host", "127.0.0.1", "-runtime", "pi"], {
     cwd: REPO_ROOT,
     env: {
       ...process.env,

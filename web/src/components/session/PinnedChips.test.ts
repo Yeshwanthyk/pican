@@ -6,7 +6,7 @@ import PinnedChips from "./PinnedChips.svelte";
 
 let observedWidth = 320;
 
-class TestResizeObserver {
+class TestResizeObserver implements ResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {}
   observe(target: Element) {
     this.callback(
@@ -16,11 +16,11 @@ class TestResizeObserver {
           contentRect: { width: observedWidth } as DOMRectReadOnly,
         } as ResizeObserverEntry,
       ],
-      this as unknown as ResizeObserver,
+      this,
     );
   }
   disconnect() {}
-  unobserve() {}
+  unobserve(_target: Element) {}
 }
 
 const pinned = (id: string, pinOrder: number) =>

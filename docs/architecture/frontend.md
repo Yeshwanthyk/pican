@@ -84,10 +84,18 @@ The index + settings Phase 4 migration is complete: those routes are Svelte-orch
 
 Pinned sessions are also available directly from the live session header. The
 centered title opens `PinnedSessionSwitcher.svelte`: an anchored popover on
-desktop and a bottom sheet on mobile. It loads the global local pin order from
-`/api/pins`, resolves those summaries through `/api/sessions`, and keeps the
-existing command palette as the broader session-search path. Pin order is the
-stable creation order recorded in SQLite rather than recent activity.
+desktop and a bottom sheet on mobile. The optional pinned-session tabs setting
+adds a compact strip below the desktop header and status-aware chips below the
+mobile composer, including a temporary guest tab for the current unpinned
+session. All three surfaces consume one `SessionShell`-owned
+`PinnedTabsModel`, whose bounded `GET /api/sessions?view=home` snapshot already
+contains every unarchived pin in stable SQLite pin order. When tabs are enabled,
+that model owns one global status subscription for running state and refreshes
+the bounded snapshot after relevant throttled reloads, curation changes, and
+reconnects; when disabled, the header switcher loads lazily and opens no
+persistent global stream. Pin mutations update optimistically, reconcile from
+the native pican curation state, and roll back on failure. The command palette
+remains the broader session-search path.
 
 ## Static / Share Export
 

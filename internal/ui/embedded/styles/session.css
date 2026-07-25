@@ -151,7 +151,7 @@ body {
   color: var(--text);
   background: var(--body-bg);
   min-height: 100vh;
-  --session-content-offset: 52px;
+  --session-header-offset: 52px;
 }
 
 body.pi-sheet-open {
@@ -175,8 +175,8 @@ body.pi-sheet-open {
 #app {
   display: flex;
   align-items: stretch;
-  height: calc(100vh - var(--session-content-offset));
-  margin-top: var(--session-content-offset);
+  height: calc(100vh - var(--session-header-offset));
+  margin-top: var(--session-header-offset);
   /* Chrome shell behind the resizer gutters so no body-bg slivers show
          beside the darker composer / sidebars. The content column re-lights
          itself with --body-bg below. */
@@ -770,13 +770,13 @@ body.right-sidebar-expanded .right-sidebar-backdrop {
 
 body.right-sidebar-expanded .right-sidebar {
   position: fixed;
-  top: var(--session-content-offset);
+  top: var(--session-header-offset);
   right: 0;
   bottom: 0;
   width: min(640px, 90vw) !important;
   min-width: min(640px, 90vw) !important;
   max-width: min(640px, 90vw) !important;
-  height: calc(100vh - var(--session-content-offset));
+  height: calc(100vh - var(--session-header-offset));
   z-index: 198;
   border-left: 1px solid var(--dim);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
@@ -1440,6 +1440,13 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 
 .pinned-tabs-strip {
   display: none;
+}
+
+:root.wco .pinned-tabs-strip,
+:root.wco .pinned-tabs-strip a,
+:root.wco .pinned-tabs-strip button {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .pinned-chips {
@@ -3412,12 +3419,12 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   }
 
   body.pican-session-page.has-session-tabs {
-    --session-content-offset: 88px;
+    --session-header-offset: 88px;
   }
 
   #app {
-    height: calc(100vh - var(--session-content-offset));
-    margin-top: var(--session-content-offset);
+    height: calc(100vh - var(--session-header-offset));
+    margin-top: var(--session-header-offset);
     overflow: hidden;
   }
 

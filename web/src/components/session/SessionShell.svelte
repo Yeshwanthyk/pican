@@ -21,6 +21,7 @@
   import PinnedTabsStrip from './PinnedTabsStrip.svelte';
   import { normalizeSession } from '../../index/sessions.js';
   import { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte.js';
+  import { sessionTitle } from '../../session/session-title.svelte.js';
   import {
     sessionModals,
     hasDiffUrlParam,
@@ -61,12 +62,12 @@
   );
   const workerDown = $derived(workerStatus.state === 'error');
   const running = $derived(workerStatus.state === 'running');
-  const pinnedTabs = new PinnedTabsModel(sessionId);
+  const pinnedTabs = new PinnedTabsModel('');
   const currentSession = $derived(
     pinnedTabs.sessions.find((session) => session.id === sessionId) ??
       normalizeSession({
         id: sessionId,
-        name: title,
+        name: sessionTitle.name || title,
         project: cwd,
         runtime,
         nativeId,
@@ -79,7 +80,8 @@
 
   $effect(() => {
     pinnedTabs.setCurrentSessionId(sessionId);
-    pinnedTabs.setEnabled(sessionTabsEnabled);
+    if (sessionTabsEnabled) pinnedTabs.start();
+    else pinnedTabs.setEnabled(false);
     document.body?.classList.toggle('has-session-tabs', sessionTabsEnabled);
   });
 
