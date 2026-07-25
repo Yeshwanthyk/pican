@@ -82,6 +82,7 @@ type SessionSummary struct {
 	// is never derived from the session file itself.
 	Pinned            bool     `json:"pinned,omitempty"`
 	PinOrder          int      `json:"pinOrder,omitempty"`
+	Archived          bool     `json:"archived,omitempty"`
 	Btw               bool     `json:"btw,omitempty"`
 	CurrentActivity   string   `json:"currentActivity,omitempty"`
 	ActivityStartedAt string   `json:"activityStartedAt,omitempty"`

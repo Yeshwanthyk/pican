@@ -26,6 +26,9 @@ func newPinsDB(t *testing.T) *sql.DB {
 	if _, err := db.Exec(sessionPinsSchema); err != nil {
 		t.Fatalf("create session_pins: %v", err)
 	}
+	if _, err := db.Exec(sessionArchivesSchema); err != nil {
+		t.Fatalf("create session_archives: %v", err)
+	}
 	t.Cleanup(func() { db.Close() })
 	return db
 }
@@ -48,6 +51,7 @@ func newPinsServer(t *testing.T) *Server {
 // session through the POST /api/pins handler.
 func TestHandleSetPin_ToggleRoundTrip(t *testing.T) {
 	s := newPinsServer(t)
+	writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "sub"), "a.jsonl", "/home/user/project")
 	post := func(body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/api/pins", strings.NewReader(body))
 		w := httptest.NewRecorder()

@@ -28,6 +28,9 @@ func newProjectPrefsDB(t *testing.T) *sql.DB {
 	if _, err := db.Exec(appSettingsSchema); err != nil {
 		t.Fatalf("create app_settings: %v", err)
 	}
+	if _, err := db.Exec(sessionArchivesSchema); err != nil {
+		t.Fatalf("create session_archives: %v", err)
+	}
 	t.Cleanup(func() { db.Close() })
 	return db
 }
@@ -211,6 +214,45 @@ func TestHandleUpdateProject(t *testing.T) {
 	}
 }
 
+func TestHandleUpdateProject_TrackPromotesDiscoveredSource(t *testing.T) {
+	s := &Server{db: newProjectPrefsDB(t), now: time.Now}
+	path := t.TempDir()
+	s.syncProjectPrefs([]string{path})
+
+	body, _ := json.Marshal(map[string]string{"path": path, "action": "track"})
+	req := httptest.NewRequest(http.MethodPost, "/api/projects", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	s.handleUpdateProject(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("track status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	var enabled int
+	var source string
+	if err := s.db.QueryRow("SELECT enabled, source FROM project_prefs WHERE project_path = ?", path).Scan(&enabled, &source); err != nil {
+		t.Fatal(err)
+	}
+	if enabled != 1 || source != "registered" {
+		t.Fatalf("tracked row = enabled %d source %q", enabled, source)
+	}
+	tracked, ok := s.trackedProjectSet()
+	if !ok || !tracked[path] {
+		t.Fatalf("tracked set = %v (ok=%v)", tracked, ok)
+	}
+
+	body, _ = json.Marshal(map[string]string{"path": path, "action": "untrack"})
+	req = httptest.NewRequest(http.MethodPost, "/api/projects", strings.NewReader(string(body)))
+	w = httptest.NewRecorder()
+	s.handleUpdateProject(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("untrack status = %d, body = %s", w.Code, w.Body.String())
+	}
+	tracked, _ = s.trackedProjectSet()
+	if tracked[path] {
+		t.Fatalf("%s remained tracked", path)
+	}
+}
+
 func TestHandleUpdateProject_BulkToggle(t *testing.T) {
 	s := &Server{db: newProjectPrefsDB(t), cache: sessions.NewCache(), sessionsDir: t.TempDir(), now: time.Now}
 	s.syncProjectPrefs([]string{"/a", "/b", "/c"})
@@ -271,6 +313,63 @@ func TestHandleApiProjects(t *testing.T) {
 	b, ok := byPath["/home/user/project-b"]
 	if !ok || b.SessionCount != 1 || !b.Enabled {
 		t.Fatalf("project-b entry wrong: %+v", b)
+	}
+}
+
+func TestHandleApiProjects_TrackedAndCountsUseMainUnarchivedSet(t *testing.T) {
+	s := newTestServer(t)
+	project := t.TempDir()
+	writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "sub"), "visible.jsonl", project)
+	writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "sub"), "archived.jsonl", project)
+	writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "sub"), "child.jsonl", project)
+	childPath := filepath.Join(s.sessionsDir, "sub", "child.jsonl")
+	data, err := os.ReadFile(childPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(childPath, []byte(strings.Replace(string(data), `"cwd":`, `"name":"subagent: child","cwd":`, 1)), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.trackProject(project); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.setSessionArchived("archived.jsonl", true); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/projects", nil)
+	w := httptest.NewRecorder()
+	s.handleApiProjects(w, req)
+	var payload struct {
+		Projects []projectEntry `json:"projects"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range payload.Projects {
+		if entry.Path == project {
+			if !entry.Tracked || entry.SessionCount != 1 {
+				t.Fatalf("project entry = %+v, want tracked with one main unarchived session", entry)
+			}
+			return
+		}
+	}
+	t.Fatalf("project %s missing from response", project)
+}
+
+func TestHandleNewSessionTracksResolvedProject(t *testing.T) {
+	s := newTestServer(t)
+	project := filepath.Join(t.TempDir(), "new-project")
+	body, _ := json.Marshal(map[string]string{"path": project, "runtime": "pi"})
+	req := httptest.NewRequest(http.MethodPost, "/api/new-session", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	s.handleNewSession(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("new session status = %d, body = %s", w.Code, w.Body.String())
+	}
+	tracked, ok := s.trackedProjectSet()
+	if !ok || !tracked[project] {
+		t.Fatalf("resolved project was not tracked: %v (ok=%v)", tracked, ok)
 	}
 }
 

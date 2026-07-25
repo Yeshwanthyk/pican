@@ -67,6 +67,7 @@ func (s *Server) setProjectFilterEnabled(enabled bool) {
 type projectEntry struct {
 	Path         string `json:"path"`
 	Enabled      bool   `json:"enabled"`
+	Tracked      bool   `json:"tracked"`
 	SessionCount int    `json:"sessionCount"`
 	Source       string `json:"source"`
 }
@@ -136,6 +137,47 @@ func (s *Server) enabledProjectSet() (map[string]bool, bool) {
 	return set, true
 }
 
+// trackedProjectSet is the explicit home registry. Legacy enabled discovered
+// rows are deliberately excluded: they are bootstrap history, not user intent.
+func (s *Server) trackedProjectSet() (map[string]bool, bool) {
+	if s.db == nil {
+		return nil, false
+	}
+	rows, err := s.db.Query("SELECT project_path FROM project_prefs WHERE source = 'registered' AND enabled = 1")
+	if err != nil {
+		return nil, false
+	}
+	defer rows.Close()
+	set := make(map[string]bool)
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, false
+		}
+		set[path] = true
+	}
+	return set, rows.Err() == nil
+}
+
+func (s *Server) trackProject(path string) error {
+	if s.db == nil {
+		return errors.New("preferences are unavailable")
+	}
+	_, err := s.db.Exec(`INSERT INTO project_prefs (project_path, enabled, source, updated_at)
+		VALUES (?, 1, 'registered', ?)
+		ON CONFLICT(project_path) DO UPDATE SET
+			enabled=1, source='registered', updated_at=excluded.updated_at`, path, s.now())
+	return err
+}
+
+func (s *Server) untrackProject(path string) error {
+	if s.db == nil {
+		return errors.New("preferences are unavailable")
+	}
+	_, err := s.db.Exec("DELETE FROM project_prefs WHERE project_path = ? AND source = 'registered'", path)
+	return err
+}
+
 // filterEnabledSummaries drops sessions whose project is disabled. Sessions with
 // an empty project are always kept. With no database it is a no-op.
 func (s *Server) filterEnabledSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
@@ -167,9 +209,11 @@ func (s *Server) handleApiProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	summaries = s.mainListSummaries(summaries)
+	archived, _ := s.archivedSessionIDs()
 	counts := make(map[string]int)
 	for _, sum := range summaries {
-		if sum.Project != "" {
+		if sum.Project != "" && !archived[sum.ID] {
 			counts[sum.Project]++
 		}
 	}
@@ -217,6 +261,7 @@ func (s *Server) handleApiProjects(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, projectEntry{
 			Path:         p,
 			Enabled:      en,
+			Tracked:      src == "registered" && en,
 			SessionCount: counts[p],
 			Source:       src,
 		})
@@ -265,8 +310,8 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := body.Path
-	if body.Action == "register" {
-		normalized, err := normalizeProjectPath(path)
+	if body.Action == "register" || body.Action == "track" {
+		normalized, err := sessions.PrepareSessionPath(path)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
@@ -289,12 +334,10 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 		_, err = s.db.Exec(`INSERT INTO project_prefs (project_path, enabled, source, updated_at)
 			VALUES (?, 0, 'discovered', ?)
 			ON CONFLICT(project_path) DO UPDATE SET enabled=0, updated_at=excluded.updated_at`, path, now)
-	case "register":
-		_, err = s.db.Exec(`INSERT INTO project_prefs (project_path, enabled, source, updated_at)
-			VALUES (?, 1, 'registered', ?)
-			ON CONFLICT(project_path) DO UPDATE SET enabled=1, updated_at=excluded.updated_at`, path, now)
-	case "remove":
-		_, err = s.db.Exec("DELETE FROM project_prefs WHERE project_path = ?", path)
+	case "register", "track":
+		err = s.trackProject(path)
+	case "remove", "untrack":
+		err = s.untrackProject(path)
 	default:
 		writeJSONError(w, http.StatusBadRequest, "unknown action")
 		return
@@ -303,6 +346,7 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "failed to update project: "+err.Error())
 		return
 	}
+	s.publishCurationUpdated()
 	writeJSON(w, 0, map[string]any{"ok": true, "path": path})
 }
 

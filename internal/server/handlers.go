@@ -254,20 +254,7 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	project := q.Get("project")
-	if project != "" {
-		filtered := make([]sessions.SessionSummary, 0, len(summaries))
-		for _, sum := range summaries {
-			if sum.Project == project {
-				filtered = append(filtered, sum)
-			}
-		}
-		summaries = filtered
-	} else {
-		summaries = s.filterEnabledSummaries(summaries)
-	}
-	summaries = s.filterBtwSummaries(summaries)
-	summaries = filterSubagentSummaries(summaries)
+	summaries = s.mainListSummaries(summaries)
 
 	if query := strings.TrimSpace(q.Get("q")); query != "" {
 		summaries = filterSummariesByQuery(summaries, query)
@@ -277,16 +264,118 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 
 	orderedPins, _ := s.orderedPinnedSessionIDs()
 	markPinnedSummaries(summaries, orderedPins)
+	archived, _ := s.archivedSessionIDs()
+	markArchivedSummaries(summaries, archived)
 	pinnedIDs := make(map[string]bool, len(orderedPins))
 	for _, id := range orderedPins {
 		pinnedIDs[id] = true
 	}
 
+	project := q.Get("project")
+	view := q.Get("view")
+	switch {
+	case project != "":
+		summaries = filterProjectSummaries(summaries, project, false)
+	case view == "home":
+		summaries = s.homeSummaries(summaries, orderedPins)
+	case view == "all":
+		summaries = filterArchivedSummaries(summaries, false)
+	case view == "archived":
+		summaries = filterArchivedSummaries(summaries, true)
+	case view == "":
+		// Preserve the historical unscoped behavior for existing callers.
+		summaries = s.filterEnabledSummaries(summaries)
+	default:
+		writeJSONError(w, http.StatusBadRequest, "unknown sessions view")
+		return
+	}
+
 	total := len(summaries)
-	page := paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))
-	page = ensurePinnedOnFirstPage(page, summaries, q.Get("offset"), pinnedIDs)
+	page := summaries
+	if view != "home" || project != "" {
+		page = paginateSummaries(summaries, q.Get("offset"), q.Get("limit"))
+	}
+	if view == "" && project == "" {
+		page = ensurePinnedOnFirstPage(page, summaries, q.Get("offset"), pinnedIDs)
+	}
 
 	writeJSON(w, 0, map[string]any{"sessions": page, "total": total})
+}
+
+// mainListSummaries is the shared catalog boundary for /api/sessions and
+// /api/projects. Curation scopes are always applied after these exclusions.
+func (s *Server) mainListSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
+	summaries = s.filterBtwSummaries(summaries)
+	return filterSubagentSummaries(summaries)
+}
+
+func filterArchivedSummaries(summaries []sessions.SessionSummary, archived bool) []sessions.SessionSummary {
+	out := make([]sessions.SessionSummary, 0, len(summaries))
+	for _, summary := range summaries {
+		if summary.Archived == archived {
+			out = append(out, summary)
+		}
+	}
+	return out
+}
+
+func filterProjectSummaries(summaries []sessions.SessionSummary, project string, includeArchived bool) []sessions.SessionSummary {
+	out := make([]sessions.SessionSummary, 0, len(summaries))
+	for _, summary := range summaries {
+		if summary.Project == project && (includeArchived || !summary.Archived) {
+			out = append(out, summary)
+		}
+	}
+	return out
+}
+
+func (s *Server) runningIDSnapshot() map[string]bool {
+	s.lastKnownMu.Lock()
+	defer s.lastKnownMu.Unlock()
+	ids := make(map[string]bool, len(s.lastKnown))
+	for id := range s.lastKnown {
+		ids[id] = true
+	}
+	return ids
+}
+
+func (s *Server) homeSummaries(all []sessions.SessionSummary, orderedPins []string) []sessions.SessionSummary {
+	running := s.runningIDSnapshot()
+	tracked, _ := s.trackedProjectSet()
+	added := make(map[string]bool)
+	out := make([]sessions.SessionSummary, 0)
+
+	// Activity sorting is already applied by the caller.
+	for _, summary := range all {
+		if running[summary.ID] || summary.WaitingQuestion != "" {
+			out = append(out, summary)
+			added[summary.ID] = true
+		}
+	}
+
+	byID := make(map[string]sessions.SessionSummary, len(all))
+	for _, summary := range all {
+		byID[summary.ID] = summary
+	}
+	for _, id := range orderedPins {
+		summary, ok := byID[id]
+		if !ok || summary.Archived || added[id] {
+			continue
+		}
+		out = append(out, summary)
+		added[id] = true
+	}
+
+	perProject := make(map[string]int)
+	for _, summary := range all {
+		if summary.Archived || added[summary.ID] || !tracked[summary.Project] || perProject[summary.Project] >= 6 {
+			continue
+		}
+		out = append(out, summary)
+		added[summary.ID] = true
+		perProject[summary.Project]++
+	}
+	return out
 }
 
 // filterSubagentSummaries drops subagent child sessions (session_info name
@@ -427,6 +516,13 @@ func paginatedEntries(entries []map[string]any) (out []map[string]any, total, fr
 // the /api/session endpoint and the bootstrap embedded in the page shell.
 func (s *Server) sessionResponseMap(session sessions.Session, entries []map[string]any, total, from int) map[string]any {
 	s.applyRuntimeAvailability(&session.SessionSummary)
+	if summary, err := s.cache.ResolveSummary(s.sessionsDir, session.ID); err == nil {
+		session.CurrentActivity = summary.CurrentActivity
+		session.ActivityStartedAt = summary.ActivityStartedAt
+		session.WaitingQuestion = summary.WaitingQuestion
+		session.WaitingSince = summary.WaitingSince
+		session.WaitingOptions = summary.WaitingOptions
+	}
 	descriptor, _ := s.runtimeDescriptor(session.Runtime)
 	return map[string]any{
 		"header":             session.Header,
@@ -444,6 +540,10 @@ func (s *Server) sessionResponseMap(session sessions.Session, entries []map[stri
 		"nativeId":           session.NativeID,
 		"projectionMode":     s.projectionMode(session.Runtime),
 		"resumeCommand":      s.terminalResumeCommand(session),
+		"archived":           s.isSessionArchived(session.ID),
+		"waitingQuestion":    session.WaitingQuestion,
+		"waitingSince":       session.WaitingSince,
+		"waitingOptions":     session.WaitingOptions,
 	}
 }
 
@@ -597,8 +697,11 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 	// thinking level immediately instead of waiting for the first chat message.
 	// If the request came from an existing session page, copy that session's
 	// current model and thinking level onto the new worker.
-	if s.chatSender != nil {
-		if resolved, err := s.resolveSession(id); err == nil {
+	if resolved, resolveErr := s.resolveSession(id); resolveErr == nil {
+		if resolved.Session.Project != "" && s.trackProject(resolved.Session.Project) == nil {
+			s.publishCurationUpdated()
+		}
+		if s.chatSender != nil {
 			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, settings)
 		}
 	}

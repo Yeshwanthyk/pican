@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"pican/internal/sessions"
 )
@@ -57,13 +56,15 @@ func (s *Server) orderedPinnedSessionIDs() ([]string, bool) {
 }
 
 func (s *Server) setSessionPinned(sessionID string, pinned bool) error {
-	if pinned {
-		_, err := s.db.Exec(`INSERT INTO session_pins (session_id, created_at) VALUES (?, ?)
-			ON CONFLICT(session_id) DO NOTHING`, sessionID, s.now().Format(time.RFC3339Nano))
+	tx, err := s.db.Begin()
+	if err != nil {
 		return err
 	}
-	_, err := s.db.Exec("DELETE FROM session_pins WHERE session_id = ?", sessionID)
-	return err
+	defer tx.Rollback()
+	if err := setPinnedTx(tx, sessionID, pinned, s.now()); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // reapOrphanedPins deletes pins whose session no longer exists. `all` must be
@@ -139,10 +140,15 @@ func (s *Server) handleSetPin(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "pins are unavailable")
 		return
 	}
+	if _, err := s.cache.Resolve(s.sessionsDir, sessionID); err != nil {
+		resolveOrWriteError(w, err)
+		return
+	}
 	if err := s.setSessionPinned(sessionID, body.Pinned); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.publishCurationUpdated()
 	writeJSON(w, 0, map[string]any{"ok": true, "pinned": body.Pinned})
 }
 
