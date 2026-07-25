@@ -138,8 +138,11 @@
   {nativeId}
   {chatAvailable}
   {workerStatus}
+  pinnedNavigationEnabled={sessionTabsEnabled}
 />
-<PinnedSessionSwitcher model={pinnedTabs} {currentSession} {onArchiveChange} />
+{#if !sessionTabsEnabled}
+  <PinnedSessionSwitcher model={pinnedTabs} {currentSession} {onArchiveChange} />
+{/if}
 {#if sessionTabsEnabled}
   <PinnedTabsStrip
     model={pinnedTabs}

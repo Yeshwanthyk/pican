@@ -26,6 +26,25 @@ describe("SessionHeader runtime commands", () => {
     );
   });
 
+  it("uses a static title with working-directory context when pinned navigation is enabled", () => {
+    const { container } = render(SessionHeader, {
+      props: {
+        title: "Pinned work",
+        cwd: "/Users/yesh/code/personal/pican",
+        pinnedNavigationEnabled: true,
+      },
+    });
+    const context = container.querySelector("#session-header-title");
+    expect(context?.tagName).toBe("DIV");
+    expect(context).not.toHaveAttribute("popovertarget");
+    expect(context).toHaveTextContent("Pinned work");
+    expect(context).toHaveTextContent("~/code/personal/pican");
+    expect(container.querySelector(".session-header-title-chevron")).toBeNull();
+    expect(container.querySelector(".session-header-bar")).toHaveClass(
+      "session-header-bar--pinned-navigation",
+    );
+  });
+
   it("copies the server-provided Pi resume command", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", {

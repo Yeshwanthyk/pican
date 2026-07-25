@@ -1647,6 +1647,38 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-header-title-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  overflow: hidden;
+  line-height: 1.15;
+}
+
+.session-header-title-primary {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-header-project {
+  width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 450;
+  line-height: 1.1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-header-state {
@@ -3545,20 +3577,63 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
            52px + inset of top padding, leaving an empty gap the height of
            the inset below the header. */
     height: calc(52px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 12px 0;
+    padding: env(safe-area-inset-top) 8px 0;
+    gap: 0;
   }
 
-  /* On phones the title sat absolutely centered and overlapped the
-         left (back + tree toggle) and right action clusters. Drop it into the
-         flex flow so it occupies only the gap between them and truncates. */
+  .session-header-left {
+    width: 44px;
+    gap: 0;
+  }
+
+  .session-header-back,
+  .session-header-actions {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+  }
+
+  .session-header-back-label,
+  .session-header-tree-toggle {
+    display: none;
+  }
+
+  .session-header-right {
+    gap: 0;
+  }
+
+  .session-header-bar--pinned-navigation .session-header-new {
+    display: none;
+  }
+
+  /* The mobile header carries context, not navigation. Pins move through the
+         composer chips; this center block stays readable between one back
+         affordance and the remaining session actions. */
   .session-header-title {
     position: static;
     transform: none;
     flex: 1 1 auto;
     min-width: 0;
     max-width: none;
-    margin: 0 8px;
-    text-align: center;
+    min-height: 40px;
+    margin: 0 4px;
+    justify-content: flex-start;
+    gap: 6px;
+    text-align: left;
+  }
+
+  .session-header-title--static {
+    padding: 3px 2px;
+  }
+
+  .session-header-runtime {
+    width: 20px;
+    height: 20px;
+  }
+
+  .session-header-runtime-mark {
+    width: 18px;
+    height: 18px;
   }
 
   .pinned-session-switcher {
@@ -4486,6 +4561,33 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   .pinned-chip-pin:disabled {
     opacity: 0.45;
     cursor: default;
+  }
+
+  .pinned-chips-new {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    flex: 0 0 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+
+  .pinned-chips-new:hover,
+  .pinned-chips-new:focus-visible {
+    color: var(--text);
+    background: var(--hover);
+    border-color: var(--dim);
+  }
+
+  .pinned-chips-new:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: -2px;
   }
 
   .pi-chat-composer--view-only:has(.pinned-chips) {

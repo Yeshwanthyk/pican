@@ -60,6 +60,7 @@ describe("PinnedChips", () => {
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("Session s10");
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("working");
     expect(container.querySelector('[title="OpenCode"]')).toHaveTextContent("O");
+    expect(container.querySelector('[aria-label="Unpin session"]')).not.toBeNull();
   });
 
   it("uses a capacity slot for the guest and exposes an explicit Pin action", async () => {
@@ -88,5 +89,25 @@ describe("PinnedChips", () => {
     });
     expect(container.querySelector(".pinned-chip--guest")).toHaveTextContent("awaiting you");
     expect(container.querySelector('[aria-label="Pin session"]')).not.toBeNull();
+  });
+
+  it("reserves a bounded chip for starting a session", async () => {
+    observedWidth = 320;
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+    const model = new PinnedTabsModel("s1");
+    model.sessions = Array.from({ length: 8 }, (_, index) => pinned(`s${index + 1}`, index + 1));
+
+    const { container } = render(PinnedChips, {
+      props: {
+        model,
+        currentSession: model.sessions[0]!,
+        canCreate: true,
+      },
+    });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".pinned-chip")).toHaveLength(4);
+    });
+    expect(container.querySelector('[aria-label="Start a new session"]')).not.toBeNull();
   });
 });

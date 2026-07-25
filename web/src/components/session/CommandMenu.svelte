@@ -409,14 +409,16 @@
 {#snippet menuBody(itemClass: string, sectionClass: string, desktop: boolean)}
   <div class={sectionClass}>
     {#each visiblePrimaryItems as item (item.action)}
-      <button
-        class={itemClass}
-        type="button"
-        data-action={item.action}
-        disabled={item.disabled}
-        title={item.title || undefined}
-        >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
-      >
+      {#if desktop || item.action !== 'tree'}
+        <button
+          class={itemClass}
+          type="button"
+          data-action={item.action}
+          disabled={item.disabled}
+          title={item.title || undefined}
+          >{@render label(item)}{#if desktop && item.kbd}<kbd>{item.kbd}</kbd>{/if}</button
+        >
+      {/if}
     {/each}
   </div>
   <div class={sectionClass}>

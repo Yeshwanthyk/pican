@@ -18,6 +18,7 @@
   import { navigate, handleNavClick } from '../../shared/navigation.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
+  import { shortenPath } from '../../session/render/session-format.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
   import { openTree } from '../../session/session-modals.svelte.js';
   import {
@@ -35,6 +36,7 @@
     nativeId = '',
     chatAvailable = true,
     workerStatus = { state: 'idle' },
+    pinnedNavigationEnabled = false,
   }: {
     title?: string;
     cwd?: string;
@@ -46,6 +48,7 @@
     nativeId?: string;
     chatAvailable?: boolean;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
+    pinnedNavigationEnabled?: boolean;
   } = $props();
 
   const safeResumeCommand = $derived(capabilities.resume ? resumeCommand : '');
@@ -156,11 +159,14 @@
   <button id="share-btn" title="Share session as GitHub Gist">Share</button>
 </div>
 
-<div class="session-header-bar">
+<div
+  class="session-header-bar"
+  class:session-header-bar--pinned-navigation={pinnedNavigationEnabled}
+>
   <div class="session-header-left">
     <a href="/" class="session-header-back" onclick={(event) => handleNavClick(event, '/')}
       ><span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
-      {t('session.back')}</a
+      <span class="session-header-back-label">{t('session.back')}</span></a
     >
     <button
       id="tree-toggle"
@@ -171,14 +177,18 @@
       onclick={() => openTree()}>{@html icon(PanelLeft, { size: 14 })}</button
     >
   </div>
-  <button
-    type="button"
+  <svelte:element
+    this={pinnedNavigationEnabled ? 'div' : 'button'}
+    type={pinnedNavigationEnabled ? undefined : 'button'}
     class="session-header-title"
+    class:session-header-title--static={pinnedNavigationEnabled}
     id="session-header-title"
-    popovertarget="pinned-session-switcher"
-    popovertargetaction="toggle"
-    aria-label={t('session.openPinnedSessions')}
-    title={t('session.openPinnedSessions')}
+    popovertarget={pinnedNavigationEnabled ? undefined : 'pinned-session-switcher'}
+    popovertargetaction={pinnedNavigationEnabled ? undefined : 'toggle'}
+    aria-label={pinnedNavigationEnabled ? undefined : t('session.openPinnedSessions')}
+    title={pinnedNavigationEnabled
+      ? `${sessionTitle.name || title}${cwd ? ` · ${shortenPath(cwd)}` : ''}`
+      : t('session.openPinnedSessions')}
   >
     <span
       class="session-header-runtime"
@@ -197,20 +207,29 @@
           >{runtimeMark.label.slice(0, 1).toUpperCase()}</span
         >{/if}
     </span>
-    <span class="session-header-title-text">{sessionTitle.name || title}</span>
-    {#if workerStatus.state === 'error'}
-      <span class="session-header-state session-header-state--danger"
-        >{t('session.workerDown')}</span
-      >
-    {:else if !chatAvailable}
-      <span class="session-header-state session-header-state--attention"
-        >{t('session.viewOnly')}</span
-      >
-    {/if}
-    <span class="session-header-title-chevron" aria-hidden="true"
-      >{@html icon(ChevronDown, { size: 12 })}</span
-    >
-  </button>
+    <span class="session-header-title-copy">
+      <span class="session-header-title-primary">
+        <span class="session-header-title-text">{sessionTitle.name || title}</span>
+        {#if workerStatus.state === 'error'}
+          <span class="session-header-state session-header-state--danger"
+            >{t('session.workerDown')}</span
+          >
+        {:else if !chatAvailable}
+          <span class="session-header-state session-header-state--attention"
+            >{t('session.viewOnly')}</span
+          >
+        {/if}
+        {#if !pinnedNavigationEnabled}
+          <span class="session-header-title-chevron" aria-hidden="true"
+            >{@html icon(ChevronDown, { size: 12 })}</span
+          >
+        {/if}
+      </span>
+      {#if cwd}
+        <span class="session-header-project" title={cwd}>{shortenPath(cwd)}</span>
+      {/if}
+    </span>
+  </svelte:element>
   <div class="session-header-right">
     {#if capabilities.create}<button
         id="new-session-header-btn"

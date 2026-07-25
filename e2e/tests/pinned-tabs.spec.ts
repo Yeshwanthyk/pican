@@ -60,6 +60,13 @@ test.describe("pinned session tabs", () => {
     try {
       await page.goto(`/session?id=${encodeURIComponent(alphaId)}`);
       await expect(page.locator(".pinned-tabs-strip")).toBeVisible();
+      await expect(page.locator(".session-header-project")).toHaveText(
+        "~/live-demo",
+      );
+      await expect(page.locator("#pinned-session-switcher")).toHaveCount(0);
+      await expect(page.locator("#session-header-title")).not.toHaveAttribute(
+        "popovertarget",
+      );
       await expect(page.locator(".pinned-tab--guest")).toContainText(
         "Tabs Alpha",
       );

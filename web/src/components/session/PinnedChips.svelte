@@ -3,7 +3,7 @@
   import { formatRelativeTime, type NormalizedSession } from '../../index/sessions';
   import { runtimeDisplay } from '../../lib/runtime-display';
   import { handleNavClick } from '../../shared/navigation';
-  import { icon, Pin } from '../../shared/icons';
+  import { icon, Pin, PinOff, Plus } from '../../shared/icons';
   import { t } from '../../shared/strings';
   import { showToast } from '../../shared/toast';
   import { prefetchSession } from '../../routes/session-prefetch';
@@ -17,12 +17,14 @@
     currentSession,
     currentRunning = false,
     currentWaiting = false,
+    canCreate = false,
     onArchiveChange = null,
   }: {
     model: PinnedTabsModel;
     currentSession: NormalizedSession;
     currentRunning?: boolean;
     currentWaiting?: boolean;
+    canCreate?: boolean;
     onArchiveChange?: ((archived: boolean) => void) | null;
   } = $props();
 
@@ -37,7 +39,7 @@
   );
 
   function updateCapacity(width: number): void {
-    idleCapacity = Math.max(0, Math.floor((width - 136) / 45));
+    idleCapacity = Math.max(0, Math.floor((width - 136 - (canCreate ? 45 : 0)) / 45));
   }
 
   onMount(() => {
@@ -75,12 +77,16 @@
     return age ? t('session.tabsIdleAge', { age }) : t('session.tabsIdle');
   }
 
-  async function pinCurrent(): Promise<void> {
-    if (await model.setPinned(currentSession, true)) {
-      if (currentSession.archived) onArchiveChange?.(false);
+  async function setCurrentPinned(pinned: boolean): Promise<void> {
+    if (await model.setPinned(currentSession, pinned)) {
+      if (pinned && currentSession.archived) onArchiveChange?.(false);
       return;
     }
     showToast(t('session.pinnedUpdateFailed'));
+  }
+
+  function createSession(): void {
+    document.getElementById('new-session-header-btn')?.click();
   }
 </script>
 
@@ -129,6 +135,16 @@
           </span>
         {/if}
       </a>
+      {#if active}
+        <button
+          type="button"
+          class="pinned-chip-pin"
+          disabled={model.isBusy(currentSession.id)}
+          aria-label={t('index.unpinSession')}
+          title={t('index.unpinSession')}
+          onclick={() => setCurrentPinned(false)}>{@html icon(PinOff, { size: 14 })}</button
+        >
+      {/if}
     </div>
   {/each}
 
@@ -164,8 +180,18 @@
         disabled={model.isBusy(currentSession.id)}
         aria-label={t('index.pinSession')}
         title={t('index.pinSession')}
-        onclick={pinCurrent}>{@html icon(Pin, { size: 14 })}</button
+        onclick={() => setCurrentPinned(true)}>{@html icon(Pin, { size: 14 })}</button
       >
     </div>
+  {/if}
+
+  {#if canCreate}
+    <button
+      type="button"
+      class="pinned-chips-new"
+      aria-label={t('session.newSession')}
+      title={t('session.newSession')}
+      onclick={createSession}>{@html icon(Plus, { size: 16 })}</button
+    >
   {/if}
 </nav>

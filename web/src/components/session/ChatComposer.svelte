@@ -271,6 +271,7 @@
         {currentSession}
         {currentRunning}
         {currentWaiting}
+        canCreate={capabilities.create}
         {onArchiveChange}
       />
     {/if}
@@ -331,6 +332,7 @@
         {currentSession}
         {currentRunning}
         {currentWaiting}
+        canCreate={capabilities.create}
         {onArchiveChange}
       />
     {/if}

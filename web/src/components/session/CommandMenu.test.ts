@@ -97,6 +97,13 @@ describe("CommandMenu", () => {
     expect(document.querySelectorAll('[data-action="subagents"]')).toHaveLength(2);
   });
 
+  it("keeps Tree in the desktop menu and removes it from the mobile action sheet", () => {
+    const { container } = render(CommandMenu, { props: { sessionId: "session.jsonl" } });
+
+    expect(container.querySelectorAll('.command-menu-item[data-action="tree"]')).toHaveLength(1);
+    expect(container.querySelector('.mobile-command-item[data-action="tree"]')).toBeNull();
+  });
+
   it("always shows the local archive action independent of runtime capabilities", () => {
     render(CommandMenu, { props: { sessionId: "session.jsonl" } });
 
