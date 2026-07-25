@@ -1442,6 +1442,10 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   display: none;
 }
 
+.pinned-chips {
+  display: none;
+}
+
 .pinned-tabs-list {
   min-width: 0;
   display: flex;
@@ -4306,6 +4310,195 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   justify-content: center;
   min-height: 64px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 900px) {
+  .pinned-chips {
+    width: 100%;
+    max-width: 760px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 6px auto 0;
+    overflow: hidden;
+  }
+
+  .pinned-chip {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    display: flex;
+    flex: 0 0 40px;
+    align-items: center;
+    overflow: hidden;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--dim) 80%, transparent);
+    border-radius: 9px;
+    box-sizing: border-box;
+    transition:
+      flex-basis 0.16s ease,
+      border-color 0.12s ease,
+      background 0.12s ease;
+  }
+
+  .pinned-chip--active {
+    min-width: 136px;
+    flex: 1 1 136px;
+    color: var(--text);
+    background: var(--surface-2);
+    border-color: var(--dim);
+  }
+
+  .pinned-chip--guest {
+    border-style: dashed;
+  }
+
+  .pinned-chip--waiting {
+    border-color: color-mix(in srgb, var(--attention) 55%, transparent);
+  }
+
+  .pinned-chip > a {
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .pinned-chip--active > a {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+
+  .pinned-chip-runtime {
+    width: 17px;
+    height: 17px;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 650;
+  }
+
+  .pinned-chip-status {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    background: transparent;
+    border-radius: 999px;
+  }
+
+  .pinned-chip--active .pinned-chip-status {
+    position: static;
+    flex: none;
+  }
+
+  .pinned-chip--running .pinned-chip-status {
+    background: var(--accent);
+    animation: pinned-tab-pulse 1.6s ease-in-out infinite;
+  }
+
+  .pinned-chip--waiting .pinned-chip-status {
+    background: var(--attention);
+  }
+
+  .pinned-chip-copy {
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.25;
+  }
+
+  .pinned-chip-title,
+  .pinned-chip-caption {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pinned-chip-title {
+    color: var(--text);
+    font-size: 10.5px;
+  }
+
+  .pinned-chip-caption {
+    color: var(--muted);
+    font-size: 9px;
+  }
+
+  .pinned-chip--running .pinned-chip-caption {
+    color: var(--accent);
+  }
+
+  .pinned-chip--waiting .pinned-chip-caption {
+    color: var(--attention);
+  }
+
+  .pinned-chip-pin {
+    width: 36px;
+    height: 40px;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--dim);
+    cursor: pointer;
+  }
+
+  .pinned-chip-pin:hover,
+  .pinned-chip-pin:focus-visible {
+    color: var(--accent);
+    background: var(--hover);
+  }
+
+  .pinned-chip > a:focus-visible,
+  .pinned-chip-pin:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: -2px;
+  }
+
+  .pinned-chip-pin:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .pi-chat-composer--view-only:has(.pinned-chips) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pi-chat-composer--view-only:has(.pinned-chips) .plain-state--view-only {
+    align-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinned-chip {
+    transition: none;
+  }
+
+  .pinned-chip--running .pinned-chip-status {
+    animation: none;
+  }
 }
 
 .plain-state--view-only {

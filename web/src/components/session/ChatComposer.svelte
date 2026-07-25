@@ -21,6 +21,7 @@
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import * as chatApi from '../../session/chat/chat-api.js';
   import GitFooter from './GitFooter.svelte';
+  import PinnedChips from './PinnedChips.svelte';
   import ChatExpandButton from './chat/ChatExpandButton.svelte';
   import ChatSelectorPopups from './chat/ChatSelectorPopups.svelte';
   import ChatToolbar from './chat/ChatToolbar.svelte';
@@ -38,6 +39,8 @@
     defaultRuntimeCapabilities,
     type CompleteRuntimeCapabilities,
   } from '../../lib/runtime-capabilities.js';
+  import type { NormalizedSession } from '../../index/sessions.js';
+  import type { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte.js';
 
   let {
     sessionId = '',
@@ -48,6 +51,11 @@
     capabilities = defaultRuntimeCapabilities('pi'),
     resumeCommand = '',
     workerStatus = { state: 'idle' },
+    pinnedTabs = null,
+    currentSession = null,
+    currentRunning = false,
+    currentWaiting = false,
+    onArchiveChange = null,
   }: {
     sessionId?: string;
     chatAvailable?: boolean;
@@ -57,6 +65,11 @@
     capabilities?: CompleteRuntimeCapabilities;
     resumeCommand?: string;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
+    pinnedTabs?: PinnedTabsModel | null;
+    currentSession?: NormalizedSession | null;
+    currentRunning?: boolean;
+    currentWaiting?: boolean;
+    onArchiveChange?: ((archived: boolean) => void) | null;
   } = $props();
 
   const workerDown = $derived(workerStatus.state === 'error');
@@ -252,6 +265,15 @@
       onclick={copyResumeCommand}
       >{t('session.viewOnlyResume', { command: safeResumeCommand })}</button
     >
+    {#if pinnedTabs && currentSession}
+      <PinnedChips
+        model={pinnedTabs}
+        {currentSession}
+        {currentRunning}
+        {currentWaiting}
+        {onArchiveChange}
+      />
+    {/if}
   </div>
 {:else}<form
     id="pi-chat-composer"
@@ -303,6 +325,15 @@
       <ChatToolbar chatAvailable={composerAvailable} {toolbar} {modelLabel} {capabilities} />
       <ContextUsage popover={true} />
     </div>
+    {#if pinnedTabs && currentSession}
+      <PinnedChips
+        model={pinnedTabs}
+        {currentSession}
+        {currentRunning}
+        {currentWaiting}
+        {onArchiveChange}
+      />
+    {/if}
     <TextAttachmentModal />
     <GitFooter {sessionId} />
   </form>

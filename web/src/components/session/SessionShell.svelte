@@ -189,6 +189,11 @@
       {capabilities}
       {resumeCommand}
       {workerStatus}
+      pinnedTabs={sessionTabsEnabled ? pinnedTabs : null}
+      {currentSession}
+      currentRunning={running}
+      currentWaiting={waiting}
+      {onArchiveChange}
     />
   </div>
   <RightSidebar {scratchpad} projectPath={cwd} />

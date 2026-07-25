@@ -4,6 +4,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import ChatComposer from "./ChatComposer.svelte";
 import { runChatComposer } from "./chat/chat-composer-runtime.js";
 import { ChatToolbarState } from "./chat/chat-toolbar-state.svelte.js";
+import { normalizeSession } from "../../index/sessions";
+import { PinnedTabsModel } from "../../session/pinned-tabs-model.svelte";
 
 function getById(dom: JSDOM, id: "pi-chat-message"): HTMLTextAreaElement;
 function getById(dom: JSDOM, id: "pi-chat-composer"): HTMLFormElement;
@@ -53,6 +55,33 @@ describe("chat composer runner", () => {
       configurable: true,
       value: originalClipboard,
     });
+  });
+
+  it("keeps pinned chips available in a view-only session", () => {
+    const currentSession = normalizeSession({
+      id: "codex.jsonl",
+      name: "Read-only Codex",
+      project: "/repo",
+      runtime: "codex",
+      pinned: true,
+      pinOrder: 1,
+      chatAvailable: false,
+    });
+    const pinnedTabs = new PinnedTabsModel(currentSession.id);
+    pinnedTabs.sessions = [currentSession];
+
+    const { container } = render(ChatComposer, {
+      props: {
+        sessionId: currentSession.id,
+        chatAvailable: false,
+        pinnedTabs,
+        currentSession,
+      },
+    });
+
+    expect(container.querySelector(".pi-chat-composer--view-only .pinned-chips")).toHaveTextContent(
+      "Read-only Codex",
+    );
   });
 
   it("keeps the composer usable so the next send can replace a crashed worker", () => {
