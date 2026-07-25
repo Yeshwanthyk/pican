@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import ChatComposer from './ChatComposer.svelte';
   import LiveReload from './LiveReload.svelte';
   import CommandMenu from './CommandMenu.svelte';
@@ -17,6 +18,8 @@
   import SessionTree from './SessionTree.svelte';
   import ShareDialog from './ShareDialog.svelte';
   import PinnedSessionSwitcher from './PinnedSessionSwitcher.svelte';
+  import { normalizeSession } from '../../index/sessions.js';
+  import { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte.js';
   import {
     sessionModals,
     hasDiffUrlParam,
@@ -46,6 +49,7 @@
     nativeId = '',
     archived = false,
     waiting = false,
+    sessionTabsEnabled = false,
     onArchiveChange = null,
     dataEl = $bindable(null),
   } = $props();
@@ -56,6 +60,32 @@
   );
   const workerDown = $derived(workerStatus.state === 'error');
   const running = $derived(workerStatus.state === 'running');
+  const pinnedTabs = new PinnedTabsModel(sessionId);
+  const currentSession = $derived(
+    pinnedTabs.sessions.find((session) => session.id === sessionId) ??
+      normalizeSession({
+        id: sessionId,
+        name: title,
+        project: cwd,
+        runtime,
+        nativeId,
+        chatAvailable,
+        chatDisabledReason,
+        archived,
+        waitingQuestion: waiting ? 'waiting' : '',
+      }),
+  );
+
+  $effect(() => {
+    pinnedTabs.setCurrentSessionId(sessionId);
+    pinnedTabs.setEnabled(sessionTabsEnabled);
+    document.body?.classList.toggle('has-session-tabs', sessionTabsEnabled);
+  });
+
+  onDestroy(() => {
+    pinnedTabs.dispose();
+    document.body?.classList.remove('has-session-tabs');
+  });
 
   // Restore the diff sheet from `?diff=open` on first load. Must seed
   // sessionModals.diff before the sync $effect runs, or that effect would see
@@ -106,7 +136,7 @@
   {chatAvailable}
   {workerStatus}
 />
-<PinnedSessionSwitcher {sessionId} />
+<PinnedSessionSwitcher model={pinnedTabs} {currentSession} {onArchiveChange} />
 
 <CommandMenu
   {sessionId}

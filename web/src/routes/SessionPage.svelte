@@ -19,6 +19,8 @@
   import { resetSessionRuntime } from '../session/session-runtime';
   import { resetSessionRuntimeContext } from '../session/session-runtime-context';
   import { t } from '../shared/strings';
+  import { boolFor } from '../settings/settings-support';
+  import { SESSION_TABS_SETTING_KEY } from '../shared/settings-store';
   import { errorMessage, settle } from '../components/shared/ui-effect';
   import {
     defaultRuntimeCapabilities,
@@ -78,6 +80,7 @@
   let nativeId = $state('');
   let archived = $state(false);
   let waiting = $state(false);
+  let sessionTabsEnabled = $state(false);
   let dataEl = $state<HTMLScriptElement | null>(null);
 
   onMount(() => {
@@ -90,6 +93,9 @@
     applyStoredSessionLayout({
       documentImpl: document,
       windowImpl: window,
+      storage: window.localStorage,
+    });
+    sessionTabsEnabled = boolFor({}, SESSION_TABS_SETTING_KEY, false, {
       storage: window.localStorage,
     });
 
@@ -153,6 +159,12 @@
           applyLazyHighlighting,
           windowImpl: window,
           documentImpl: document,
+          onSettingsHydrated: () => {
+            if (!active) return;
+            sessionTabsEnabled = boolFor({}, SESSION_TABS_SETTING_KEY, false, {
+              storage: window.localStorage,
+            });
+          },
         });
         applyLazyHighlighting(document);
       } else {
@@ -213,6 +225,7 @@
     {nativeId}
     {archived}
     {waiting}
+    {sessionTabsEnabled}
     onArchiveChange={(next: boolean) => (archived = next)}
     bind:dataEl
   />

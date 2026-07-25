@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/svelte";
 import PinnedSessionSwitcher from "./PinnedSessionSwitcher.svelte";
+import { normalizeSession } from "../../index/sessions";
+import { PinnedTabsModel } from "../../session/pinned-tabs-model.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -8,12 +10,7 @@ describe("PinnedSessionSwitcher", () => {
   it("loads global pins and renders them in pin order", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/api/pins") {
-        return new Response(
-          JSON.stringify({ pins: ["second.jsonl", "third.jsonl", "first.jsonl"] }),
-        );
-      }
-      if (url === "/api/sessions?limit=1&view=all") {
+      if (url === "/api/sessions?view=home") {
         return new Response(
           JSON.stringify({
             sessions: [
@@ -22,6 +19,7 @@ describe("PinnedSessionSwitcher", () => {
                 name: "First",
                 project: "/repo/one",
                 pinned: true,
+                pinOrder: 3,
                 runtime: "pi",
               },
               {
@@ -29,6 +27,7 @@ describe("PinnedSessionSwitcher", () => {
                 name: "Second",
                 project: "/repo/two",
                 pinned: true,
+                pinOrder: 1,
                 runtime: "codex",
               },
               {
@@ -36,6 +35,7 @@ describe("PinnedSessionSwitcher", () => {
                 name: "Third",
                 project: "/repo/three",
                 pinned: true,
+                pinOrder: 2,
                 runtime: "opencode",
               },
             ],
@@ -46,8 +46,17 @@ describe("PinnedSessionSwitcher", () => {
     });
     vi.stubGlobal("fetch", fetchImpl);
 
+    const model = new PinnedTabsModel("first.jsonl");
     const { container } = render(PinnedSessionSwitcher, {
-      props: { sessionId: "first.jsonl" },
+      props: {
+        model,
+        currentSession: normalizeSession({
+          id: "first.jsonl",
+          name: "First",
+          project: "/repo/one",
+          runtime: "pi",
+        }),
+      },
     });
     const switcher = container.querySelector("#pinned-session-switcher");
     const toggle = new Event("toggle");
@@ -70,5 +79,9 @@ describe("PinnedSessionSwitcher", () => {
     ).toEqual(["/codex-icon.svg", null, "/pi-icon.svg"]);
     expect(container.querySelector('[title="OpenCode"]')).toHaveTextContent("O");
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("First");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/sessions?view=home",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
   });
 });

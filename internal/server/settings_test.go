@@ -54,6 +54,9 @@ func TestHandleGetSettingsDefaults(t *testing.T) {
 	if got["pican-theme"] != "dark" {
 		t.Errorf("expected default theme 'dark', got %q", got["pican-theme"])
 	}
+	if got["pican:v1:session-tabs"] != "false" {
+		t.Errorf("expected session-tabs default 'false', got %q", got["pican:v1:session-tabs"])
+	}
 	if len(got) != len(settingDefaults) {
 		t.Errorf("expected %d settings, got %d", len(settingDefaults), len(got))
 	}

@@ -46,12 +46,14 @@ const isRuntimeModel = (value: unknown): value is RuntimeModel => {
 export function startSessionPageRuntime({
   sessionId,
   applyLazyHighlighting,
+  onSettingsHydrated,
   windowImpl = window,
   documentImpl = document,
   runtime = getSessionRuntime(),
 }: {
   readonly sessionId: string;
   readonly applyLazyHighlighting: (documentImpl: Document) => void;
+  readonly onSettingsHydrated?: () => void;
   readonly windowImpl?: Window & typeof globalThis;
   readonly documentImpl?: Document;
   readonly runtime?: SessionRuntimeContext;
@@ -108,7 +110,10 @@ export function startSessionPageRuntime({
   // Catch up the toggle state to whatever the server returned, once it lands.
   // hydrated may be null when fetch isn't configured (export bundle / tests).
   hydrated?.then?.((settings) => {
-    if (settings) ui.toggleController.reload();
+    if (settings) {
+      ui.toggleController.reload();
+      onSettingsHydrated?.();
+    }
   });
   navigateTo(
     model.currentLeafId,

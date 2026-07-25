@@ -315,6 +315,9 @@ export default {
   "session.noPinnedSessions": "No pinned sessions yet",
   "session.pinnedLoadFailed": "Couldn’t load pinned sessions",
   "session.pinnedUpdateFailed": "Couldn’t update this pin",
+  "session.tabsAwaiting": "awaiting you",
+  "session.tabsIdle": "idle",
+  "session.tabsIdleAge": "idle · {age}",
   "session.pinCurrent": "Pin this session",
   "session.unpinCurrent": "Unpin this session",
   "session.archiveCurrent": "Archive this session",
@@ -558,6 +561,8 @@ export default {
   "settings.titleBuiltin": "Built-in heuristic (no AI)",
 
   "settings.sessionDisplay": "Session Display",
+  "settings.sessionTabs": "Pinned session tabs",
+  "settings.sessionTabsHint": "Show pinned sessions inside a session for quick switching.",
   "settings.thinkingExpanded": "Show thinking by default",
   "settings.thinkingExpandedHint":
     "When on, model reasoning is expanded as sessions load. You can still toggle it per session from the header.",

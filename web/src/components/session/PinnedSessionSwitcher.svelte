@@ -1,53 +1,35 @@
 <script lang="ts">
-  import { runPromise } from '../../lib/runtime';
-  import { effects } from '../../shared/api';
   import { icon, Check, Pin, PinOff, Search, X } from '../../shared/icons';
   import { navigate } from '../../shared/navigation';
   import { openSessionPalette } from '../../shared/command-palette-runtime';
   import { t } from '../../shared/strings';
   import { runtimeDisplay } from '../../lib/runtime-display';
-  import { normalizeSession, type NormalizedSession } from '../../index/sessions';
-  import { settle } from '../shared/ui-effect';
+  import type { NormalizedSession } from '../../index/sessions';
+  import type { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte';
 
-  let { sessionId = '' }: { sessionId?: string } = $props();
+  let {
+    model,
+    currentSession,
+    onArchiveChange = null,
+  }: {
+    model: PinnedTabsModel;
+    currentSession: NormalizedSession;
+    onArchiveChange?: ((archived: boolean) => void) | null;
+  } = $props();
 
   let popover = $state<HTMLElement | null>(null);
-  let sessions = $state<NormalizedSession[]>([]);
-  let loading = $state(false);
   let error = $state('');
-  let pinBusy = $state(false);
 
-  const currentPinned = $derived(sessions.some((session) => session.id === sessionId));
+  const currentPinned = $derived(model.isPinned(currentSession.id));
+  const pinBusy = $derived(model.isBusy(currentSession.id));
 
   function close(): void {
     if (popover && typeof popover.hidePopover === 'function') popover.hidePopover();
   }
 
   async function loadPinnedSessions(): Promise<void> {
-    loading = true;
     error = '';
-    const result = await settle(() =>
-      Promise.all([
-        runPromise(effects.sessions.pins),
-        runPromise(effects.sessions.list({ limit: 1, view: 'all' })),
-      ]),
-    );
-    if (result.ok) {
-      const [pinResponse, sessionResponse] = result.value;
-      const byId = new Map(
-        sessionResponse.sessions.map((raw) => {
-          const session = normalizeSession(raw);
-          return [session.id, session] as const;
-        }),
-      );
-      sessions = pinResponse.pins.flatMap((id) => {
-        const session = byId.get(id);
-        return session ? [session] : [];
-      });
-    } else {
-      error = t('session.pinnedLoadFailed');
-    }
-    loading = false;
+    if (!(await model.load())) error = t('session.pinnedLoadFailed');
   }
 
   function handleToggle(event: Event): void {
@@ -56,18 +38,18 @@
 
   function openSession(id: string): void {
     close();
-    if (id !== sessionId) navigate('/session?id=' + encodeURIComponent(id));
+    if (id !== currentSession.id) navigate('/session?id=' + encodeURIComponent(id));
   }
 
   async function toggleCurrentPin(): Promise<void> {
-    if (!sessionId || pinBusy) return;
-    pinBusy = true;
-    const result = await settle(() =>
-      runPromise(effects.sessions.updatePin(sessionId, !currentPinned)),
-    );
-    if (result.ok) await loadPinnedSessions();
-    else error = t('session.pinnedUpdateFailed');
-    pinBusy = false;
+    if (!currentSession.id || pinBusy) return;
+    error = '';
+    const next = !currentPinned;
+    if (await model.setPinned(currentSession, next)) {
+      if (next && currentSession.archived) onArchiveChange?.(false);
+    } else {
+      error = t('session.pinnedUpdateFailed');
+    }
   }
 
   function searchSessions(): void {
@@ -97,7 +79,7 @@
   </div>
 
   <div class="pinned-session-switcher-list" aria-live="polite">
-    {#if loading}
+    {#if model.loading}
       <div class="pinned-session-switcher-state">{t('session.loadingPinnedSessions')}</div>
     {:else if error}
       <button
@@ -105,16 +87,16 @@
         class="pinned-session-switcher-state pinned-session-switcher-retry"
         onclick={loadPinnedSessions}>{error} · {t('common.retry')}</button
       >
-    {:else if sessions.length === 0}
+    {:else if model.sessions.length === 0}
       <div class="pinned-session-switcher-state">{t('session.noPinnedSessions')}</div>
     {:else}
-      {#each sessions as session (session.id)}
+      {#each model.sessions as session (session.id)}
         {@const mark = runtimeDisplay(session.runtime)}
         <button
           type="button"
           class="pinned-session-switcher-row"
-          class:pinned-session-switcher-row--current={session.id === sessionId}
-          aria-current={session.id === sessionId ? 'page' : undefined}
+          class:pinned-session-switcher-row--current={session.id === currentSession.id}
+          aria-current={session.id === currentSession.id ? 'page' : undefined}
           onclick={() => openSession(session.id)}
         >
           {#if mark.icon}
@@ -134,7 +116,7 @@
             <span class="pinned-session-switcher-title">{session.name}</span>
             <span class="pinned-session-switcher-project">{session.project}</span>
           </span>
-          {#if session.id === sessionId}
+          {#if session.id === currentSession.id}
             <span class="pinned-session-switcher-check" aria-hidden="true"
               >{@html icon(Check, { size: 15 })}</span
             >

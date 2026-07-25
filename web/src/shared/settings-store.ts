@@ -3,6 +3,8 @@ import { NetworkError, StorageError } from "../lib/errors";
 import { runFork, runPromise, runSync } from "../lib/runtime";
 import { SettingsResponseSchema } from "../lib/schema";
 
+export const SESSION_TABS_SETTING_KEY = "pican:v1:session-tabs";
+
 export const SERVER_SETTING_KEYS = [
   "pican-theme",
   "pican:v1:font-ui",
@@ -21,6 +23,7 @@ export const SERVER_SETTING_KEYS = [
   "pican:v1:toggle:thinking",
   "pican:v1:toggle:tools",
   "pican:v1:toggle:tool-outputs",
+  SESSION_TABS_SETTING_KEY,
 ] as const;
 
 export interface SettingsStorage {

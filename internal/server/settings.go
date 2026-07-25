@@ -72,6 +72,7 @@ var settingDefaults = map[string]string{
 	"pican:v1:toggle:thinking":     "true",
 	"pican:v1:toggle:tools":        "true",
 	"pican:v1:toggle:tool-outputs": "false",
+	"pican:v1:session-tabs":        "false",
 }
 
 // getSettings returns every server-backed setting: defaults overlaid with any
