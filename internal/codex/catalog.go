@@ -63,15 +63,18 @@ func (catalog *Catalog) Sync(ctx context.Context) (SyncResult, error) {
 		listedIDs[listed.ID] = struct{}{}
 		_, projected := initialProjections[listed.ID]
 		if updatedAt, exists := catalog.updatedAt[listed.ID]; initialScanErr == nil && projected && exists && updatedAt == listed.UpdatedAt {
-			result.IDs = append(result.IDs, filepath.Base(initialProjections[listed.ID]))
-			continue
+			metadata, metadataErr := ReadProjectionMetadata(initialProjections[listed.ID])
+			if metadataErr == nil && !metadata.Fresh {
+				result.IDs = append(result.IDs, filepath.Base(initialProjections[listed.ID]))
+				continue
+			}
 		}
 		thread, readErr := c.ReadThread(ctx, listed.ID)
 		if readErr != nil {
 			result.Errors[listed.ID] = readErr.Error()
 			continue
 		}
-		projection, writeErr := Materialize(catalog.sessionsDir, thread)
+		projection, writeErr := materializeProjection(catalog.sessionsDir, thread, clearFreshProjection)
 		if writeErr != nil {
 			result.Errors[listed.ID] = writeErr.Error()
 			continue
@@ -84,6 +87,18 @@ func (catalog *Catalog) Sync(ctx context.Context) (SyncResult, error) {
 	} else {
 		for nativeID, path := range initialProjections {
 			if _, visible := listedIDs[nativeID]; visible {
+				continue
+			}
+			metadata, metadataErr := ReadProjectionMetadata(path)
+			if metadataErr != nil {
+				result.Errors[nativeID] = metadataErr.Error()
+				continue
+			}
+			// A newly created empty thread can lag thread/list even after
+			// thread/name/set and thread/read succeeded. Its durable projection
+			// marker is creation intent and survives complete stale listings
+			// until activity or authoritative list visibility clears it.
+			if metadata.Fresh {
 				continue
 			}
 			if removeErr := RemoveProjection(path, nativeID); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
@@ -167,7 +182,7 @@ func StartSession(ctx context.Context, sessionsDir string, command []string, cwd
 	if err != nil {
 		return Projection{}, err
 	}
-	return Materialize(sessionsDir, thread)
+	return materializeProjection(sessionsDir, thread, setFreshProjection)
 }
 
 // RenameSession changes the Codex thread name, then refreshes the projection.

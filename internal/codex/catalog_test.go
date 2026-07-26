@@ -57,6 +57,51 @@ func TestSyncPrunesRecentProjectionMissingFromAuthoritativeList(t *testing.T) {
 	}
 }
 
+func TestCatalogRetainsFreshEmptySessionUntilListVisibility(t *testing.T) {
+	root := t.TempDir()
+	projection, err := StartSession(
+		context.Background(),
+		root,
+		helperCommand("created-empty"),
+		"/tmp/project",
+		"gpt",
+		"medium",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := ReadProjectionMetadata(projection.Path)
+	if err != nil || !metadata.Fresh {
+		t.Fatalf("new empty session = metadata:%+v err:%v, want durable fresh intent", metadata, err)
+	}
+
+	catalog := NewCatalog(root, helperCommand("empty-list"))
+	if _, err := catalog.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err = ReadProjectionMetadata(projection.Path)
+	if err != nil || !metadata.Fresh {
+		t.Fatalf("stale complete list pruned fresh session: metadata=%+v err=%v", metadata, err)
+	}
+
+	catalog.command = helperCommand("list-empty-thread")
+	if _, err := catalog.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err = ReadProjectionMetadata(projection.Path)
+	if err != nil || metadata.Fresh {
+		t.Fatalf("authoritative list visibility did not clear fresh intent: metadata=%+v err=%v", metadata, err)
+	}
+
+	catalog.command = helperCommand("empty-list")
+	if _, err := catalog.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(projection.Path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("projection remains after fresh intent cleared and membership disappeared: %v", err)
+	}
+}
+
 func TestCatalogSkipsUnchangedThreadAndReadsUpdatedThread(t *testing.T) {
 	root := t.TempDir()
 	logPath := filepath.Join(t.TempDir(), "rpc.log")

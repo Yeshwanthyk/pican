@@ -29,7 +29,11 @@ func TestCodexHelperProcess(t *testing.T) {
 	s := bufio.NewScanner(os.Stdin)
 	enc := json.NewEncoder(os.Stdout)
 	thread := testThread()
+	if scenario == "created-empty" || scenario == "list-empty-thread" {
+		thread.Turns = nil
+	}
 	named := false
+	var pendingStartID int64
 	for s.Scan() {
 		var request map[string]json.RawMessage
 		if json.Unmarshal(s.Bytes(), &request) != nil {
@@ -39,7 +43,7 @@ func TestCodexHelperProcess(t *testing.T) {
 		_ = json.Unmarshal(request["method"], &method)
 		if logPath != "" && method != "" {
 			f, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-			if scenario == "wire" {
+			if scenario == "wire" || scenario == "start-ack-pending" || scenario == "interrupt-no-reply" {
 				fmt.Fprintln(f, s.Text())
 			} else {
 				fmt.Fprintln(f, method)
@@ -114,6 +118,11 @@ func TestCodexHelperProcess(t *testing.T) {
 			if method == "review/start" {
 				turnID = "turn-review"
 			}
+			if scenario == "start-ack-pending" && method == "turn/start" {
+				pendingStartID = id
+				_ = enc.Encode(map[string]any{"method": "turn/started", "params": map[string]any{"threadId": "thread-1", "turn": map[string]any{"id": turnID, "status": "inProgress", "items": []any{}}}})
+				continue
+			}
 			reply(map[string]any{"reviewThreadId": "thread-1", "turn": map[string]any{"id": turnID, "status": "inProgress", "items": []any{}}})
 			_ = enc.Encode(map[string]any{"method": "turn/started", "params": map[string]any{"threadId": "thread-1", "turn": map[string]any{"id": turnID, "status": "inProgress", "items": []any{}}}})
 			_ = enc.Encode(map[string]any{"method": "item/agentMessage/delta", "params": map[string]any{"threadId": "thread-1", "turnId": turnID, "itemId": "agent-live", "delta": "hello"}})
@@ -127,8 +136,15 @@ func TestCodexHelperProcess(t *testing.T) {
 				TurnID string `json:"turnId"`
 			}
 			_ = json.Unmarshal(request["params"], &params)
+			if scenario == "interrupt-no-reply" {
+				continue
+			}
 			reply(map[string]any{})
 			_ = enc.Encode(map[string]any{"method": "turn/completed", "params": map[string]any{"threadId": "thread-1", "turn": map[string]any{"id": params.TurnID, "status": "interrupted", "items": []any{}}}})
+			if pendingStartID != 0 {
+				_ = enc.Encode(map[string]any{"id": pendingStartID, "result": map[string]any{"turn": map[string]any{"id": params.TurnID, "status": "interrupted", "items": []any{}}}})
+				pendingStartID = 0
+			}
 		default:
 			_ = enc.Encode(map[string]any{"id": id, "error": map[string]any{"code": -32601, "message": "unknown"}})
 		}

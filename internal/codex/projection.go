@@ -32,6 +32,7 @@ type ProjectionMetadata struct {
 	CWD            string
 	Model          string
 	Effort         string
+	Fresh          bool
 	ApprovalPolicy json.RawMessage
 	Sandbox        json.RawMessage
 }
@@ -68,6 +69,7 @@ func ReadProjectionMetadata(path string) (ProjectionMetadata, error) {
 			Effort              string          `json:"effort"`
 			ModelID             string          `json:"modelId"`
 			ThinkingLevel       string          `json:"thinkingLevel"`
+			Fresh               bool            `json:"codexFresh"`
 			CodexApprovalPolicy json.RawMessage `json:"codexApprovalPolicy"`
 			CodexSandbox        json.RawMessage `json:"codexSandbox"`
 		}
@@ -84,6 +86,7 @@ func ReadProjectionMetadata(path string) (ProjectionMetadata, error) {
 				CWD:            entry.CWD,
 				Model:          entry.Model,
 				Effort:         entry.Effort,
+				Fresh:          entry.Fresh,
 				ApprovalPolicy: append(json.RawMessage(nil), entry.CodexApprovalPolicy...),
 				Sandbox:        append(json.RawMessage(nil), entry.CodexSandbox...),
 			}
@@ -209,15 +212,29 @@ func projectionStoreForPath(path string) (*projections.Store, error) {
 	return projections.NewStore(filepath.Dir(filepath.Dir(path)), "codex")
 }
 
+type freshProjectionMode uint8
+
+const (
+	preserveFreshProjection freshProjectionMode = iota
+	setFreshProjection
+	clearFreshProjection
+)
+
 // Materialize atomically replaces a Codex projection while preserving local
-// session_info, label, model_change, and thinking_level_change entries.
+// session_info, label, model_change, thinking_level_change, and fresh creation
+// intent until native activity or authoritative catalog visibility clears it.
 func Materialize(sessionsDir string, thread Thread) (Projection, error) {
+	return materializeProjection(sessionsDir, thread, preserveFreshProjection)
+}
+
+func materializeProjection(sessionsDir string, thread Thread, freshMode freshProjectionMode) (Projection, error) {
 	store, err := projections.NewStore(sessionsDir, "codex")
 	if err != nil {
 		return Projection{}, err
 	}
 	thread.CWD = canonicalProjectPath(thread.CWD)
 	projection, err := store.Replace(thread.ID, thread.CWD, func(paths []string) ([]map[string]any, error) {
+		fresh := false
 		// thread/read does not include the active model or reasoning effort. Keep
 		// the last projected values unless an open/start response supplied newer
 		// ones, otherwise periodic catalog refreshes erase worker settings.
@@ -226,6 +243,7 @@ func Materialize(sessionsDir string, thread Thread) (Projection, error) {
 			if metadataErr != nil {
 				continue
 			}
+			fresh = fresh || metadata.Fresh
 			if thread.Model == "" {
 				thread.Model = metadata.Model
 			}
@@ -244,7 +262,16 @@ func Materialize(sessionsDir string, thread Thread) (Projection, error) {
 			return nil, fmt.Errorf("preserve captured Codex tool activity: %w", err)
 		}
 		thread = mergeCapturedToolTurns(thread, capturedTurns)
-		return projectThread(thread), nil
+		switch freshMode {
+		case setFreshProjection:
+			fresh = true
+		case clearFreshProjection:
+			fresh = false
+		}
+		if len(thread.Turns) > 0 {
+			fresh = false
+		}
+		return projectThreadWithFresh(thread, fresh), nil
 	})
 	if err != nil {
 		return Projection{}, err
@@ -387,12 +414,19 @@ func mergeCapturedToolTurns(thread Thread, captured map[string]Turn) Thread {
 }
 
 func projectThread(thread Thread) []map[string]any {
+	return projectThreadWithFresh(thread, false)
+}
+
+func projectThreadWithFresh(thread Thread, fresh bool) []map[string]any {
 	created := unixTimestamp(thread.CreatedAt)
 	title := strings.TrimSpace(thread.Name)
 	if title == "" {
 		title = strings.TrimSpace(thread.Preview)
 	}
 	header := map[string]any{"type": "session", "version": 3, "id": "codex-" + thread.ID, "timestamp": created, "cwd": thread.CWD, "runtime": "codex", "nativeId": thread.ID, "name": title, "preview": thread.Preview, "provider": Provider, "modelProvider": Provider}
+	if fresh {
+		header["codexFresh"] = true
+	}
 	if title == newSessionName {
 		// StartSession assigns this system placeholder only to make an empty
 		// native thread resumable. It is not a user-owned title, so mark it as
