@@ -299,7 +299,7 @@ Wave 1 preserves the public Pi/Codex surface while moving internals to the regis
 - `server.Deps.RuntimeRegistry` is the canonical path. Legacy `EnabledRuntimes` and `RuntimeAvailable` remain source-compatible for existing tests/embedders and are converted to a Pi/Codex-only compatibility registry. Legacy defaulting still prefers Pi; a supplied registry defaults to its first registration. An explicit default outside the registry is rejected.
 - `/api/runtimes` retains `defaultRuntime`, `id`, `available`, optional `reason`, and the existing capabilities object. It adds `label`, `command`, optional `version`, `projectionMode`, and the complete capability set. Entries retain selected registry order; frontend parsing keeps the new metadata optional and falls back to translated/runtime IDs for labels.
 - Missing persisted runtime metadata still means Pi. Persisted Pi/Codex/Claude/OpenCode sessions remain viewable when their runtime is disabled; runtime-dependent actions use availability to fail clearly. Unknown persisted runtimes take the conservative replaceable/full-reconcile path.
-- `ChatWorker` and `workers.Manager` lifecycle contracts are unchanged. Registry dispatch replaces only the hard-coded Pi/Codex factory branch.
+- `ChatWorker` retains one runtime-specific native abort operation. `workers.Manager` additionally reserves accepted sends before worker creation and exposes a non-creating `AbortExisting` lookup so Stop can cancel the startup window or survive a replaceable-projection race.
 
 ### Runtime operation boundary
 
@@ -311,7 +311,7 @@ Create, fork, clone, rename, delete, chat/steer, cancel, persistent queue operat
 
 ### `workers.Manager`
 
-Manages runtime-specific subprocesses per session. Its factory reads validated session metadata and dispatches through `runtimes.Registry`; the manager owns reuse, single-flight creation, error eviction, and the shared 10-minute idle reap policy.
+Manages runtime-specific subprocesses per session. Its factory reads validated session metadata and dispatches through `runtimes.Registry`; the manager owns reuse, single-flight creation, error eviction, accepted-send reservations, per-send cancellation, and the shared 10-minute idle reap policy. `AbortExisting` cancels pending sends first and then interrupts a cached worker if present. It never calls the factory.
 
 ```go
 type Manager struct {
@@ -332,7 +332,7 @@ state, model, plus PID/uptime/idle for workers implementing the optional
 
 ### Runtime workers
 
-`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process. `claude.Worker` owns one installed `claude` bidirectional stream-json process. OpenCode uses one supervised authenticated loopback child and global SSE stream; each active session receives a lightweight `ChatWorker` that shares that service and validates canonical cwd/native identity. The manager retains single-flight creation, crash eviction, and idle reaping. Runtime capabilities still gate unsupported queueing, steering, settings, and commands independently.
+`rpc.piRPCWorker` owns one `pi --mode rpc` subprocess and communicates via Pi's JSONL RPC. `codex.Worker` owns one `codex app-server --stdio` process. `claude.Worker` owns one installed `claude` bidirectional stream-json process. OpenCode uses one supervised authenticated loopback child and global SSE stream; each active session receives a lightweight `ChatWorker` that shares that service and validates canonical cwd/native identity. The manager retains single-flight creation, pending-send cancellation, crash eviction, and idle reaping. Runtime capabilities still gate unsupported queueing, steering, settings, and commands independently.
 
 The Codex worker consumes ordered app-server notifications, emits preview/status callbacks, and atomically refreshes the projection. It never treats projected JSONL as authoritative conversation state. See [codex-runtime.md](./codex-runtime.md).
 

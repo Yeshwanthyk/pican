@@ -48,6 +48,8 @@ type fakeSender struct {
 	setThinkingSessionID    string
 	setThinkingLevel        string
 	getCommandsCalls        int
+	abortCalls              int
+	abortSessionID          string
 }
 
 func (f *fakeSender) Send(ctx context.Context, sessionID, sessionPath string, chat chat.Request) error {
@@ -80,6 +82,10 @@ func (f *fakeSender) SetThinkingLevel(ctx context.Context, sessionID, sessionPat
 }
 
 func (f *fakeSender) Abort(ctx context.Context, sessionID string) error {
+	f.mu.Lock()
+	f.abortCalls++
+	f.abortSessionID = sessionID
+	f.mu.Unlock()
 	return nil
 }
 
@@ -108,6 +114,36 @@ func (f *fakeSender) Status(sessionID string) workers.WorkerStatus {
 		return f.status
 	}
 	return workers.WorkerStatus{State: workers.WorkerStateIdle}
+}
+
+func (f *fakeSender) abortInfo() (calls int, sessionID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.abortCalls, f.abortSessionID
+}
+
+type existingAbortSender struct {
+	*fakeSender
+	exists bool
+}
+
+func (s *existingAbortSender) AbortExisting(ctx context.Context, sessionID string) (bool, error) {
+	if !s.exists {
+		return false, nil
+	}
+	return true, s.Abort(ctx, sessionID)
+}
+
+type blockingAbortSender struct {
+	*fakeSender
+	started chan struct{}
+	release chan struct{}
+}
+
+func (s *blockingAbortSender) Abort(context.Context, string) error {
+	close(s.started)
+	<-s.release
+	return nil
 }
 
 func (f *fakeSender) EnsureWorker(ctx context.Context, sessionID, sessionPath string) error {
@@ -153,6 +189,85 @@ func (f *fakeSender) thinkingSessionID() string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.setThinkingSessionID
+}
+
+func TestHandleCancelChatAbortsResolvedSession(t *testing.T) {
+	root := t.TempDir()
+	_ = writeSessionFile(t, root, "project", "session.jsonl")
+	sender := &fakeSender{}
+	s := &Server{sessionsDir: root, chatSender: sender, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/cancel?id=session.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleCancelChat(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+	if calls, sessionID := sender.abortInfo(); calls != 1 || sessionID != "session.jsonl" {
+		t.Fatalf("Abort calls/session = %d/%q, want 1/session.jsonl", calls, sessionID)
+	}
+}
+
+func TestHandleCancelChatAbortsExistingWorkerWhenProjectionIsMissing(t *testing.T) {
+	sender := &existingAbortSender{fakeSender: &fakeSender{}, exists: true}
+	s := &Server{sessionsDir: t.TempDir(), chatSender: sender, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/cancel?id=codex-missing.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleCancelChat(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+	if calls, sessionID := sender.abortInfo(); calls != 1 || sessionID != "codex-missing.jsonl" {
+		t.Fatalf("AbortExisting calls/session = %d/%q, want 1/codex-missing.jsonl", calls, sessionID)
+	}
+}
+
+func TestHandleCancelChatMissingProjectionWithoutWorkerRemainsNotFound(t *testing.T) {
+	sender := &existingAbortSender{fakeSender: &fakeSender{}, exists: false}
+	s := &Server{sessionsDir: t.TempDir(), chatSender: sender, now: time.Now}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/cancel?id=missing.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleCancelChat(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleCancelChatReturnsWhenAdapterIgnoresCancellation(t *testing.T) {
+	root := t.TempDir()
+	_ = writeSessionFile(t, root, "project", "session.jsonl")
+	sender := &blockingAbortSender{
+		fakeSender: &fakeSender{},
+		started:    make(chan struct{}),
+		release:    make(chan struct{}),
+	}
+	s := &Server{sessionsDir: root, chatSender: sender, now: time.Now}
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/cancel?id=session.jsonl", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	startedAt := time.Now()
+	s.handleCancelChat(w, req)
+	elapsed := time.Since(startedAt)
+	close(sender.release)
+
+	if w.Code != http.StatusGatewayTimeout {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("cancel handler blocked for %s", elapsed)
+	}
+	select {
+	case <-sender.started:
+	default:
+		t.Fatal("Abort was not invoked")
+	}
 }
 
 func TestHandleChatQueuesResolvedSession(t *testing.T) {

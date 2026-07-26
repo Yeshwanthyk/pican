@@ -292,7 +292,15 @@ func (w *piRPCWorker) Abort(ctx context.Context) error {
 	w.mu.Lock()
 	w.status.State = workers.WorkerStateIdle
 	w.status.Error = ""
+	w.lastStreamActivity.Store(0)
+	status := w.status
 	w.mu.Unlock()
+	// The native abort response is sent only after pi has awaited
+	// AgentSession.abort(). Clear the recent-stream overlay so Status cannot
+	// transiently turn this acknowledged terminal state back into running.
+	if w.statusSink != nil && !w.closing.Load() {
+		w.statusSink(status)
+	}
 	return nil
 }
 

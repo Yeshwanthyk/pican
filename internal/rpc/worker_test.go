@@ -19,6 +19,18 @@ type nopWriteCloser struct{ w io.Writer }
 func (n nopWriteCloser) Write(p []byte) (int, error) { return n.w.Write(p) }
 func (n nopWriteCloser) Close() error                { return nil }
 
+type commandCapture struct {
+	writes chan []byte
+}
+
+func (c *commandCapture) Write(p []byte) (int, error) {
+	command := append([]byte(nil), p...)
+	c.writes <- command
+	return len(p), nil
+}
+
+func (*commandCapture) Close() error { return nil }
+
 func waitForPending(t *testing.T, w *piRPCWorker, id string) {
 	t.Helper()
 	for i := 0; i < 1000; i++ {
@@ -43,6 +55,49 @@ func TestStatusReportsRunningDuringRecentStreamActivity(t *testing.T) {
 
 	if got := w.Status(); got.State != workers.WorkerStateRunning {
 		t.Fatalf("status = %q, want running", got.State)
+	}
+}
+
+func TestAbortWritesNativeRPCAndReturnsWorkerToIdle(t *testing.T) {
+	stdin := &commandCapture{writes: make(chan []byte, 1)}
+	var notified workers.WorkerStatus
+	w := &piRPCWorker{
+		stdin:      stdin,
+		status:     workers.WorkerStatus{State: workers.WorkerStateRunning},
+		pending:    make(map[string]chan response),
+		statusSink: func(status workers.WorkerStatus) { notified = status },
+	}
+	w.lastStreamActivity.Store(time.Now().UnixNano())
+
+	abortDone := make(chan error, 1)
+	go func() { abortDone <- w.Abort(context.Background()) }()
+
+	var wire []byte
+	select {
+	case wire = <-stdin.writes:
+	case <-time.After(time.Second):
+		t.Fatal("abort command was not written")
+	}
+	var command struct {
+		ID   string `json:"id"`
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(wire), &command); err != nil {
+		t.Fatal(err)
+	}
+	if command.ID != "req-1" || command.Type != "abort" {
+		t.Fatalf("abort command = %+v", command)
+	}
+
+	w.handleRPCLine(`{"type":"response","id":"req-1","command":"abort","success":true}`)
+	if err := <-abortDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Status(); got.State != workers.WorkerStateIdle || got.Error != "" {
+		t.Fatalf("status after native abort acknowledgement = %#v", got)
+	}
+	if notified.State != workers.WorkerStateIdle {
+		t.Fatalf("published status after native abort acknowledgement = %#v", notified)
 	}
 }
 

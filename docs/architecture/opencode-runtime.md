@@ -34,7 +34,7 @@ One authenticated `/global/event` subscription serves the child generation. pica
 
 For a prompt, pican submits `prompt_async` and consumes ordered message, part, and status events. The transient browser preview is bounded. Relevant native events trigger a session/message read and atomic projection refresh; the authoritative projection replaces the preview through the normal `replaceable-projection` reconciliation path.
 
-Cancellation calls the native abort endpoint with the session's canonical directory. A successful abort returns the worker to an idle/reusable state. Runtime status comes from native session status plus the shared event stream.
+Cancellation posts to the native `/session/<id>/abort` endpoint with the session's canonical directory. Only a native `true` response returns the worker to an idle/reusable state. A rejected `false` response or transport failure preserves running state with the error until native session status or the shared event stream provides an authoritative transition.
 
 Models come from OpenCode's provider/model API. The selection is stored as pican-local projection metadata and applied to subsequent prompts. The browser exposes model listing and switching, but not effort or reasoning controls.
 

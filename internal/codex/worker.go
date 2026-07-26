@@ -45,6 +45,7 @@ type Worker struct {
 	reviewThreads                           map[string]struct{}
 	reviewStarting                          bool
 	completedTurns                          map[string]struct{}
+	interruptTimeout                        time.Duration
 	revision                                uint64
 	materializePending                      bool
 	materializedRevision                    uint64
@@ -57,6 +58,8 @@ type Worker struct {
 
 var _ workers.ChatWorker = (*Worker)(nil)
 
+const defaultInterruptTimeout = 5 * time.Second
+
 // NewWorker validates a Codex projection, starts app-server, initializes it,
 // resumes its native thread, and refreshes the projection.
 func NewWorker(ctx context.Context, sessionPath string, command []string, callbacks Callbacks) (*Worker, error) {
@@ -64,7 +67,7 @@ func NewWorker(ctx context.Context, sessionPath string, command []string, callba
 	if err != nil {
 		return nil, err
 	}
-	w := &Worker{command: append([]string(nil), command...), sessionPath: sessionPath, sessionsDir: filepath.Dir(filepath.Dir(sessionPath)), nativeID: meta.NativeID, cwd: meta.CWD, model: meta.Model, effort: meta.Effort, status: workers.WorkerStatus{State: workers.WorkerStateIdle, Model: meta.Model, ModelProvider: Provider, ThinkingLevel: meta.Effort}, callbacks: callbacks, statusCh: make(chan workers.WorkerStatus, 1), preview: map[string]*strings.Builder{}, reviewThreads: map[string]struct{}{}, completedTurns: map[string]struct{}{}, startedAt: time.Now(), lastActive: time.Now()}
+	w := &Worker{command: append([]string(nil), command...), sessionPath: sessionPath, sessionsDir: filepath.Dir(filepath.Dir(sessionPath)), nativeID: meta.NativeID, cwd: meta.CWD, model: meta.Model, effort: meta.Effort, status: workers.WorkerStatus{State: workers.WorkerStateIdle, Model: meta.Model, ModelProvider: Provider, ThinkingLevel: meta.Effort}, callbacks: callbacks, statusCh: make(chan workers.WorkerStatus, 1), preview: map[string]*strings.Builder{}, reviewThreads: map[string]struct{}{}, completedTurns: map[string]struct{}{}, interruptTimeout: defaultInterruptTimeout, startedAt: time.Now(), lastActive: time.Now()}
 	ready := make(chan struct{})
 	c, err := NewClient(ctx, command, func(notification Notification) {
 		<-ready
@@ -245,8 +248,6 @@ func (w *Worker) SetThinkingLevel(_ context.Context, level string) error {
 	return w.appendSetting("thinking_level_change", map[string]any{"thinkingLevel": level})
 }
 func (w *Worker) Abort(ctx context.Context) error {
-	w.turnOpMu.Lock()
-	defer w.turnOpMu.Unlock()
 	w.mu.Lock()
 	turn := w.activeTurn
 	clear(w.preview)
@@ -255,7 +256,13 @@ func (w *Worker) Abort(ctx context.Context) error {
 	if turn == "" {
 		return nil
 	}
-	if err := w.client.InterruptTurn(ctx, w.nativeID, turn); err != nil {
+	timeout := w.interruptTimeout
+	if timeout <= 0 {
+		timeout = defaultInterruptTimeout
+	}
+	interruptCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := w.client.InterruptTurn(interruptCtx, w.nativeID, turn); err != nil {
 		return w.operationError(err, workers.WorkerStateRunning)
 	}
 	return nil

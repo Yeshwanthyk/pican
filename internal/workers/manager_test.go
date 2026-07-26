@@ -156,6 +156,45 @@ func TestManagerStatusReportsRunningWhileSendSpawnsWorker(t *testing.T) {
 	}
 }
 
+func TestManagerAbortCancelsSendBeforeWorkerFinishesSpawning(t *testing.T) {
+	spawnStarted := make(chan struct{})
+	releaseSpawn := make(chan struct{})
+	worker := &fakeChatWorker{}
+	manager := NewManager(func(string, string) (ChatWorker, error) {
+		close(spawnStarted)
+		<-releaseSpawn
+		return worker, nil
+	})
+
+	sendDone := make(chan error, 1)
+	go func() {
+		sendDone <- manager.Send(context.Background(), "a.jsonl", "/tmp/a.jsonl", chat.Request{Message: "hi"})
+	}()
+	<-spawnStarted
+
+	found, err := manager.AbortExisting(context.Background(), "a.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("AbortExisting did not claim the pending send")
+	}
+	if status := manager.Status("a.jsonl"); status.State != WorkerStateIdle {
+		t.Fatalf("status after canceling pending send = %q, want idle", status.State)
+	}
+
+	close(releaseSpawn)
+	if err := <-sendDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Send error = %v, want context canceled", err)
+	}
+	worker.mu.Lock()
+	promptCount := len(worker.prompts)
+	worker.mu.Unlock()
+	if promptCount != 0 {
+		t.Fatalf("prompt count = %d, want 0 after pre-spawn cancellation", promptCount)
+	}
+}
+
 func TestManagerStatusIdleAfterFailedSend(t *testing.T) {
 	manager := NewManager(func(string, string) (ChatWorker, error) {
 		return nil, errors.New("spawn failed")

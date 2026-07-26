@@ -26,6 +26,12 @@ type ChatSender interface {
 	EnsureWorker(ctx context.Context, sessionID, sessionPath string) error
 }
 
+type existingWorkerAborter interface {
+	AbortExisting(ctx context.Context, sessionID string) (bool, error)
+}
+
+const chatCancelTimeout = 5 * time.Second
+
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -72,7 +78,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go func() {
-		if err := s.chatSender.Send(context.Background(), sessionID, sessionPath, chatReq); err != nil {
+		if err := s.chatSender.Send(context.Background(), sessionID, sessionPath, chatReq); err != nil && !errors.Is(err, context.Canceled) {
 			fmt.Fprintf(os.Stderr, "chat send failed for %s: %v\n", sessionID, err)
 		}
 	}()
@@ -134,24 +140,81 @@ func (s *Server) handleCancelChat(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
-	if resolveOrWriteError(w, err) {
+
+	requestedID := r.URL.Query().Get("id")
+	resolved, resolveErr := s.resolveSession(requestedID)
+	if resolveErr == nil && !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityCancel) {
 		return
 	}
-	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityCancel) {
+	if resolveErr != nil && s.chatSender == nil {
+		resolveOrWriteError(w, resolveErr)
 		return
 	}
 	if s.chatSender == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
 	}
-	if err := s.chatSender.Abort(r.Context(), resolved.Session.ID); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
+
+	sessionID := requestedID
+	var abort func(context.Context) error
+	if resolveErr == nil {
+		sessionID = resolved.Session.ID
+		abort = func(ctx context.Context) error {
+			return s.chatSender.Abort(ctx, sessionID)
+		}
+	} else {
+		// A replaceable projection is a cache, while the live worker owns the
+		// active native turn. Keep Stop available across a projection race
+		// without turning cancellation into a worker-creation path.
+		aborter, ok := s.chatSender.(existingWorkerAborter)
+		if !ok {
+			resolveOrWriteError(w, resolveErr)
+			return
+		}
+		abort = func(ctx context.Context) error {
+			found, err := aborter.AbortExisting(ctx, requestedID)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return resolveErr
+			}
+			return nil
+		}
+	}
+
+	cancelCtx, cancel := context.WithTimeout(r.Context(), chatCancelTimeout)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		result <- abort(cancelCtx)
+	}()
+
+	var abortErr error
+	select {
+	case abortErr = <-result:
+	case <-cancelCtx.Done():
+		abortErr = cancelCtx.Err()
+	}
+	if abortErr != nil {
+		if errors.Is(abortErr, context.DeadlineExceeded) {
+			writeJSONError(w, http.StatusGatewayTimeout, "cancel timed out")
+			return
+		}
+		if errors.Is(abortErr, context.Canceled) {
+			writeJSONError(w, http.StatusRequestTimeout, "cancel interrupted")
+			return
+		}
+		if resolveErr != nil && errors.Is(abortErr, resolveErr) {
+			resolveOrWriteError(w, resolveErr)
+			return
+		}
+		writeJSONError(w, http.StatusInternalServerError, abortErr.Error())
 		return
 	}
-	_ = os.Remove(filepath.Join(s.sessionStatusDir(), resolved.Session.ID))
-	s.recomputeAndBroadcastStatus(resolved.Session.ID)
-	s.broadcast(resolved.Session.ID, "reload")
+	_ = os.Remove(filepath.Join(s.sessionStatusDir(), sessionID))
+	s.recomputeAndBroadcastStatus(sessionID)
+	s.broadcast(sessionID, "reload")
 	writeJSON(w, 0, map[string]any{"ok": true, "status": "cancelled"})
 }
 

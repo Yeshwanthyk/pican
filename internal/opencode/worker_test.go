@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ func TestWorkerPromptDemultiplexPreviewRefreshAndCancel(t *testing.T) {
 	var mu sync.Mutex
 	var prompt PromptRequest
 	abortCalls := 0
+	abortAccepted := true
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/session/status":
@@ -56,8 +58,15 @@ func TestWorkerPromptDemultiplexPreviewRefreshAndCancel(t *testing.T) {
 		case "/session/ses_worker/abort":
 			mu.Lock()
 			abortCalls++
+			accepted := abortAccepted
 			mu.Unlock()
-			_, _ = writer.Write([]byte(`true`))
+			if request.Method != http.MethodPost {
+				t.Errorf("abort method = %q", request.Method)
+			}
+			if request.URL.Query().Get("directory") != canonicalCWD {
+				t.Errorf("abort directory = %q", request.URL.Query().Get("directory"))
+			}
+			_ = json.NewEncoder(writer).Encode(accepted)
 		default:
 			http.NotFound(writer, request)
 		}
@@ -126,6 +135,19 @@ func TestWorkerPromptDemultiplexPreviewRefreshAndCancel(t *testing.T) {
 	case <-refreshCh:
 	case <-time.After(time.Second):
 		t.Fatal("abort did not request authoritative refresh")
+	}
+
+	if err := worker.Prompt(context.Background(), chat.Request{Message: "second turn"}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	abortAccepted = false
+	mu.Unlock()
+	if err := worker.Abort(context.Background()); err == nil {
+		t.Fatal("rejected native abort returned nil")
+	}
+	if got := worker.Status(); got.State != workers.WorkerStateRunning || !strings.Contains(got.Error, "refused to abort") {
+		t.Fatalf("status after rejected native abort = %#v", got)
 	}
 }
 

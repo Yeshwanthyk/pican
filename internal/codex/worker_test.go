@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -38,6 +39,132 @@ func TestWorkerClearsPreviewOnProtocolError(t *testing.T) {
 	}
 	if len(w.preview) != 0 {
 		t.Fatalf("preview entries after protocol error = %d, want 0", len(w.preview))
+	}
+}
+
+func TestWorkerAbortInterruptsAnnouncedTurnWhileStartAckIsPending(t *testing.T) {
+	root := t.TempDir()
+	thread := testThread()
+	thread.CWD = "/tmp/project"
+	projection, err := Materialize(root, thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logPath := root + "/rpc.jsonl"
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	w, err := NewWorker(ctx, projection.Path, helperCommand("start-ack-pending", logPath), Callbacks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	promptErr := make(chan error, 1)
+	go func() {
+		promptErr <- w.Prompt(context.Background(), chat.Request{Message: "work"})
+	}()
+	deadline := time.Now().Add(time.Second)
+	for {
+		w.mu.Lock()
+		active := w.activeTurn
+		w.mu.Unlock()
+		if active == "turn-live" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("turn/started did not publish the active turn identity")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	abortErr := make(chan error, 1)
+	go func() {
+		abortErr <- w.Abort(context.Background())
+	}()
+	select {
+	case err := <-abortErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("Abort blocked behind the pending turn/start acknowledgement")
+	}
+	select {
+	case err := <-promptErr:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("Prompt did not reconcile after the interrupted turn completed")
+	}
+
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var interrupt struct {
+		Method string `json:"method"`
+		Params struct {
+			ThreadID string `json:"threadId"`
+			TurnID   string `json:"turnId"`
+		} `json:"params"`
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var request struct {
+			Method string `json:"method"`
+			Params struct {
+				ThreadID string `json:"threadId"`
+				TurnID   string `json:"turnId"`
+			} `json:"params"`
+		}
+		if json.Unmarshal([]byte(line), &request) == nil && request.Method == "turn/interrupt" {
+			interrupt = request
+			break
+		}
+	}
+	if interrupt.Method != "turn/interrupt" || interrupt.Params.ThreadID != "thread-1" || interrupt.Params.TurnID != "turn-live" {
+		t.Fatalf("interrupt request = %+v; wire log:\n%s", interrupt, data)
+	}
+}
+
+func TestWorkerAbortTimesOutWhenInterruptHasNoReply(t *testing.T) {
+	root := t.TempDir()
+	thread := testThread()
+	thread.CWD = "/tmp/project"
+	projection, err := Materialize(root, thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	w, err := NewWorker(ctx, projection.Path, helperCommand("interrupt-no-reply", root+"/rpc.jsonl"), Callbacks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	w.interruptTimeout = 50 * time.Millisecond
+	if err := w.Prompt(ctx, chat.Request{Message: "work"}); err != nil {
+		t.Fatal(err)
+	}
+
+	abortErr := make(chan error, 1)
+	started := time.Now()
+	go func() {
+		abortErr <- w.Abort(context.Background())
+	}()
+	select {
+	case err := <-abortErr:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Abort error = %v, want deadline exceeded", err)
+		}
+		if elapsed := time.Since(started); elapsed > 250*time.Millisecond {
+			t.Fatalf("Abort took %s, want bounded interrupt timeout", elapsed)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("Abort hung waiting for a turn/interrupt response")
+	}
+	if status := w.Status(); status.State != workers.WorkerStateRunning {
+		t.Fatalf("unknown interrupt outcome changed authoritative running state: %+v", status)
 	}
 }
 

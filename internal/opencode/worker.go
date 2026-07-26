@@ -255,14 +255,14 @@ func (w *Worker) Abort(ctx context.Context) error {
 	}
 	client, err := w.supervisor.Client()
 	if err != nil {
-		return w.operationError(err)
+		return w.abortError(err)
 	}
 	aborted, err := client.Abort(ctx, w.nativeID, w.cwd)
 	if err != nil {
-		return w.operationError(err)
+		return w.abortError(err)
 	}
 	if !aborted {
-		return w.operationError(errors.New("OpenCode refused to abort the running session"))
+		return w.abortError(errors.New("OpenCode refused to abort the running session"))
 	}
 	w.finishTurn("")
 	return nil
@@ -494,6 +494,22 @@ func (w *Worker) operationError(err error) error {
 	w.mu.Lock()
 	if !w.closed && w.status.State != workers.WorkerStateError {
 		w.status = workers.WorkerStatus{State: workers.WorkerStateIdle, Error: err.Error(), Model: w.model, ModelProvider: Provider}
+		w.lastActive = time.Now()
+	}
+	status := w.status
+	w.mu.Unlock()
+	w.publishStatus(status)
+	w.publishError(err)
+	return err
+}
+
+func (w *Worker) abortError(err error) error {
+	w.mu.Lock()
+	if !w.closed && w.status.State != workers.WorkerStateError {
+		// A failed or rejected native abort is not a terminal transition. Keep
+		// the worker running until OpenCode's authoritative status/event stream
+		// says otherwise.
+		w.status.Error = err.Error()
 		w.lastActive = time.Now()
 	}
 	status := w.status

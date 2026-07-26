@@ -93,8 +93,10 @@ type Manager struct {
 	// Prompt lands — without this, Status dips to idle mid-send, letting the
 	// queue drainer dispatch queued items into a run that is still starting and
 	// making status polls fire a spurious idle transition.
-	pendingSends map[string]int
-	closed       bool
+	pendingSends   map[string]int
+	sendCancels    map[string]map[uint64]context.CancelFunc
+	nextSendCancel uint64
+	closed         bool
 
 	idleTTL    time.Duration
 	reaperStop chan struct{}
@@ -123,6 +125,7 @@ func NewManagerWithTTL(factory Factory, ttl time.Duration) *Manager {
 		creating:     make(map[string]*createCall),
 		factory:      factory,
 		pendingSends: make(map[string]int),
+		sendCancels:  make(map[string]map[uint64]context.CancelFunc),
 		idleTTL:      ttl,
 		reaperStop:   make(chan struct{}),
 		reaperDone:   make(chan struct{}),
@@ -187,24 +190,44 @@ func (m *Manager) reapOnce(now time.Time) {
 }
 
 func (m *Manager) Send(ctx context.Context, sessionID, sessionPath string, chat chat.Request) error {
+	sendCtx, cancel := context.WithCancel(ctx)
 	m.mu.Lock()
 	m.pendingSends[sessionID]++
+	m.nextSendCancel++
+	cancelID := m.nextSendCancel
+	if m.sendCancels[sessionID] == nil {
+		m.sendCancels[sessionID] = make(map[uint64]context.CancelFunc)
+	}
+	m.sendCancels[sessionID][cancelID] = cancel
 	m.mu.Unlock()
 	defer func() {
+		cancel()
 		// By the time Prompt returns (acked), the worker itself reports
 		// Running, so the pending mark and the worker status overlap and the
 		// session never observably dips to idle mid-send.
 		m.mu.Lock()
-		if m.pendingSends[sessionID]--; m.pendingSends[sessionID] <= 0 {
+		if pending := m.pendingSends[sessionID]; pending > 1 {
+			m.pendingSends[sessionID] = pending - 1
+		} else {
 			delete(m.pendingSends, sessionID)
+		}
+		delete(m.sendCancels[sessionID], cancelID)
+		if len(m.sendCancels[sessionID]) == 0 {
+			delete(m.sendCancels, sessionID)
 		}
 		m.mu.Unlock()
 	}()
+	if err := sendCtx.Err(); err != nil {
+		return err
+	}
 	worker, err := m.workerFor(sessionID, sessionPath)
 	if err != nil {
 		return err
 	}
-	return worker.Prompt(ctx, chat)
+	if err := sendCtx.Err(); err != nil {
+		return err
+	}
+	return worker.Prompt(sendCtx, chat)
 }
 
 // Snapshot returns a point-in-time view of every live worker, for the metrics
@@ -326,13 +349,31 @@ func (m *Manager) RespondExtensionUI(sessionID, id string, response ExtensionUIR
 }
 
 func (m *Manager) Abort(ctx context.Context, sessionID string) error {
+	_, err := m.AbortExisting(ctx, sessionID)
+	return err
+}
+
+// AbortExisting interrupts an already-created worker without consulting or
+// recreating its projection. This keeps cancellation available when a
+// replaceable projection disappears while its native worker is still live.
+func (m *Manager) AbortExisting(ctx context.Context, sessionID string) (bool, error) {
 	m.mu.Lock()
 	worker := m.workers[sessionID]
-	m.mu.Unlock()
-	if worker == nil {
-		return nil
+	cancels := make([]context.CancelFunc, 0, len(m.sendCancels[sessionID]))
+	for _, cancel := range m.sendCancels[sessionID] {
+		cancels = append(cancels, cancel)
 	}
-	return worker.Abort(ctx)
+	if len(cancels) > 0 {
+		delete(m.pendingSends, sessionID)
+	}
+	m.mu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+	if worker == nil {
+		return len(cancels) > 0, nil
+	}
+	return true, worker.Abort(ctx)
 }
 
 func (m *Manager) EnsureWorker(ctx context.Context, sessionID, sessionPath string) error {
