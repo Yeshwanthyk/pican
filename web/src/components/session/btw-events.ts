@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from "effect";
 import { runSync } from "../../lib/runtime";
+import { withBasePath } from "../../shared/base-path";
 
 type EventSourceConstructor = new (url: string) => EventSource;
 
@@ -20,8 +21,9 @@ export function createBtwEventSource(
   topic: string,
   { EventSourceImpl = EventSource }: BtwEventOptions = {},
 ): EventSource {
-  if (EventSourceImpl === null) return new EventSource("/events?id=" + encodeURIComponent(topic));
-  return new EventSourceImpl("/events?id=" + encodeURIComponent(topic));
+  const url = withBasePath("/events?id=" + encodeURIComponent(topic));
+  if (EventSourceImpl === null) return new EventSource(url);
+  return new EventSourceImpl(url);
 }
 
 export function setupBtwSessionEvents({

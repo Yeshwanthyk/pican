@@ -6,6 +6,7 @@
   import { showToast } from '../../shared/toast.js';
   import { describeError } from '../../lib/errors';
   import { runtimeDisplay } from '../../lib/runtime-display';
+  import { withBasePath } from '../../shared/base-path';
   import { Archive, ArchiveRestore } from 'lucide';
   import { settle } from '../shared/ui-effect';
   import {
@@ -30,7 +31,7 @@
 
   let { session, running = false, runningStatus = null, now = Date.now() }: Props = $props();
 
-  const href = $derived(`/session?id=${encodeURIComponent(session.id || '')}`);
+  const href = $derived(withBasePath(`/session?id=${encodeURIComponent(session.id || '')}`));
   const title = $derived(session.name || session.id || '');
   const modelLabel = $derived(formatRunningModel(runningStatus) || sessionModelLabel(session));
   const runtimeMark = $derived(runtimeDisplay(session.runtime));

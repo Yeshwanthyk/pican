@@ -38,3 +38,31 @@ func TestAppShellPreservesPWAContract(t *testing.T) {
 		}
 	}
 }
+
+func TestAppShellUsesMountedLiveURLs(t *testing.T) {
+	if err := SetBasePath("/s/test"); err != nil {
+		t.Fatal(err)
+	}
+	defer SetBasePath("")
+	old := appScriptPath
+	appScriptPath = "/static/assets/app-hash.js"
+	defer func() { appScriptPath = old }()
+
+	var b strings.Builder
+	if err := RenderAppShell(&b, ""); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{
+		`name="pican-base-path" content="/s/test"`,
+		`href="/s/test/app-icon.png"`,
+		`href="/s/test/manifest.webmanifest"`,
+		`href="/s/test/styles/app.css?v=`,
+		`src="/s/test/static/assets/app-hash.js"`,
+		`register('/s/test/sw.js',{scope:'/s/test/'})`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("shell missing %q", want)
+		}
+	}
+}

@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import type { ApiError } from "../lib/errors";
 import * as Http from "../lib/http";
 import { runPromise } from "../lib/runtime";
+import { createSessionEffect } from "./create-session";
 import {
   ApiErrorBodySchema,
   DirBrowseSchema,
@@ -10,7 +11,6 @@ import {
   GitRenameResponseSchema,
   ModelListSchema,
   MutationResponseSchema,
-  NewSessionResponseSchema,
   OkResponseSchema,
   PeerListSchema,
   PeerMutationResponseSchema,
@@ -132,8 +132,7 @@ export const effects = {
         }),
         SessionListSchema,
       ),
-    create: (path: string, runtime = "pi") =>
-      Http.post("/api/new-session", { path, runtime }, NewSessionResponseSchema),
+    create: (path: string, runtime = "pi") => createSessionEffect({ path, runtime }),
     recentLocations: Http.get("/api/recent-locations", RecentLocationsSchema),
     runtimes: Http.get("/api/runtimes", RuntimesResponseSchema),
     projects: Http.get("/api/projects", ProjectListSchema),

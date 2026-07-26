@@ -4,18 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
+	"strings"
 	"time"
 
-	"pican/internal/agentdir"
 	"pican/internal/auth"
+	"pican/internal/basepath"
 	"pican/internal/claude"
 	"pican/internal/codex"
 	"pican/internal/frontend"
@@ -26,53 +24,78 @@ import (
 	"pican/internal/ui"
 	"pican/internal/updater"
 	"pican/internal/workers"
+	"pican/internal/workspace"
 	"pican/web"
 )
 
 const defaultPort = "31415"
 const tokenEnvVar = "PICAN_TOKEN"
 
-// Main runs the pican application. version is supplied by cmd/pican so
-// release builds can set it with -ldflags "-X main.version=...".
-func Main(version string) {
-	port := flag.String("p", defaultPort, "port to listen on")
-	hostOverride := flag.String("host", "", "host/IP to bind; defaults to 127.0.0.1")
-	open := flag.Bool("o", false, "auto-open browser")
-	insecure := flag.Bool("insecure", false, "allow non-loopback bind without "+tokenEnvVar+" (DANGEROUS)")
-	showVersion := flag.Bool("version", false, "print version and exit")
-	runtimeFlag := flag.String("runtime", "auto", "agent runtimes: auto, pi, codex, claude, opencode, both, or a comma-separated list")
-	codexCommandFlag := flag.String("codex-command", "", "path to the Codex executable")
-	claudeCommandFlag := flag.String("claude-command", "", "path to the Claude executable")
-	claudeHomeFlag := flag.String("claude-home", "", "Claude config home containing projects/")
-	openCodeCommandFlag := flag.String("opencode-command", "", "path to the OpenCode executable")
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Println(version)
-		os.Exit(0)
+// Run starts pican and owns every resource created during startup. It returns
+// after ctx is canceled or the HTTP server fails.
+func Run(ctx context.Context, config Config) error {
+	if ctx.Err() != nil {
+		return nil
 	}
+	ctx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	config = config.withDefaults()
+	if err := config.validate(); err != nil {
+		return err
+	}
+	var hostedWorkspace *workspace.Resolver
+	if config.Mode == ModeHosted {
+		workspaceResolver, err := workspace.New(config.WorkspaceRoot)
+		if err != nil {
+			return fmt.Errorf("configure hosted workspace: %w", err)
+		}
+		hostedWorkspace = workspaceResolver
+		config.WorkspaceRoot = workspaceResolver.Root()
+		stateRoot, err := workspaceResolver.CreateDir(config.StateRoot, 0o755)
+		if err != nil {
+			return fmt.Errorf("configure hosted state root: %w", err)
+		}
+		config.StateRoot = stateRoot
+		config.ChildEnv = hostedCodexChildEnv(config.ChildEnv)
+		// Scotty owns the browser-facing route and runtime lifecycle. Hosted
+		// pican never publishes a parallel Tailscale endpoint or opens its
+		// internal listener in a local browser.
+		config.HostExplicit = true
+		config.OpenBrowser = false
+	}
+	cleanups := cleanupStack{}
+	defer cleanups.close()
 
-	codexPath := codexExecutable(*codexCommandFlag)
+	host, port, err := net.SplitHostPort(config.ListenAddress)
+	if err != nil {
+		return fmt.Errorf("invalid listen address %q: %w", config.ListenAddress, err)
+	}
+	codexPath := codexExecutable(config.CodexCommand)
 	codexArgv := codexCommand(codexPath)
-	claudePath := claude.ResolveCommand(*claudeCommandFlag)
-	openCodePath := openCodeExecutable(*openCodeCommandFlag)
-	runtimeSelection, err := discoverRuntimeSelection(*runtimeFlag, []runtimeCandidate{
-		{id: runtimes.PiID, command: "pi"},
-		{id: runtimes.CodexID, command: codexPath},
-		{id: runtimes.ClaudeID, command: claudePath},
-		{id: runtimes.OpenCodeID, command: openCodePath},
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	childEnv := make([]string, len(config.ChildEnv))
+	copy(childEnv, config.ChildEnv)
+	codexProcess := codex.ProcessOptions{Env: childEnv}
+	if config.Mode == ModeHosted {
+		codexProcess.Dir = config.WorkspaceRoot
 	}
-	claudeHome, err := claude.ResolveHome(*claudeHomeFlag)
+	runtimeCandidates := []runtimeCandidate{{id: runtimes.CodexID, command: codexPath}}
+	claudePath, openCodePath := "", ""
+	if config.Mode == ModeStandalone {
+		claudePath = claude.ResolveCommand(config.ClaudeCommand)
+		openCodePath = openCodeExecutable(config.OpenCodeCommand)
+		runtimeCandidates = []runtimeCandidate{
+			{id: runtimes.PiID, command: "pi"},
+			{id: runtimes.CodexID, command: codexPath},
+			{id: runtimes.ClaudeID, command: claudePath},
+			{id: runtimes.OpenCodeID, command: openCodePath},
+		}
+	}
+	runtimeSelection, err := discoverRuntimeSelection(config.Runtime, runtimeCandidates)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "resolve Claude home: %v\n", err)
-		os.Exit(2)
+		return err
 	}
 
-	agentDir := agentdir.Path()
+	agentDir := config.StateRoot
 	if err := seedSoundsDir(agentDir); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to seed sounds directory: %v\n", err)
 	}
@@ -80,88 +103,120 @@ func Main(version string) {
 
 	var srv *server.Server
 	currentServer := func() *server.Server { return srv }
-	codexCatalogSyncer := newCatalogSyncer("Codex", codexCatalog(sessionsDir, codexArgv), 10*time.Minute, time.Minute)
-	codexProbe := codex.NewProbe(codexPath, 30*time.Second)
+	var catalogCWDResolver func(string) (string, error)
+	if hostedWorkspace != nil {
+		catalogCWDResolver = hostedWorkspace.ResolveExisting
+	}
+	codexCatalogSyncer := newCatalogSyncer("Codex", configuredCodexCatalog(sessionsDir, codexArgv, codexProcess, catalogCWDResolver), 10*time.Minute, time.Minute)
+	codexProbe := codex.NewProbeWithOptions(codexPath, 30*time.Second, codexProcess)
 	if runtimeSelectionIncludes(runtimeSelection, runtimes.CodexID) {
-		probeCtx, probeCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		probeCtx, probeCancel := context.WithTimeout(ctx, 3*time.Second)
 		_ = codexProbe.Refresh(probeCtx)
 		probeCancel()
 	}
-	claudeCatalog, err := claude.NewCatalog(claudeHome, sessionsDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "initialize Claude catalog: %v\n", err)
-		os.Exit(1)
-	}
-	claudeCatalogSyncer := newCatalogSyncer("Claude", claudeCatalog.Sync, 15*time.Second, 10*time.Minute)
-	claudeProbe := claude.NewProbe(claudePath, claudeHome, 30*time.Second)
-	if runtimeSelectionIncludes(runtimeSelection, runtimes.ClaudeID) {
-		probeCtx, probeCancel := context.WithTimeout(context.Background(), 3*time.Second)
-		_ = claudeProbe.Refresh(probeCtx)
-		probeCancel()
-	}
-	openCodeSeed, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "resolve OpenCode seed directory: %v\n", err)
-		os.Exit(1)
-	}
+	var claudeHome string
+	var claudeCatalog *claude.Catalog
+	var claudeCatalogSyncer *catalogSyncer
+	var claudeProbe *claude.Probe
 	var openCodeSupervisor *opencode.Supervisor
+	var openCodeService *opencode.Service
+	var openCodeCatalog *opencode.Catalog
+	var openCodeCatalogSyncer *catalogSyncer
+	var openCodeSeed string
+	var openCodeAvailability func(context.Context) runtimes.Availability
 	openCodeClient := func() (opencode.NativeClient, error) {
 		if openCodeSupervisor == nil {
 			return nil, opencode.ErrSupervisorNotReady
 		}
 		return openCodeSupervisor.Client()
 	}
-	openCodeService, err := opencode.NewService(sessionsDir, openCodeSeed, openCodeClient)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "initialize OpenCode service: %v\n", err)
-		os.Exit(1)
-	}
-	openCodeCatalog := openCodeService.Catalog()
-	openCodeEvents, err := opencode.NewCatalogEvents(openCodeCatalog, 100*time.Millisecond, opencode.CatalogEventCallbacks{
-		Projection: func(projection opencode.Projection) {
-			if live := currentServer(); live != nil {
-				live.NotifyWorkerUpdate(projection.ID, true)
-			}
-		},
-		Error: func(eventErr error) {
-			fmt.Fprintf(os.Stderr, "OpenCode event reconciliation: %v\n", eventErr)
-		},
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "initialize OpenCode event reconciliation: %v\n", err)
-		os.Exit(1)
-	}
-	openCodeSupervisor = opencode.NewSupervisor(opencode.Options{
-		Command: openCodePath,
-		Dir:     openCodeSeed,
-		Reconcile: func(ctx context.Context, client *opencode.Client) error {
-			result, syncErr := openCodeCatalog.SyncWithClient(ctx, client)
-			if errors.Is(syncErr, opencode.ErrPartialCatalog) {
-				fmt.Fprintf(os.Stderr, "OpenCode catalog is partial; healthy sessions remain available and pruning is disabled: %v\n", syncErr)
-				return nil
-			}
-			if syncErr != nil {
-				return syncErr
-			}
-			if !result.Complete {
-				return fmt.Errorf("OpenCode catalog reconciliation was incomplete")
-			}
-			return nil
-		},
-		Event: openCodeEvents.HandleEvent,
-	})
-	openCodeCatalogSyncer := newCatalogSyncer("OpenCode", openCodeCatalog.Sync, 30*time.Second, time.Minute)
-	openCodeAvailability := func(context.Context) runtimes.Availability {
-		ready := openCodeSupervisor.Ready()
-		reason := ""
-		if ready.Err != nil {
-			reason = "OpenCode runtime is unavailable: " + ready.Err.Error()
-		} else if !ready.Available {
-			reason = "OpenCode runtime is not started"
+
+	if config.Mode == ModeStandalone {
+		claudeHome, err = claude.ResolveHome(config.ClaudeHome)
+		if err != nil {
+			return fmt.Errorf("resolve Claude home: %w", err)
 		}
-		return runtimes.Availability{Available: ready.Available, Reason: reason}
+		claudeCatalog, err = claude.NewCatalog(claudeHome, sessionsDir)
+		if err != nil {
+			return fmt.Errorf("initialize Claude catalog: %w", err)
+		}
+		claudeCatalogSyncer = newCatalogSyncer("Claude", claudeCatalog.Sync, 15*time.Second, 10*time.Minute)
+		claudeProbe = claude.NewProbe(claudePath, claudeHome, 30*time.Second)
+		if runtimeSelectionIncludes(runtimeSelection, runtimes.ClaudeID) {
+			probeCtx, probeCancel := context.WithTimeout(ctx, 3*time.Second)
+			_ = claudeProbe.Refresh(probeCtx)
+			probeCancel()
+		}
+
+		openCodeSeed, err = os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("resolve OpenCode seed directory: %w", err)
+		}
+		openCodeService, err = opencode.NewService(sessionsDir, openCodeSeed, openCodeClient)
+		if err != nil {
+			return fmt.Errorf("initialize OpenCode service: %w", err)
+		}
+		openCodeCatalog = openCodeService.Catalog()
+		openCodeEvents, eventsErr := opencode.NewCatalogEvents(openCodeCatalog, 100*time.Millisecond, opencode.CatalogEventCallbacks{
+			Projection: func(projection opencode.Projection) {
+				if live := currentServer(); live != nil {
+					live.NotifyWorkerUpdate(projection.ID, true)
+				}
+			},
+			Error: func(eventErr error) {
+				fmt.Fprintf(os.Stderr, "OpenCode event reconciliation: %v\n", eventErr)
+			},
+		})
+		if eventsErr != nil {
+			return fmt.Errorf("initialize OpenCode event reconciliation: %w", eventsErr)
+		}
+		cleanups.add(openCodeEvents.Close)
+		openCodeSupervisor = opencode.NewSupervisor(opencode.Options{
+			Command: openCodePath,
+			Dir:     openCodeSeed,
+			Reconcile: func(ctx context.Context, client *opencode.Client) error {
+				result, syncErr := openCodeCatalog.SyncWithClient(ctx, client)
+				if errors.Is(syncErr, opencode.ErrPartialCatalog) {
+					fmt.Fprintf(os.Stderr, "OpenCode catalog is partial; healthy sessions remain available and pruning is disabled: %v\n", syncErr)
+					return nil
+				}
+				if syncErr != nil {
+					return syncErr
+				}
+				if !result.Complete {
+					return fmt.Errorf("OpenCode catalog reconciliation was incomplete")
+				}
+				return nil
+			},
+			Event: openCodeEvents.HandleEvent,
+		})
+		cleanups.add(func() { _ = openCodeSupervisor.Close() })
+		openCodeCatalogSyncer = newCatalogSyncer("OpenCode", openCodeCatalog.Sync, 30*time.Second, time.Minute)
+		openCodeAvailability = func(context.Context) runtimes.Availability {
+			ready := openCodeSupervisor.Ready()
+			reason := ""
+			if ready.Err != nil {
+				reason = "OpenCode runtime is unavailable: " + ready.Err.Error()
+			} else if !ready.Available {
+				reason = "OpenCode runtime is not started"
+			}
+			return runtimes.Availability{Available: ready.Available, Reason: reason}
+		}
 	}
 	buildRegistry := func(openCodeVersion string) (*runtimeRegistry, error) {
+		codexRuntime := applicationRuntime{
+			registration: runtimes.Codex(runtimes.BuiltinOptions{
+				Command:           codexPath,
+				Version:           codexProbe.Version(),
+				AvailabilityProbe: codexProbe.Availability,
+				Catalog:           codexCatalogSyncer,
+				WorkerFactory:     configuredCodexWorkerFactory(ctx, sessionsDir, codexArgv, currentServer, codexProcess),
+			}),
+			models: configuredCodexModels(codexArgv, codexProcess),
+		}
+		if config.Mode == ModeHosted {
+			return newRuntimeRegistry(codexRuntime)
+		}
 		return newRuntimeRegistry(
 			applicationRuntime{
 				registration: runtimes.Pi(runtimes.BuiltinOptions{
@@ -171,16 +226,7 @@ func Main(version string) {
 				}),
 				models: piModels,
 			},
-			applicationRuntime{
-				registration: runtimes.Codex(runtimes.BuiltinOptions{
-					Command:           codexPath,
-					Version:           codexProbe.Version(),
-					AvailabilityProbe: codexProbe.Availability,
-					Catalog:           codexCatalogSyncer,
-					WorkerFactory:     codexWorkerFactory(sessionsDir, codexArgv, currentServer),
-				}),
-				models: codexModels(codexArgv),
-			},
+			codexRuntime,
 			applicationRuntime{
 				registration: runtimes.Claude(runtimes.BuiltinOptions{
 					Command:           claudePath,
@@ -205,48 +251,43 @@ func Main(version string) {
 	}
 	registry, err := buildRegistry("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "initialize runtime registry: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize runtime registry: %w", err)
 	}
 	enabledRuntimes, err := parseRuntime(runtimeSelection, registry)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return err
+	}
+	if config.Mode == ModeHosted && !enabledRuntimes.only(runtimes.CodexID) {
+		return fmt.Errorf("hosted mode supports only the Codex runtime; selected %s", strings.Join(enabledRuntimes.enabledRuntimes(), ","))
 	}
 	if _, statErr := os.Stat(sessionsDir); os.IsNotExist(statErr) {
 		if !enabledRuntimes.requiresExistingSessionsDir() {
 			if mkdirErr := os.MkdirAll(sessionsDir, 0755); mkdirErr != nil {
-				fmt.Fprintf(os.Stderr, "create sessions directory: %v\n", mkdirErr)
-				os.Exit(1)
+				return fmt.Errorf("create sessions directory: %w", mkdirErr)
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "sessions directory not found: %s\n", sessionsDir)
-			os.Exit(1)
+			return fmt.Errorf("sessions directory not found: %s", sessionsDir)
 		}
 	}
 
-	bindHost := chooseBindHost(*hostOverride)
-	token := os.Getenv(tokenEnvVar)
-	tokenRequired := token == "" && !isLoopbackHost(bindHost) && !*insecure
+	bindHost := host
+	token := config.AuthToken
+	tokenRequired := token == "" && !isLoopbackHost(bindHost) && !config.Insecure
 	if tokenRequired {
-		fmt.Fprintf(os.Stderr,
+		return fmt.Errorf(
 			"refusing to bind %s without %s set: anyone reachable on this address could view sessions and drive pi.\n"+
 				"  set %s=$(openssl rand -hex 16) to require a token, or pass --insecure to override.\n",
 			bindHost, tokenEnvVar, tokenEnvVar)
-		os.Exit(1)
 	}
 
 	openCodeVersion := ""
 	if enabledRuntimes.enables(string(runtimes.OpenCodeID)) {
-		startCtx, startCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		startCtx, startCancel := context.WithTimeout(ctx, 60*time.Second)
 		startErr := openCodeSupervisor.Start(startCtx)
 		startCancel()
 		if startErr != nil {
 			if enabledRuntimes.only(runtimes.OpenCodeID) {
-				openCodeEvents.Close()
-				_ = openCodeSupervisor.Close()
-				fmt.Fprintf(os.Stderr, "OpenCode runtime unavailable: %v\n", startErr)
-				os.Exit(1)
+				return fmt.Errorf("OpenCode runtime unavailable: %w", startErr)
 			}
 			fmt.Fprintf(os.Stderr, "OpenCode unavailable; continuing with %s: %v\n", enabledRuntimes.labelsExcept(runtimes.OpenCodeID), startErr)
 		} else {
@@ -255,21 +296,17 @@ func Main(version string) {
 	}
 	registry, err = buildRegistry(openCodeVersion)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "initialize enabled runtime registry: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize enabled runtime registry: %w", err)
 	}
 	enabledRuntimes, err = parseRuntime(runtimeSelection, registry)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return err
 	}
 	enabledRegistry, err := enabledRuntimes.selectedRegistry()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "resolve enabled runtimes: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("resolve enabled runtimes: %w", err)
 	}
 
-	var activeCatalogs []*catalogSyncer
 	for _, runtimeID := range enabledRuntimes.ordered {
 		registration, _ := registry.registry.Lookup(runtimeID)
 		if registration.Catalog == nil {
@@ -277,10 +314,10 @@ func Main(version string) {
 		}
 		if runtimeID == runtimes.OpenCodeID {
 			openCodeCatalogSyncer.start(false)
-			activeCatalogs = append(activeCatalogs, openCodeCatalogSyncer)
+			cleanups.add(openCodeCatalogSyncer.close)
 			continue
 		}
-		startupCtx, startupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		startupCtx, startupCancel := context.WithTimeout(ctx, 15*time.Second)
 		_, syncErr := registration.Catalog.Sync(startupCtx)
 		startupCancel()
 		if syncErr != nil {
@@ -288,7 +325,7 @@ func Main(version string) {
 		}
 		if syncer, ok := registration.Catalog.(*catalogSyncer); ok {
 			syncer.start(syncErr != nil)
-			activeCatalogs = append(activeCatalogs, syncer)
+			cleanups.add(syncer.close)
 		}
 	}
 
@@ -299,12 +336,22 @@ func Main(version string) {
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Claude transcript watcher unavailable; periodic sync remains active: %v\n", err)
+		} else {
+			cleanups.add(func() { _ = claudeWatcher.Close() })
 		}
 	}
 
-	authMiddleware := auth.New(token)
+	var authMiddleware *auth.Middleware
+	if config.AuthMode == AuthModeProxy {
+		authMiddleware, err = auth.NewProxyOnly(config.ProxyAuthHeader, token)
+		if err != nil {
+			return fmt.Errorf("configure proxy authentication: %w", err)
+		}
+	} else {
+		authMiddleware = auth.New(token)
+	}
 
-	versionChecker := updater.New(version)
+	versionChecker := updater.New(config.Version)
 
 	manager := workers.NewManager(func(sessionID, sessionPath string) (workers.ChatWorker, error) {
 		parsed, err := sessions.ParseFile(sessionPath, filepath.Base(filepath.Dir(sessionPath)), filepath.Base(sessionPath))
@@ -320,11 +367,26 @@ func Main(version string) {
 		}
 		return enabledRegistry.NewWorker(runtimeID, sessionID, sessionPath)
 	})
+	cleanups.add(func() { _ = manager.Close() })
 	sessionCache := sessions.NewCache()
 	var srvErr error
+	var runInstallHook func(context.Context) error
+	var runRestartHook func() error
+	if config.Mode == ModeStandalone {
+		runInstallHook = runInstall
+		runRestartHook = runRestart
+	}
 	srv, srvErr = server.New(server.Deps{
-		AgentDir:            agentDir,
-		SessionsDir:         sessionsDir,
+		AgentDir:      agentDir,
+		SessionsDir:   sessionsDir,
+		Hosted:        config.Mode == ModeHosted,
+		WorkspaceRoot: config.WorkspaceRoot,
+		ChildEnv: func() []string {
+			if config.Mode != ModeHosted {
+				return nil
+			}
+			return childEnv
+		}(),
 		Auth:                authMiddleware,
 		ChatSender:          manager,
 		Cache:               sessionCache,
@@ -349,7 +411,7 @@ func Main(version string) {
 			if !enabledRuntimes.enables(string(runtimes.CodexID)) {
 				return nil
 			}
-			return codexService{sessionsDir: sessionsDir, command: codexArgv}
+			return configuredCodexService{sessionsDir: sessionsDir, command: codexArgv, process: codexProcess}
 		}(),
 		OpenCode: func() server.OpenCodeService {
 			if !enabledRuntimes.enables(string(runtimes.OpenCodeID)) {
@@ -358,23 +420,30 @@ func Main(version string) {
 			return openCodeService
 		}(),
 		Updater:    versionChecker,
-		RunInstall: runInstall,
-		RunRestart: runRestart,
+		RunInstall: runInstallHook,
+		RunRestart: runRestartHook,
 	})
 	if srvErr != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize server: %v\n", srvErr)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize server: %w", srvErr)
 	}
+	cleanups.add(srv.Shutdown)
 
 	ui.SetThemeProvider(srv.ThemeSetting)
 	ui.SetFontProvider(srv.FontStyles)
+	if err := ui.SetBasePath(config.BasePath); err != nil {
+		return fmt.Errorf("configure UI base path: %w", err)
+	}
+	basePath, err := basepath.Parse(config.BasePath)
+	if err != nil {
+		return fmt.Errorf("configure HTTP base path: %w", err)
+	}
 
 	mux := http.NewServeMux()
 	srv.Register(mux)
 	ui.RegisterPWAHandlers(mux)
 	mux.HandleFunc("/styles/app.css", ui.ServeAppStyles)
 	dfs := web.DistFS()
-	if scripts, err := frontend.LoadScripts(dfs, frontend.AppEntry); err == nil {
+	if scripts, err := frontend.LoadScriptsAt(dfs, basePath, frontend.AppEntry); err == nil {
 		for _, script := range scripts {
 			if script.Entry == frontend.AppEntry {
 				ui.SetAppScriptPath(script.Path)
@@ -387,16 +456,16 @@ func Main(version string) {
 		fmt.Fprintf(os.Stderr, "WARNING: failed to load Vite frontend scripts: %v (frontend JS will be unavailable)\n", err)
 	}
 
-	addr := net.JoinHostPort(bindHost, *port)
-	url := fmt.Sprintf("http://%s", net.JoinHostPort(bindHost, *port))
+	addr := config.ListenAddress
+	url := fmt.Sprintf("http://%s%s", config.ListenAddress, basePath.String())
 	var tailscaleURL string
 	var tailscaleServe bool
-	if *hostOverride == "" {
-		tsCtx, tsCancel := context.WithTimeout(context.Background(), tailscaleConfigureTimeout)
-		tsURL, tsOk, tsErr := configureTailscaleServe(tsCtx, *port)
+	if !config.HostExplicit {
+		tsCtx, tsCancel := context.WithTimeout(ctx, tailscaleConfigureTimeout)
+		tsURL, tsOk, tsErr := configureTailscaleServe(tsCtx, port)
 		tsCancel()
 		if tsErr == nil && tsOk {
-			tailscaleURL = tsURL
+			tailscaleURL = tsURL + basePath.String()
 			tailscaleServe = true
 		} else if tsErr != nil {
 			if tsCtx.Err() == context.DeadlineExceeded {
@@ -411,28 +480,38 @@ func Main(version string) {
 		fmt.Printf("Tailscale HTTPS -> %s\n", tailscaleURL)
 	}
 	fmt.Printf("Serving from: %s\n", sessionsDir)
-	if authMiddleware.Enabled() {
+	if config.AuthMode == AuthModeProxy {
+		fmt.Println("Auth: proxy-only")
+	} else if authMiddleware.Enabled() {
 		fmt.Println("Auth: enabled (set PICAN_TOKEN to require token)")
 	} else {
 		fmt.Printf("Auth: disabled — set %s to require a token for access.\n", tokenEnvVar)
 	}
 
-	stateFilePath, err := writeStateFile(agentDir, bindHost, *port, tailscaleServe, tailscaleURL)
+	stateFilePath, err := writeStateFile(agentDir, bindHost, port, tailscaleServe, tailscaleURL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return err
 	}
-	defer func() {
-		if stateFile != nil {
-			_ = stateFile.Close()
+	ownedStateFile := stateFile
+	cleanups.add(func() {
+		if ownedStateFile != nil {
+			_ = ownedStateFile.Close()
+		}
+		if stateFile == ownedStateFile {
+			stateFile = nil
 		}
 		_ = os.Remove(stateFilePath)
-	}()
+	})
 
-	if *open {
+	if config.OpenBrowser {
 		go func() {
-			time.Sleep(300 * time.Millisecond)
-			openBrowser(url)
+			timer := time.NewTimer(300 * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+			case <-timer.C:
+				openBrowser(url)
+			}
 		}()
 	}
 
@@ -441,38 +520,25 @@ func Main(version string) {
 	}
 
 	httpServer := &http.Server{
-		Addr:              addr,
-		Handler:           mux,
+		Addr: addr,
+		Handler: func() http.Handler {
+			if config.AuthMode == AuthModeProxy {
+				return basePath.Handler(authMiddleware.WrapHandler(mux))
+			}
+			return basePath.Handler(mux)
+		}(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// WriteTimeout intentionally 0 — SSE streams are long-lived.
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	go versionChecker.Start(ctx)
-
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(shutdownCtx)
-		if claudeWatcher != nil {
-			_ = claudeWatcher.Close()
-		}
-		_ = manager.Close()
-		for _, catalog := range activeCatalogs {
-			catalog.close()
-		}
-		openCodeEvents.Close()
-		_ = openCodeSupervisor.Close()
-		srv.Shutdown()
-	}()
-
-	serveErr := httpServer.ListenAndServe()
-	if serveErr != nil && serveErr != http.ErrServerClosed {
-		fmt.Fprintf(os.Stderr, "server error: %v\n", serveErr)
-		os.Exit(1)
+	if config.Mode == ModeStandalone {
+		go versionChecker.Start(ctx)
 	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}
+	cleanups.add(func() { _ = listener.Close() })
+	return serveUntilCanceled(ctx, httpServer, listener)
 }

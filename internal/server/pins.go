@@ -140,7 +140,7 @@ func (s *Server) handleSetPin(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "pins are unavailable")
 		return
 	}
-	if _, err := s.cache.Resolve(s.sessionsDir, sessionID); err != nil {
+	if _, err := s.resolveSession(sessionID); err != nil {
 		resolveOrWriteError(w, err)
 		return
 	}

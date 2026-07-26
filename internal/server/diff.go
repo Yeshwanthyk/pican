@@ -17,11 +17,14 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
-	diff, err := git.WorkingTreeDiff(cwd)
+	if err := s.validateGitBoundary(cwd); resolveOrWriteError(w, err) {
+		return
+	}
+	diff, err := git.WorkingTreeDiffWithEnv(cwd, s.childEnv)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"isRepo": false, "diff": ""})
 		return
 	}
-	branch, _ := git.CurrentBranch(cwd)
+	branch, _ := git.CurrentBranchWithEnv(cwd, s.childEnv)
 	writeJSON(w, http.StatusOK, map[string]any{"isRepo": true, "diff": diff, "branch": branch})
 }

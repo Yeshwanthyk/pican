@@ -1,6 +1,6 @@
 # Sequence Flow: Server Startup
 
-This document traces the execution from starting pican to the first HTTP request. The default selection discovers installed Pi, Codex, Claude, and OpenCode commands; explicit runtime selection remains available.
+This document traces the execution from starting pican to the first HTTP request. The default standalone selection discovers installed Pi, Codex, Claude, and OpenCode commands; explicit runtime selection remains available. An embedding host instead calls `app.Run(ctx, config)` directly.
 
 ## Sequence Diagram
 
@@ -12,7 +12,8 @@ This document traces the execution from starting pican to the first HTTP request
    │  exec     │             │              │              │            │
    │──────────▶│             │              │              │            │
    │           │             │              │              │            │
-   │           │─── flag.Parse() ──────────▶│              │            │
+   │           │─── app.ParseCLI() ─────────▶│              │            │
+   │           │─── app.Run(ctx, config) ───▶│              │            │
    │           │             │              │              │            │
    │           │─── os.Stat(sessionsDir) ──▶│              │            │
    │           │             │              │              │            │
@@ -58,7 +59,9 @@ This document traces the execution from starting pican to the first HTTP request
 
 ## Step-by-Step
 
-### 1. CLI Flag Parsing
+### 1. Reusable process boundary and CLI parsing
+
+`app.Config` owns the listen address, base path, workspace root, state root, authentication policy, exact child environment, selected runtime, and current version. `app.Run` owns and cleans up all resources created below. It returns when the supplied context is canceled or serving fails; it never installs process-global signal handling and never calls `os.Exit`. `cmd/pican` parses flags/environment, creates a signal-aware context, calls `Run`, and translates the returned error into a process exit.
 
 ```go
 port := flag.String("p", "31415", "port to listen on")
@@ -74,7 +77,9 @@ openCodeCommandFlag := flag.String("opencode-command", "", "path to the OpenCode
 
 The default `auto` selection resolves each configured command with `exec.LookPath` and enables installed runtimes in Pi, Codex, Claude, OpenCode registry order. `-runtime` accepts registered comma-separated IDs as an explicit override; `both` remains exactly `pi,codex`. OpenCode command precedence is `-opencode-command`, `PICAN_OPENCODE_COMMAND`, `~/.opencode/bin/opencode` when installed there, then `opencode` from `PATH`. Other runtime overrides retain their documented precedence. Command values are executable paths, never shell fragments.
 
-### 2. Agent & Sessions Directory
+Hosted mode is selected with `PICAN_MODE=hosted`. `PICAN_BASE_PATH`, `PICAN_WORKSPACE_ROOT`, `PICAN_STATE_ROOT`, `PICAN_AUTH_MODE=proxy`, and `PICAN_PROXY_HEADER` supply non-secret hosting configuration; `PICAN_PROXY_TOKEN` is environment-only and has no CLI flag. Hosted validation requires Codex-only runtime selection, an absolute workspace, a state root contained by that workspace, and proxy-only authentication.
+
+### 2. State, workspace, and sessions directories
 
 ```go
 agentDir := agentdir.Path() // PI_CODING_AGENT_DIR, else ~/.pi/agent
@@ -82,6 +87,8 @@ sessionsDir := filepath.Join(agentDir, "sessions")
 ```
 
 Any selection containing Pi requires the sessions directory to exist. Replaceable-only selections create it because it contains rebuildable projections.
+
+Hosted mode canonicalizes `WorkspaceRoot` through symlinks and creates `StateRoot` only through the containment resolver. Pican's sessions, SQLite, state file, sounds, projections, and other mutable data live below `StateRoot`; Codex's separately supplied home remains below the workspace. All hosted filesystem/git/project paths and Codex working directories must resolve to the workspace root or a descendant.
 
 ### 3. Codex Catalog Initialization
 
@@ -133,6 +140,8 @@ if token == "" && !isLoopbackHost(bindHost) && !*insecure {
 
 Non-loopback binds **require** `PICAN_TOKEN` to prevent unauthorized access over the network.
 
+Hosted mode does not use this browser token flow. The complete mounted mux, including assets and PWA routes, is gated by proxy-only auth. Exactly one configured private header must match in constant time; query/form/Bearer/Pican-header/cookie/browser-login alternatives are rejected. Scotty authenticates the public browser request and injects the header only on the private proxy hop.
+
 ### 8. Server Construction
 
 ```go
@@ -174,7 +183,7 @@ On success, server creation starts:
 5. the schedule runner;
 6. the persistent chat-queue drainer.
 
-### 9. Route Registration
+### 9. Route Registration and Mounting
 
 All routes are wrapped with `auth.Wrap`:
 
@@ -188,6 +197,8 @@ mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
 ```
 
 `/api/models?runtime=<runtime>` scopes explicit discovery; `/api/models?id=<session-id>` resolves the session runtime. Global callers such as settings and schedules continue using the merged `/api/models` response.
+
+Handlers remain registered against root-relative paths on one inner mux. A single base-path handler mounts that mux and strips the prefix before dispatch; requests outside the mount return `404`. The same normalized path is supplied to the live shell, frontend URL helpers, PWA metadata, and Vite asset loader.
 
 ### 10. Static Asset Loading
 
@@ -231,7 +242,7 @@ httpServer := &http.Server{
     ReadHeaderTimeout: 10 * time.Second,
     IdleTimeout:       120 * time.Second,
 }
-httpServer.ListenAndServe()
+app.Run(ctx, config)
 ```
 
-Blocks until interrupted. On `SIGINT`/`SIGTERM`, the server performs a graceful HTTP shutdown, closes native watchers/event streams, cancels catalog sync, closes runtime workers and supervised child process trees, stops server background work, closes SQLite, and removes the state file.
+The CLI blocks until its signal-aware context is canceled. An embedding host can cancel its own context. In either case `Run` performs a graceful HTTP shutdown, closes native watchers/event streams, cancels catalog sync, closes runtime workers and supervised child process trees, stops server background work, closes SQLite, and removes the state file.

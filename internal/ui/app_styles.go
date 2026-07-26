@@ -58,7 +58,7 @@ func gzipCSS(css string) []byte {
 
 // appStylesHref is the versioned URL the SPA shell links to.
 func appStylesHref() string {
-	return "/styles/app.css?v=" + appStylesHash
+	return liveURL("/styles/app.css?v=" + appStylesHash)
 }
 
 // ServeAppStyles serves the externalized stylesheet bundle with a long-lived

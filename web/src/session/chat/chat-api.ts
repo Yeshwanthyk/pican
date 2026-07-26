@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { AbortError, NetworkError } from "../../lib/errors";
 import type { FetchLike } from "../../lib/http";
 import { runPromise } from "../../lib/runtime";
+import { withBasePath } from "../../shared/base-path";
 
 interface FetchOptions {
   readonly fetchImpl?: FetchLike;
@@ -33,7 +34,8 @@ const request = (
       requestSignal?.addEventListener("abort", abort, { once: true });
       signal?.addEventListener("abort", abort, { once: true });
       effectSignal.addEventListener("abort", abort, { once: true });
-      const response = init === undefined ? fetchImpl(url) : fetchImpl(url, init);
+      const mountedURL = withBasePath(url);
+      const response = init === undefined ? fetchImpl(mountedURL) : fetchImpl(mountedURL, init);
       response.then(
         (response) => resume(Effect.succeed(response)),
         (cause) => resume(requestSignal?.aborted ? new AbortError() : new NetworkError({ cause })),
@@ -51,7 +53,7 @@ const requestJson = (url: string, value: unknown, options: FetchOptions): Promis
     encodeJson(value).pipe(
       Effect.flatMap((body) =>
         Effect.callback<Response, NetworkError>((resume) => {
-          (options.fetchImpl ?? globalThis.fetch)(url, {
+          (options.fetchImpl ?? globalThis.fetch)(withBasePath(url), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,

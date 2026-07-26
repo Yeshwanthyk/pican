@@ -175,12 +175,16 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 
 	path := strings.TrimSpace(sc.ProjectPath)
 	if path == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			_ = s.schedules.FailRun(runID, err.Error())
-			return "", err
+		if s.workspace != nil {
+			path = s.workspaceRoot
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				_ = s.schedules.FailRun(runID, err.Error())
+				return "", err
+			}
+			path = home
 		}
-		path = home
 	}
 
 	settings := sessions.InitialSettings{
@@ -202,7 +206,7 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 			_ = s.schedules.FailRun(runID, err.Error())
 			return "", err
 		}
-		cwd, pathErr := sessions.PrepareSessionPath(path)
+		cwd, pathErr := s.prepareSessionPath(path)
 		if pathErr != nil {
 			_ = s.schedules.FailRun(runID, pathErr.Error())
 			return "", pathErr
@@ -225,7 +229,7 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 			_ = s.schedules.FailRun(runID, err.Error())
 			return "", err
 		}
-		cwd, pathErr := sessions.PrepareSessionPath(path)
+		cwd, pathErr := s.prepareSessionPath(path)
 		if pathErr != nil {
 			_ = s.schedules.FailRun(runID, pathErr.Error())
 			return "", pathErr
@@ -243,7 +247,7 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 		}
 		filename = projection.ID
 	case string(runtimes.PiID):
-		filename, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, settings)
+		filename, err = s.createPiSession(path, settings)
 		if err != nil {
 			_ = s.schedules.FailRun(runID, err.Error())
 			return "", fmt.Errorf("create session: %w", err)
@@ -259,6 +263,10 @@ func (s *Server) fireSchedule(sc schedules.Schedule) (string, error) {
 		return "", fmt.Errorf("resolve session: %w", err)
 	}
 	sessionID := resolved.Session.ID
+	if _, err := s.validateSessionWorkspace(resolved); err != nil {
+		_ = s.schedules.FailRun(runID, err.Error())
+		return "", err
+	}
 	if err := s.schedules.AttachSession(runID, sessionID, filename); err != nil {
 		fmt.Fprintf(os.Stderr, "scheduler: attach session: %v\n", err)
 	}

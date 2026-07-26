@@ -358,6 +358,10 @@ func (s *Server) resolveCodexSession(w http.ResponseWriter, id string) (sessions
 		writeJSONError(w, http.StatusBadRequest, "Codex session required")
 		return sessions.ResolvedSession{}, false
 	}
+	if _, err := s.validateSessionWorkspace(resolved); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return sessions.ResolvedSession{}, false
+	}
 	return resolved, true
 }
 
@@ -377,6 +381,12 @@ func (s *Server) resolveOpenCodeSession(w http.ResponseWriter, id string) (sessi
 	if resolved.Session.Runtime != string(runtimes.OpenCodeID) || resolved.Session.NativeID == "" || resolved.Session.Project == "" {
 		writeJSONError(w, http.StatusBadRequest, "OpenCode session required")
 		return sessions.ResolvedSession{}, false
+	}
+	if project, err := s.validateSessionWorkspace(resolved); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return sessions.ResolvedSession{}, false
+	} else {
+		resolved.Session.Project = project
 	}
 	return resolved, true
 }
@@ -463,6 +473,21 @@ func (s *Server) handleCodexThreadUnarchive(w http.ResponseWriter, r *http.Reque
 		writeJSONError(w, http.StatusBadRequest, "valid nativeId is required")
 		return
 	}
+	if s.workspace != nil {
+		thread, err := s.codex.InspectArchivedThread(r.Context(), body.NativeID)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				writeJSONError(w, http.StatusNotFound, "thread not found")
+			} else {
+				writeJSONError(w, http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+		if _, err := s.resolveWorkspacePath(thread.CWD); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	projection, err := s.codex.UnarchiveSession(r.Context(), body.NativeID)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -471,6 +496,17 @@ func (s *Server) handleCodexThreadUnarchive(w http.ResponseWriter, r *http.Reque
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
+	}
+	if s.workspace != nil {
+		resolved, resolveErr := s.resolveSession(projection.ID)
+		if resolveErr != nil {
+			writeJSONError(w, http.StatusInternalServerError, resolveErr.Error())
+			return
+		}
+		if _, boundaryErr := s.validateSessionWorkspace(resolved); boundaryErr != nil {
+			writeJSONError(w, http.StatusBadRequest, boundaryErr.Error())
+			return
+		}
 	}
 	s.broadcast(globalSessID, "reload:"+projection.ID)
 	writeJSON(w, 0, map[string]any{"ok": true, "id": projection.ID})

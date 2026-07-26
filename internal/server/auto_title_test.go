@@ -165,6 +165,25 @@ func TestMaybeAutoTitleUsesModel(t *testing.T) {
 	}
 }
 
+func TestHostedAutoTitleNeverLaunchesAmbientModelProcess(t *testing.T) {
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
+	s.hosted = true
+	calls := 0
+	restore := autoTitleGenerate
+	autoTitleGenerate = func(context.Context, rpc.PromptOpts) (string, error) {
+		calls++
+		return "must not be used", nil
+	}
+	t.Cleanup(func() { autoTitleGenerate = restore })
+
+	if got := s.generateTitle("fix the flaky login test"); got != "Fix Flaky Login Test" {
+		t.Fatalf("hosted heuristic title = %q", got)
+	}
+	if calls != 0 {
+		t.Fatalf("hosted auto-title launched ambient subprocess %d times", calls)
+	}
+}
+
 func TestMaybeAutoTitleModelErrorFallsBack(t *testing.T) {
 	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
 	id := writeAutoTitleSession(t, s.sessionsDir, "fix the flaky login test", "")

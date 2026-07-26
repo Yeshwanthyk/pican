@@ -3,6 +3,7 @@ import type { ApiError } from "../lib/errors";
 import { HttpError, NetworkError } from "../lib/errors";
 import * as Http from "../lib/http";
 import type { FetchLike } from "../lib/http";
+import { withBasePath } from "../shared/base-path";
 import { runPromise } from "../lib/runtime";
 import { TaskExecutionSchema, TaskListSchema } from "../lib/schema";
 import type { Task } from "../lib/schema";
@@ -114,7 +115,9 @@ const taskOutputEffect = (
   Effect.tryPromise({
     try: () =>
       fetchImpl(
-        `/api/tasks/output?project=${encodeURIComponent(project)}&taskId=${encodeURIComponent(taskId)}`,
+        withBasePath(
+          `/api/tasks/output?project=${encodeURIComponent(project)}&taskId=${encodeURIComponent(taskId)}`,
+        ),
         { headers: { Accept: "text/plain" } },
       ),
     catch: (cause) => new NetworkError({ cause }),

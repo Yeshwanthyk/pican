@@ -33,7 +33,7 @@ func appStylesheets() template.HTML {
 // bootstrap, when non-empty, is the base64 session payload the SPA reads to
 // render the first paint without fetching /api/session — see the session route.
 func RenderAppShell(w io.Writer, bootstrap string) error {
-	scriptSrc := template.HTMLEscapeString(appScriptPath)
+	scriptSrc := template.HTMLEscapeString(liveURL(appScriptPath))
 	preload := template.HTML(`<link rel="modulepreload" href="` + scriptSrc + `">`)
 	bootstrapTag := template.HTML("")
 	if bootstrap != "" {

@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+
+import readline from "node:readline";
+import { readFileSync, writeFileSync } from "node:fs";
+
+const forbiddenChildKeys = ["PICAN_PROXY_TOKEN", "SCOTTY_REAL_CREDENTIAL"];
+for (const key of forbiddenChildKeys) {
+  if (process.env[key]) {
+    process.stderr.write(`forbidden hosted child environment key: ${key}\n`);
+    process.exit(70);
+  }
+}
+
+const args = process.argv.slice(2);
+if (args[0] === "--version") {
+  process.stdout.write("codex-cli 0.0.0-e2e\n");
+  process.exit(0);
+}
+if (args[0] === "login" && args[1] === "status") {
+  process.stdout.write("Logged in\n");
+  process.exit(0);
+}
+if (args[0] !== "app-server") {
+  process.stderr.write(`unsupported stub codex command: ${args.join(" ")}\n`);
+  process.exit(64);
+}
+
+const threads = new Map();
+let nextTurn = 1;
+
+function nextThreadID() {
+  const counterPath = process.env.CODEX_E2E_COUNTER;
+  if (!counterPath) return "thread-e2e-1";
+  let current = 0;
+  try {
+    current = Number.parseInt(readFileSync(counterPath, "utf8"), 10) || 0;
+  } catch {
+    // First thread in a fresh hosted workspace.
+  }
+  const next = current + 1;
+  writeFileSync(counterPath, String(next), { mode: 0o600 });
+  return `thread-e2e-${next}`;
+}
+
+function threadFor(id, cwd = process.cwd()) {
+  let thread = threads.get(id);
+  if (!thread) {
+    const now = Date.now();
+    thread = {
+      id,
+      cwd,
+      name: "New Codex session",
+      createdAt: now,
+      updatedAt: now,
+      turns: [],
+      model: "gpt-5.6-e2e",
+      modelProvider: "openai",
+      reasoningEffort: "medium",
+      approvalPolicy: "never",
+      sandbox: { type: "dangerFullAccess" },
+    };
+    threads.set(id, thread);
+  }
+  return thread;
+}
+
+function write(message) {
+  process.stdout.write(`${JSON.stringify(message)}\n`);
+}
+
+function result(id, value = {}) {
+  write({ id, result: value });
+}
+
+function notify(method, params) {
+  write({ method, params });
+}
+
+function textFromInput(input) {
+  if (!Array.isArray(input)) return "";
+  return input
+    .filter((item) => item?.type === "text")
+    .map((item) => item.text ?? "")
+    .join("\n");
+}
+
+const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+lines.on("line", (line) => {
+  const request = JSON.parse(line);
+  if (request.id === undefined) return;
+
+  const params = request.params ?? {};
+  switch (request.method) {
+    case "initialize":
+      result(request.id, { userAgent: "pican-e2e-stub" });
+      break;
+    case "thread/list":
+      result(request.id, { data: Array.from(threads.values()), nextCursor: null });
+      break;
+    case "thread/start": {
+      const id = nextThreadID();
+      const thread = threadFor(id, params.cwd);
+      result(request.id, {
+        thread,
+        cwd: thread.cwd,
+        model: thread.model,
+        modelProvider: thread.modelProvider,
+        reasoningEffort: thread.reasoningEffort,
+        approvalPolicy: thread.approvalPolicy,
+        sandbox: thread.sandbox,
+      });
+      break;
+    }
+    case "thread/resume": {
+      const thread = threadFor(params.threadId, params.cwd);
+      result(request.id, {
+        thread,
+        cwd: thread.cwd,
+        model: thread.model,
+        modelProvider: thread.modelProvider,
+        reasoningEffort: thread.reasoningEffort,
+        approvalPolicy: thread.approvalPolicy,
+        sandbox: thread.sandbox,
+      });
+      break;
+    }
+    case "thread/read": {
+      const thread = threadFor(params.threadId);
+      result(request.id, { thread });
+      break;
+    }
+    case "thread/name/set": {
+      const thread = threadFor(params.threadId);
+      thread.name = params.name;
+      thread.updatedAt = Date.now();
+      result(request.id);
+      break;
+    }
+    case "model/list":
+      result(request.id, {
+        data: [
+          {
+            id: "gpt-5.6-e2e",
+            model: "gpt-5.6-e2e",
+            displayName: "GPT 5.6 E2E",
+            defaultReasoningEffort: "medium",
+            supportedReasoningEfforts: [{ reasoningEffort: "medium" }],
+          },
+        ],
+        nextCursor: null,
+      });
+      break;
+    case "turn/start": {
+      const thread = threadFor(params.threadId, params.cwd);
+      const turnId = `turn-e2e-${nextTurn++}`;
+      const agentId = `agent-${turnId}`;
+      const prompt = textFromInput(params.input);
+      const userItem = {
+        id: `user-${turnId}`,
+        type: "userMessage",
+        content: [{ type: "text", text: prompt }],
+      };
+      const running = { id: turnId, status: "inProgress", items: [userItem] };
+      result(request.id, { turn: running });
+      setTimeout(() => {
+        notify("turn/started", { threadId: thread.id, turn: running });
+        notify("item/agentMessage/delta", {
+          threadId: thread.id,
+          turnId,
+          itemId: agentId,
+          delta: "hello from mounted e2e",
+        });
+        const agentItem = {
+          id: agentId,
+          type: "agentMessage",
+          text: "hello from mounted e2e",
+        };
+        notify("item/completed", {
+          threadId: thread.id,
+          turnId,
+          item: agentItem,
+          completedAtMs: Date.now(),
+        });
+        const completed = {
+          id: turnId,
+          status: "completed",
+          items: [userItem, agentItem],
+          startedAt: Date.now(),
+          completedAt: Date.now(),
+        };
+        thread.turns = [completed];
+        thread.updatedAt = Date.now();
+        notify("turn/completed", { threadId: thread.id, turn: completed });
+      }, 25);
+      break;
+    }
+    default:
+      result(request.id);
+  }
+});

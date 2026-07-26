@@ -20,6 +20,7 @@
   import { persistSetting, valueFor } from '../settings/settings-support';
   import { describeError } from '../lib/errors';
   import { recoverSync, settle } from '../components/shared/ui-effect';
+  import { withBasePath } from '../shared/base-path';
 
   let { project = '', session = '' }: { project?: string; session?: string } = $props();
   let projects = $state<ReadonlyArray<{ readonly path: string }>>([]);
@@ -149,7 +150,7 @@
 
 <main class="tasks-page" data-tasks-page>
   {#if session}
-    <a class="tasks-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+    <a class="tasks-session-scope" href={withBasePath('/session?id=' + encodeURIComponent(session))}
       >{t('tasks.sessionScope')}</a
     >
   {:else}

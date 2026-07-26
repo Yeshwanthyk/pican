@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { navigate } from '../shared/navigation';
   import { t } from '../shared/strings';
+  import { withBasePath } from '../shared/base-path';
   import FullScreenSheet from '../components/session/FullScreenSheet.svelte';
   import {
     groupModelsByProvider,
@@ -342,7 +343,7 @@
 <div class="session-header-bar">
   <div class="session-header-left">
     <a
-      href="/"
+      href={withBasePath('/')}
       class="session-header-back"
       onclick={(e) => {
         e.preventDefault();

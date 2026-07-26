@@ -151,6 +151,9 @@ func (d *queueDrainer) drainSession(sessionID string) {
 		// from the UI.
 		return
 	}
+	if _, err := d.server.validateSessionWorkspace(resolved); err != nil {
+		return
+	}
 	item, ok, err := d.server.chatQueue.PopHead(sessionID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "queue drainer: PopHead %s: %v\n", sessionID, err)

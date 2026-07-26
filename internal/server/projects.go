@@ -132,6 +132,11 @@ func (s *Server) enabledProjectSet() (map[string]bool, bool) {
 		if err := rows.Scan(&p); err != nil {
 			return nil, false
 		}
+		if canonical, ok := s.workspaceProject(p); ok {
+			p = canonical
+		} else if s.workspace != nil {
+			continue
+		}
 		set[p] = true
 	}
 	return set, true
@@ -154,6 +159,11 @@ func (s *Server) trackedProjectSet() (map[string]bool, bool) {
 		if err := rows.Scan(&path); err != nil {
 			return nil, false
 		}
+		if canonical, ok := s.workspaceProject(path); ok {
+			path = canonical
+		} else if s.workspace != nil {
+			continue
+		}
 		set[path] = true
 	}
 	return set, rows.Err() == nil
@@ -162,6 +172,13 @@ func (s *Server) trackedProjectSet() (map[string]bool, bool) {
 func (s *Server) trackProject(path string) error {
 	if s.db == nil {
 		return errors.New("preferences are unavailable")
+	}
+	if s.workspace != nil {
+		var err error
+		path, err = s.resolveWorkspacePath(path)
+		if err != nil {
+			return err
+		}
 	}
 	_, err := s.db.Exec(`INSERT INTO project_prefs (project_path, enabled, source, updated_at)
 		VALUES (?, 1, 'registered', ?)
@@ -173,6 +190,13 @@ func (s *Server) trackProject(path string) error {
 func (s *Server) untrackProject(path string) error {
 	if s.db == nil {
 		return errors.New("preferences are unavailable")
+	}
+	if s.workspace != nil {
+		var err error
+		path, err = s.resolveWorkspacePath(path)
+		if err != nil {
+			return err
+		}
 	}
 	_, err := s.db.Exec("DELETE FROM project_prefs WHERE project_path = ? AND source = 'registered'", path)
 	return err
@@ -229,6 +253,11 @@ func (s *Server) handleApiProjects(w http.ResponseWriter, r *http.Request) {
 				var p, src string
 				var en int
 				if err := rows.Scan(&p, &en, &src); err != nil {
+					continue
+				}
+				if canonical, ok := s.workspaceProject(p); ok {
+					p = canonical
+				} else if s.workspace != nil {
 					continue
 				}
 				enabled[p] = en == 1
@@ -311,7 +340,14 @@ func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 
 	path := body.Path
 	if body.Action == "register" || body.Action == "track" {
-		normalized, err := sessions.PrepareSessionPath(path)
+		normalized, err := s.prepareSessionPath(path)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		path = normalized
+	} else if s.workspace != nil {
+		normalized, err := s.resolveWorkspacePath(path)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return

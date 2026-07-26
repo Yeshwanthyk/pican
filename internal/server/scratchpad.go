@@ -14,8 +14,13 @@ func (s *Server) lookupScratchpad(project string) (string, error) {
 	if project == "" || s.db == nil {
 		return "", nil
 	}
+	var err error
+	project, err = s.resolveWorkspacePath(project)
+	if err != nil {
+		return "", err
+	}
 	var content string
-	err := s.db.QueryRow("SELECT content FROM scratchpads WHERE project_path = ?", project).Scan(&content)
+	err = s.db.QueryRow("SELECT content FROM scratchpads WHERE project_path = ?", project).Scan(&content)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -36,6 +41,11 @@ func (s *Server) handleGetScratchpad(w http.ResponseWriter, r *http.Request) {
 
 	if s.db == nil {
 		writeJSONError(w, http.StatusInternalServerError, "database is unavailable")
+		return
+	}
+	project, err := s.resolveWorkspacePath(project)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -72,11 +82,16 @@ func (s *Server) handleSaveScratchpad(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "database is unavailable")
 		return
 	}
+	project, err := s.resolveWorkspacePath(body.Project)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	_, err := s.db.Exec(`INSERT INTO scratchpads (project_path, content, updated_at)
+	_, err = s.db.Exec(`INSERT INTO scratchpads (project_path, content, updated_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT(project_path) DO UPDATE SET content=excluded.content, updated_at=excluded.updated_at`,
-		body.Project, body.Content, time.Now())
+		project, body.Content, time.Now())
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to save scratchpad: "+err.Error())
 		return

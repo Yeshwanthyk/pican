@@ -14,6 +14,7 @@ import (
 
 	"pican/internal/codex"
 	"pican/internal/sessions"
+	"pican/internal/workspace"
 )
 
 type fakeCodexService struct {
@@ -53,6 +54,11 @@ func (f *fakeCodexService) ArchiveSession(_ context.Context, nativeID string) er
 	f.archived = nativeID
 	path, _ := codex.ProjectionPath(f.root, f.thread)
 	return codex.RemoveProjection(path, nativeID)
+}
+func (f *fakeCodexService) InspectArchivedThread(_ context.Context, nativeID string) (codex.Thread, error) {
+	thread := f.thread
+	thread.ID = nativeID
+	return thread, nil
 }
 func (f *fakeCodexService) UnarchiveSession(_ context.Context, nativeID string) (codex.Projection, error) {
 	f.unarchived = nativeID
@@ -186,6 +192,34 @@ func TestCodexNativeLifecycleRoutes(t *testing.T) {
 	s.handleCodexThreadDelete(deleteRec, httptest.NewRequest(http.MethodPost, "/api/codex/thread/delete?id="+sessionID, nil))
 	if deleteRec.Code != http.StatusOK || fake.deleted != "native" {
 		t.Fatalf("delete = %d %s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func TestHostedCodexUnarchiveAuthorizesBeforeMutation(t *testing.T) {
+	s, fake, _, _ := newCodexRouteServer(t)
+	workspaceRoot := t.TempDir()
+	resolver, err := workspace.New(workspaceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.workspace = resolver
+	s.workspaceRoot = resolver.Root()
+	s.hosted = true
+
+	rec := httptest.NewRecorder()
+	s.handleCodexThreadUnarchive(
+		rec,
+		httptest.NewRequest(
+			http.MethodPost,
+			"/api/codex/thread/unarchive",
+			strings.NewReader(`{"nativeId":"native"}`),
+		),
+	)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
+	}
+	if fake.unarchived != "" {
+		t.Fatalf("outside thread mutated before authorization: %q", fake.unarchived)
 	}
 }
 

@@ -246,7 +246,11 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 	}
 	path := body.Path
 	if path == "" {
-		path, _ = os.UserHomeDir()
+		if s.workspace != nil {
+			path = s.workspaceRoot
+		} else {
+			path, _ = os.UserHomeDir()
+		}
 	}
 
 	runtime := s.defaultRuntime
@@ -265,7 +269,7 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
 		}
-		cwd, err := sessions.PrepareSessionPath(path)
+		cwd, err := s.prepareSessionPath(path)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
@@ -278,7 +282,7 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 		id = projection.ID
 	case string(runtimes.PiID):
 		var err error
-		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, path, sessions.InitialSettings{})
+		id, err = s.createPiSession(path, sessions.InitialSettings{})
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -288,7 +292,7 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "Claude runtime is unavailable")
 			return
 		}
-		cwd, err := sessions.PrepareSessionPath(path)
+		cwd, err := s.prepareSessionPath(path)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
@@ -304,7 +308,7 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
 			return
 		}
-		cwd, err := sessions.PrepareSessionPath(path)
+		cwd, err := s.prepareSessionPath(path)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
@@ -325,7 +329,9 @@ func (s *Server) handleNewBtw(w http.ResponseWriter, r *http.Request) {
 	// handleNewSession.
 	if s.chatSender != nil {
 		if resolved, err := s.resolveSession(id); err == nil {
-			go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, sessions.InitialSettings{})
+			if _, boundaryErr := s.validateSessionWorkspace(resolved); boundaryErr == nil {
+				go s.initializeNewSessionWorker(context.Background(), resolved.Session.ID, resolved.Path, sessions.InitialSettings{})
+			}
 		}
 	}
 

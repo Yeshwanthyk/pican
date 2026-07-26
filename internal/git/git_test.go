@@ -10,6 +10,33 @@ import (
 	"time"
 )
 
+func TestCurrentBranchWithEnvUsesExactEnvironment(t *testing.T) {
+	binDir := t.TempDir()
+	capture := filepath.Join(t.TempDir(), "env.json")
+	script := filepath.Join(binDir, "git")
+	body := "#!/bin/sh\n/usr/bin/env > " + capture + "\nprintf feature/exact\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+	t.Setenv("HOST_SECRET_MUST_NOT_LEAK", "real-secret")
+	branch, err := CurrentBranchWithEnv(t.TempDir(), []string{"PATH=" + binDir, "CHILD_SENTINEL=opaque"})
+	if err != nil || branch != "feature/exact" {
+		t.Fatalf("branch=%q err=%v", branch, err)
+	}
+	data, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := string(data)
+	if !strings.Contains(env, "PATH="+binDir+"\n") || !strings.Contains(env, "CHILD_SENTINEL=opaque\n") {
+		t.Fatalf("child env missing configured entries: %q", env)
+	}
+	if strings.Contains(env, "HOST_SECRET_MUST_NOT_LEAK") {
+		t.Fatalf("ambient host secret leaked: %q", env)
+	}
+}
+
 func initTestRepo(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

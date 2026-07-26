@@ -48,6 +48,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusConflict, resolved.Session.ChatDisabledReason)
 		return
 	}
+	if _, err := s.validateSessionWorkspace(resolved); err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return
+	}
 	chatReq, err := chat.ParseRequest(r, chat.DefaultMaxImageBytes, chat.DefaultMaxRequestBytes)
 	if err != nil {
 		switch {
@@ -269,6 +273,10 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := resolved.Session.ID
 	if r.URL.Query().Get("load") == "1" {
+		if _, err := s.validateSessionWorkspace(resolved); err != nil {
+			writeJSONError(w, http.StatusConflict, err.Error())
+			return
+		}
 		if err := s.chatSender.EnsureWorker(r.Context(), sessionID, resolved.Path); err != nil {
 			fmt.Fprintf(os.Stderr, "commands: ensure worker failed for %s: %v\n", sessionID, err)
 		}
@@ -326,6 +334,10 @@ func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
 		return
 	}
+	if _, err := s.validateSessionWorkspace(resolved); err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return
+	}
 	if err := s.chatSender.SetModel(r.Context(), resolved.Session.ID, resolved.Path, body.Provider, body.ModelID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -358,6 +370,10 @@ func (s *Server) handleSetThinkingLevel(w http.ResponseWriter, r *http.Request) 
 	}
 	if s.chatSender == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "chat unavailable")
+		return
+	}
+	if _, err := s.validateSessionWorkspace(resolved); err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
 		return
 	}
 	if err := s.chatSender.SetThinkingLevel(r.Context(), resolved.Session.ID, resolved.Path, body.Level); err != nil {

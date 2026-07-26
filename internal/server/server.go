@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,9 +28,11 @@ import (
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
 	"pican/internal/schedules"
+	"pican/internal/sessioncreate"
 	"pican/internal/sessions"
 	"pican/internal/updater"
 	"pican/internal/workers"
+	"pican/internal/workspace"
 
 	_ "modernc.org/sqlite"
 )
@@ -58,6 +61,7 @@ type CodexService interface {
 	ForkSession(context.Context, string, *string) (codex.Projection, error)
 	RefreshThread(context.Context, string) (codex.Projection, error)
 	ArchiveSession(context.Context, string) error
+	InspectArchivedThread(context.Context, string) (codex.Thread, error)
 	UnarchiveSession(context.Context, string) (codex.Projection, error)
 	DeleteSession(context.Context, string) error
 	ResolveTurnID(string, string) (string, error)
@@ -76,8 +80,16 @@ type OpenCodeService interface {
 }
 
 type Deps struct {
-	AgentDir            string
-	SessionsDir         string
+	AgentDir    string
+	SessionsDir string
+	// Hosted enables the single-workspace filesystem policy. WorkspaceRoot is
+	// required in hosted mode; a non-empty WorkspaceRoot also enables the
+	// policy for embedders migrating before they set Hosted explicitly.
+	Hosted        bool
+	WorkspaceRoot string
+	// ChildEnv is the exact environment for hosted helper subprocesses. Nil
+	// preserves standalone inheritance.
+	ChildEnv            []string
 	Auth                *auth.Middleware
 	ChatSender          ChatSender
 	Cache               *sessions.Cache
@@ -113,6 +125,10 @@ type Deps struct {
 type Server struct {
 	agentDir            string
 	sessionsDir         string
+	hosted              bool
+	workspaceRoot       string
+	workspace           *workspace.Resolver
+	childEnv            []string
 	clients             []*sseClient
 	clientsMu           sync.RWMutex
 	fileMod             map[string]time.Time
@@ -141,6 +157,7 @@ type Server struct {
 	db                  *sql.DB
 	schedules           *schedules.Store
 	chatQueue           *chatqueue.Store
+	sessionCreates      *sessioncreate.Store
 	queueDrainer        *queueDrainer
 	updater             *updater.Checker
 	runInstall          func(ctx context.Context) error
@@ -170,10 +187,25 @@ type Server struct {
 // embedders may construct a Server without a cache, so retain the uncached
 // fallback for those callers.
 func (s *Server) resolveSession(id string) (sessions.ResolvedSession, error) {
+	var (
+		resolved sessions.ResolvedSession
+		err      error
+	)
 	if s.cache != nil {
-		return s.cache.Resolve(s.sessionsDir, id)
+		resolved, err = s.cache.Resolve(s.sessionsDir, id)
+	} else {
+		resolved, err = sessions.ResolveByID(s.sessionsDir, id)
 	}
-	return sessions.ResolveByID(s.sessionsDir, id)
+	if err != nil || s.workspace == nil {
+		return resolved, err
+	}
+	cwd, _ := resolved.Session.Header["cwd"].(string)
+	canonical, boundaryErr := s.resolveWorkspacePath(cwd)
+	if boundaryErr != nil {
+		return sessions.ResolvedSession{}, boundaryErr
+	}
+	resolved.Session.Project = canonical
+	return resolved, nil
 }
 
 // metricsState backs the metrics dashboard. startedAt drives process uptime;
@@ -209,15 +241,35 @@ func New(deps Deps) (*Server, error) {
 	if err := os.MkdirAll(agentDir, 0755); err != nil {
 		return nil, fmt.Errorf("create agent directory %s: %w", agentDir, err)
 	}
+	hosted := deps.Hosted || strings.TrimSpace(deps.WorkspaceRoot) != ""
+	var workspaceResolver *workspace.Resolver
+	if hosted {
+		if strings.TrimSpace(deps.WorkspaceRoot) == "" {
+			return nil, errors.New("workspace root is required in hosted mode")
+		}
+		var err error
+		workspaceResolver, err = workspace.New(deps.WorkspaceRoot)
+		if err != nil {
+			return nil, fmt.Errorf("configure workspace root: %w", err)
+		}
+	}
 
 	db, err := initDB(agentDir)
 	if err != nil {
 		return nil, err
 	}
+	sessionCreates := sessioncreate.NewStore(db, now)
+	if err := sessionCreates.RecoverInterrupted(context.Background()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("recover interrupted session creation: %w", err)
+	}
 
 	s := &Server{
 		agentDir:            agentDir,
 		sessionsDir:         deps.SessionsDir,
+		hosted:              hosted,
+		workspace:           workspaceResolver,
+		childEnv:            append([]string(nil), deps.ChildEnv...),
 		clients:             make([]*sseClient, 0),
 		fileMod:             make(map[string]time.Time),
 		chatSender:          deps.ChatSender,
@@ -238,6 +290,7 @@ func New(deps Deps) (*Server, error) {
 		db:                  db,
 		schedules:           schedules.NewStore(db),
 		chatQueue:           chatqueue.NewStore(db),
+		sessionCreates:      sessionCreates,
 		updater:             deps.Updater,
 		runInstall:          deps.RunInstall,
 		runRestart:          deps.RunRestart,
@@ -251,6 +304,9 @@ func New(deps Deps) (*Server, error) {
 			count:     make(map[string]int),
 			userOwned: make(map[string]bool),
 		},
+	}
+	if workspaceResolver != nil {
+		s.workspaceRoot = workspaceResolver.Root()
 	}
 	s.runtimeRegistry, err = serverRuntimeRegistry(deps)
 	if err != nil {
@@ -351,6 +407,7 @@ func initDB(agentDir string) (*sql.DB, error) {
 		{"chat_queue_items table", chatqueue.ItemsTableDDL},
 		{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
 		{"chat_queue_state table", chatqueue.StateTableDDL},
+		{"hosted_session_creates table", sessioncreate.TableDDL},
 	}
 	for _, s := range schema {
 		if _, err := db.Exec(s.stmt); err != nil {
@@ -468,7 +525,20 @@ func (s *Server) getPostHandler(get, post http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) loadSummaries() ([]sessions.SessionSummary, error) {
-	return s.cache.LoadAll(s.sessionsDir)
+	summaries, err := s.cache.LoadAll(s.sessionsDir)
+	if err != nil || s.workspace == nil {
+		return summaries, err
+	}
+	filtered := summaries[:0]
+	for _, summary := range summaries {
+		project, resolveErr := s.workspace.ResolveExisting(summary.Project)
+		if resolveErr != nil {
+			continue
+		}
+		summary.Project = project
+		filtered = append(filtered, summary)
+	}
+	return filtered, nil
 }
 
 // ── SSE clients ────────────────────────────────────────────────────────────

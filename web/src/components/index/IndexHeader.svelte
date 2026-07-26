@@ -3,6 +3,7 @@
   import { handleNavClick } from '../../shared/navigation.js';
   import { t } from '../../shared/strings.js';
   import type { SessionView } from '../../index/sessions.js';
+  import { withBasePath } from '../../shared/base-path.js';
 
   interface Props {
     view?: SessionView;
@@ -50,11 +51,11 @@
 <header class="header">
   <div class="header-inner">
     <div class="header-identity">
-      <img class="pi-logo-mark" src="/app-icon.png" alt="" aria-hidden="true" />
+      <img class="pi-logo-mark" src={withBasePath('/app-icon.png')} alt="" aria-hidden="true" />
       {#if project}
         <a
           class="project-back"
-          href="/"
+          href={withBasePath('/')}
           aria-label={t('index.backToProjects')}
           onclick={(event) => handleNavClick(event, '/')}>{@html icon(ArrowLeft, { size: 15 })}</a
         >
@@ -83,7 +84,7 @@
         <nav class="scope-toggle" aria-label={t('index.sessionScope')}>
           {#each scopes as scope}
             <a
-              href={scope.href}
+              href={withBasePath(scope.href)}
               aria-current={view === scope.view ? 'page' : undefined}
               onclick={(event) => handleNavClick(event, scope.href)}>{t(scope.key)}</a
             >

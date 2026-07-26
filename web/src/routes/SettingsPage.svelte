@@ -13,6 +13,7 @@
   import { loadSettings, persistSetting } from '../settings/settings-support';
   import type { Settings } from '../settings/settings-support';
   import { recoverSync, settle } from '../components/shared/ui-effect';
+  import { stripBasePath, withBasePath } from '../shared/base-path';
 
   let settings = $state<Settings>({});
   let savedVisible = $state(false);
@@ -96,7 +97,7 @@
       return (
         !!ref &&
         new URL(ref).origin === window.location.origin &&
-        new URL(ref).pathname !== '/settings'
+        stripBasePath(new URL(ref).pathname) !== '/settings'
       );
     }, false);
 
@@ -135,7 +136,7 @@
         {t('settings.title')}
       </button>
     {:else}
-      <a class="session-header-back" href="/" onclick={onHomeBack}>
+      <a class="session-header-back" href={withBasePath('/')} onclick={onHomeBack}>
         <span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
         {cameFromApp ? t('common.back') : t('session.back')}
       </a>

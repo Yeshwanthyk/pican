@@ -9,6 +9,7 @@
   import SubagentsPage from './routes/SubagentsPage.svelte';
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
+  import { stripBasePath } from './shared/base-path';
 
   interface AppProps {
     readonly path?: string;
@@ -16,7 +17,9 @@
   }
 
   let {
-    path: initialPath = typeof window !== 'undefined' ? window.location.pathname : '/',
+    path: initialPath = typeof window !== 'undefined'
+      ? stripBasePath(window.location.pathname)
+      : '/',
     search: initialSearch = typeof window !== 'undefined' ? window.location.search : '',
   }: AppProps = $props();
 
@@ -52,7 +55,7 @@
   // pushes the same URL) is a no-op.
   onMount(() => {
     const syncPath = () => {
-      path = window.location.pathname;
+      path = stripBasePath(window.location.pathname);
       search = window.location.search;
     };
     const { history } = window;

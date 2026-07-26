@@ -672,7 +672,7 @@ export default {
   "artifact.runPreview": "Run preview",
   "artifact.showSource": "Show source",
   "artifact.emptyHidden":
-    '{count} {noun} hidden by your filter — adjust in <a href="/settings">Settings</a>.',
+    '{count} {noun} hidden by your filter — adjust in <a href="{settingsHref}">Settings</a>.',
   "artifact.emptyNone": "No artifacts in this session yet.",
   "artifact.nounOne": "artifact",
   "artifact.nounMany": "artifacts",

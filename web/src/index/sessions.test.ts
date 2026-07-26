@@ -114,9 +114,34 @@ describe("index sessions helpers", () => {
     await defaultCreateSession("/repo", "codex", { fetchImpl });
     expect(fetchImpl).toHaveBeenCalledWith("/api/new-session", {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Idempotency-Key": expect.any(String),
+      },
       body: JSON.stringify({ path: "/repo", runtime: "codex" }),
+      signal: expect.any(AbortSignal),
     });
+  });
+
+  it("retains a create intent key across a failed retry and rotates it after success", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "retry" }), { status: 503 }))
+      .mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify({ ok: true, id: "new" }))),
+      );
+
+    await expect(defaultCreateSession("/retry-repo", "codex", { fetchImpl })).rejects.toBeDefined();
+    await defaultCreateSession("/retry-repo", "codex", { fetchImpl });
+    await defaultCreateSession("/retry-repo", "codex", { fetchImpl });
+
+    const key = (call: number): string => {
+      const init = fetchImpl.mock.calls[call]?.[1] as RequestInit;
+      return (init.headers as Record<string, string>)["Idempotency-Key"] ?? "";
+    };
+    expect(key(0)).toBe(key(1));
+    expect(key(2)).not.toBe(key(1));
   });
 
   it("formats relative times", () => {

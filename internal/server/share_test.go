@@ -142,6 +142,20 @@ func TestHandleShareSucceeds(t *testing.T) {
 	}
 }
 
+func TestHostedSharePublishingDoesNotInvokeGh(t *testing.T) {
+	runner := &fakeShareRunner{createOut: "https://gist.github.com/u/x\n"}
+	s, _ := newShareTestServer(t, runner)
+	s.hosted = true
+	rec := httptest.NewRecorder()
+	s.handleShare(rec, httptest.NewRequest(http.MethodPost, "/share?id=session.jsonl", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+	if runner.createCalled {
+		t.Fatal("hosted share invoked gh")
+	}
+}
+
 func TestHandleShareReportsCreateFailure(t *testing.T) {
 	runner := &fakeShareRunner{
 		createErr:    errors.New("exit status 1"),

@@ -22,6 +22,7 @@
   import { boolFor } from '../settings/settings-support';
   import { SESSION_TABS_SETTING_KEY } from '../shared/settings-store';
   import { errorMessage, settle } from '../components/shared/ui-effect';
+  import { withBasePath } from '../shared/base-path';
   import {
     defaultRuntimeCapabilities,
     type CompleteRuntimeCapabilities,
@@ -204,7 +205,7 @@
 {:else if error}
   <div class="session-loading session-loading--error">
     <h1>{error}</h1>
-    <p><a href="/">{t('session.backToSessions')}</a></p>
+    <p><a href={withBasePath('/')}>{t('session.backToSessions')}</a></p>
   </div>
 {:else}
   <SessionShell

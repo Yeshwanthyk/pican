@@ -31,19 +31,50 @@ func (s *Server) handleFSBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expanded, err := expandBrowsePath(r.URL.Query().Get("path"))
+	raw := r.URL.Query().Get("path")
+	if s.workspace != nil && strings.TrimSpace(raw) == "" {
+		raw = s.workspaceRoot + string(filepath.Separator)
+	}
+	expanded, err := expandBrowsePath(raw)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if s.workspace != nil {
+		expanded, err = s.workspace.ResolveForCreation(expanded)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	parent, filter := splitBrowsePath(expanded)
+	if s.workspace != nil {
+		parent, err = s.workspace.ResolveExisting(parent)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	info, statErr := os.Stat(expanded)
 	exists := statErr == nil && info.IsDir()
+	entries := listBrowseDirs(parent, filter)
+	if s.workspace != nil {
+		contained := entries[:0]
+		for _, entry := range entries {
+			resolved, resolveErr := s.workspace.ResolveExisting(entry.FullPath)
+			if resolveErr != nil {
+				continue
+			}
+			entry.FullPath = resolved
+			contained = append(contained, entry)
+		}
+		entries = contained
+	}
 
 	writeJSON(w, 0, map[string]any{
 		"parentPath": parent,
-		"entries":    listBrowseDirs(parent, filter),
+		"entries":    entries,
 		"exists":     exists,
 	})
 }

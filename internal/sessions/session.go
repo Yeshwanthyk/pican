@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"pican/internal/workspace"
 )
 
 // Session JSONL is read line-by-line; a single line (e.g. a large assistant
@@ -940,6 +942,31 @@ func ListRecentLocations(sessionsDir string) ([]string, error) {
 	return locations, nil
 }
 
+// ListRecentLocationsInWorkspace returns only canonical existing locations
+// inside workspaceRoot. Legacy persisted cwd values are revalidated rather
+// than trusted.
+func ListRecentLocationsInWorkspace(sessionsDir, workspaceRoot string) ([]string, error) {
+	resolver, err := workspace.New(workspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	locations, err := ListRecentLocations(sessionsDir)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]string, 0, len(locations))
+	seen := make(map[string]bool)
+	for _, location := range locations {
+		canonical, resolveErr := resolver.ResolveExisting(location)
+		if resolveErr != nil || seen[canonical] {
+			continue
+		}
+		seen[canonical] = true
+		filtered = append(filtered, canonical)
+	}
+	return filtered, nil
+}
+
 // resolveLocation returns the projects absolute path for the given
 // project directory name.  It first tries DecodeProjectName; if the
 // result exists on disk it is returned directly.  Otherwise it falls
@@ -1033,12 +1060,36 @@ func PrepareSessionPath(path string) (string, error) {
 	return path, nil
 }
 
+// PrepareSessionPathInWorkspace applies the hosted creation contract. Missing
+// descendants are created only after the nearest existing ancestor and every
+// symlink have been proven to stay inside workspaceRoot.
+func PrepareSessionPathInWorkspace(path, workspaceRoot string) (string, error) {
+	resolver, err := workspace.New(workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+	return resolver.CreateDir(path, 0o755)
+}
+
 func CreateSessionFileWithSettings(sessionsDir, path string, settings InitialSettings) (string, error) {
 	path, err := PrepareSessionPath(path)
 	if err != nil {
 		return "", err
 	}
+	return createSessionFileWithSettings(sessionsDir, path, settings)
+}
 
+// CreateSessionFileWithSettingsInWorkspace creates a Pi session only after its
+// working directory has passed the hosted workspace creation contract.
+func CreateSessionFileWithSettingsInWorkspace(sessionsDir, path, workspaceRoot string, settings InitialSettings) (string, error) {
+	path, err := PrepareSessionPathInWorkspace(path, workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+	return createSessionFileWithSettings(sessionsDir, path, settings)
+}
+
+func createSessionFileWithSettings(sessionsDir, path string, settings InitialSettings) (string, error) {
 	projectDir := filepath.Join(sessionsDir, EncodeProjectName(path))
 	rel, err := filepath.Rel(sessionsDir, projectDir)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {

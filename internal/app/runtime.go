@@ -367,6 +367,9 @@ func (c codexService) RefreshThread(ctx context.Context, nativeID string) (codex
 func (c codexService) ArchiveSession(ctx context.Context, nativeID string) error {
 	return codex.ArchiveSession(ctx, c.sessionsDir, c.command, nativeID)
 }
+func (c codexService) InspectArchivedThread(ctx context.Context, nativeID string) (codex.Thread, error) {
+	return codex.InspectArchivedThread(ctx, c.command, nativeID)
+}
 func (c codexService) UnarchiveSession(ctx context.Context, nativeID string) (codex.Projection, error) {
 	return codex.UnarchiveSession(ctx, c.sessionsDir, c.command, nativeID)
 }

@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { navigate, handleNavClick } from "./navigation.js";
+import { configureBasePath, resetBasePath } from "./base-path.js";
+
+afterEach(() => resetBasePath());
 
 function makeWindow() {
   return { history: { pushState: vi.fn() } };
@@ -23,6 +26,13 @@ describe("navigate", () => {
     const windowImpl = makeWindow();
     navigate("/session?id=abc", { windowImpl });
     expect(windowImpl.history.pushState).toHaveBeenCalledWith({}, "", "/session?id=abc");
+  });
+
+  it("pushes mounted URLs under /s/test", () => {
+    configureBasePath("/s/test");
+    const windowImpl = makeWindow();
+    navigate("/session?id=abc", { windowImpl });
+    expect(windowImpl.history.pushState).toHaveBeenCalledWith({}, "", "/s/test/session?id=abc");
   });
 
   it("ignores empty urls", () => {

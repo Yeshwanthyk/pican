@@ -110,3 +110,30 @@ func TestHandleRestartInvokesRunRestart(t *testing.T) {
 		t.Fatalf("runRestart was not invoked")
 	}
 }
+
+func TestHostedUpdateLifecycleFailsClosedWithoutHooks(t *testing.T) {
+	installCalled := false
+	restartCalled := false
+	s := &Server{
+		hosted:  true,
+		updater: updater.New("dev"),
+		runInstall: func(context.Context) error {
+			installCalled = true
+			return nil
+		},
+		runRestart: func() error {
+			restartCalled = true
+			return nil
+		},
+	}
+	for _, handler := range []http.HandlerFunc{s.handleCheckUpdate, s.handleUpdate, s.handleRestart} {
+		rec := httptest.NewRecorder()
+		handler(rec, httptest.NewRequest(http.MethodPost, "/", nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status=%d want 503: %s", rec.Code, rec.Body.String())
+		}
+	}
+	if installCalled || restartCalled {
+		t.Fatalf("hosted lifecycle invoked hooks: install=%v restart=%v", installCalled, restartCalled)
+	}
+}

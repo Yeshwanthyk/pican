@@ -13,6 +13,7 @@
   } from '../../shared/icons.js';
   import { openVersionModal } from '../../shared/version.js';
   import { handleNavClick } from '../../shared/navigation.js';
+  import { withBasePath } from '../../shared/base-path.js';
 
   interface Props {
     open?: boolean;
@@ -72,7 +73,7 @@
     {#each scopes as scope}
       <a
         class="web-menu-item"
-        href={scope.href}
+        href={withBasePath(scope.href)}
         role="menuitem"
         onclick={(event) => {
           onClose();
@@ -128,7 +129,7 @@
   <div class="web-menu-section">
     <a
       class="web-menu-item"
-      href="/settings"
+      href={withBasePath('/settings')}
       role="menuitem"
       onclick={(event) => {
         onClose();

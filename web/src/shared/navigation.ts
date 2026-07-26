@@ -3,6 +3,7 @@
 // page whenever window.location.pathname changes, so pushing a URL here
 // navigates between SPA routes (e.g. the sessions index → a session view)
 // without a full page reload.
+import { withBasePath } from "./base-path";
 
 export interface NavigationWindow {
   readonly history: { pushState(data: unknown, unused: string, url?: string | URL | null): void };
@@ -30,7 +31,7 @@ function resolveWindow(windowImpl?: NavigationWindow): NavigationWindow | undefi
 export function navigate(url: string | null | undefined, { windowImpl }: NavigationOptions = {}) {
   const win = resolveWindow(windowImpl);
   if (!url || !win) return;
-  win.history.pushState({}, "", url);
+  win.history.pushState({}, "", typeof url === "string" ? withBasePath(url) : url);
 }
 
 // Click handler for <a> elements that point at an internal SPA route. Defers to

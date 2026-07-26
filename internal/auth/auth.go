@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -11,11 +12,65 @@ import (
 const TokenCookieName = "pican_token"
 
 type Middleware struct {
-	token string
+	mode        Mode
+	token       string
+	proxyHeader string
+}
+
+type Mode uint8
+
+const (
+	ModeStandalone Mode = iota
+	ModeProxyOnly
+)
+
+// Config describes one mutually exclusive authentication mode.
+type Config struct {
+	Mode   Mode
+	Token  string
+	Header string
 }
 
 func New(token string) *Middleware {
-	return &Middleware{token: strings.TrimSpace(token)}
+	return &Middleware{mode: ModeStandalone, token: strings.TrimSpace(token)}
+}
+
+// NewConfigured constructs an explicitly configured authentication policy.
+// Proxy-only mode requires both a non-empty private header name and token.
+func NewConfigured(config Config) (*Middleware, error) {
+	switch config.Mode {
+	case ModeStandalone:
+		return New(config.Token), nil
+	case ModeProxyOnly:
+		header := strings.TrimSpace(config.Header)
+		if header == "" || config.Token == "" {
+			return nil, fmt.Errorf("proxy-only auth requires a header and token")
+		}
+		if !validHeaderName(header) {
+			return nil, fmt.Errorf("invalid proxy auth header %q", header)
+		}
+		return &Middleware{mode: ModeProxyOnly, token: config.Token, proxyHeader: header}, nil
+	default:
+		return nil, fmt.Errorf("unknown auth mode %d", config.Mode)
+	}
+}
+
+func NewProxyOnly(header, token string) (*Middleware, error) {
+	return NewConfigured(Config{Mode: ModeProxyOnly, Header: header, Token: token})
+}
+
+func validHeaderName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || strings.ContainsRune("!#$%&'*+-.^_`|~", rune(c))) {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *Middleware) Enabled() bool {
@@ -35,10 +90,19 @@ func (a *Middleware) Enabled() bool {
 // instead of a bare 401. API clients (no text/html in Accept) still receive
 // a plain 401.
 func (a *Middleware) Wrap(h http.HandlerFunc) http.HandlerFunc {
+	return a.WrapHandler(h).ServeHTTP
+}
+
+// WrapHandler supports auth-gating a complete mounted mux, including assets.
+func (a *Middleware) WrapHandler(h http.Handler) http.Handler {
 	if !a.Enabled() {
 		return h
 	}
-	return func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if a.mode == ModeProxyOnly {
+			a.wrapProxyOnly(h, w, r)
+			return
+		}
 		got := ""
 		fromQuery := false
 		fromPost := false
@@ -107,8 +171,21 @@ func (a *Middleware) Wrap(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		h(w, r)
+		h.ServeHTTP(w, r)
+	})
+}
+
+func (a *Middleware) wrapProxyOnly(h http.Handler, w http.ResponseWriter, r *http.Request) {
+	values := r.Header.Values(a.proxyHeader)
+	got := ""
+	if len(values) == 1 {
+		got = values[0]
 	}
+	if len(values) != 1 || subtle.ConstantTimeCompare([]byte(got), []byte(a.token)) != 1 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	h.ServeHTTP(w, r)
 }
 
 // cleanURL returns r.URL.Path with query string intact except for "token" and

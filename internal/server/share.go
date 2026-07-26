@@ -21,6 +21,13 @@ func (a shareRunnerAdapter) CreateGist(htmlPath string) (string, string, error) 
 }
 
 func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
+	// Static preview rendering is process-local. Publishing shells out to gh,
+	// which is deliberately unavailable in hosted mode: Scotty owns external
+	// credentials and egress.
+	if s.hosted && r.URL.Query().Get("preview") != "1" {
+		writeJSONError(w, http.StatusServiceUnavailable, "sharing is unavailable in hosted mode")
+		return
+	}
 	var runner share.Runner
 	if s.shareRunner != nil {
 		runner = shareRunnerAdapter{runner: s.shareRunner}

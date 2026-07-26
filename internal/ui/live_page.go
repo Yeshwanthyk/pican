@@ -117,9 +117,12 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 		b.WriteString(string(data.Preload))
 		b.WriteByte('\n')
 	}
-	b.WriteString("<link rel=\"icon\" type=\"image/png\" href=\"/app-icon.png\">\n")
-	b.WriteString("<link rel=\"apple-touch-icon\" href=\"/app-icon.png\">\n")
-	b.WriteString("<link rel=\"manifest\" href=\"/manifest.webmanifest\">\n")
+	b.WriteString("<meta name=\"pican-base-path\" content=\"")
+	b.WriteString(template.HTMLEscapeString(liveBasePath.String()))
+	b.WriteString("\">\n")
+	b.WriteString("<link rel=\"icon\" type=\"image/png\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
+	b.WriteString("<link rel=\"apple-touch-icon\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
+	b.WriteString("<link rel=\"manifest\" href=\"" + template.HTMLEscapeString(liveURL("/manifest.webmanifest")) + "\">\n")
 	b.WriteString("<meta name=\"theme-color\" content=\"#0e0e13\">\n")
 	b.WriteString("<meta name=\"mobile-web-app-capable\" content=\"yes\">\n")
 	b.WriteString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n")
@@ -131,7 +134,7 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 		b.WriteString(string(data.Styles))
 		b.WriteByte('\n')
 	}
-	b.WriteString("<link rel=\"stylesheet\" href=\"/custom-themes.css\">\n")
+	b.WriteString("<link rel=\"stylesheet\" href=\"" + template.HTMLEscapeString(liveURL("/custom-themes.css")) + "\">\n")
 	fontUI, fontContent, fontCode, fontUISize, fontContentSize := fontProvider()
 	b.WriteString("<style id=\"pican-fonts\">:root{--font-sans:")
 	b.WriteString(fontUI)
@@ -241,7 +244,9 @@ func themeBootScript(defaultTheme string) template.HTML {
 }
 
 func liveServiceWorkerScript() template.HTML {
-	return template.HTML(`<script>if('serviceWorker' in navigator && window.isSecureContext){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});});}</script>`)
+	sw := template.JSEscapeString(liveURL("/sw.js"))
+	scope := template.JSEscapeString(liveURL("/"))
+	return template.HTML(`<script>if('serviceWorker' in navigator && window.isSecureContext){window.addEventListener('load',function(){navigator.serviceWorker.register('` + sw + `',{scope:'` + scope + `'}).catch(function(){});});}</script>`)
 }
 
 func liveDocumentEnd() template.HTML { return template.HTML("</body>\n</html>") }

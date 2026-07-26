@@ -37,6 +37,23 @@ type Notification struct {
 }
 type NotificationHandler func(Notification)
 
+// ProcessOptions configures the Codex child process boundary. A non-nil Env is
+// exact (including an explicitly empty slice); nil preserves standalone
+// inheritance. Dir, when set, is the already-validated safe working directory.
+type ProcessOptions struct {
+	Env []string
+	Dir string
+}
+
+func (o ProcessOptions) clone() ProcessOptions {
+	if o.Env != nil {
+		env := make([]string, len(o.Env))
+		copy(env, o.Env)
+		o.Env = env
+	}
+	return o
+}
+
 type pendingResult struct {
 	result json.RawMessage
 	err    error
@@ -63,15 +80,26 @@ type Client struct {
 }
 
 // NewClient launches command (default: codex app-server --stdio), initializes
-// the protocol, and sends initialized. The current environment, including
-// HOME, is inherited unchanged.
+// the protocol, and sends initialized.
 func NewClient(ctx context.Context, command []string, handler NotificationHandler) (*Client, error) {
+	return NewClientWithOptions(ctx, command, handler, ProcessOptions{})
+}
+
+// NewClientWithOptions launches app-server with an optional exact environment
+// and safe process directory.
+func NewClientWithOptions(ctx context.Context, command []string, handler NotificationHandler, options ProcessOptions) (*Client, error) {
 	if len(command) == 0 {
 		command = []string{"codex", "app-server", "--stdio"}
 	}
 	cmd := exec.Command(command[0], command[1:]...)
 	configureCommand(cmd)
-	cmd.Env = os.Environ()
+	options = options.clone()
+	if options.Env != nil {
+		cmd.Env = options.Env
+	}
+	if options.Dir != "" {
+		cmd.Dir = options.Dir
+	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

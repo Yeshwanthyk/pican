@@ -1,5 +1,6 @@
 import { Effect, Queue, Schedule, Schema, Stream } from "effect";
 import { SseError } from "./errors";
+import { withBasePath } from "../shared/base-path";
 import {
   StatusDeltaSchema,
   StatusSnapshotSchema,
@@ -70,7 +71,9 @@ export const statusEvents = (
     Effect.acquireRelease(
       Effect.try({
         try: () => {
-          const eventSource = eventSourceFactory(`/events?id=${encodeURIComponent(topic)}`);
+          const eventSource = eventSourceFactory(
+            withBasePath(`/events?id=${encodeURIComponent(topic)}`),
+          );
           const emitParsed = (type: string, event: Event) => {
             const data = (event as MessageEvent<string>).data;
             Effect.runFork(

@@ -102,14 +102,18 @@ func resolveRoot(cwd, scope string) (string, error) {
 	if cwd == "" {
 		return "", ErrNotDir
 	}
-	if info, err := os.Stat(cwd); err != nil || !info.IsDir() {
+	canonicalCWD, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return "", ErrNotDir
+	}
+	if info, err := os.Stat(canonicalCWD); err != nil || !info.IsDir() {
 		return "", ErrNotDir
 	}
 	if scope == "" {
-		return cwd, nil
+		return canonicalCWD, nil
 	}
-	root := filepath.Join(cwd, filepath.FromSlash(scope))
-	if !withinRoot(cwd, root) {
+	root, err := filepath.EvalSymlinks(filepath.Join(canonicalCWD, filepath.FromSlash(scope)))
+	if err != nil || !withinRoot(canonicalCWD, root) {
 		return "", ErrNotDir
 	}
 	return root, nil
@@ -134,12 +138,19 @@ func TopLevel(cwd, scope string) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	cwd, err = filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return nil, ErrNotDir
+	}
 	dirents, err := os.ReadDir(root)
 	if err != nil {
 		return []Entry{}, nil // scope points at a file or nothing to list
 	}
 	out := make([]Entry, 0, len(dirents))
 	for _, d := range dirents {
+		if d.Type()&os.ModeSymlink != 0 {
+			continue
+		}
 		if d.IsDir() && skipDirs[d.Name()] {
 			continue
 		}
@@ -163,6 +174,10 @@ func WalkScoped(cwd, scope string, opts Options) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	cwd, err = filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return nil, ErrNotDir
+	}
 
 	var out []Entry
 	scanned := 0
@@ -175,6 +190,12 @@ func WalkScoped(cwd, scope string, opts Options) ([]Entry, error) {
 			return nil
 		}
 		if path == root {
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		if scanned >= opts.MaxScanned || len(out) >= opts.MaxEntries {

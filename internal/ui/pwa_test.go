@@ -9,6 +9,32 @@ import (
 	"testing"
 )
 
+func TestMountedPWAContract(t *testing.T) {
+	if err := SetBasePath("/s/test"); err != nil {
+		t.Fatal(err)
+	}
+	defer SetBasePath("")
+	mux := http.NewServeMux()
+	RegisterPWAHandlers(mux)
+
+	manifest := httptest.NewRecorder()
+	mux.ServeHTTP(manifest, httptest.NewRequest(http.MethodGet, "/manifest.webmanifest", nil))
+	for _, want := range []string{`"start_url": "/s/test/"`, `"scope": "/s/test/"`, `"/s/test/app-icon.png"`} {
+		if !strings.Contains(manifest.Body.String(), want) {
+			t.Errorf("manifest missing %q", want)
+		}
+	}
+
+	sw := httptest.NewRecorder()
+	mux.ServeHTTP(sw, httptest.NewRequest(http.MethodGet, "/sw.js", nil))
+	if got := sw.Header().Get("Service-Worker-Allowed"); got != "/s/test/" {
+		t.Fatalf("Service-Worker-Allowed = %q", got)
+	}
+	if !strings.Contains(sw.Body.String(), `const PICAN_BASE_PATH = "/s/test";`) {
+		t.Fatal("service worker missing mounted bootstrap")
+	}
+}
+
 func TestCodexIconIsServed(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterPWAHandlers(mux)

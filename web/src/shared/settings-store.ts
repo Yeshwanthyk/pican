@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { NetworkError, StorageError } from "../lib/errors";
 import { runFork, runPromise, runSync } from "../lib/runtime";
 import { SettingsResponseSchema } from "../lib/schema";
+import { withBasePath } from "./base-path";
 
 export const SESSION_TABS_SETTING_KEY = "pican:v1:session-tabs";
 
@@ -78,7 +79,7 @@ const postSettings = (settings: Readonly<Record<string, string>>) => {
   const pending = runSync(
     Effect.try({
       try: () =>
-        fetchImpl("/api/settings", {
+        fetchImpl(withBasePath("/api/settings"), {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body,
@@ -136,7 +137,8 @@ const hydrateEffect = Effect.fnUntraced(function* (
   storage: SettingsStorage | null,
 ) {
   const response = yield* Effect.tryPromise({
-    try: () => fetchImpl("/api/settings", { headers: { Accept: "application/json" } }),
+    try: () =>
+      fetchImpl(withBasePath("/api/settings"), { headers: { Accept: "application/json" } }),
     catch: (cause) => new NetworkError({ cause }),
   });
   if (!response.ok || response.json === undefined) return null;

@@ -4,6 +4,7 @@ import type { FetchLike } from "../../lib/http";
 import { runFork, runPromise, runSync } from "../../lib/runtime";
 import { writeSetting } from "../../shared/settings-store.js";
 import type { SettingsStorage } from "../../shared/settings-store.js";
+import { withBasePath } from "../../shared/base-path.js";
 
 interface AudioLike {
   volume: number;
@@ -134,7 +135,7 @@ export function playDoneSound({
   bestEffort(() => {
     const AudioCtor = windowImpl.Audio;
     if (!AudioCtor) return;
-    const src = audioSrc || `/sounds/${getSelectedSound({ storage })}`;
+    const src = audioSrc || withBasePath(`/sounds/${getSelectedSound({ storage })}`);
     const audio = new AudioCtor(src);
     audio.volume = 0.7;
     const p = audio.play();
@@ -156,7 +157,11 @@ export function showDoneNotification({
     const N = windowImpl.Notification;
     if (!N || N.permission !== "granted") return;
     if (!documentImpl.hidden) return;
-    const n = new N(title, { body, icon: "/app-icon.png", tag: "pican-session-done" });
+    const n = new N(title, {
+      body,
+      icon: withBasePath("/app-icon.png"),
+      tag: "pican-session-done",
+    });
     n.onclick = () => {
       bestEffort(() => windowImpl.focus?.(), undefined);
       n.close();
@@ -237,7 +242,7 @@ export async function registerPushSubscription({
       catch: (cause) => new NetworkError({ cause }),
     });
     const keyResp = yield* Effect.tryPromise({
-      try: () => fetchImpl("/api/push/vapid"),
+      try: () => fetchImpl(withBasePath("/api/push/vapid")),
       catch: (cause) => new NetworkError({ cause }),
     });
     if (!keyResp.ok) return false;
@@ -259,7 +264,7 @@ export async function registerPushSubscription({
     );
     yield* Effect.tryPromise({
       try: () =>
-        fetchImpl("/api/push/subscribe", {
+        fetchImpl(withBasePath("/api/push/subscribe"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
@@ -305,7 +310,7 @@ export async function unregisterPushSubscription({
     );
     yield* Effect.tryPromise({
       try: () =>
-        fetchImpl("/api/push/unsubscribe", {
+        fetchImpl(withBasePath("/api/push/unsubscribe"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
@@ -413,7 +418,7 @@ export async function fetchAvailableSounds({
 }> {
   const fallback = { sounds: ["cat.mp3", "done.mp3"], default: "cat.mp3" };
   const operation = Effect.tryPromise({
-    try: () => fetchImpl("/api/sounds"),
+    try: () => fetchImpl(withBasePath("/api/sounds")),
     catch: (cause) => new NetworkError({ cause }),
   }).pipe(
     Effect.flatMap((response) =>

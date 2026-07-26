@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -29,6 +30,9 @@ func TestCodexHelperProcess(t *testing.T) {
 	s := bufio.NewScanner(os.Stdin)
 	enc := json.NewEncoder(os.Stdout)
 	thread := testThread()
+	if scenario == "catalog-cwd" {
+		thread.CWD = os.Getenv("PICAN_TEST_THREAD_CWD")
+	}
 	if scenario == "created-empty" || scenario == "list-empty-thread" {
 		thread.Turns = nil
 	}
@@ -41,7 +45,7 @@ func TestCodexHelperProcess(t *testing.T) {
 		}
 		var method string
 		_ = json.Unmarshal(request["method"], &method)
-		if logPath != "" && method != "" {
+		if logPath != "" && method != "" && scenario != "process-options" {
 			f, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 			if scenario == "wire" || scenario == "start-ack-pending" || scenario == "interrupt-no-reply" {
 				fmt.Fprintln(f, s.Text())
@@ -61,6 +65,11 @@ func TestCodexHelperProcess(t *testing.T) {
 		}
 		switch method {
 		case "initialize":
+			if scenario == "process-options" {
+				cwd, _ := os.Getwd()
+				data, _ := json.Marshal(map[string]any{"env": os.Environ(), "cwd": cwd})
+				_ = os.WriteFile(logPath, data, 0o600)
+			}
 			reply(map[string]any{"userAgent": "fake"})
 			if scenario == "exit" {
 				os.Exit(7)
@@ -148,6 +157,65 @@ func TestCodexHelperProcess(t *testing.T) {
 		default:
 			_ = enc.Encode(map[string]any{"id": id, "error": map[string]any{"code": -32601, "message": "unknown"}})
 		}
+	}
+}
+
+func TestNewClientWithOptionsUsesExactEnvironmentAndDirectory(t *testing.T) {
+	t.Setenv("PICAN_AMBIENT_MUST_NOT_LEAK", "ambient")
+	dir := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "process.json")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	c, err := NewClientWithOptions(ctx, helperCommand("process-options", logPath), nil, ProcessOptions{
+		Env: []string{"PICAN_CHILD_ONLY=exact"},
+		Dir: dir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Env []string `json:"env"`
+		CWD string   `json:"cwd"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Env) != 1 || got.Env[0] != "PICAN_CHILD_ONLY=exact" {
+		t.Fatalf("child env = %#v, want exact configured env", got.Env)
+	}
+	wantDir, _ := filepath.EvalSymlinks(dir)
+	if got.CWD != wantDir {
+		t.Fatalf("child cwd = %q, want %q", got.CWD, wantDir)
+	}
+}
+
+func TestNewClientWithOptionsPreservesExplicitlyEmptyEnvironment(t *testing.T) {
+	t.Setenv("PICAN_AMBIENT_MUST_NOT_LEAK", "ambient")
+	logPath := filepath.Join(t.TempDir(), "process.json")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	c, err := NewClientWithOptions(ctx, helperCommand("process-options", logPath), nil, ProcessOptions{Env: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Env []string `json:"env"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Env) != 0 {
+		t.Fatalf("child env = %#v, want empty", got.Env)
 	}
 }
 

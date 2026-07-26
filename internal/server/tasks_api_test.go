@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"pican/internal/workspace"
 )
 
 func writeTaskTestFile(t *testing.T, path, contents string) {
@@ -133,5 +135,54 @@ func TestHandleApiTaskOutput(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHostedTasksRejectStoreAndOutputSymlinkEscapes(t *testing.T) {
+	root := t.TempDir()
+	workspaceRoot := filepath.Join(root, "workspace")
+	project := filepath.Join(workspaceRoot, "project")
+	outside := filepath.Join(root, "outside")
+	for _, path := range []string{filepath.Join(project, ".pi"), outside} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTaskTestFile(t, filepath.Join(outside, "tasks.json"), `{"tasks":[{"id":"secret"}]}`)
+	if err := os.Symlink(outside, filepath.Join(project, ".pi", "tasks")); err != nil {
+		t.Fatal(err)
+	}
+	resolver, err := workspace.New(workspaceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer(t)
+	s.workspace = resolver
+	s.workspaceRoot = resolver.Root()
+	s.hosted = true
+
+	stores := httptest.NewRecorder()
+	s.handleApiTasks(stores, taskAPIRequest("/api/tasks", project))
+	if stores.Code != http.StatusBadRequest {
+		t.Fatalf("symlinked store status = %d, want 400: %s", stores.Code, stores.Body.String())
+	}
+
+	if err := os.Remove(filepath.Join(project, ".pi", "tasks")); err != nil {
+		t.Fatal(err)
+	}
+	writeTaskTestFile(t, filepath.Join(project, ".pi", "tasks", "tasks.json"), `{"tasks":[]}`)
+	outputOutside := filepath.Join(outside, "output")
+	writeTaskTestFile(t, filepath.Join(outputOutside, "task-secret.txt"), "secret")
+	if err := os.Symlink(outputOutside, filepath.Join(project, ".pi", "tasks", "output")); err != nil {
+		t.Fatal(err)
+	}
+	output := httptest.NewRecorder()
+	req := taskAPIRequest("/api/tasks/output", project)
+	query := req.URL.Query()
+	query.Set("taskId", "secret")
+	req.URL.RawQuery = query.Encode()
+	s.handleApiTaskOutput(output, req)
+	if output.Code != http.StatusBadRequest {
+		t.Fatalf("symlinked output status = %d, want 400: %s", output.Code, output.Body.String())
 	}
 }

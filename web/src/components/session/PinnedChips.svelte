@@ -7,6 +7,7 @@
   import { t } from '../../shared/strings';
   import { showToast } from '../../shared/toast';
   import { prefetchSession } from '../../routes/session-prefetch';
+  import { withBasePath } from '../../shared/base-path';
   import {
     selectVisiblePinnedSessions,
     type PinnedTabsModel,
@@ -55,7 +56,7 @@
   });
 
   function hrefFor(sessionId: string): string {
-    return `/session?id=${encodeURIComponent(sessionId)}`;
+    return withBasePath(`/session?id=${encodeURIComponent(sessionId)}`);
   }
 
   function startPrefetch(sessionId: string): void {

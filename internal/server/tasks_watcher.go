@@ -29,9 +29,11 @@ func (s *Server) startTasksWatcher() {
 	s.tasks.watcher = watcher
 	s.tasks.targets = make(map[string]string)
 	s.tasks.watched = make(map[string]bool)
-	if info, err := os.Stat(s.globalTasksDir()); err == nil && info.IsDir() {
-		s.tasks.targets[s.globalTasksDir()] = "global"
-		s.addTasksWatch(s.globalTasksDir())
+	if s.workspace == nil {
+		if info, err := os.Stat(s.globalTasksDir()); err == nil && info.IsDir() {
+			s.tasks.targets[s.globalTasksDir()] = "global"
+			s.addTasksWatch(s.globalTasksDir())
+		}
 	}
 	s.wg.Add(1)
 	go func() {
@@ -66,17 +68,22 @@ func (s *Server) refreshTasksWatchesLocked(target string) {
 }
 
 func (s *Server) watchTasksProject(project string) {
+	target, err := s.resolveWorkspaceLeaf(filepath.Join(project, ".pi", "tasks"))
+	if err != nil {
+		return
+	}
 	s.tasks.mu.Lock()
 	defer s.tasks.mu.Unlock()
 	if s.tasks.watcher == nil {
 		return
 	}
-	target := filepath.Join(project, ".pi", "tasks")
 	s.tasks.targets[target] = project
 	s.refreshTasksWatchesLocked(target)
-	if info, err := os.Stat(s.globalTasksDir()); err == nil && info.IsDir() {
-		s.tasks.targets[s.globalTasksDir()] = "global"
-		s.addTasksWatch(s.globalTasksDir())
+	if s.workspace == nil {
+		if info, err := os.Stat(s.globalTasksDir()); err == nil && info.IsDir() {
+			s.tasks.targets[s.globalTasksDir()] = "global"
+			s.addTasksWatch(s.globalTasksDir())
+		}
 	}
 }
 

@@ -5,14 +5,17 @@
 ```
 pican/
 ├── cmd/pican/
-│   └── main.go                 # Tiny CLI entry point; passes build version to app.Main
+│   └── main.go                 # Thin CLI/environment/version/signal adapter over app.Run
 ├── web/
 │   └── assets_embed.go         # Embeds Vite build output from web/dist
 ├── internal/
 │   ├── agentdir/
 │   │   └── agentdir.go         # Resolve ~/.pi/agent dir + the paths pican stores under it
 │   ├── app/
-│   │   ├── app.go              # CLI flags, dependency wiring, HTTP mux setup
+│   │   ├── config.go           # Exported reusable Config and mode validation
+│   │   ├── cli.go              # CLI/environment adapter
+│   │   ├── app.go              # Run lifecycle, dependency wiring, HTTP mux setup
+│   │   ├── serve.go            # Context cancellation and graceful HTTP shutdown
 │   │   ├── network.go          # Bind host / loopback helpers
 │   │   ├── tailscale.go        # Tailscale Serve detection/configuration
 │   │   ├── models_cache.go     # Process-wide coalesced cache for Pi model list
@@ -33,7 +36,9 @@ pican/
 │   │   ├── pwa.go              # PWA routes: manifest, sw.js, icons, css, cat.webm
 │   │   └── embedded/     # Embedded HTML/CSS/assets (shells, styles, export/)
 │   ├── auth/
-│   │   └── auth.go             # Token-based HTTP middleware
+│   │   └── auth.go             # Standalone token and hosted proxy-only middleware
+│   ├── basepath/
+│   │   └── basepath.go         # Shared live URL prefix and inner-mux mount
 │   ├── chat/
 │   │   └── request.go          # Multipart chat request parser (text + images)
 │   ├── files/
@@ -84,6 +89,7 @@ pican/
 │   │   ├── runtime.go          # Runtime availability and /api/runtimes
 │   │   ├── chat.go             # Chat, set-model, set-thinking, worker-status, commands handlers
 │   │   ├── new_session.go      # New-session creation logic
+│   │   ├── workspace.go        # Hosted workspace enforcement at server boundaries
 │   │   ├── git.go              # /api/git/info, /api/git/rename-branch handlers
 │   │   ├── diff.go             # /api/git/diff handler
 │   │   ├── files.go            # /api/files handler + per-cwd file-walk cache
@@ -115,6 +121,10 @@ pican/
 │   │   ├── title.go            # ReadTitleInputs: extract auto-title source text from a session
 │   │   ├── cache.go            # Modtime-aware session cache
 │   │   └── lookup.go           # Resolve session by ID
+│   ├── sessioncreate/
+│   │   └── store.go            # Durable hosted create/idempotency state machine
+│   ├── workspace/
+│   │   └── containment.go      # Canonical symlink-aware hosted containment resolver
 │   ├── schedules/
 │   │   └── schedule.go         # Schedule/Run structs, SQLite store, cron next-fire (robfig/cron)
 │   ├── share/

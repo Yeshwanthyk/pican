@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { runPromise, runSync } from "../../lib/runtime.js";
+import { withBasePath } from "../../shared/base-path.js";
 import {
   isUnknownRecord,
   sessionEntryFromUnknown,
@@ -82,7 +83,7 @@ export function createSessionEventSource(
     EventSourceImpl = BrowserEventSource,
   }: { readonly EventSourceImpl?: EventSourceConstructor } = {},
 ): EventSourceLike {
-  return new EventSourceImpl("/events?id=" + encodeURIComponent(sessionId));
+  return new EventSourceImpl(withBasePath("/events?id=" + encodeURIComponent(sessionId)));
 }
 
 export function getReloadEntryCount(model: ReloadModel | null | undefined): number | null {
@@ -164,7 +165,7 @@ export async function handleSessionReload({
   const dataValue = await runPromise(
     Effect.tryPromise({
       try: async () => {
-        const response = await fetchImpl(url);
+        const response = await fetchImpl(withBasePath(url));
         if (response instanceof Response) return response.json();
         if (isUnknownRecord(response) && typeof response.json === "function")
           return response.json();

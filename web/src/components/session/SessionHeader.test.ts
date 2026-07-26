@@ -153,7 +153,11 @@ describe("SessionHeader runtime commands", () => {
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
     expect(fetchImpl).toHaveBeenCalledWith("/api/new-session", {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Idempotency-Key": expect.any(String),
+      },
       body: JSON.stringify({
         path: "/repo",
         sourceSessionId: "projection.jsonl",

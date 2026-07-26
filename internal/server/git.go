@@ -16,8 +16,8 @@ func (s *Server) resolveSessionCwd(id string) (sessions.ResolvedSession, string,
 	if err != nil {
 		return resolved, "", err
 	}
-	cwd, _ := resolved.Session.Header["cwd"].(string)
-	return resolved, cwd, nil
+	cwd, err := s.validateSessionWorkspace(resolved)
+	return resolved, cwd, err
 }
 
 // resolveOrWriteError maps a session-resolution error to an HTTP status and
@@ -28,6 +28,8 @@ func resolveOrWriteError(w http.ResponseWriter, err error) bool {
 		return false
 	}
 	switch {
+	case isWorkspaceBoundaryError(err):
+		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, sessions.ErrInvalidSessionID):
 		writeJSONError(w, http.StatusBadRequest, "invalid session id")
 	case errors.Is(err, sessions.ErrSessionNotFound):
@@ -49,7 +51,10 @@ func (s *Server) handleGitInfo(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
-	info, _ := git.Describe(cwd)
+	if err := s.validateGitBoundary(cwd); resolveOrWriteError(w, err) {
+		return
+	}
+	info, _ := git.DescribeWithEnv(cwd, s.childEnv)
 	writeJSON(w, 0, info)
 }
 
@@ -70,7 +75,10 @@ func (s *Server) handleGitRenameBranch(w http.ResponseWriter, r *http.Request) {
 	if resolveOrWriteError(w, err) {
 		return
 	}
-	branch, err := git.RenameBranch(cwd, body.Name)
+	if err := s.validateGitBoundary(cwd); resolveOrWriteError(w, err) {
+		return
+	}
+	branch, err := git.RenameBranchWithEnv(cwd, body.Name, s.childEnv)
 	if err != nil {
 		switch {
 		case errors.Is(err, git.ErrInvalidBranchName):

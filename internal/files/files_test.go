@@ -1,6 +1,7 @@
 package files
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -254,6 +255,12 @@ func TestListDoesNotFollowSymlinks(t *testing.T) {
 	got := paths(MustList(t, root, "secret"))
 	if contains(got, "link/secret.txt") {
 		t.Fatalf("walk followed symlink out of cwd: %v", got)
+	}
+	if contains(paths(mustTopLevel(t, root, "")), "link") {
+		t.Fatal("top-level listing exposed a symlink")
+	}
+	if _, err := TopLevel(root, "link"); !errors.Is(err, ErrNotDir) {
+		t.Fatalf("scoped symlink error = %v, want ErrNotDir", err)
 	}
 }
 

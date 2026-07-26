@@ -14,6 +14,7 @@
     ARTIFACT_SETTING_KEYS,
   } from '../../session/artifacts/artifact-filter.js';
   import { t } from '../../shared/strings.js';
+  import { withBasePath } from '../../shared/base-path.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
   import { sessionRuntime } from '../../session/session-runtime.js';
   import type { ArtifactRuntime } from '../../session/session-runtime.js';
@@ -339,7 +340,11 @@
     {#if artifacts.length === 0}
       {#if hiddenCount > 0}
         <div class="artifact-empty">
-          {@html t('artifact.emptyHidden', { count: hiddenCount, noun })}
+          {@html t('artifact.emptyHidden', {
+            count: hiddenCount,
+            noun,
+            settingsHref: withBasePath('/settings'),
+          })}
         </div>
       {:else}
         <div class="artifact-empty">{t('artifact.emptyNone')}</div>

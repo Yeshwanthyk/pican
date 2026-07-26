@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"pican/internal/basepath"
 	"pican/internal/render"
 )
 
@@ -75,6 +76,26 @@ func loadFrontendScript(distFS fs.FS, manifest render.Manifest, entryName string
 
 func LoadScripts(distFS fs.FS, entryNames ...string) ([]Script, error) {
 	return loadFrontendScripts(distFS, entryNames...)
+}
+
+// LoadScriptsAt rewrites Vite's public asset base inside entry scripts so
+// dynamic imports resolve beneath the configured HTTP mount.
+func LoadScriptsAt(distFS fs.FS, mount basepath.Path, entryNames ...string) ([]Script, error) {
+	scripts, err := loadFrontendScripts(distFS, entryNames...)
+	if err != nil {
+		return nil, err
+	}
+	publicBase := mount.URL("/static/")
+	for i := range scripts {
+		for _, quote := range []string{`"`, `'`, "`"} {
+			scripts[i].JS = strings.ReplaceAll(
+				scripts[i].JS,
+				quote+"/static/"+quote,
+				quote+publicBase+quote,
+			)
+		}
+	}
+	return scripts, nil
 }
 
 func loadFrontendScripts(distFS fs.FS, entryNames ...string) ([]Script, error) {

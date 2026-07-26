@@ -1,12 +1,23 @@
 import { Effect, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { get, post } from "./http";
 import { runPromise } from "./runtime";
+import { configureBasePath, resetBasePath } from "../shared/base-path";
 
 const ResultSchema = Schema.Struct({ ok: Schema.Boolean });
 const failed = <E>(effect: Effect.Effect<unknown, E>) => runPromise(Effect.flip(effect));
+afterEach(() => resetBasePath());
 
 describe("apiFetch", () => {
+  it("prefixes API requests under a configured mount", async () => {
+    configureBasePath("/s/test");
+    const fetchImpl = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    await runPromise(get("/api/test", ResultSchema, { fetchImpl }));
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/s/test/api/test",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
   it.each([
     {
       name: "network rejection",

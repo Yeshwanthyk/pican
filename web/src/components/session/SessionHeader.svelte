@@ -1,10 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import * as Http from '../../lib/http.js';
   import { describeError } from '../../lib/errors.js';
   import { runtimeDisplay } from '../../lib/runtime-display.js';
   import { runPromise } from '../../lib/runtime.js';
-  import { NewSessionResponseSchema } from '../../lib/schema.js';
+  import { createSessionEffect } from '../../shared/create-session.js';
   import {
     icon,
     ArrowLeft,
@@ -18,6 +17,7 @@
   import { navigate, handleNavClick } from '../../shared/navigation.js';
   import { showToast } from '../../shared/toast.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
+  import { withBasePath } from '../../shared/base-path.js';
   import { shortenPath } from '../../session/render/session-format.js';
   import { sessionTitle, setSessionTitle } from '../../session/session-title.svelte.js';
   import { openTree } from '../../session/session-modals.svelte.js';
@@ -115,13 +115,7 @@
         newBtn.innerHTML = originalHTML;
         newBtn.disabled = false;
       };
-      void runPromise(
-        Http.post(
-          '/api/new-session',
-          { path: cwd, sourceSessionId: sessionId, runtime },
-          NewSessionResponseSchema,
-        ),
-      ).then(
+      void runPromise(createSessionEffect({ path: cwd, sourceSessionId: sessionId, runtime })).then(
         (data) => {
           navigate('/session?id=' + encodeURIComponent(data.id));
         },
@@ -164,7 +158,10 @@
   class:session-header-bar--pinned-navigation={pinnedNavigationEnabled}
 >
   <div class="session-header-left">
-    <a href="/" class="session-header-back" onclick={(event) => handleNavClick(event, '/')}
+    <a
+      href={withBasePath('/')}
+      class="session-header-back"
+      onclick={(event) => handleNavClick(event, '/')}
       ><span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
       <span class="session-header-back-label">{t('session.back')}</span></a
     >

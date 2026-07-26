@@ -1,7 +1,10 @@
 import { Effect, Stream } from "effect";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPromise } from "./runtime";
 import { parseStatusEvent, statusEvents } from "./sse";
+import { configureBasePath, resetBasePath } from "../shared/base-path";
+
+afterEach(() => resetBasePath());
 
 describe("SSE parsing", () => {
   it("parses reload and typed status events", async () => {
@@ -42,6 +45,18 @@ class FakeEventSource {
 }
 
 describe("SSE stream", () => {
+  it("connects to the mounted event stream", async () => {
+    configureBasePath("/s/test");
+    const source = new FakeEventSource();
+    const factory = vi.fn(() => source);
+    const result = runPromise(
+      statusEvents("topic", factory).pipe(Stream.take(1), Stream.runCollect),
+    );
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledWith("/s/test/events?id=topic"));
+    source.emit("message", "ready");
+    await result;
+  });
+
   it("drops malformed typed payloads and keeps the same browser connection", async () => {
     const source = new FakeEventSource();
     const factory = vi.fn(() => source);

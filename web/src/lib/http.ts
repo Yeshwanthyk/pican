@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 import type { ApiError } from "./errors";
 import { AbortError, DecodeError, HttpError, NetworkError, TimeoutError } from "./errors";
+import { withBasePath } from "../shared/base-path";
 
 export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -40,7 +41,7 @@ const fetchResponse = (
     }
     requestSignal?.addEventListener("abort", abort, { once: true });
     effectSignal.addEventListener("abort", abort, { once: true });
-    fetchImpl(url, { ...init, signal: controller.signal }).then(
+    fetchImpl(withBasePath(url), { ...init, signal: controller.signal }).then(
       (response) => resume(Effect.succeed(response)),
       (cause) => resume(controller.signal.aborted ? new AbortError() : new NetworkError({ cause })),
     );

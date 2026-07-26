@@ -51,13 +51,16 @@ type Info struct {
 	PRURL string `json:"prUrl"`
 }
 
-func run(dir string, args ...string) (string, error) {
+func runWithEnv(dir string, env []string, args ...string) (string, error) {
 	// Bound every git invocation: a command that blocks (huge untracked tree,
 	// network filesystem, a stuck index lock) must not hang the HTTP handler.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	if env != nil {
+		cmd.Env = env
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -65,12 +68,21 @@ func run(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func run(dir string, args ...string) (string, error) {
+	return runWithEnv(dir, nil, args...)
+}
+
 // CurrentBranch returns the checked-out branch name for dir.
 func CurrentBranch(dir string) (string, error) {
+	return CurrentBranchWithEnv(dir, nil)
+}
+
+// CurrentBranchWithEnv is CurrentBranch with an exact child environment.
+func CurrentBranchWithEnv(dir string, env []string) (string, error) {
 	if dir == "" {
 		return "", ErrNotRepo
 	}
-	branch, err := run(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	branch, err := runWithEnv(dir, env, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", ErrNotRepo
 	}
@@ -85,20 +97,25 @@ func CurrentBranch(dir string) (string, error) {
 // non-repo directory yields Info{IsRepo: false} with a nil error so callers can
 // simply hide the footer.
 func Describe(dir string) (Info, error) {
-	branch, err := CurrentBranch(dir)
+	return DescribeWithEnv(dir, nil)
+}
+
+// DescribeWithEnv is Describe with an exact child environment.
+func DescribeWithEnv(dir string, env []string) (Info, error) {
+	branch, err := CurrentBranchWithEnv(dir, env)
 	if err != nil {
 		return Info{IsRepo: false}, nil
 	}
-	info := Info{IsRepo: true, Branch: branch, HasChanges: HasLocalChanges(dir)}
-	if def := DefaultBranch(dir); def != "" && def == branch {
+	info := Info{IsRepo: true, Branch: branch, HasChanges: HasLocalChangesWithEnv(dir, env)}
+	if def := DefaultBranchWithEnv(dir, env); def != "" && def == branch {
 		info.IsDefault = true
 	}
-	if url, err := pullRequestURL(dir, branch); err == nil {
+	if url, err := pullRequestURLWithEnv(dir, branch, env); err == nil {
 		info.PRCreateURL = url
 	}
 	// Only feature branches can have a PR against the default branch.
 	if !info.IsDefault {
-		info.PRURL = existingOpenPRURL(dir)
+		info.PRURL = existingOpenPRURLWithEnv(dir, env)
 	}
 	return info, nil
 }
@@ -106,10 +123,15 @@ func Describe(dir string) (Info, error) {
 // HasLocalChanges reports whether there is something to commit or push: either
 // a dirty working tree, or local commits ahead of the upstream branch.
 func HasLocalChanges(dir string) bool {
-	if out, err := run(dir, "status", "--porcelain"); err == nil && out != "" {
+	return HasLocalChangesWithEnv(dir, nil)
+}
+
+// HasLocalChangesWithEnv is HasLocalChanges with an exact child environment.
+func HasLocalChangesWithEnv(dir string, env []string) bool {
+	if out, err := runWithEnv(dir, env, "status", "--porcelain"); err == nil && out != "" {
 		return true
 	}
-	if out, err := run(dir, "rev-list", "--count", "@{upstream}..HEAD"); err == nil {
+	if out, err := runWithEnv(dir, env, "rev-list", "--count", "@{upstream}..HEAD"); err == nil {
 		if out != "" && out != "0" {
 			return true
 		}
@@ -121,11 +143,14 @@ func HasLocalChanges(dir string) bool {
 // trimming, since patch whitespace is significant). git exits 1 to signal
 // "differences found", which is not an error for us; any higher exit code or a
 // failure to start the process is.
-func diffRun(dir string, args ...string) (string, error) {
+func diffRunWithEnv(dir string, env []string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	if env != nil {
+		cmd.Env = env
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		var exit *exec.ExitError
@@ -135,6 +160,10 @@ func diffRun(dir string, args ...string) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+func diffRun(dir string, args ...string) (string, error) {
+	return diffRunWithEnv(dir, nil, args...)
 }
 
 const (
@@ -157,22 +186,27 @@ const (
 // subprocess per untracked file and could take tens of seconds in trees with
 // thousands of untracked files. The combined output is capped at maxDiffBytes.
 func WorkingTreeDiff(dir string) (string, error) {
+	return WorkingTreeDiffWithEnv(dir, nil)
+}
+
+// WorkingTreeDiffWithEnv is WorkingTreeDiff with an exact child environment.
+func WorkingTreeDiffWithEnv(dir string, env []string) (string, error) {
 	if dir == "" {
 		return "", ErrNotRepo
 	}
-	if _, err := run(dir, "rev-parse", "--is-inside-work-tree"); err != nil {
+	if _, err := runWithEnv(dir, env, "rev-parse", "--is-inside-work-tree"); err != nil {
 		return "", ErrNotRepo
 	}
 	var b strings.Builder
 	// Tracked changes vs HEAD. In a repo with no commits yet HEAD is absent and
 	// this fails harmlessly — the untracked pass below still surfaces new files.
-	if tracked, err := diffRun(dir, "-c", "core.quotepath=false", "diff", "HEAD"); err == nil {
+	if tracked, err := diffRunWithEnv(dir, env, "-c", "core.quotepath=false", "diff", "HEAD"); err == nil {
 		b.WriteString(tracked)
 	}
 	if b.Len() >= maxDiffBytes {
 		return b.String(), nil
 	}
-	others, err := run(dir, "ls-files", "--others", "--exclude-standard", "-z")
+	others, err := runWithEnv(dir, env, "ls-files", "--others", "--exclude-standard", "-z")
 	if err == nil && others != "" {
 		for _, f := range strings.Split(others, "\x00") {
 			if f == "" {
@@ -240,6 +274,10 @@ func isBinary(data []byte) bool {
 // branch, using the gh CLI when available. It is best-effort: a missing/
 // unauthenticated gh, no PR, or a closed/merged PR all yield "".
 func existingOpenPRURL(dir string) string {
+	return existingOpenPRURLWithEnv(dir, nil)
+}
+
+func existingOpenPRURLWithEnv(dir string, env []string) string {
 	gh, err := exec.LookPath("gh")
 	if err != nil {
 		return ""
@@ -248,6 +286,9 @@ func existingOpenPRURL(dir string) string {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, gh, "pr", "view", "--json", "url,state")
 	cmd.Dir = dir
+	if env != nil {
+		cmd.Env = env
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -269,11 +310,16 @@ func existingOpenPRURL(dir string) string {
 // remote's published HEAD (origin/HEAD) and falls back to a local main/master
 // when that isn't configured. Returns "" when it can't be determined.
 func DefaultBranch(dir string) string {
-	if out, err := run(dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); err == nil && out != "" {
+	return DefaultBranchWithEnv(dir, nil)
+}
+
+// DefaultBranchWithEnv is DefaultBranch with an exact child environment.
+func DefaultBranchWithEnv(dir string, env []string) string {
+	if out, err := runWithEnv(dir, env, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); err == nil && out != "" {
 		return strings.TrimPrefix(out, "origin/")
 	}
 	for _, candidate := range []string{"main", "master"} {
-		if _, err := run(dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+candidate); err == nil {
+		if _, err := runWithEnv(dir, env, "rev-parse", "--verify", "--quiet", "refs/heads/"+candidate); err == nil {
 			return candidate
 		}
 	}
@@ -283,19 +329,27 @@ func DefaultBranch(dir string) string {
 // RenameBranch renames the currently checked-out branch to name via
 // `git branch -m`, validating the name first.
 func RenameBranch(dir, name string) (string, error) {
+	return RenameBranchWithEnv(dir, name, nil)
+}
+
+// RenameBranchWithEnv is RenameBranch with an exact child environment.
+func RenameBranchWithEnv(dir, name string, env []string) (string, error) {
 	name = strings.TrimSpace(name)
 	if !ValidBranchName(name) {
 		return "", ErrInvalidBranchName
 	}
-	branch, err := CurrentBranch(dir)
+	branch, err := CurrentBranchWithEnv(dir, env)
 	if err != nil {
 		return "", err
 	}
-	if def := DefaultBranch(dir); def != "" && def == branch {
+	if def := DefaultBranchWithEnv(dir, env); def != "" && def == branch {
 		return "", ErrDefaultBranch
 	}
 	cmd := exec.Command("git", "branch", "-m", name)
 	cmd.Dir = dir
+	if env != nil {
+		cmd.Env = env
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		msg := strings.TrimSpace(string(out))
 		if msg == "" {
@@ -324,7 +378,11 @@ func ValidBranchName(name string) bool {
 // request" URL. Supports both SSH (git@github.com:owner/repo.git) and HTTPS
 // remotes. Returns ErrNoRemote for non-GitHub or missing remotes.
 func pullRequestURL(dir, branch string) (string, error) {
-	remote, err := run(dir, "remote", "get-url", "origin")
+	return pullRequestURLWithEnv(dir, branch, nil)
+}
+
+func pullRequestURLWithEnv(dir, branch string, env []string) (string, error) {
+	remote, err := runWithEnv(dir, env, "remote", "get-url", "origin")
 	if err != nil || remote == "" {
 		return "", ErrNoRemote
 	}

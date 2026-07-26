@@ -1,11 +1,12 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { BINARY, FIXTURES_SESSIONS, REPO_ROOT, TMP_DIR } from "./paths";
 
 /** Directory holding the stub `pi` binary, prepended to PATH so chat works without real pi. */
 const STUB_PI_DIR = join(REPO_ROOT, "e2e", "lib", "stub-pi");
+const STUB_CODEX = join(REPO_ROOT, "e2e", "lib", "stub-codex", "codex");
 
 export async function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -44,12 +45,17 @@ export function seedAgentDir(): { agentDir: string; sessionsDir: string } {
   return { agentDir, sessionsDir };
 }
 
-async function waitForReady(baseURL: string, timeoutMs = 15000): Promise<void> {
+async function waitForReady(
+  baseURL: string,
+  path = "/",
+  headers: Record<string, string> = {},
+  timeoutMs = 15000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(baseURL + "/", { redirect: "manual" });
+      const res = await fetch(baseURL + path, { redirect: "manual", headers });
       if (res.status > 0) return;
     } catch (err) {
       lastErr = err;
@@ -64,6 +70,18 @@ export interface StartedServer {
   agentDir: string;
   sessionsDir: string;
   child: ChildProcess;
+}
+
+export interface StartedHostedServer {
+  baseURL: string;
+  basePath: string;
+  workspaceRoot: string;
+  stateRoot: string;
+  proxyHeader: string;
+  proxyToken: string;
+  realSecretFixture: string;
+  child: ChildProcess;
+  logs(): string;
 }
 
 export async function startServer(): Promise<StartedServer> {
@@ -96,6 +114,73 @@ export async function startServer(): Promise<StartedServer> {
 
   await waitForReady(baseURL);
   return { baseURL, agentDir, sessionsDir, child };
+}
+
+export async function startHostedCodexServer(): Promise<StartedHostedServer> {
+  ensureBinary();
+  mkdirSync(TMP_DIR, { recursive: true });
+  const workspaceRoot = mkdtempSync(join(TMP_DIR, "hosted-workspace-"));
+  const stateRoot = join(workspaceRoot, ".pican");
+  mkdirSync(join(workspaceRoot, ".codex"), { recursive: true });
+  const port = await findFreePort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const basePath = "/s/test";
+  const proxyHeader = "X-Pican-Proxy-Token";
+  const proxyToken = "pican-proxy-secret-e2e";
+  const realSecretFixture = "scotty-real-secret-e2e";
+  let output = "";
+
+  const child = spawn(
+    BINARY,
+    [
+      "-p",
+      String(port),
+      "-host",
+      "127.0.0.1",
+      "-runtime",
+      "codex",
+      "-codex-command",
+      STUB_CODEX,
+    ],
+    {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        PICAN_MODE: "hosted",
+        PICAN_BASE_PATH: basePath,
+        PICAN_WORKSPACE_ROOT: workspaceRoot,
+        PICAN_STATE_ROOT: stateRoot,
+        PICAN_AUTH_MODE: "proxy",
+        PICAN_PROXY_HEADER: proxyHeader,
+        PICAN_PROXY_TOKEN: proxyToken,
+        CODEX_HOME: join(workspaceRoot, ".codex"),
+        CODEX_E2E_COUNTER: join(workspaceRoot, ".codex", "e2e-counter"),
+        CODEX_OPAQUE_SENTINEL: "opaque-codex-e2e",
+        GITHUB_TOKEN: "opaque-github-e2e",
+        SCOTTY_REAL_CREDENTIAL: realSecretFixture,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  child.stdout?.on("data", (data) => {
+    output += String(data);
+  });
+  child.stderr?.on("data", (data) => {
+    output += String(data);
+  });
+
+  await waitForReady(baseURL, basePath + "/", { [proxyHeader]: proxyToken });
+  return {
+    baseURL,
+    basePath,
+    workspaceRoot,
+    stateRoot,
+    proxyHeader,
+    proxyToken,
+    realSecretFixture,
+    child,
+    logs: () => output,
+  };
 }
 
 export function stopServer(pid: number): void {

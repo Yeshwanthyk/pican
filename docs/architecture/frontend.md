@@ -20,7 +20,7 @@ web/src/{components,routes,index,session,settings,shared}/**/*.{svelte,ts}
                          .vite/manifest.json
 ```
 
-At startup, `internal/frontend/assets.go` + `web/assets_embed.go` reads `.vite/manifest.json`, validates the `src/main.ts` SPA entrypoint, and registers its hashed asset route under `/static/...`. Other hashed chunks are served from the embedded `web/dist/assets/` filesystem.
+At startup, `internal/frontend/assets.go` + `web/assets_embed.go` reads `.vite/manifest.json`, validates the `src/main.ts` SPA entrypoint, and registers its hashed asset route under the live app's configured base path. Other hashed chunks are served from the embedded `web/dist/assets/` filesystem.
 
 ## SPA Shell and Routes
 
@@ -38,6 +38,10 @@ Browser routes served by the SPA shell:
 - `/login` → `web/src/routes/LoginPage.svelte`
 
 API, SSE, PWA, sound, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
+
+The route list above is relative to one shared live base path. At `/s/abc123`, for example, the browser sees `/s/abc123/session`, `/s/abc123/api/session`, `/s/abc123/events`, mounted hashed assets, and mounted PWA URLs. The Go shell emits the normalized value in `meta[name=pican-base-path]`; `web/src/shared/base-path.ts` is the only frontend prefix/strip abstraction used by navigation, route parsing, API helpers, SSE, icons, and service-worker registration. A static contract test rejects new root-relative live runtime URL sinks outside that helper. Static export is intentionally unchanged and self-contained.
+
+All live session-create controls use `shared/create-session.ts`. It adds a browser-generated `Idempotency-Key`, retains that key when a request fails, and clears it only after a successful response, so a user retry converges on the server's durable create mapping.
 
 ## Effect and TypeScript Boundary
 

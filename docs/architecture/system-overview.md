@@ -14,9 +14,9 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
 | Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI; supervised authenticated HTTP/SSE via `opencode serve` |
-| Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under `~/.pi/agent/sessions`; Codex, Claude, and OpenCode retain native authority |
-| Local DB | SQLite (`~/.pi/agent/pican.sqlite`) for per-project scratchpads, tracked-project metadata, session pins/local archive, server-backed user settings, and the btw scratch-chat registry |
-| Auth | Token cookie/query/header (optional on localhost) |
+| Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under the configured state root; Codex, Claude, and OpenCode retain native authority |
+| Local DB | SQLite under the configured state root for per-project scratchpads, tracked-project metadata, session pins/local archive, server-backed user settings, btw scratch-chat registry, and hosted create idempotency |
+| Auth | Standalone token cookie/query/header, or mutually exclusive hosted proxy-only header authentication |
 
 ## Component Diagram
 
@@ -83,7 +83,7 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   PWA: /manifest.webmanifest, /sw.js, /icon.svg, /cat.webm, …           │
 │   GET  /static/…      →  embedded Vite assets                            │
 │                                                                           │
-│   All handlers wrapped with auth.Middleware (token check)                │
+│   Inner mux mounted through one base path and auth policy                 │
 └──────────────────────────────────────────────────────────────────────────┘
                                     │
          ┌──────────────────────────┼──────────────────────────┐
@@ -146,6 +146,20 @@ Tailscale owns HTTPS/certificates and exposes the app at the node's MagicDNS
 name, while pican itself continues listening only on localhost.
 ```
 
+## Reusable Hosted Process Contract
+
+`app.Config` and `app.Run(ctx, config) error` are the reusable hosting boundary. `Run` owns the listener, server, database, watchers, catalog loops, and workers it creates; cancellation shuts them down and returns. It does not install signal handlers or call `os.Exit`. `cmd/pican` is only the CLI/environment/version/signal adapter.
+
+Standalone defaults retain the local `~/.pi/agent` shape. Hosted mode is intentionally Codex-only and requires one canonical absolute `WorkspaceRoot`, one absolute `StateRoot` contained by that workspace, one normalized `BasePath` such as `/s/abc123`, proxy-only authentication, and an exact child environment supplied by the host.
+
+The server registers a root-based inner mux once, then the base-path handler strips the configured mount before dispatch. Requests outside the mount return `404`. Live HTML, hashed assets, styles, API requests, SSE, navigation, icons, manifest, and service-worker URLs all derive from the same base-path value. Static export/share remains a separate self-contained render and does not inherit live mount or network behavior.
+
+Proxy-only mode accepts exactly one instance of the configured header and compares its value in constant time. It accepts no query token, login form, Bearer token, `X-Pican-Token`, Pican cookie, or browser fallback. The proxy token is read from `PICAN_PROXY_TOKEN`; there is deliberately no CLI token flag. It is not copied into the Codex environment, state, projections, responses, or logs. Scotty must keep Pican off the public network, authenticate the browser, strip browser credentials, and inject the private header only on its internal hop.
+
+Every hosted create, browse, file, git, task, project, and child-working-directory boundary resolves through one canonical symlink-aware workspace resolver. The root and descendants are accepted; raw `..`, siblings, scoped filesystem symlinks, task store/output symlinks, and external Git gitdirs are rejected before reads or creation. Catalog reconciliation validates each authoritative Codex thread cwd before projection, and direct API/bootstrap/share reads repeat the same check. Native unarchive validates archived metadata before mutation. The Codex child and hosted Git helpers receive only the configured allowlisted environment, including opaque `CODEX_*`, `OPENAI_*`, `GH_*`, and `GITHUB_*` sentinels. Pican never resolves those sentinel values. Pican auth variables and unrelated host/provider secrets are stripped.
+
+Hosted mode does not publish GitHub gists, run remote update checks, install or restart Pican, or invoke the ambient Pi auto-title model path. Share preview remains a local static render, and auto-title falls back to the local heuristic. Scotty owns external egress and runtime replacement.
+
 ## Session Directory Layout
 
 ```
@@ -169,6 +183,8 @@ name, while pican itself continues listening only on localhost.
     ├── vapid.json          ← web-push VAPID keys (when push enabled)
     └── push-subs.json      ← web-push subscriptions (when push enabled)
 ```
+
+In hosted mode the equivalent layout is rooted at the configured state directory, for example `/workspace/<id>/.pican/{sessions,pican.sqlite,pican/...}`. Codex keeps its separate authoritative home at `/workspace/<id>/.codex`; Pican neither parses nor copies Codex credentials.
 
 ## Tracked Projects and Session Curation
 
@@ -200,19 +216,21 @@ because archive controls navigation, not session authority.
 
 ## Startup Order
 
-1. Construct app-level Pi, Codex, Claude, and OpenCode registrations in that order. OpenCode owns one supervised loopback HTTP/SSE service shared by its catalog, model, lifecycle, and worker adapters.
-2. Resolve runtime command/home flags, then parse `-runtime=auto|pi|codex|claude|opencode|both|<comma-separated registered IDs>`. `auto` is the default and enables installed commands in registry order; every other value is an explicit override. `both` remains an exact alias for `pi,codex`; selection is deduplicated and normalized back to registration order.
-3. Derive a selected registry that is not mutated after startup. Malformed and valid-but-unregistered IDs fail CLI parsing before any runtime starts.
-4. Resolve `~/.pi/agent/sessions`: any selected append-only-native runtime requires it; a replaceable-projection-only selection creates it.
-5. Probe selected executable-backed runtimes independently from catalog freshness, then give each initial catalog adapter a bounded startup pass. Deferred Codex reconciliation retries immediately with a longer bound, then runs a minute-level list with `UpdatedAt`-gated hydration. Claude starts a debounced watcher plus periodic recovery. OpenCode starts its authenticated loopback child, health/version checks it, connects one global event stream, then lists/reads and reconciles before availability. Partial scans never prune.
-6. Determine bind host and auth policy, then build the shared worker manager. On first activity for a session it parses the session header, defaults an absent runtime to Pi, verifies selection, and dispatches construction through the selected registry.
-7. Build `server.Deps` with the selected registry, runtime-aware model discovery, shared manager, narrow Claude creation service, and separate Codex lifecycle service; `server.New` validates the default runtime and starts server-owned watchers and background loops.
-8. Register routes and embedded live-app assets, then optionally configure Tailscale Serve.
-9. Write the state file, optionally open a browser, warm the Pi model cache when enabled, and start `http.Server`.
-10. On `SIGINT`/`SIGTERM`, shut down HTTP, cancel catalog sync, close workers, and stop server goroutines.
+1. The CLI builds `app.Config`, installs `SIGINT`/`SIGTERM` cancellation, and calls `app.Run`. An embedding host can call `Run` directly with its own context and no process-global signal behavior.
+2. `Run` validates and canonicalizes the mount, workspace, state, authentication, environment, runtime, and listener contract before opening the HTTP server. Hosted mode rejects every runtime selection except Codex.
+3. Construct app-level Pi, Codex, Claude, and OpenCode registrations in that order for standalone mode. OpenCode owns one supervised loopback HTTP/SSE service shared by its catalog, model, lifecycle, and worker adapters.
+4. Resolve runtime command/home flags, then parse `-runtime=auto|pi|codex|claude|opencode|both|<comma-separated registered IDs>`. `auto` is the default and enables installed commands in registry order; every other value is an explicit override. `both` remains an exact alias for `pi,codex`; selection is deduplicated and normalized back to registration order.
+5. Derive a selected registry that is not mutated after startup. Malformed and valid-but-unregistered IDs fail CLI parsing before any runtime starts.
+6. Resolve the configured state-root sessions directory: any selected append-only-native runtime requires it; a replaceable-projection-only selection creates it.
+7. Probe selected executable-backed runtimes independently from catalog freshness, then give each initial catalog adapter a bounded startup pass. Deferred Codex reconciliation retries immediately with a longer bound, then runs a minute-level list with `UpdatedAt`-gated hydration. Claude starts a debounced watcher plus periodic recovery. OpenCode starts its authenticated loopback child, health/version checks it, connects one global event stream, then lists/reads and reconciles before availability. Partial scans never prune.
+8. Determine bind host and auth policy, then build the shared worker manager. On first activity for a session it parses the session header, defaults an absent runtime to Pi, verifies selection, and dispatches construction through the selected registry.
+9. Build `server.Deps` with the selected registry, runtime-aware model discovery, shared manager, narrow Claude creation service, and separate Codex lifecycle service; `server.New` validates the default runtime and starts server-owned watchers and background loops.
+10. Register root-relative inner routes and embedded live-app assets, wrap the inner mux in authentication, then mount it at `BasePath`. Standalone mode may configure Tailscale Serve; hosted mode never does.
+11. Write the state file, optionally open a browser, warm the Pi model cache when enabled, and serve the pre-bound listener.
+12. When the caller's context is canceled, shut down HTTP, cancel catalog sync, close workers, and stop server goroutines.
 
 ```text
-Main
+app.Run
  ├─ newRuntimeRegistry(Pi, Codex, Claude, OpenCode) ── registrations + model loaders
  ├─ parseRuntime(...) ────────────── selects registered IDs
  ├─ selectedRegistry() ───────────── passed to server and worker dispatch

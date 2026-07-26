@@ -96,12 +96,18 @@ func TestStaticExportKeepsInlineSessionRenderer(t *testing.T) {
 }
 
 func TestIndexSourceReferencesAPINewSession(t *testing.T) {
-	data, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
+	index, err := os.ReadFile(repoPath("web/src/index/sessions.ts"))
 	if err != nil {
 		t.Fatalf("read web/src/index/sessions.ts: %v", err)
 	}
-	if !strings.Contains(string(data), "/api/new-session") {
-		t.Fatal("web/src/index/sessions.ts missing /api/new-session reference")
+	helper, err := os.ReadFile(repoPath("web/src/shared/create-session.ts"))
+	if err != nil {
+		t.Fatalf("read web/src/shared/create-session.ts: %v", err)
+	}
+	if !strings.Contains(string(index), "createSessionEffect") ||
+		!strings.Contains(string(helper), `"/api/new-session"`) ||
+		!strings.Contains(string(helper), `"Idempotency-Key"`) {
+		t.Fatal("index create path is not routed through the idempotent shared endpoint helper")
 	}
 }
 

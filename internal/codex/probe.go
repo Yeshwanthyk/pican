@@ -17,6 +17,20 @@ func runProbeCommand(ctx context.Context, executable string, args ...string) ([]
 	return exec.CommandContext(ctx, executable, args...).CombinedOutput()
 }
 
+func runProbeCommandWithOptions(options ProcessOptions) probeRunner {
+	options = options.clone()
+	return func(ctx context.Context, executable string, args ...string) ([]byte, error) {
+		cmd := exec.CommandContext(ctx, executable, args...)
+		if options.Env != nil {
+			cmd.Env = options.Env
+		}
+		if options.Dir != "" {
+			cmd.Dir = options.Dir
+		}
+		return cmd.CombinedOutput()
+	}
+}
+
 // Probe keeps executable/auth health separate from catalog freshness. A large
 // native catalog may take time to reconcile without making app-server unusable
 // for create, resume, or chat operations.
@@ -33,6 +47,10 @@ type Probe struct {
 
 func NewProbe(command string, ttl time.Duration) *Probe {
 	return newProbe(command, ttl, runProbeCommand)
+}
+
+func NewProbeWithOptions(command string, ttl time.Duration, options ProcessOptions) *Probe {
+	return newProbe(command, ttl, runProbeCommandWithOptions(options))
 }
 
 func newProbe(command string, ttl time.Duration, runner probeRunner) *Probe {

@@ -22,6 +22,10 @@ func (s *Server) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	if s.hosted {
+		writeJSONError(w, http.StatusServiceUnavailable, "update checks are unavailable in hosted mode")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 	info, err := s.updater.Check(ctx)
@@ -38,6 +42,10 @@ func (s *Server) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.hosted {
+		writeJSONError(w, http.StatusServiceUnavailable, "in-place update is unavailable in hosted mode")
 		return
 	}
 	if s.runInstall == nil {
@@ -63,6 +71,10 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.hosted {
+		writeJSONError(w, http.StatusServiceUnavailable, "restart is unavailable in hosted mode")
 		return
 	}
 	if s.runRestart == nil {

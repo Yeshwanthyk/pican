@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect";
 import { runSync } from "../lib/runtime";
 import { parseStatusEvent } from "../lib/sse";
+import { withBasePath } from "./base-path";
 
 interface LegacyEventSource {
   onmessage: ((event: MessageEvent<string>) => void) | null;
@@ -84,7 +85,9 @@ export function createStatusEvents({
   const connect = () => {
     if (EventSourceImpl === undefined) return;
     cleanup();
-    const eventSource = new EventSourceImpl(`/events?id=${encodeURIComponent(topic)}`);
+    const eventSource = new EventSourceImpl(
+      withBasePath(`/events?id=${encodeURIComponent(topic)}`),
+    );
     stream = eventSource;
 
     eventSource.addEventListener("open", () => {

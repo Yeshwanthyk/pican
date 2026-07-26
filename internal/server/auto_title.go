@@ -150,7 +150,11 @@ func (s *Server) maybeAutoTitle(sessID string) {
 // a local heuristic when the model is unset, errors, or returns nothing usable.
 func (s *Server) generateTitle(firstUserText string) string {
 	model := s.autoTitleModel()
-	if model != "" {
+	// Hosted mode only permits subprocesses through the configured Codex
+	// worker environment. The legacy title generator launches pi directly
+	// with the ambient process environment, so use the deterministic local
+	// heuristic until that path can be made equally explicit.
+	if model != "" && !s.hosted {
 		ctx, cancel := context.WithTimeout(context.Background(), autoTitleTimeout)
 		raw, err := autoTitleGenerate(ctx, rpc.PromptOpts{
 			Message:      autoTitlePrompt(firstUserText),

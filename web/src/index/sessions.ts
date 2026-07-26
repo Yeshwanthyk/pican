@@ -1,18 +1,14 @@
 import { effects } from "../shared/api.js";
 import type { FetchLike } from "../lib/http";
 import { runPromise } from "../lib/runtime";
-import {
-  NewSessionResponseSchema,
-  RuntimesResponseSchema,
-  SessionListSchema,
-  MutationResponseSchema,
-} from "../lib/schema";
+import { RuntimesResponseSchema, SessionListSchema, MutationResponseSchema } from "../lib/schema";
 import type { RecentLocations, RuntimesResponse, Session, SessionList } from "../lib/schema";
 import { t } from "../shared/strings.js";
 import {
   normalizeRuntimeCapabilities,
   type CompleteRuntimeCapabilities,
 } from "../lib/runtime-capabilities";
+import { createSessionEffect } from "../shared/create-session";
 
 export interface NormalizedSession {
   id: string;
@@ -508,17 +504,7 @@ export function defaultCreateSession(
   runtime = "pi",
   { fetchImpl = globalThis.fetch }: FetchOptions = {},
 ) {
-  const legacyFetch: FetchLike = (input, init) =>
-    fetchImpl(input, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: init?.body,
-    });
-  return runPromise(
-    effects.post("/api/new-session", { path, runtime: runtime || "pi" }, NewSessionResponseSchema, {
-      fetchImpl: legacyFetch,
-    }),
-  );
+  return runPromise(createSessionEffect({ path, runtime: runtime || "pi" }, { fetchImpl }));
 }
 export function defaultFetchProjects() {
   return runPromise(effects.sessions.projects);

@@ -1,4 +1,5 @@
 import { t } from "../shared/strings";
+import { withBasePath } from "../shared/base-path";
 
 export interface RuntimeDisplay {
   readonly id: string;
@@ -8,9 +9,9 @@ export interface RuntimeDisplay {
 }
 
 const runtimeIcon = (id: string): string => {
-  if (id === "pi") return "/pi-icon.svg";
-  if (id === "codex") return "/codex-icon.svg";
-  if (id === "claude") return "/claude-icon.svg";
+  if (id === "pi") return withBasePath("/pi-icon.svg");
+  if (id === "codex") return withBasePath("/codex-icon.svg");
+  if (id === "claude") return withBasePath("/claude-icon.svg");
   return "";
 };
 

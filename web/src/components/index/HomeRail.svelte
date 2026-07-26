@@ -5,6 +5,7 @@
   import type { NormalizedPeerHost } from '../../index/peers.js';
   import type { Schedule } from '../../lib/schema';
   import MachinesSection from './MachinesSection.svelte';
+  import { withBasePath } from '../../shared/base-path.js';
 
   interface Props {
     waitingSessions?: ReadonlyArray<NormalizedSession>;
@@ -50,7 +51,7 @@
       <div class="rail-heading">{t('index.waitingOnYou')}</div>
       <a
         class="rail-session-title"
-        href={`/session?id=${encodeURIComponent(waiting.id)}`}
+        href={withBasePath(`/session?id=${encodeURIComponent(waiting.id)}`)}
         onclick={(event) => handleNavClick(event, `/session?id=${encodeURIComponent(waiting.id)}`)}
         >{waiting.name}</a
       >
@@ -72,7 +73,7 @@
       {:else}
         <a
           class="rail-open-session"
-          href={`/session?id=${encodeURIComponent(waiting.id)}`}
+          href={withBasePath(`/session?id=${encodeURIComponent(waiting.id)}`)}
           onclick={(event) =>
             handleNavClick(event, `/session?id=${encodeURIComponent(waiting.id)}`)}
           >{t('index.openWaitingSession')}</a

@@ -29,6 +29,7 @@
   import * as sidebarApi from '../../session/ui/sidebar.js';
   import { openVersionModal } from '../../shared/version.js';
   import { navigate } from '../../shared/navigation.js';
+  import { withBasePath } from '../../shared/base-path.js';
   import { openSessionPalette } from '../../shared/command-palette-runtime.js';
   import {
     openModelUsage,
@@ -427,7 +428,7 @@
         {#if item.kind === 'link'}
           <a
             class={itemClass}
-            href={item.href}
+            href={withBasePath(item.href)}
             role="menuitem"
             target={item.external ? '_blank' : undefined}
             rel={item.external ? 'noreferrer' : undefined}

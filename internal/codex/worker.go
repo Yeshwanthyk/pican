@@ -63,13 +63,17 @@ const defaultInterruptTimeout = 5 * time.Second
 // NewWorker validates a Codex projection, starts app-server, initializes it,
 // resumes its native thread, and refreshes the projection.
 func NewWorker(ctx context.Context, sessionPath string, command []string, callbacks Callbacks) (*Worker, error) {
+	return NewWorkerWithOptions(ctx, sessionPath, command, callbacks, ProcessOptions{})
+}
+
+func NewWorkerWithOptions(ctx context.Context, sessionPath string, command []string, callbacks Callbacks, options ProcessOptions) (*Worker, error) {
 	meta, err := ReadProjectionMetadata(sessionPath)
 	if err != nil {
 		return nil, err
 	}
 	w := &Worker{command: append([]string(nil), command...), sessionPath: sessionPath, sessionsDir: filepath.Dir(filepath.Dir(sessionPath)), nativeID: meta.NativeID, cwd: meta.CWD, model: meta.Model, effort: meta.Effort, status: workers.WorkerStatus{State: workers.WorkerStateIdle, Model: meta.Model, ModelProvider: Provider, ThinkingLevel: meta.Effort}, callbacks: callbacks, statusCh: make(chan workers.WorkerStatus, 1), preview: map[string]*strings.Builder{}, reviewThreads: map[string]struct{}{}, completedTurns: map[string]struct{}{}, interruptTimeout: defaultInterruptTimeout, startedAt: time.Now(), lastActive: time.Now()}
 	ready := make(chan struct{})
-	c, err := NewClient(ctx, command, func(notification Notification) {
+	c, err := NewClientWithOptions(ctx, command, func(notification Notification) {
 		<-ready
 		w.mu.Lock()
 		if w.closed {
@@ -80,7 +84,7 @@ func NewWorker(ctx context.Context, sessionPath string, command []string, callba
 		w.mu.Unlock()
 		defer w.background.Done()
 		w.handleNotification(notification)
-	})
+	}, options)
 	if err != nil {
 		close(ready)
 		return nil, err

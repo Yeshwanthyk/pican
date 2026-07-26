@@ -11,6 +11,8 @@
 // module script: text/html" errors on lazy-loaded JS chunks.
 
 const VERSION = 'v5-purge-caches';
+const picanURL = (path) =>
+  `${typeof PICAN_BASE_PATH === 'string' ? PICAN_BASE_PATH : ''}${path}`;
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -62,8 +64,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'pican session';
     const options = {
       body: data.body || 'Response ready',
-      icon: '/app-icon.png',
-      badge: '/app-icon.png',
+      icon: picanURL('/app-icon.png'),
+      badge: picanURL('/app-icon.png'),
       tag: isSchedule ? `pican-schedule-${data.sessionId || ''}` : 'pican-session-done',
       renotify: true,
       data: { sessionId: data.sessionId || '' },
@@ -85,7 +87,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const sessionId = event.notification.data && event.notification.data.sessionId;
-  const target = sessionId ? `/session?id=${encodeURIComponent(sessionId)}` : '/';
+  const target = picanURL(sessionId ? `/session?id=${encodeURIComponent(sessionId)}` : '/');
   event.waitUntil((async () => {
     try {
       if (self.navigator && self.navigator.clearAppBadge) {

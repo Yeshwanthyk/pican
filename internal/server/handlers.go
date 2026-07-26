@@ -92,9 +92,16 @@ func (s *Server) handleApiForkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resolved, err := s.cache.Resolve(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
+	}
+	if s.workspace != nil {
+		canonical, workspaceErr := s.validateSessionWorkspace(resolved)
+		if resolveOrWriteError(w, workspaceErr) {
+			return
+		}
+		resolved.Session.Project = canonical
 	}
 
 	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityFork) {
@@ -176,9 +183,16 @@ func (s *Server) handleApiCloneSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resolved, err := s.cache.Resolve(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
+	}
+	if s.workspace != nil {
+		canonical, workspaceErr := s.validateSessionWorkspace(resolved)
+		if resolveOrWriteError(w, workspaceErr) {
+			return
+		}
+		resolved.Session.Project = canonical
 	}
 	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityClone) {
 		return
@@ -435,7 +449,7 @@ func paginateSummaries(summaries []sessions.SessionSummary, offsetStr, limitStr 
 }
 
 func (s *Server) handleApiSession(w http.ResponseWriter, r *http.Request) {
-	resolved, err := s.cache.Resolve(s.sessionsDir, r.URL.Query().Get("id"))
+	resolved, err := s.resolveSession(r.URL.Query().Get("id"))
 	if resolveOrWriteError(w, err) {
 		return
 	}
@@ -555,7 +569,7 @@ func (s *Server) sessionBootstrap(id string) string {
 	if s.cache == nil {
 		return ""
 	}
-	resolved, err := s.cache.Resolve(s.sessionsDir, id)
+	resolved, err := s.resolveSession(id)
 	if err != nil {
 		return ""
 	}
@@ -581,11 +595,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	var body struct {
-		Path            string `json:"path"`
-		SourceSessionID string `json:"sourceSessionId"`
-		Runtime         string `json:"runtime"`
-	}
+	var body newSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid json body")
 		return
@@ -597,13 +607,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 
 	runtime := strings.TrimSpace(body.Runtime)
 	if runtime == "" && body.SourceSessionID != "" {
-		var source sessions.ResolvedSession
-		var resolveErr error
-		if s.cache != nil {
-			source, resolveErr = s.cache.Resolve(s.sessionsDir, body.SourceSessionID)
-		} else {
-			source, resolveErr = s.resolveSession(body.SourceSessionID)
-		}
+		source, resolveErr := s.resolveSession(body.SourceSessionID)
 		if resolveErr == nil {
 			runtime = source.Session.Runtime
 		}
@@ -613,6 +617,22 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		if runtime == "" {
 			runtime = "pi"
 		}
+	}
+	body.SourceSessionID = strings.TrimSpace(body.SourceSessionID)
+	body.Runtime = runtime
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+	if s.hosted && idempotencyKey == "" {
+		writeJSONError(w, http.StatusBadRequest, "a valid Idempotency-Key header is required")
+		return
+	}
+	if strings.TrimSpace(body.InitialPrompt) != "" && idempotencyKey == "" {
+		writeJSONError(w, http.StatusBadRequest, "initialPrompt requires an Idempotency-Key header")
+		return
+	}
+	if s.hosted || strings.TrimSpace(body.InitialPrompt) != "" {
+		settings := s.initialSettingsFromSource(r.Context(), body.SourceSessionID, runtime)
+		s.handleIdempotentCodexCreate(w, r, body, settings)
+		return
 	}
 	if !s.requireRuntimeCapability(w, r, runtime, runtimes.CapabilityCreate) {
 		return
@@ -627,7 +647,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "Codex runtime is unavailable")
 			return
 		}
-		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		cwd, pathErr := s.prepareSessionPath(body.Path)
 		if pathErr != nil {
 			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
 			return
@@ -643,7 +663,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		}
 		id = projection.ID
 	case string(runtimes.PiID):
-		id, err = sessions.CreateSessionFileWithSettings(s.sessionsDir, body.Path, settings)
+		id, err = s.createPiSession(body.Path, settings)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -653,7 +673,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "Claude runtime is unavailable")
 			return
 		}
-		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		cwd, pathErr := s.prepareSessionPath(body.Path)
 		if pathErr != nil {
 			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
 			return
@@ -673,7 +693,7 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusServiceUnavailable, "OpenCode runtime is unavailable")
 			return
 		}
-		cwd, pathErr := sessions.PrepareSessionPath(body.Path)
+		cwd, pathErr := s.prepareSessionPath(body.Path)
 		if pathErr != nil {
 			writeJSONError(w, http.StatusBadRequest, pathErr.Error())
 			return
@@ -731,6 +751,13 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 	resolved, err := s.resolveSession(id)
 	if resolveOrWriteError(w, err) {
 		return
+	}
+	if s.workspace != nil {
+		canonical, workspaceErr := s.validateSessionWorkspace(resolved)
+		if resolveOrWriteError(w, workspaceErr) {
+			return
+		}
+		resolved.Session.Project = canonical
 	}
 
 	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityRename) {
@@ -842,7 +869,15 @@ func (s *Server) handleLabelSessionEntry(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleRecentLocations(w http.ResponseWriter, r *http.Request) {
-	locations, err := sessions.ListRecentLocations(s.sessionsDir)
+	var (
+		locations []string
+		err       error
+	)
+	if s.workspace != nil {
+		locations, err = sessions.ListRecentLocationsInWorkspace(s.sessionsDir, s.workspaceRoot)
+	} else {
+		locations, err = sessions.ListRecentLocations(s.sessionsDir)
+	}
 	if err != nil {
 		locations = []string{}
 	}

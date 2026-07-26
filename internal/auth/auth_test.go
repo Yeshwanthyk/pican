@@ -278,3 +278,102 @@ func TestAuthAllowsBrowserWithCorrectTokenViaCookie(t *testing.T) {
 		t.Fatal("handler should have been invoked")
 	}
 }
+
+func TestProxyOnlyRequiresCompleteConfiguration(t *testing.T) {
+	for _, config := range []Config{
+		{Mode: ModeProxyOnly, Header: "", Token: "secret"},
+		{Mode: ModeProxyOnly, Header: "X-Internal-Auth", Token: ""},
+		{Mode: ModeProxyOnly, Header: "bad header", Token: "secret"},
+	} {
+		if _, err := NewConfigured(config); err == nil {
+			t.Fatalf("NewConfigured(%+v) unexpectedly succeeded", config)
+		}
+	}
+}
+
+func TestProxyOnlyAcceptsOnlyConfiguredHeader(t *testing.T) {
+	a, err := NewProxyOnly("X-Pican-Proxy-Auth", "internal-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Pican-Proxy-Auth", "internal-secret")
+	rec := httptest.NewRecorder()
+	a.WrapHandler(http.HandlerFunc(okHandler)).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestProxyOnlyRejectsStandaloneCredentialsAndBrowserFallback(t *testing.T) {
+	a, err := NewProxyOnly("X-Pican-Proxy-Auth", "internal-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		edit func(*http.Request)
+	}{
+		{name: "query", edit: func(r *http.Request) { r.URL.RawQuery = "token=internal-secret" }},
+		{name: "bearer", edit: func(r *http.Request) { r.Header.Set("Authorization", "Bearer internal-secret") }},
+		{name: "pican header", edit: func(r *http.Request) { r.Header.Set("X-Pican-Token", "internal-secret") }},
+		{name: "cookie", edit: func(r *http.Request) {
+			r.AddCookie(&http.Cookie{Name: TokenCookieName, Value: "internal-secret"})
+		}},
+		{name: "browser", edit: func(r *http.Request) { r.Header.Set("Accept", "text/html") }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			tt.edit(req)
+			rec := httptest.NewRecorder()
+			a.Wrap(okHandler)(rec, req)
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d", rec.Code)
+			}
+			if strings.Contains(strings.ToLower(rec.Header().Get("Content-Type")), "text/html") {
+				t.Fatalf("proxy-only mode returned browser login fallback")
+			}
+			if strings.Contains(rec.Body.String(), "internal-secret") {
+				t.Fatal("response leaked proxy token")
+			}
+		})
+	}
+}
+
+func TestProxyOnlyRejectsWrongOrDuplicateInternalHeader(t *testing.T) {
+	a, err := NewProxyOnly("X-Pican-Proxy-Auth", "internal-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, values := range [][]string{{}, {"wrong"}, {"internal-secret", "internal-secret"}} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		for _, value := range values {
+			req.Header.Add("X-Pican-Proxy-Auth", value)
+		}
+		rec := httptest.NewRecorder()
+		a.Wrap(okHandler)(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("values %v: status = %d", values, rec.Code)
+		}
+	}
+}
+
+func TestProxyOnlyComparesTheConfiguredTokenExactly(t *testing.T) {
+	a, err := NewProxyOnly("X-Pican-Proxy-Auth", " internal-secret ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for token, want := range map[string]int{
+		"internal-secret":   http.StatusUnauthorized,
+		" internal-secret ": http.StatusOK,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header["X-Pican-Proxy-Auth"] = []string{token}
+		rec := httptest.NewRecorder()
+		a.Wrap(okHandler)(rec, req)
+		if rec.Code != want {
+			t.Fatalf("token %q: status = %d, want %d", token, rec.Code, want)
+		}
+	}
+}

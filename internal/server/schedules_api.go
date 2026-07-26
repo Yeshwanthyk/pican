@@ -60,6 +60,17 @@ func (in scheduleInput) apply(sc *schedules.Schedule) {
 	}
 }
 
+func (s *Server) normalizeScheduleProject(path string) (string, error) {
+	path = strings.TrimSpace(path)
+	if s.workspace == nil {
+		return path, nil
+	}
+	if path == "" {
+		return s.workspaceRoot, nil
+	}
+	return s.workspace.ResolveForCreation(path)
+}
+
 // withNextRun annotates a schedule with its next computed fire time (not stored).
 func (s *Server) withNextRun(sc schedules.Schedule) schedules.Schedule {
 	if !sc.Enabled || sc.IsManual() {
@@ -86,6 +97,11 @@ func (s *Server) handleApiSchedules(w http.ResponseWriter, r *http.Request) {
 		}
 		out := make([]schedules.Schedule, 0, len(list))
 		for _, sc := range list {
+			project, resolveErr := s.normalizeScheduleProject(sc.ProjectPath)
+			if resolveErr != nil {
+				continue
+			}
+			sc.ProjectPath = project
 			out = append(out, s.withNextRun(sc))
 		}
 		writeJSON(w, 0, map[string]any{"schedules": out})
@@ -101,6 +117,12 @@ func (s *Server) handleApiSchedules(w http.ResponseWriter, r *http.Request) {
 		}
 		sc := schedules.Schedule{ID: uuid.NewString(), Enabled: true}
 		in.apply(&sc)
+		project, err := s.normalizeScheduleProject(sc.ProjectPath)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		sc.ProjectPath = project
 		if err := s.scheduleCapabilityError(r.Context(), sc); err != nil {
 			writeRuntimeOperationError(w, err)
 			return
@@ -138,6 +160,12 @@ func (s *Server) handleApiSchedule(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if project, resolveErr := s.normalizeScheduleProject(existing.ProjectPath); resolveErr != nil {
+		writeJSONError(w, http.StatusNotFound, "schedule not found")
+		return
+	} else {
+		existing.ProjectPath = project
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -153,6 +181,12 @@ func (s *Server) handleApiSchedule(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		in.apply(&existing)
+		project, err := s.normalizeScheduleProject(existing.ProjectPath)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		existing.ProjectPath = project
 		if err := s.scheduleCapabilityError(r.Context(), existing); err != nil {
 			writeRuntimeOperationError(w, err)
 			return

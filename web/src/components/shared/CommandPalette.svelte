@@ -3,6 +3,7 @@
   import { getSessionPaletteApi, setSessionPaletteApi } from '../../shared/command-palette-runtime';
   import { icon, X } from '../../shared/icons';
   import { t } from '../../shared/strings';
+  import { withBasePath } from '../../shared/base-path';
   import {
     fetchPaletteSessions,
     filterPaletteSessions,
@@ -67,7 +68,7 @@
   function go(url: string) {
     if (!url) return;
     if (navigate) navigate(url);
-    else window.location.href = url;
+    else window.location.href = withBasePath(url);
   }
 
   function close() {

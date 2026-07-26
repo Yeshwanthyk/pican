@@ -116,7 +116,7 @@ func (s *Server) handleSetArchive(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "sessionId is required")
 		return
 	}
-	resolved, err := s.cache.Resolve(s.sessionsDir, body.SessionID)
+	resolved, err := s.resolveSession(body.SessionID)
 	if resolveOrWriteError(w, err) {
 		return
 	}

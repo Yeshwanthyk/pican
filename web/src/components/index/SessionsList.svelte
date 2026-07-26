@@ -14,6 +14,7 @@
   } from '../../index/sessions.js';
   import type { Project } from '../../lib/schema';
   import SessionCard from './SessionCard.svelte';
+  import { withBasePath } from '../../shared/base-path.js';
 
   const dateBucketLabels: Readonly<Record<DateBucket, string>> = {
     today: 'index.dateToday',
@@ -181,7 +182,7 @@
           >
             <a
               class="project-name"
-              href={'/?project=' + encodeURIComponent(item.project)}
+              href={withBasePath('/?project=' + encodeURIComponent(item.project))}
               title={item.project}
               onclick={(event) =>
                 handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
@@ -189,7 +190,7 @@
             >
             <a
               class="project-count project-view-all"
-              href={'/?project=' + encodeURIComponent(item.project)}
+              href={withBasePath('/?project=' + encodeURIComponent(item.project))}
               onclick={(event) =>
                 handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
               >{t('index.viewAllCount', { count: item.total })}</a
@@ -216,8 +217,9 @@
         <div class="plain-state-line">{t('index.noTrackedProjects')}</div>
         <div class="plain-state-hint">
           {t('index.noTrackedProjectsHint')}
-          <a href="/?view=all" onclick={(event) => handleNavClick(event, '/?view=all')}
-            >{t('index.openAllSessions')}</a
+          <a
+            href={withBasePath('/?view=all')}
+            onclick={(event) => handleNavClick(event, '/?view=all')}>{t('index.openAllSessions')}</a
           >
         </div>
         <button class="btn-primary empty-add-project" type="button" onclick={onAddProject}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"pican/internal/sessions"
+	"pican/internal/workspace"
 )
 
 func TestSyncPrunesOnlyValidatedCodexProjectionAfterSuccessfulList(t *testing.T) {
@@ -165,6 +166,53 @@ func TestCatalogSkipsUnchangedThreadAndReadsUpdatedThread(t *testing.T) {
 	}
 	if got := strings.Count(string(data), "thread/read\n"); got != 3 {
 		t.Fatalf("thread/read calls after UpdatedAt change = %d, want 3", got)
+	}
+}
+
+func TestHostedCatalogDoesNotProjectOutsideWorkspaceThreads(t *testing.T) {
+	sessionsRoot := t.TempDir()
+	root := t.TempDir()
+	workspaceRoot := filepath.Join(root, "workspace")
+	outside := filepath.Join(root, "outside")
+	if err := os.MkdirAll(workspaceRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	resolver, err := workspace.New(workspaceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	escape := filepath.Join(workspaceRoot, "escape")
+	if err := os.Symlink(outside, escape); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, candidate := range []string{outside, escape} {
+		t.Run(filepath.Base(candidate), func(t *testing.T) {
+			projection, err := Materialize(sessionsRoot, Thread{ID: "thread-1", CWD: candidate, CreatedAt: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PICAN_TEST_THREAD_CWD", candidate)
+			catalog := NewCatalogWithOptions(
+				sessionsRoot,
+				helperCommand("catalog-cwd"),
+				ProcessOptions{},
+				WithCatalogCWDResolver(resolver.ResolveExisting),
+			)
+			result, err := catalog.Sync(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.IDs) != 0 {
+				t.Fatalf("outside catalog IDs = %v, want none", result.IDs)
+			}
+			if _, err := os.Stat(projection.Path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("outside projection remains: %v", err)
+			}
+		})
 	}
 }
 

@@ -118,6 +118,23 @@ func currentWorkflowPhaseNumber(snapshot workflowSnapshot) int {
 	return 0
 }
 
+func (s *Server) workflowInWorkspace(snapshot workflowSnapshot) bool {
+	if s.workspace == nil || snapshot.SessionID == "" {
+		return true
+	}
+	target := sessionUUIDFromReference(snapshot.SessionID)
+	summaries, err := s.loadSummaries()
+	if err != nil {
+		return false
+	}
+	for _, summary := range summaries {
+		if sessionUUIDFromReference(summary.Filename) == target || summary.SessionUUID == target {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
@@ -143,7 +160,7 @@ func (s *Server) handleApiWorkflows(w http.ResponseWriter, r *http.Request) {
 		}
 		runDir := filepath.Join(s.workflowsDir(), entry.Name())
 		_, snapshot, err := readWorkflowJSON(filepath.Join(runDir, "workflow.json"))
-		if err != nil || snapshot.RunID != entry.Name() {
+		if err != nil || snapshot.RunID != entry.Name() || !s.workflowInWorkspace(snapshot) {
 			continue
 		}
 		if sessionID != "" && snapshot.SessionID != sessionID {
@@ -226,6 +243,10 @@ func (s *Server) handleApiWorkflowRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if snapshot.RunID != runID {
+		writeJSONError(w, http.StatusNotFound, "workflow not found")
+		return
+	}
+	if !s.workflowInWorkspace(snapshot) {
 		writeJSONError(w, http.StatusNotFound, "workflow not found")
 		return
 	}

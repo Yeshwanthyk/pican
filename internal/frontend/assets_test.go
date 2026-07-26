@@ -2,8 +2,27 @@ package frontend
 
 import (
 	"testing"
+
+	"pican/internal/basepath"
 	"testing/fstest"
 )
+
+func TestLoadScriptsAtRewritesVitePublicBase(t *testing.T) {
+	dist := fstest.MapFS{
+		".vite/manifest.json": {Data: []byte(`{"src/main.ts":{"file":"assets/app.js","src":"src/main.ts","isEntry":true}}`)},
+		"assets/app.js":       {Data: []byte("const a=`/static/`;const b=\"/static/\";")},
+	}
+	scripts, err := LoadScriptsAt(dist, basepath.MustParse("/s/test"), AppEntry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := scripts[0].JS; got != "const a=`/s/test/static/`;const b=\"/s/test/static/\";" {
+		t.Fatalf("rewritten JS = %q", got)
+	}
+	if got := scripts[0].Path; got != "/static/assets/app.js" {
+		t.Fatalf("script registration path changed: %q", got)
+	}
+}
 
 func TestLoadFrontendScriptsSingleEntrypoint(t *testing.T) {
 	fsys := fstest.MapFS{

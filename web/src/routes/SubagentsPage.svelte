@@ -15,6 +15,7 @@
   import type { Subagent } from '../subagents/subagents';
   import { describeError } from '../lib/errors';
   import { recoverSync, settle } from '../components/shared/ui-effect';
+  import { withBasePath } from '../shared/base-path';
 
   let { session = '' }: { session?: string } = $props();
 
@@ -48,7 +49,7 @@
   }
 
   function sessionURL(value: string) {
-    return '/session?id=' + encodeURIComponent(value);
+    return withBasePath('/session?id=' + encodeURIComponent(value));
   }
 
   onMount(() => {
@@ -93,7 +94,9 @@
 
 <main class="subagents-page" data-subagents-page>
   {#if session}
-    <a class="workflow-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+    <a
+      class="workflow-session-scope"
+      href={withBasePath('/session?id=' + encodeURIComponent(session))}
       >{t('subagents.sessionScope')}</a
     >
   {/if}

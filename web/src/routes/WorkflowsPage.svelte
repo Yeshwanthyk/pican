@@ -17,6 +17,7 @@
   import type { WorkflowRunDetail } from '../lib/schema';
   import { describeError } from '../lib/errors';
   import { recoverSync, settle } from '../components/shared/ui-effect';
+  import { withBasePath } from '../shared/base-path';
 
   let { runId = '', session = '' }: { runId?: string; session?: string } = $props();
 
@@ -130,7 +131,9 @@
 
 <main class="workflows-page" data-workflows-page>
   {#if session}
-    <a class="workflow-session-scope" href={'/session?id=' + encodeURIComponent(session)}
+    <a
+      class="workflow-session-scope"
+      href={withBasePath('/session?id=' + encodeURIComponent(session))}
       >{t('workflows.sessionScope')}</a
     >
   {/if}

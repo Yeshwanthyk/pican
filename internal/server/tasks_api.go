@@ -36,6 +36,11 @@ func (s *Server) validateTasksProject(project string) (string, error) {
 	if project == "" || !filepath.IsAbs(project) || filepath.Clean(project) != project {
 		return "", errors.New("project must be an absolute cleaned path")
 	}
+	var err error
+	project, err = s.resolveWorkspacePath(project)
+	if err != nil {
+		return "", err
+	}
 	summaries, err := s.loadSummaries()
 	if err != nil {
 		return "", err
@@ -45,7 +50,11 @@ func (s *Server) validateTasksProject(project string) (string, error) {
 			return project, nil
 		}
 	}
-	info, err := os.Stat(filepath.Join(project, ".pi", "tasks"))
+	taskDir, taskDirErr := s.resolveWorkspaceLeaf(filepath.Join(project, ".pi", "tasks"))
+	if taskDirErr != nil {
+		return "", taskDirErr
+	}
+	info, err := os.Stat(taskDir)
 	if err == nil && info.IsDir() {
 		return project, nil
 	}
@@ -62,7 +71,7 @@ func readTaskStores(dir, defaultScope string) ([]taskStore, error) {
 	}
 	stores := make([]taskStore, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
@@ -107,7 +116,12 @@ func (s *Server) handleApiTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.watchTasksProject(project)
-	projectStores, err := readTaskStores(filepath.Join(project, ".pi", "tasks"), "project")
+	taskDir, err := s.resolveWorkspaceLeaf(filepath.Join(project, ".pi", "tasks"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	projectStores, err := readTaskStores(taskDir, "project")
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -122,6 +136,10 @@ func (s *Server) handleApiTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		writeJSON(w, 0, map[string]any{"stores": filteredStores})
+		return
+	}
+	if s.workspace != nil {
+		writeJSON(w, 0, map[string]any{"stores": projectStores})
 		return
 	}
 	globalStores, err := readTaskStores(s.globalTasksDir(), "global")
@@ -148,7 +166,12 @@ func (s *Server) handleApiTaskOutput(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "invalid taskId")
 		return
 	}
-	data, err := os.ReadFile(filepath.Join(project, ".pi", "tasks", "output", "task-"+taskID+".txt"))
+	outputPath, err := s.resolveWorkspaceLeaf(filepath.Join(project, ".pi", "tasks", "output", "task-"+taskID+".txt"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	data, err := os.ReadFile(outputPath)
 	if os.IsNotExist(err) {
 		writeJSONError(w, http.StatusNotFound, "task output not found")
 		return

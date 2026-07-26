@@ -331,6 +331,8 @@ Browser POST /api/new-session
            └──▶ Return {"ok": true, "id": <session-or-projection filename>}
 ```
 
+Hosted Codex creation uses this same endpoint, not a host-only parallel API. Before `thread/start`, the handler canonicalizes the request path inside `WorkspaceRoot`, normalizes the optional initial prompt, hashes the payload, and claims the bounded `Idempotency-Key` in SQLite. One owner creates the Codex thread and persists both Pican and native IDs before prompt dispatch. Same-key replays wait for or return that stable mapping; a different normalized payload returns `409`. Prompt dispatch advances `pending → dispatching → accepted`; a failed or interrupted acknowledgement becomes `unknown`, and startup recovers leftover `dispatching` rows to `unknown` instead of blindly resending.
+
 ## Data Flow: Fork Session
 
 ```

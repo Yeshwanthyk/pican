@@ -4,6 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -69,14 +71,14 @@ func RegisterPWAHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/manifest.webmanifest", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/manifest+json")
 		w.Header().Set("Cache-Control", "no-cache")
-		_, _ = w.Write([]byte(manifestJSON))
+		_, _ = w.Write([]byte(liveManifestJSON()))
 	})
 	mux.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		// Allow the SW to control the whole origin.
-		w.Header().Set("Service-Worker-Allowed", "/")
+		// Allow the SW to control exactly the configured live-app mount.
+		w.Header().Set("Service-Worker-Allowed", liveURL("/"))
 		w.Header().Set("Cache-Control", "no-cache")
-		_, _ = w.Write([]byte(swJS))
+		_, _ = w.Write([]byte("const PICAN_BASE_PATH = " + strconv.Quote(liveBasePath.String()) + ";\n" + swJS))
 	})
 	mux.HandleFunc("/icon.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
@@ -118,4 +120,18 @@ func RegisterPWAHandlers(mux *http.ServeMux) {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		http.ServeContent(w, r, "cat.webm", time.Time{}, bytes.NewReader(catWebm))
 	})
+}
+
+func liveManifestJSON() string {
+	out := manifestJSON
+	replacements := map[string]string{
+		`"/pican"`:        strconv.Quote(liveURL("/pican")),
+		`"/"`:             strconv.Quote(liveURL("/")),
+		`"/app-icon.png"`: strconv.Quote(liveURL("/app-icon.png")),
+	}
+	// Replace specific values before the generic root scope/start_url value.
+	out = strings.ReplaceAll(out, `"/app-icon.png"`, replacements[`"/app-icon.png"`])
+	out = strings.ReplaceAll(out, `"/pican"`, replacements[`"/pican"`])
+	out = strings.ReplaceAll(out, `"/"`, replacements[`"/"`])
+	return out
 }
