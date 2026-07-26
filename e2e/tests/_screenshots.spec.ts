@@ -37,7 +37,7 @@ test.describe("@screenshots queue + steer panel @screenshots", () => {
     await textarea.fill("audit the cwd's tests and report findings [[slow:60000]]");
     await page.locator("#pi-chat-send").click();
     await expect(page.locator("#pi-chat-queue")).toBeVisible();
-    await expect(page.locator("#pi-chat-send")).toHaveText("Steer");
+    await expect(page.locator("#pi-chat-send")).toHaveText("Steer now");
 
     // ── 1. Steer chip mid-flight ─────────────────────────────────────────────
     // The chip clears the moment pi echoes the user entry back via SSE reload

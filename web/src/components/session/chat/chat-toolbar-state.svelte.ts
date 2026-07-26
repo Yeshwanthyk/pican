@@ -3,9 +3,10 @@ export function isRunningStatus(text: string, cls: string): boolean {
     cls === "running" ||
     text === "running" ||
     text === "sending" ||
+    text === "submitted" ||
     text === "queued" ||
     text === "accepted" ||
-    text === "cancelling"
+    text === "stopping"
   );
 }
 

@@ -37,7 +37,9 @@
         aria-label={t('composer.attachPhotos')}
         disabled={!chatAvailable}>{@html icon(Paperclip, { size: 15 })}</button
       >{/if}
-    <span id="pi-chat-status" class="pi-chat-status {toolbar.statusClass}">{statusText}</span>
+    <span id="pi-chat-status" class="pi-chat-status {toolbar.statusClass}" aria-live="polite"
+      >{statusText}</span
+    >
     {#if capabilities.effortSelection || capabilities.reasoningSelection}<button
         type="button"
         id="pi-chat-thinking-label"
@@ -59,31 +61,37 @@
       >{/if}
     <ContextUsage />
   </div>
-  <div class="actions">
+  <div
+    class="actions pi-chat-actions"
+    class:pi-chat-actions--running={toolbar.isRunning}
+    aria-label={toolbar.isRunning ? t('composer.runningActions') : t('composer.idleActions')}
+  >
     {#if capabilities.cancel}<button
         type="button"
         id="pi-chat-cancel"
-        class="pi-chat-cancel"
+        class="pi-chat-cancel pi-chat-stop"
         style:display={toolbar.isRunning ? '' : 'none'}
-        title={t('composer.cancelRunning')}
-        aria-label={t('composer.cancelRunning')}
-        disabled={toolbar.statusText === 'cancelling' || !chatAvailable}
-        >{t('composer.cancel')}</button
+        title={t('composer.stopRunning')}
+        aria-label={t('composer.stopRunning')}
+        disabled={toolbar.statusText === 'stopping' || !chatAvailable}>{t('composer.stop')}</button
       >{/if}
-    {#if capabilities.persistentQueue}<button
-        type="button"
-        id="pi-chat-queue"
-        class="pi-chat-queue"
-        style:display={toolbar.isRunning ? '' : 'none'}
-        title={t('composer.queueHint')}
-        disabled>{t('composer.queue')}</button
-      >{/if}
-    <button
-      type="submit"
-      id="pi-chat-send"
-      class="pi-chat-send"
-      style:display={toolbar.isRunning && !capabilities.steer ? 'none' : ''}
-      disabled>{toolbar.isRunning ? t('composer.steer') : t('composer.send')}</button
-    >
+    <div class="pi-chat-route-actions">
+      <button
+        type="submit"
+        id="pi-chat-send"
+        class="pi-chat-send"
+        style:display={toolbar.isRunning && !capabilities.steer ? 'none' : ''}
+        title={toolbar.isRunning ? t('composer.steerHint') : t('composer.sendHint')}
+        disabled>{toolbar.isRunning ? t('composer.steerNow') : t('composer.send')}</button
+      >
+      {#if capabilities.persistentQueue}<button
+          type="button"
+          id="pi-chat-queue"
+          class="pi-chat-queue"
+          style:display={toolbar.isRunning ? '' : 'none'}
+          title={t('composer.queueHint')}
+          disabled>{t('composer.queueNext')}</button
+        >{/if}
+    </div>
   </div>
 </div>

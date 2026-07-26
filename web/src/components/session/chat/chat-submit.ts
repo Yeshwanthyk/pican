@@ -34,6 +34,7 @@ interface SubmissionOptions {
   readonly FormDataImpl?: typeof FormData;
   readonly CustomEventImpl?: typeof CustomEvent;
   readonly canSend?: () => boolean;
+  readonly getRoute?: () => "send" | "steer";
 }
 
 class SubmissionError extends Schema.TaggedErrorClass<SubmissionError>()("SubmissionError", {
@@ -75,21 +76,24 @@ export function setupChatSubmission({
   FormDataImpl = FormData,
   CustomEventImpl = CustomEvent,
   canSend = () => true,
+  getRoute = () => "send",
 }: SubmissionOptions) {
   let refreshWorkerStatus = async (): Promise<void> => {};
 
   cancelButton?.addEventListener("click", () => {
     cancelButton.disabled = true;
-    setStatus("cancelling", "running");
+    setStatus("stopping", "running");
     const cancel = requestJson(() => chatApi.cancelChat(sessionId)).pipe(
       Effect.match({
-        onFailure: ({ message }) => setStatus(message, "error"),
+        onFailure: ({ message }) => {
+          cancelButton.disabled = false;
+          setStatus(message, "error");
+        },
         onSuccess: () => {
-          setStatus("idle", "");
+          windowImpl.dispatchEvent(new CustomEventImpl("pi-chat-cancel-accepted"));
           void refreshWorkerStatus();
         },
       }),
-      Effect.ensuring(Effect.sync(() => (cancelButton.disabled = false))),
     );
     void runPromise(cancel);
   });
@@ -102,13 +106,16 @@ export function setupChatSubmission({
       setStatus("message or image required", "error");
       return Promise.resolve(false);
     }
+    // Capture the route before `setStatus("sending")` makes the toolbar look
+    // active. Worker-status polling can also report running before the HTTP
+    // response returns, so consumers must not infer this from event timing.
+    const route = getRoute();
     const body = new FormDataImpl();
     body.set("message", message);
     for (const file of files) body.append("images", file);
     sendButton.dataset.sending = "1";
     sendButton.disabled = true;
     setStatus("sending", "running");
-    windowImpl.dispatchEvent(new CustomEventImpl("pi-chat-message-sent", { detail: { message } }));
 
     const send = requestJson(() => chatApi.sendChat(sessionId, body)).pipe(
       Effect.match({
@@ -117,7 +124,16 @@ export function setupChatSubmission({
           return false;
         },
         onSuccess: (data) => {
-          setStatus(typeof data.status === "string" ? data.status : "queued", "running");
+          windowImpl.dispatchEvent(
+            new CustomEventImpl("pi-chat-message-sent", { detail: { message, route } }),
+          );
+          const acceptedStatus =
+            data.status === "queued" || data.status === "accepted"
+              ? "submitted"
+              : typeof data.status === "string"
+                ? data.status
+                : "submitted";
+          setStatus(acceptedStatus, "running");
           return true;
         },
       }),

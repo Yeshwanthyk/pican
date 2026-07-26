@@ -39,17 +39,33 @@ test.describe("steer / queue (stubbed pi)", () => {
     await expect(composer).toHaveAttribute("data-chat-available", "true");
 
     const textarea = page.locator("#pi-chat-message");
+    await expect(page.locator("#pi-chat-send")).toHaveText("Send");
+    await page.evaluate(() => {
+      const host = window as Window & { __piAcceptedRoutes?: unknown[] };
+      host.__piAcceptedRoutes = [];
+      window.addEventListener("pi-chat-message-sent", (event) => {
+        host.__piAcceptedRoutes?.push((event as CustomEvent<unknown>).detail);
+      });
+    });
     // Hold the run open so we can interact while running. Pass slowMs to
     // extend this for tests that need the worker to stay busy through pause
     // setup so the autonomous backend drainer can't dispatch items first.
     await textarea.fill(`task A [[slow:${slowMs}]]`);
     await page.locator("#pi-chat-send").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const host = window as Window & { __piAcceptedRoutes?: unknown[] };
+          return host.__piAcceptedRoutes?.[0];
+        }),
+      )
+      .toMatchObject({ route: "send" });
 
     // Compact mobile layouts reveal the toolbar when the composer is focused.
     await textarea.focus();
-    // While running, the Steer (send) and Queue buttons are available.
+    // While running, the explicit Steer now and Queue next routes are available.
     await expect(page.locator("#pi-chat-queue")).toBeVisible();
-    await expect(page.locator("#pi-chat-send")).toHaveText("Steer");
+    await expect(page.locator("#pi-chat-send")).toHaveText("Steer now");
     return { textarea };
   }
 
@@ -598,6 +614,14 @@ test.describe("steer / queue (stubbed pi)", () => {
       "data-chat-available",
       "true",
     );
+    await expect(page1.locator("#pi-chat-send")).toHaveText("Send");
+    await page1.evaluate(() => {
+      const host = window as Window & { __piAcceptedRoutes?: unknown[] };
+      host.__piAcceptedRoutes = [];
+      window.addEventListener("pi-chat-message-sent", (event) => {
+        host.__piAcceptedRoutes?.push((event as CustomEvent<unknown>).detail);
+      });
+    });
 
     // Pause first so the autonomous drainer doesn't snap the message into pi
     // before we get a chance to see it from the second context.
@@ -607,6 +631,14 @@ test.describe("steer / queue (stubbed pi)", () => {
     // queue to outlive a full browser close, so pause as soon as it's there.
     await page1.locator("#pi-chat-message").fill("task A [[slow:30000]]");
     await page1.locator("#pi-chat-send").click();
+    await expect
+      .poll(() =>
+        page1.evaluate(() => {
+          const host = window as Window & { __piAcceptedRoutes?: unknown[] };
+          return host.__piAcceptedRoutes?.[0];
+        }),
+      )
+      .toMatchObject({ route: "send" });
     // Compact mobile layouts reveal the toolbar when the composer is focused.
     await page1.locator("#pi-chat-message").focus();
     await expect(page1.locator("#pi-chat-queue")).toBeVisible();

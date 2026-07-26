@@ -64,8 +64,18 @@ describe("QueueStore (server-backed)", () => {
     expect(store.queuedCount).toBe(2);
     expect(store.steerCount).toBe(1);
     expect(store.paused).toBe(true);
-    expect(store.items[0]).toMatchObject({ kind: "queued", position: 5, text: "hello" });
-    expect(store.items[1]).toMatchObject({ kind: "queued", position: 6, text: "world" });
+    expect(store.items[0]).toMatchObject({
+      kind: "queued",
+      position: 5,
+      text: "hello",
+      createdAt: "2026-07-19T00:00:00Z",
+    });
+    expect(store.items[1]).toMatchObject({
+      kind: "queued",
+      position: 6,
+      text: "world",
+      createdAt: "2026-07-19T00:00:00Z",
+    });
     expect(store.items[2]).toMatchObject({ kind: "steer", text: "mid-flight" });
   });
 

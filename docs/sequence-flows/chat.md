@@ -2,6 +2,8 @@
 
 This flow covers a user typing a message in the session page chat composer and sending it through Pi, Codex, Claude, or OpenCode. Attachments are parsed only when the runtime declares the corresponding capability; OpenCode 1.18.4 is text-only in pican.
 
+The live composer has one unambiguous route per action. Idle shows `Send`. A runtime that supports steering shows an independent `Stop`, primary `Steer now`, and secondary `Queue next` while a turn is running. Queue rows show the server timestamp and `queued next`; a steer chip appears only after `/api/chat` accepts the request and shows its browser submission time. Runtimes without steering or a persistent queue omit those controls from their trusted capability set.
+
 ## Sequence Diagram
 
 The HTTP handler resolves and validates the request, starts `chatSender.Send` in a goroutine, and immediately returns HTTP 202 `queued`. The worker portion below is the asynchronous path after that response; worker startup or prompt failures are logged and reflected by subsequent status/reload behavior, not returned by the accepted request.
@@ -152,6 +154,8 @@ lock → reuse healthy worker / evict error worker / join in-flight creation
 
 The manager reuses that worker until it fails, the server exits, or it has been idle for 10 minutes. Codex resumes from its native thread. Claude resumes from its native UUID and read-only transcript; neither replays the pican projection as authority.
 
+`Manager.Send` reserves the session before worker lookup, so the accepted-send window reports `running` even while a worker process is still starting. The reservation has its own cancellable context. Stop cancels pending sends before they reach `Prompt`, and also calls the native abort operation when a worker already exists; a cancellation never creates a worker.
+
 ### 4. Runtime prompt
 
 For Pi, `piRPCWorker.Prompt` builds and sends:
@@ -231,7 +235,16 @@ After 10 minutes of idle time (no user-initiated actions), the reaper goroutine 
 
 ### 9. Cancelling a Chat
 
-`POST /api/chat/cancel?id=<id>` calls the runtime worker's abort operation, removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`. Pi sends its abort RPC; Codex calls `turn/interrupt`; Claude sends a stream-json `control_request`; OpenCode calls its native abort endpoint with the canonical directory and session ID.
+`POST /api/chat/cancel?id=<id>` checks the runtime's `cancel` capability and calls the existing runtime worker's abort operation. If a replaceable projection disappears during a live turn, cancellation may fall back to the manager's existing-worker lookup by session ID; it does not recreate the projection or worker. The HTTP operation has a five-second bound even if an adapter fails to honor context cancellation. On success the server removes any terminal session-status file, broadcasts reload/status updates, and returns `{"ok": true, "status": "cancelled"}`.
+
+The native requests are:
+
+- Pi writes `{"type":"abort"}` through its JSONL RPC. Pi replies only after `AgentSession.abort()` completes; pican clears the recent-stream overlay and publishes idle after that acknowledgement.
+- Codex sends JSON-RPC `turn/interrupt` with the exact active `{threadId, turnId}`. It is not serialized behind a pending `turn/start` acknowledgement. The worker bounds the call to five seconds; an unknown timeout outcome stays `running` instead of claiming completion.
+- Claude writes `{"type":"control_request","request_id":"...","request":{"subtype":"interrupt"}}`. A successful matching `control_response` leaves the process reusable; timeout terminates the process tree and reports an error.
+- OpenCode posts `/session/<native-id>/abort?directory=<canonical-cwd>`. Only a native `true` response moves the worker to idle. Rejection or transport failure retains running state plus the error until authoritative native status says otherwise.
+
+The browser treats HTTP success as interrupt acknowledgement, not terminal completion. It shows `stopping`, disables repeated Stop clicks, clears the optimistic working preview, and reloads persisted content. Polling keeps `stopping` visible while the worker still reports running and changes to idle only on an authoritative worker transition.
 
 ### 10. Model and effort
 

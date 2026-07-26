@@ -436,9 +436,15 @@ export default {
   // ── Chat composer ──
   "composer.placeholder": "Continue this session…",
   "composer.send": "Send",
+  "composer.sendHint": "Send this message",
   "composer.steer": "Steer",
+  "composer.steerNow": "Steer now",
+  "composer.steerHint": "Add this message to the response in progress",
   "composer.queue": "Queue",
+  "composer.queueNext": "Queue next",
   "composer.queueHint": "Queue this message for after the current response",
+  "composer.queuedNext": "queued next",
+  "composer.submitted": "submitted",
   "composer.removeQueued": "Remove queued message",
   "composer.queueActive": "Queue",
   "composer.queuePaused": "Queue paused",
@@ -459,6 +465,9 @@ export default {
   "composer.queueSavedLocallyHint":
     "Queued messages are saved on the server and will be sent automatically when the worker is idle — even if you close the browser",
   "composer.cancel": "Cancel",
+  "composer.stop": "Stop",
+  "composer.idleActions": "Message actions",
+  "composer.runningActions": "Running response actions",
   "composer.idle": "idle",
   "composer.unavailable": "unavailable",
   "composer.restartWorker": "send a message to restart the worker…",
@@ -476,6 +485,7 @@ export default {
   "composer.copyPath": "Click to copy path",
   "composer.focusShortcut": "Shift + i to focus",
   "composer.cancelRunning": "Cancel running response",
+  "composer.stopRunning": "Stop the running response",
   "composer.contextDetails": "Click for details",
   "composer.pathCopied": "Path copied",
 

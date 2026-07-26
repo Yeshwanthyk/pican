@@ -15,9 +15,10 @@
 //     into the textarea (edit). That way the server doesn't try to dispatch
 //     a row we've already taken over.
 //
-// `activeRun` is driven solely by the `pi-chat-message-sent` (-> true) and
-// `pi-worker-done` (-> false) events, so the first message of a run is never
-// mistaken for a steer.
+// `activeRun` is seeded and reconciled by authoritative worker-status events,
+// then updated immediately by message-sent / worker-done events. A composer
+// opened mid-run therefore recognises its first message as a steer, while the
+// first message of a new idle run is not mislabeled.
 import type { SessionEntry } from "../../../session/data/session-types";
 import { isUnknownRecord } from "../../../session/data/session-types";
 import { Schema } from "effect";
@@ -44,7 +45,10 @@ interface SteerQueueOptions {
   readonly getLiveEntries?: (() => readonly SessionEntry[]) | null;
 }
 
-const MessageSentDetail = Schema.Struct({ message: Schema.String });
+const MessageSentDetail = Schema.Struct({
+  message: Schema.String,
+  route: Schema.optionalKey(Schema.Literals(["send", "steer"])),
+});
 const isMessageSentDetail = Schema.is(MessageSentDetail);
 
 export function setupSteerQueue({
@@ -143,7 +147,8 @@ export function setupSteerQueue({
   const onMessageSent = (event: Event) => {
     const detail = (event as CustomEvent<unknown>).detail;
     const message = isMessageSentDetail(detail) ? detail.message : "";
-    if (activeRun) {
+    const route = isMessageSentDetail(detail) ? detail.route : undefined;
+    if (route === "steer" || (route === undefined && activeRun)) {
       store.pushSteer({ text: message });
     }
     activeRun = true;
@@ -154,6 +159,13 @@ export function setupSteerQueue({
     store.clearSteers();
     // Server drainer dispatches the next queued message; SSE 'queue' event
     // will refresh the panel so the head item disappears from the list.
+  };
+
+  const onWorkerStatus = (event: Event) => {
+    const detail = (event as CustomEvent<unknown>).detail;
+    if (!isUnknownRecord(detail) || typeof detail.state !== "string") return;
+    if (detail.state === "running") activeRun = true;
+    if (detail.state === "idle") onWorkerDone();
   };
 
   // When pi folds a steer into the active turn it appends a user entry to the
@@ -247,6 +259,7 @@ export function setupSteerQueue({
   textarea?.addEventListener("input", updateQueueEnabled);
   windowImpl.addEventListener("pi-chat-message-sent", onMessageSent);
   windowImpl.addEventListener("pi-worker-done", onWorkerDone);
+  windowImpl.addEventListener("pi-worker-status", onWorkerStatus);
   windowImpl.addEventListener("pi-session-reload", reconcileSteersAgainstEntries);
 
   updateQueueEnabled();
@@ -261,6 +274,7 @@ export function setupSteerQueue({
     dispose: () => {
       windowImpl.removeEventListener("pi-chat-message-sent", onMessageSent);
       windowImpl.removeEventListener("pi-worker-done", onWorkerDone);
+      windowImpl.removeEventListener("pi-worker-status", onWorkerStatus);
       windowImpl.removeEventListener("pi-session-reload", reconcileSteersAgainstEntries);
     },
   };

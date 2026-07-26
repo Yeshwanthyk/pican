@@ -43,10 +43,14 @@ describe("chat submit", () => {
     );
     const setStatus = vi.fn();
     const updateSendEnabled = vi.fn();
-    const dispatched: string[] = [];
+    const dispatched: Array<{ message: string; route: string }> = [];
     window.addEventListener("pi-chat-message-sent", (event) => {
-      if (event instanceof CustomEvent && typeof event.detail?.message === "string")
-        dispatched.push(event.detail.message);
+      if (
+        event instanceof CustomEvent &&
+        typeof event.detail?.message === "string" &&
+        typeof event.detail?.route === "string"
+      )
+        dispatched.push(event.detail);
     });
 
     setupChatSubmission({
@@ -63,6 +67,7 @@ describe("chat submit", () => {
       updateSendEnabled,
       FormDataImpl: FormData,
       CustomEventImpl: CustomEvent,
+      getRoute: () => "steer",
     });
 
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -70,12 +75,41 @@ describe("chat submit", () => {
 
     expect(sendChat).toHaveBeenCalledWith("s1", expect.any(FormData));
     expect(sendChat.mock.calls[0]?.[1]?.get("message")).toBe("hello");
-    expect(dispatched).toEqual(["hello"]);
+    expect(dispatched).toEqual([{ message: "hello", route: "steer" }]);
     expect(attachments.clear).toHaveBeenCalled();
     expect(attachments.restore).not.toHaveBeenCalled();
-    expect(setStatus).toHaveBeenCalledWith("queued", "running");
+    expect(setStatus).toHaveBeenCalledWith("submitted", "running");
     expect(sendButton.disabled).toBe(false);
     expect(updateSendEnabled).toHaveBeenCalled();
+  });
+
+  it("does not publish a submitted message when the server rejects it", async () => {
+    const { form, textarea, sendButton, cancelButton } = setupDom();
+    textarea.value = "retry";
+    const dispatchEvent = vi.fn(() => true);
+
+    setupChatSubmission({
+      windowImpl: { dispatchEvent },
+      form,
+      textarea,
+      sendButton,
+      cancelButton,
+      attachments: createAttachments({ message: "retry" }),
+      chatApi: {
+        sendChat: vi.fn(() =>
+          Promise.resolve(new Response('{"error":"unavailable"}', { status: 503 })),
+        ),
+        cancelChat: vi.fn(),
+      },
+      setStatus: vi.fn(),
+      FormDataImpl: FormData,
+      CustomEventImpl: CustomEvent,
+    });
+
+    form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchEvent).not.toHaveBeenCalled();
   });
 
   it("restores the draft and attachments when send fails", async () => {
@@ -151,6 +185,8 @@ describe("chat submit", () => {
     const cancelChat = vi.fn(() => Promise.resolve(new Response("{}", { status: 200 })));
     const setStatus = vi.fn();
     const refresh = vi.fn();
+    const accepted = vi.fn();
+    window.addEventListener("pi-chat-cancel-accepted", accepted, { once: true });
 
     const submission = setupChatSubmission({
       windowImpl: window,
@@ -171,9 +207,45 @@ describe("chat submit", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(cancelChat).toHaveBeenCalledWith("s1");
-    expect(setStatus).toHaveBeenCalledWith("cancelling", "running");
-    expect(setStatus).toHaveBeenCalledWith("idle", "");
+    expect(setStatus).toHaveBeenCalledWith("stopping", "running");
+    expect(setStatus).not.toHaveBeenCalledWith("idle", "");
+    expect(accepted).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalled();
+    expect(cancelButton?.disabled).toBe(true);
+  });
+
+  it("re-enables Stop and does not emit acceptance when cancel fails", async () => {
+    const { form, textarea, sendButton, cancelButton } = setupDom();
+    const accepted = vi.fn();
+    window.addEventListener("pi-chat-cancel-accepted", accepted, { once: true });
+    const setStatus = vi.fn();
+
+    setupChatSubmission({
+      windowImpl: window,
+      form,
+      textarea,
+      sendButton,
+      cancelButton,
+      attachments: createAttachments(),
+      chatApi: {
+        sendChat: vi.fn(),
+        cancelChat: vi.fn(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ error: "interrupt rejected" }), { status: 409 }),
+          ),
+        ),
+      },
+      sessionId: "s1",
+      setStatus,
+      FormDataImpl: FormData,
+      CustomEventImpl: CustomEvent,
+    });
+
+    cancelButton?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(setStatus).toHaveBeenLastCalledWith("interrupt rejected", "error");
+    expect(accepted).not.toHaveBeenCalled();
     expect(cancelButton?.disabled).toBe(false);
   });
 });

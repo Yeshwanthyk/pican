@@ -4,6 +4,8 @@ import { ChatToolbarState, isRunningStatus } from "./chat-toolbar-state.svelte.j
 describe("chat toolbar state", () => {
   it("detects statuses that should expose cancel", () => {
     expect(isRunningStatus("sending", "")).toBe(true);
+    expect(isRunningStatus("submitted", "")).toBe(true);
+    expect(isRunningStatus("stopping", "")).toBe(true);
     expect(isRunningStatus("idle", "running")).toBe(true);
     expect(isRunningStatus("idle", "")).toBe(false);
   });

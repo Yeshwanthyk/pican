@@ -239,6 +239,14 @@
       triggerReload();
     });
 
+    on(windowImpl, 'pi-chat-cancel-accepted', () => {
+      // Native acknowledgement means Stop was received, not that the worker is
+      // idle. The optimistic transcript is no longer trustworthy, though, so
+      // clear it immediately and reconcile any persisted partial/final output.
+      clearChatPreviewState(CHAT_PREVIEW_STATE);
+      triggerReload();
+    });
+
     on(windowImpl, 'pi-worker-status', (event: Event) => {
       if (!(event instanceof CustomEvent) || !model) return;
       const detail = event.detail;

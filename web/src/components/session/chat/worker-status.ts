@@ -38,6 +38,7 @@ export function setupWorkerStatusPolling({
   getKnownThinkingLevel = () => "",
   setKnownThinkingLevel = () => {},
   getWorkerModelUpdate = () => null,
+  getStatusText = () => "",
   setIntervalImpl = windowImpl.setInterval?.bind(windowImpl),
   clearIntervalImpl = windowImpl.clearInterval?.bind(windowImpl),
   CustomEventImpl = windowImpl.CustomEvent,
@@ -55,6 +56,7 @@ export function setupWorkerStatusPolling({
   readonly getKnownThinkingLevel?: () => string;
   readonly setKnownThinkingLevel?: (level: string) => void;
   readonly getWorkerModelUpdate?: () => ((provider: string, model: string) => void) | null;
+  readonly getStatusText?: () => string;
   readonly setIntervalImpl?: ((handler: () => void, timeout: number) => number) | null;
   readonly clearIntervalImpl?: ((id: number) => void) | null;
   readonly CustomEventImpl?: typeof CustomEvent;
@@ -94,7 +96,11 @@ export function setupWorkerStatusPolling({
             : "";
           if (apiModelLabel) setKnownModelLabel(apiModelLabel);
           if (data.thinkingLevel) setKnownThinkingLevel(data.thinkingLevel);
-          if (data.state === "running") setStatus("running", "running");
+          // Interrupt acknowledgement means the runtime received Stop, not
+          // that the turn is terminal. Keep "stopping" until status is idle.
+          if (data.state === "running" && getStatusText() !== "stopping") {
+            setStatus("running", "running");
+          }
           if (data.state === "idle") setStatus("idle", "");
           if (data.state === "error") setStatus(data.error || "worker error", "error");
           if (data.state) {

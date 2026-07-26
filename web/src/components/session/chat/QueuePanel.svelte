@@ -34,6 +34,20 @@
     return raw || t('composer.attachmentText');
   }
 
+  function itemState(item: QueueDisplayItem): string {
+    return item.kind === 'queued' ? t('composer.queuedNext') : t('composer.submitted');
+  }
+
+  function itemTime(item: QueueDisplayItem): string {
+    if (!item.createdAt) return '';
+    const date = new Date(item.createdAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  }
+
   function onResume(): void {
     store.actions.resume?.();
   }
@@ -226,9 +240,12 @@
             {@html icon(item.kind === 'steer' ? CornerDownRight : Layers, { size: 12 })}
           </span>
           <span class="pi-queue-item-text">{chipText(item)}</span>
-          {#if item.kind === 'steer'}
-            <span class="pi-queue-item-tag">{t('composer.steerTag')}</span>
-          {/if}
+          <span class="pi-queue-item-meta">
+            <span class="pi-queue-item-tag">{itemState(item)}</span>
+            {#if itemTime(item)}
+              <time datetime={item.createdAt} title={item.createdAt}>{itemTime(item)}</time>
+            {/if}
+          </span>
           <button
             type="button"
             class="pi-queue-item-remove"

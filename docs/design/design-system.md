@@ -144,6 +144,7 @@ Every component (the index list cards, sidebar tree, chat bubbles, buttons, and 
 ### Plain States
 
 - First-run and empty-search states use one centered muted line plus one dim hint line. They don't use cards, glyphs, or apology copy; the hint states the immediate fix.
+- The live chat composer uses explicit routing verbs. Idle shows `Send`; a steerable running turn separates quiet `Stop` from primary `Steer now` and secondary `Queue next`. Queue/steer rows include `queued next` or `submitted` plus a tabular timestamp. Native interrupt acknowledgement displays `stopping` until authoritative idle and prevents repeated Stop clicks.
 - A crashed worker adds a danger line at the end of the saved transcript with the process exit code, a saved-transcript hint, a `worker down` header substate, and a disabled composer. Any active streaming caret turns danger and stops blinking.
 - A view-only session replaces the composer with a centered `view only · resume in terminal: …` copy target and adds an attention-colored `view only` header substate.
 - Plain-state metrics and exit codes use tabular numerals. Interactive copy targets keep 40px desktop and 44px mobile minimum heights, a named 120ms color/transform transition, and `scale(0.96)` press feedback.

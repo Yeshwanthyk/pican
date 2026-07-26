@@ -33,12 +33,15 @@ describe("ChatToolbar", () => {
     expect(button("pi-chat-thinking-label").disabled).toBe(false);
     expect(byId("pi-chat-model-label").textContent).toBe("gpt-test");
     expect(byId("pi-chat-model-label").style.display).toBe("");
-    // Cancel + Queue surface only while a response is running; Send becomes Steer.
+    // Stop stays independent from the two clear routing choices.
     expect(byId("pi-chat-cancel").style.display).toBe("");
-    expect(byId("pi-chat-cancel").textContent).toBe("Cancel");
+    expect(byId("pi-chat-cancel").textContent).toBe("Stop");
     expect(byId("pi-chat-queue").style.display).toBe("");
-    expect(byId("pi-chat-queue").textContent).toBe("Queue");
-    expect(byId("pi-chat-send").textContent).toBe("Steer");
+    expect(byId("pi-chat-queue").textContent).toBe("Queue next");
+    expect(byId("pi-chat-send").textContent).toBe("Steer now");
+    expect(byId("pi-chat-send").getAttribute("title")).toBe(
+      "Add this message to the response in progress",
+    );
   });
 
   it("falls back to defaults and hides controls when unavailable", () => {
@@ -63,6 +66,15 @@ describe("ChatToolbar", () => {
     expect(byId("pi-chat-cancel").style.display).toBe("none");
     expect(byId("pi-chat-queue").style.display).toBe("none");
     expect(byId("pi-chat-send").textContent).toBe("Send");
+  });
+
+  it("keeps Stop disabled while an accepted interrupt is settling", () => {
+    const toolbar = new ChatToolbarState();
+    toolbar.setStatus("stopping", "running");
+    render(ChatToolbar, { props: { chatAvailable: true, toolbar } });
+
+    expect(button("pi-chat-cancel").disabled).toBe(true);
+    expect(byId("pi-chat-status")).toHaveTextContent("stopping");
   });
 
   it("omits unsupported runtime controls and prevents steering", () => {
@@ -105,7 +117,7 @@ describe("ChatToolbar", () => {
     expect(document.querySelector("#pi-chat-attach")).toBeNull();
     expect(document.querySelector("#pi-chat-thinking-label")).toBeNull();
     expect(byId("pi-chat-model-label")).toHaveTextContent("anthropic/claude-sonnet-4");
-    expect(byId("pi-chat-cancel")).toHaveTextContent("Cancel");
+    expect(byId("pi-chat-cancel")).toHaveTextContent("Stop");
     expect(document.querySelector("#pi-chat-queue")).toBeNull();
     expect(byId("pi-chat-send").style.display).toBe("none");
   });

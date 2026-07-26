@@ -113,6 +113,45 @@ describe("setupSteerQueue (server-backed)", () => {
     expect(store.steerCount).toBe(0);
   });
 
+  it("recognises a steer when the composer is opened during an existing run", () => {
+    const { queueButton, textarea } = makeDom();
+    const store = new QueueStore();
+    setupSteerQueue({ store, queueButton, textarea });
+
+    window.dispatchEvent(new CustomEvent("pi-worker-status", { detail: { state: "running" } }));
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-message-sent", { detail: { message: "mid-run steer" } }),
+    );
+
+    expect(store.steerCount).toBe(1);
+    expect(store.items[0]?.text).toBe("mid-run steer");
+
+    window.dispatchEvent(new CustomEvent("pi-worker-status", { detail: { state: "idle" } }));
+    expect(store.steerCount).toBe(0);
+  });
+
+  it("does not relabel an initial send when running status wins the acceptance race", () => {
+    const { queueButton, textarea } = makeDom();
+    const store = new QueueStore();
+    setupSteerQueue({ store, queueButton, textarea });
+
+    window.dispatchEvent(new CustomEvent("pi-worker-status", { detail: { state: "running" } }));
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-message-sent", {
+        detail: { message: "initial task", route: "send" },
+      }),
+    );
+    expect(store.steerCount).toBe(0);
+
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-message-sent", {
+        detail: { message: "change course", route: "steer" },
+      }),
+    );
+    expect(store.steerCount).toBe(1);
+    expect(store.items[0]?.text).toBe("change course");
+  });
+
   it("worker-done clears steer rows but does not auto-dispatch (server drainer handles that)", () => {
     const { queueButton, textarea } = makeDom();
     const api = makeApi();

@@ -91,6 +91,24 @@ describe("setupWorkerStatusPolling", () => {
     expect(events).toEqual(["pi-worker-done"]);
   });
 
+  it("keeps stopping visible while the native worker is still running", async () => {
+    const setStatus = vi.fn();
+
+    setupWorkerStatusPolling({
+      windowImpl: statusWindow(),
+      chatApi: {
+        getWorkerStatus: vi.fn(() => Promise.resolve(response({ state: "running" }))),
+      },
+      getStatusText: () => "stopping",
+      setStatus,
+      setIntervalImpl: () => 0,
+      CustomEventImpl: CustomEvent,
+    });
+    await tick();
+
+    expect(setStatus).not.toHaveBeenCalledWith("running", "running");
+  });
+
   it("dispatches the worker exit code for the reactive session model", async () => {
     const target = new EventTarget();
     const details: unknown[] = [];

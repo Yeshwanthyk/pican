@@ -82,6 +82,8 @@ The old runners/renderers have been replaced by Svelte components plus focused h
 
 The index + settings Phase 4 migration is complete: those routes are Svelte-orchestrated too, with only pure/API helpers left outside components.
 
+The live composer derives its action layout from runtime capabilities and authoritative worker status. Idle exposes `Send`; a steerable running turn exposes independent `Stop`, `Steer now`, and `Queue next` actions. Server-backed queue rows show `queued next` with the server `createdAt` time. Browser-local steer acknowledgements show `submitted` with local acceptance time and are created only after `/api/chat` succeeds. Stop acknowledgement enters `stopping`, clears the optimistic transcript preview, and stays non-terminal until `/api/worker-status` reports idle. This state and all composer/SSE behavior remain live-only and are not imported by static export.
+
 The optional pinned-session tabs setting adds a compact strip below the desktop
 header and status-aware chips below the mobile composer, including a temporary
 guest tab for the current unpinned session. Both projections consume one

@@ -289,6 +289,7 @@ export function runChatComposer({
       FormDataImpl: FormData,
       CustomEventImpl: CustomEvent,
       canSend: () => !toolbar.isRunning || capabilities.steer,
+      getRoute: () => (toolbar.isRunning ? "steer" : "send"),
     });
 
     if (capabilities.userQuestions) {
@@ -326,6 +327,7 @@ export function runChatComposer({
       getKnownThinkingLevel: toolbar.getKnownThinkingLevel,
       setKnownThinkingLevel: toolbar.setKnownThinkingLevel,
       getWorkerModelUpdate: () => onWorkerModelUpdate,
+      getStatusText: () => toolbar.statusText,
       setIntervalImpl: setInterval,
       CustomEventImpl: CustomEvent,
     });

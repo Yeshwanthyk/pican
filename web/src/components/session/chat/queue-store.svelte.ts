@@ -24,6 +24,7 @@ export type QueueDisplayItem =
       readonly position: number;
       readonly text: string;
       readonly displayText: string;
+      readonly createdAt: string;
       readonly files?: readonly File[];
     }
   | {
@@ -31,6 +32,7 @@ export type QueueDisplayItem =
       readonly kind: "steer";
       readonly text: string;
       readonly displayText: string;
+      readonly createdAt: string;
     };
 
 export class QueueStore {
@@ -110,6 +112,7 @@ export class QueueStore {
       position: entry.position,
       text: String(entry.message ?? ""),
       displayText: String(entry.displayText ?? entry.message ?? ""),
+      createdAt: String(entry.createdAt ?? ""),
       files: [],
     }));
     this.items = [...queued, ...steers];
@@ -139,6 +142,7 @@ export class QueueStore {
             position: item.position,
             text: item.message || message,
             displayText: item.displayText || displayText || message,
+            createdAt: item.createdAt,
           };
         }) ?? null,
       () => null,
@@ -146,12 +150,17 @@ export class QueueStore {
   };
 
   /** Push a transient steer chip (browser-only, never persisted). */
-  pushSteer = (item: { readonly text?: string; readonly displayText?: string }) => {
+  pushSteer = (item: {
+    readonly text?: string;
+    readonly displayText?: string;
+    readonly createdAt?: string;
+  }) => {
     this.items.push({
       id: `s-${++this.#steerSeq}-${Date.now().toString(36)}`,
       kind: "steer",
       text: String(item.text ?? ""),
       displayText: String(item.displayText ?? item.text ?? ""),
+      createdAt: item.createdAt || new Date().toISOString(),
     });
     this.#clampFocus();
   };
