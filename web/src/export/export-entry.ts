@@ -30,6 +30,7 @@ import * as searchFiltersApi from "../session/ui/search-filters.js";
 import { setupSessionUi } from "../session/ui/session-ui-runner.js";
 import { sessionRuntime } from "../session/session-runtime.js";
 import { setupKeyboardNav } from "../shared/keyboard-nav.js";
+import { copyExportText } from "./export-clipboard.js";
 
 // In a sandboxed iframe (e.g. a srcdoc preview without `allow-same-origin`),
 // even *reading* the `localStorage` property throws SecurityError — which would
@@ -215,6 +216,8 @@ export function runExportApp({ target = window }: ExportAppOptions = {}): void {
           sessionRuntime.toggleState?.applyToNode(container);
           highlightPending(container);
         },
+        copyText: (text: string) =>
+          copyExportText(text, { documentImpl, navigatorImpl: target.navigator }),
       },
     });
   }

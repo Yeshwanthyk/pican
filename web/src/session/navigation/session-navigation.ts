@@ -3,8 +3,8 @@
 // the navigator no longer builds DOM, caches nodes, or wires per-entry buttons.
 // It just moves the active leaf/target (which the reactive model reads to
 // recompute the path) and scrolls to the requested entry once Svelte has
-// flushed. Copy/fork/label buttons are handled by a single delegated click
-// listener in session-content-runtime.js.
+// flushed. Copy-link/fork buttons are handled by a delegated click listener in
+// session-content-runtime.js; message-content copy stays local to SessionEntry.
 export function openAncestorDetails(element: HTMLElement | null | undefined): void {
   let current = element?.parentElement;
   while (current) {
