@@ -61,7 +61,7 @@ This document traces the execution from starting pican to the first HTTP request
 
 ### 1. Reusable process boundary and CLI parsing
 
-`app.Config` owns the listen address, base path, workspace root, state root, authentication policy, exact child environment, selected runtime, and current version. `app.Run` owns and cleans up all resources created below. It returns when the supplied context is canceled or serving fails; it never installs process-global signal handling and never calls `os.Exit`. `cmd/pican` parses flags/environment, creates a signal-aware context, calls `Run`, and translates the returned error into a process exit.
+`app.Config` owns the listen address, base path, workspace root, state root, authentication policy, exact child environment, selected runtime, current version, and optional browser-safe host-navigation URL. `app.Run` owns and cleans up all resources created below. It returns when the supplied context is canceled or serving fails; it never installs process-global signal handling and never calls `os.Exit`. `cmd/pican` parses flags/environment, creates a signal-aware context, calls `Run`, and translates the returned error into a process exit.
 
 ```go
 port := flag.String("p", "31415", "port to listen on")
@@ -77,7 +77,7 @@ openCodeCommandFlag := flag.String("opencode-command", "", "path to the OpenCode
 
 The default `auto` selection resolves each configured command with `exec.LookPath` and enables installed runtimes in Pi, Codex, Claude, OpenCode registry order. `-runtime` accepts registered comma-separated IDs as an explicit override; `both` remains exactly `pi,codex`. OpenCode command precedence is `-opencode-command`, `PICAN_OPENCODE_COMMAND`, `~/.opencode/bin/opencode` when installed there, then `opencode` from `PATH`. Other runtime overrides retain their documented precedence. Command values are executable paths, never shell fragments.
 
-Hosted mode is selected with `PICAN_MODE=hosted`. `PICAN_BASE_PATH`, `PICAN_WORKSPACE_ROOT`, `PICAN_STATE_ROOT`, `PICAN_AUTH_MODE=proxy`, and `PICAN_PROXY_HEADER` supply non-secret hosting configuration; `PICAN_PROXY_TOKEN` is environment-only and has no CLI flag. Hosted validation requires Codex-only runtime selection, an absolute workspace, a state root contained by that workspace, and proxy-only authentication.
+Hosted mode is selected with `PICAN_MODE=hosted`. `PICAN_BASE_PATH`, `PICAN_WORKSPACE_ROOT`, `PICAN_STATE_ROOT`, `PICAN_AUTH_MODE=proxy`, `PICAN_PROXY_HEADER`, and optional `PICAN_HOST_NAVIGATION_URL` supply non-secret hosting configuration; `PICAN_PROXY_TOKEN` is environment-only and has no CLI flag. The navigation URL must be an absolute HTTP(S) URL without userinfo or a root-relative path. Hosted validation requires Codex-only runtime selection, an absolute workspace, a state root contained by that workspace, and proxy-only authentication.
 
 ### 2. State, workspace, and sessions directories
 
@@ -140,7 +140,7 @@ if token == "" && !isLoopbackHost(bindHost) && !*insecure {
 
 Non-loopback binds **require** `PICAN_TOKEN` to prevent unauthorized access over the network.
 
-Hosted mode does not use this browser token flow. The complete mounted mux, including assets and PWA routes, is gated by proxy-only auth. Exactly one configured private header must match in constant time; query/form/Bearer/Pican-header/cookie/browser-login alternatives are rejected. Scotty authenticates the public browser request and injects the header only on the private proxy hop.
+Hosted mode does not use this browser token flow. The complete mounted mux, including assets, is gated by proxy-only auth. Exactly one configured private header must match in constant time; query/form/Bearer/Pican-header/cookie/browser-login alternatives are rejected. The embedding host authenticates the public browser request and injects the header only on the private proxy hop. Hosted mode does not register PWA routes.
 
 ### 8. Server Construction
 
@@ -198,7 +198,9 @@ mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
 
 `/api/models?runtime=<runtime>` scopes explicit discovery; `/api/models?id=<session-id>` resolves the session runtime. Global callers such as settings and schedules continue using the merged `/api/models` response.
 
-Handlers remain registered against root-relative paths on one inner mux. A single base-path handler mounts that mux and strips the prefix before dispatch; requests outside the mount return `404`. The same normalized path is supplied to the live shell, frontend URL helpers, PWA metadata, and Vite asset loader.
+Handlers remain registered against root-relative paths on one inner mux. A single base-path handler mounts that mux and strips the prefix before dispatch; requests outside the mount return `404`. The same normalized path is supplied to the live shell, frontend URL helpers, and Vite asset loader, plus standalone-only PWA metadata.
+
+Before Vite runs, the live shell emits a schema-validated application context containing only `mode` and optional `hostNavigationUrl`. The frontend decodes it before mount and safely defaults to standalone. Hosted shells omit manifest/install metadata and service-worker boot; standalone shells and PWA behavior are unchanged.
 
 ### 10. Static Asset Loading
 

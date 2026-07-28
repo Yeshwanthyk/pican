@@ -445,8 +445,10 @@ PWA / static asset routes (registered outside `Server.Register`):
 
 | Route | Source |
 |-------|--------|
-| `/manifest.webmanifest`, `/sw.js`, `/icon.svg`, `/icon-maskable.svg`, `/pi-logo.svg`, `/cat.webm`, `/theme.css`, `/index.css`, `/menu.css`, `/palette.css` | `internal/ui/pwa.go` (embedded assets) |
+| `/manifest.webmanifest`, `/sw.js`, `/icon.svg`, `/icon-maskable.svg`, `/pi-logo.svg`, `/cat.webm`, `/theme.css`, `/index.css`, `/menu.css`, `/palette.css` | `internal/ui/pwa.go` (embedded assets; standalone mode only) |
 | `/static/assets/app-*.js`, `/static/assets/...` | Embedded Vite SPA bundle and chunks (`internal/app/app.go` + `internal/frontend`) |
+
+`internal/app` does not register the PWA handler set in hosted mode. The hosted live shell also omits manifest/install metadata and service-worker registration; hashed SPA assets remain available.
 
 ## Auth Flow
 
