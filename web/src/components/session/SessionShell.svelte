@@ -12,7 +12,6 @@
   import ModelUsageModal from './ModelUsageModal.svelte';
   import ForkModal from './ForkModal.svelte';
   import BtwPopup from './BtwPopup.svelte';
-  import LabelModal from './LabelModal.svelte';
   import DiffModal from './DiffModal.svelte';
   import LoadEarlier from './LoadEarlier.svelte';
   import SessionTree from './SessionTree.svelte';
@@ -32,6 +31,7 @@
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import type { WorkerProcessStatus } from '../../session/data/session-types.js';
   import { defaultRuntimeCapabilities } from '../../lib/runtime-capabilities.js';
+  import { copyToClipboard } from '../../shared/clipboard.js';
 
   let {
     sessionModel,
@@ -182,6 +182,7 @@
           {modelLabel}
           {sessionId}
           canFork={capabilities.fork}
+          copyText={copyToClipboard}
         />
       </div>
     </main>
@@ -211,12 +212,6 @@
   bind:open={sessionModals.fork.open}
   entries={sessionModals.fork.entries}
   onSelect={sessionModals.fork.onSelect}
-/>
-<LabelModal
-  bind:open={sessionModals.label.open}
-  entryId={sessionModals.label.entryId}
-  currentLabel={sessionModals.label.currentLabel}
-  onSave={sessionModals.label.onSave}
 />
 <DiffModal bind:open={sessionModals.diff.open} sessionId={sessionModals.diff.sessionId} />
 <SessionTree bind:open={sessionModals.tree.open} />

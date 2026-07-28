@@ -82,7 +82,7 @@ The SPA owns all live browser routes. The **session viewer is fully Svelte-orche
 
 - `SessionPage.svelte`'s `onMount` (`startSessionPageRuntime()`): per-page bootstrap, `setupSessionUi`, content-runtime wiring, header handlers, initial `navigateTo`
 - `session/session-globals.ts`: page-global glue (keyboard shortcuts, done-notifier, visual-viewport/scroll) — returns a disposer
-- `session/session-content-runtime.ts`: the `afterRender` hook (toggle state + lazy highlight), the delegated copy/fork/label handler, and the download-JSONL action
+- `session/session-content-runtime.ts`: the `afterRender` hook (toggle state + lazy highlight), the delegated copy-link/fork handler, and the download-JSONL action
 - `session/lazy-highlight.ts`: deferred `highlight.js` pass
 - `SessionDataModel.reconcile()`: live-reload / load-earlier model reconciliation
 

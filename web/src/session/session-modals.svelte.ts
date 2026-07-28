@@ -22,11 +22,6 @@ const hasUserMessage = (entries: ReadonlyArray<ForkEntry>): boolean =>
     return content?.some((block) => block.type === "text" && Boolean(block.text?.trim())) ?? false;
   });
 
-interface LabelSave {
-  readonly entryId: string;
-  readonly label: string;
-}
-
 interface SessionModalState {
   shortcuts: boolean;
   modelUsage: boolean;
@@ -34,12 +29,6 @@ interface SessionModalState {
     open: boolean;
     entries: ForkEntry[];
     onSelect: ((entryId: string) => void) | null;
-  };
-  label: {
-    open: boolean;
-    entryId: string;
-    currentLabel: string;
-    onSave: ((value: LabelSave) => void | Promise<void>) | null;
   };
   diff: { open: boolean; sessionId: string };
   tree: { open: boolean };
@@ -57,7 +46,6 @@ export const sessionModals = $state<SessionModalState>({
   shortcuts: false,
   modelUsage: false,
   fork: { open: false, entries: [], onSelect: null },
-  label: { open: false, entryId: "", currentLabel: "", onSave: null },
   diff: { open: false, sessionId: "" },
   tree: { open: false },
 });
@@ -84,21 +72,6 @@ export function openFork({
   sessionModals.fork.onSelect = onSelect;
   sessionModals.fork.open = true;
   return true;
-}
-
-export function openLabel({
-  entryId = "",
-  currentLabel = "",
-  onSave = null,
-}: {
-  readonly entryId?: string;
-  readonly currentLabel?: string;
-  readonly onSave?: ((value: LabelSave) => void | Promise<void>) | null;
-} = {}): void {
-  sessionModals.label.entryId = entryId;
-  sessionModals.label.currentLabel = currentLabel;
-  sessionModals.label.onSave = onSave;
-  sessionModals.label.open = true;
 }
 
 export function openDiff({ sessionId = "" }: { readonly sessionId?: string } = {}): void {
@@ -188,10 +161,6 @@ export function resetSessionModals(): void {
   sessionModals.fork.open = false;
   sessionModals.fork.entries = [];
   sessionModals.fork.onSelect = null;
-  sessionModals.label.open = false;
-  sessionModals.label.entryId = "";
-  sessionModals.label.currentLabel = "";
-  sessionModals.label.onSave = null;
   sessionModals.diff.open = false;
   sessionModals.diff.sessionId = "";
   sessionModals.tree.open = false;

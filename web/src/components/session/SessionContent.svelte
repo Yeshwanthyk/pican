@@ -27,6 +27,7 @@
     modelLabel?: string;
     sessionId?: string;
     canFork?: boolean;
+    copyText?: (text: string) => Promise<boolean>;
   }
 
   let {
@@ -36,6 +37,7 @@
     modelLabel = '',
     sessionId = '',
     canFork = true,
+    copyText = async () => false,
   }: Props = $props();
 
   let containerEl = $state<HTMLDivElement | null>(null);
@@ -70,7 +72,15 @@
         {sessionId}
       />
     {:else}
-      <SessionEntry entry={item.entry} {model} {live} {modelLabel} {sessionId} {canFork} />
+      <SessionEntry
+        entry={item.entry}
+        {model}
+        {live}
+        {modelLabel}
+        {sessionId}
+        {canFork}
+        {copyText}
+      />
     {/if}
   {/each}
   {#if model.workerStatus?.state === 'error'}

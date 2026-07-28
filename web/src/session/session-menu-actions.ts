@@ -65,17 +65,3 @@ export async function cloneSession(
   const payload = await postJSON(sessionUrl("/api/clone-session", sessionId), {}, { fetchImpl });
   return runPromise(decodeMutation(payload));
 }
-
-export async function labelSession(
-  sessionId: string,
-  entryId: string,
-  label: string,
-  { fetchImpl = globalThis.fetch }: ActionOptions = {},
-) {
-  const payload = await postJSON(
-    sessionUrl("/api/label-session", sessionId),
-    { entryId, label },
-    { fetchImpl },
-  );
-  return runPromise(decodeMutation(payload));
-}
