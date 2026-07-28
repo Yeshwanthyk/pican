@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -58,9 +57,9 @@ func Run(ctx context.Context, config Config) error {
 		}
 		config.StateRoot = stateRoot
 		config.ChildEnv = hostedCodexChildEnv(config.ChildEnv)
-		// The embedding host owns the browser-facing route and runtime
-		// lifecycle. Hosted pican never publishes a parallel Tailscale endpoint
-		// or opens its internal listener in a local browser.
+		// Scotty owns the browser-facing route and runtime lifecycle. Hosted
+		// pican never publishes a parallel Tailscale endpoint or opens its
+		// internal listener in a local browser.
 		config.HostExplicit = true
 		config.OpenBrowser = false
 	}
@@ -370,7 +369,6 @@ func Run(ctx context.Context, config Config) error {
 	})
 	cleanups.add(func() { _ = manager.Close() })
 	sessionCache := sessions.NewCache()
-	applicationContext := browserApplicationContext(config)
 	var srvErr error
 	var runInstallHook func(context.Context) error
 	var runRestartHook func() error
@@ -393,9 +391,7 @@ func Run(ctx context.Context, config Config) error {
 		ChatSender:          manager,
 		Cache:               sessionCache,
 		RenderExportSession: ui.RenderExportSessionPage,
-		RenderAppShell: func(w io.Writer, bootstrap string) error {
-			return ui.RenderAppShellWithContext(w, bootstrap, applicationContext)
-		},
+		RenderAppShell:      ui.RenderAppShell,
 		Models: func(ctx context.Context) (json.RawMessage, error) {
 			return runtimeModels(ctx, enabledRuntimes, sessionsDir, sessionCache, server.ModelQuery{})
 		},
@@ -444,7 +440,7 @@ func Run(ctx context.Context, config Config) error {
 
 	mux := http.NewServeMux()
 	srv.Register(mux)
-	registerPWAHandlers(mux, config.Mode)
+	ui.RegisterPWAHandlers(mux)
 	mux.HandleFunc("/styles/app.css", ui.ServeAppStyles)
 	dfs := web.DistFS()
 	if scripts, err := frontend.LoadScriptsAt(dfs, basePath, frontend.AppEntry); err == nil {
@@ -545,17 +541,4 @@ func Run(ctx context.Context, config Config) error {
 	}
 	cleanups.add(func() { _ = listener.Close() })
 	return serveUntilCanceled(ctx, httpServer, listener)
-}
-
-func registerPWAHandlers(mux *http.ServeMux, mode Mode) {
-	if mode == ModeStandalone {
-		ui.RegisterPWAHandlers(mux)
-	}
-}
-
-func browserApplicationContext(config Config) ui.ApplicationContext {
-	return ui.ApplicationContext{
-		Mode:              string(config.Mode),
-		HostNavigationURL: config.HostNavigationURL,
-	}
 }

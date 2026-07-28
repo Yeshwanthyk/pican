@@ -27,7 +27,7 @@ internal/ui/embedded/app.html
         └── routes/LoginPage.svelte     (/login)
 ```
 
-The Go shell always emits a minimal application-context JSON script (`mode` plus optional `hostNavigationUrl`) before the Vite module, and the frontend validates it before mount. The standalone shell preserves the current PWA-first boot path:
+The Go shell intentionally preserves the current PWA-first boot path:
 
 - no-zoom iPhone viewport metadata
 - theme boot before first paint
@@ -37,8 +37,6 @@ The Go shell always emits a minimal application-context JSON script (`mode` plus
 - server-backed font variables
 - service worker registration
 - Vite hashed SPA asset from `web/dist/.vite/manifest.json`
-
-Hosted mode keeps the theme/font/Vite boot but omits PWA metadata and service-worker registration. Its backend also leaves the PWA handler set unregistered. Static export is unaffected.
 
 API, SSE, PWA, static asset, sound, and share routes remain server-handled.
 

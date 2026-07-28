@@ -27,7 +27,6 @@ func ParseCLI(args []string, version string, stderr io.Writer) (Config, bool, er
 	flags.StringVar(&config.WorkspaceRoot, "workspace-root", config.WorkspaceRoot, "hosted workspace root")
 	flags.StringVar(&config.StateRoot, "state-root", config.StateRoot, "pican mutable state root")
 	flags.StringVar(&config.ProxyAuthHeader, "proxy-auth-header", config.ProxyAuthHeader, "trusted proxy auth header")
-	flags.StringVar(&config.HostNavigationURL, "host-navigation-url", config.HostNavigationURL, "optional browser-safe URL for returning to the host application")
 	flags.StringVar(&config.Runtime, "runtime", "auto", "agent runtimes: auto, pi, codex, claude, opencode, both, or a comma-separated list")
 	flags.StringVar(&config.CodexCommand, "codex-command", "", "path to the Codex executable")
 	flags.StringVar(&config.ClaudeCommand, "claude-command", "", "path to the Claude executable")
@@ -78,9 +77,6 @@ func applyHostedEnvironment(config *Config) {
 		config.ProxyAuthHeader = value
 	} else if config.Mode == ModeHosted {
 		config.ProxyAuthHeader = "X-Pican-Proxy-Token"
-	}
-	if value := os.Getenv(hostNavigationEnvVar); value != "" {
-		config.HostNavigationURL = value
 	}
 	if config.AuthMode == AuthModeProxy {
 		config.AuthToken = os.Getenv(proxyTokenEnvVar)

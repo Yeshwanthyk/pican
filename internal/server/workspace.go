@@ -134,7 +134,6 @@ func (s *Server) validateGitBoundary(cwd string) error {
 
 func isWorkspaceBoundaryError(err error) bool {
 	return errors.Is(err, errSessionOutsideWorkspace) ||
-		errors.Is(err, errHostedNonCodexSession) ||
 		errors.Is(err, workspace.ErrOutsideRoot) ||
 		errors.Is(err, workspace.ErrTraversal)
 }

@@ -3,7 +3,6 @@ package app
 import (
 	"errors"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,30 +26,28 @@ const (
 )
 
 const (
-	modeEnvVar           = "PICAN_MODE"
-	basePathEnvVar       = "PICAN_BASE_PATH"
-	workspaceEnvVar      = "PICAN_WORKSPACE_ROOT"
-	stateRootEnvVar      = "PICAN_STATE_ROOT"
-	authModeEnvVar       = "PICAN_AUTH_MODE"
-	proxyHeaderEnvVar    = "PICAN_PROXY_HEADER"
-	proxyTokenEnvVar     = "PICAN_PROXY_TOKEN"
-	hostNavigationEnvVar = "PICAN_HOST_NAVIGATION_URL"
+	modeEnvVar        = "PICAN_MODE"
+	basePathEnvVar    = "PICAN_BASE_PATH"
+	workspaceEnvVar   = "PICAN_WORKSPACE_ROOT"
+	stateRootEnvVar   = "PICAN_STATE_ROOT"
+	authModeEnvVar    = "PICAN_AUTH_MODE"
+	proxyHeaderEnvVar = "PICAN_PROXY_HEADER"
+	proxyTokenEnvVar  = "PICAN_PROXY_TOKEN"
 )
 
 // Config is the process-independent startup contract for pican.
 type Config struct {
-	ListenAddress     string
-	BasePath          string
-	WorkspaceRoot     string
-	StateRoot         string
-	Mode              Mode
-	AuthMode          AuthMode
-	ProxyAuthHeader   string
-	AuthToken         string
-	HostNavigationURL string
-	ChildEnv          []string
-	Runtime           string
-	Version           string
+	ListenAddress   string
+	BasePath        string
+	WorkspaceRoot   string
+	StateRoot       string
+	Mode            Mode
+	AuthMode        AuthMode
+	ProxyAuthHeader string
+	AuthToken       string
+	ChildEnv        []string
+	Runtime         string
+	Version         string
 
 	OpenBrowser     bool
 	Insecure        bool
@@ -114,9 +111,6 @@ func (c Config) validate() error {
 	if c.Mode != ModeStandalone && c.Mode != ModeHosted {
 		return errors.New("mode must be standalone or hosted")
 	}
-	if err := validateHostNavigationURL(c.HostNavigationURL); err != nil {
-		return err
-	}
 	if c.Mode == ModeHosted {
 		if strings.TrimSpace(c.WorkspaceRoot) == "" {
 			return errors.New("hosted mode requires a workspace root")
@@ -136,30 +130,6 @@ func (c Config) validate() error {
 		if !filepath.IsAbs(c.StateRoot) {
 			return errors.New("hosted mode state root must be absolute")
 		}
-	}
-	return nil
-}
-
-func validateHostNavigationURL(raw string) error {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return errors.New("host navigation URL must be an absolute HTTP(S) URL or root-relative path")
-	}
-	if parsed.User != nil {
-		return errors.New("host navigation URL must not contain credentials")
-	}
-	if parsed.IsAbs() {
-		if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-			return errors.New("host navigation URL must be an absolute HTTP(S) URL or root-relative path")
-		}
-		return nil
-	}
-	if !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
-		return errors.New("host navigation URL must be an absolute HTTP(S) URL or root-relative path")
 	}
 	return nil
 }

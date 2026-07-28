@@ -12,7 +12,6 @@ import (
 
 	"pican/internal/chat"
 	"pican/internal/runtimes"
-	"pican/internal/sessions"
 	"pican/internal/workers"
 )
 
@@ -148,10 +147,6 @@ func (s *Server) handleCancelChat(w http.ResponseWriter, r *http.Request) {
 
 	requestedID := r.URL.Query().Get("id")
 	resolved, resolveErr := s.resolveSession(requestedID)
-	if s.hosted && resolveErr != nil && !errors.Is(resolveErr, sessions.ErrSessionNotFound) {
-		resolveOrWriteError(w, resolveErr)
-		return
-	}
 	if resolveErr == nil && !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityCancel) {
 		return
 	}

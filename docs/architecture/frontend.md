@@ -24,9 +24,7 @@ At startup, `internal/frontend/assets.go` + `web/assets_embed.go` reads `.vite/m
 
 ## SPA Shell and Routes
 
-The live app is hosted by `internal/ui/embedded/app.html`, rendered by `internal/ui/spa_page.go`. Every shell embeds an inert `#pican-application-context` JSON script before the Vite module. It contains only the application mode (`standalone` or `hosted`) and an optional browser-safe host-navigation URL. `web/src/shared/application-context.ts` schema-decodes and URL-validates it before `mount(App, ...)`; absent, malformed, or unknown context defaults to standalone. No workspace root, state root, authentication value, child environment, credential, or runtime/provider detail crosses this boundary.
-
-The standalone shell preserves the PWA contract: viewport/no-zoom metadata, theme boot, Window Controls Overlay boot, font variables, custom themes, manifest/install metadata, and service-worker registration. Hosted mode keeps the live theme/font/SPA boot but emits no PWA metadata or service-worker registration, and its backend does not serve the PWA handler set.
+The live app is hosted by `internal/ui/embedded/app.html`, rendered by `internal/ui/spa_page.go`. The shell preserves the PWA contract: viewport/no-zoom metadata, theme boot, Window Controls Overlay boot, font variables, custom themes, and service-worker registration.
 
 Browser routes served by the SPA shell:
 
@@ -41,7 +39,7 @@ Browser routes served by the SPA shell:
 
 API, SSE, PWA, sound, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
 
-The route list above is relative to one shared live base path. At `/s/abc123`, for example, the browser sees `/s/abc123/session`, `/s/abc123/api/session`, `/s/abc123/events`, and mounted hashed assets; standalone also sees mounted PWA URLs. The Go shell emits the normalized value in `meta[name=pican-base-path]`; `web/src/shared/base-path.ts` is the only frontend prefix/strip abstraction used by navigation, route parsing, API helpers, SSE, icons, and standalone service-worker registration. A static contract test rejects new root-relative live runtime URL sinks outside that helper. Static export is intentionally unchanged and self-contained.
+The route list above is relative to one shared live base path. At `/s/abc123`, for example, the browser sees `/s/abc123/session`, `/s/abc123/api/session`, `/s/abc123/events`, mounted hashed assets, and mounted PWA URLs. The Go shell emits the normalized value in `meta[name=pican-base-path]`; `web/src/shared/base-path.ts` is the only frontend prefix/strip abstraction used by navigation, route parsing, API helpers, SSE, icons, and service-worker registration. A static contract test rejects new root-relative live runtime URL sinks outside that helper. Static export is intentionally unchanged and self-contained.
 
 All live session-create controls use `shared/create-session.ts`. It adds a browser-generated `Idempotency-Key`, retains that key when a request fails, and clears it only after a successful response, so a user retry converges on the server's durable create mapping.
 

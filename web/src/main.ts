@@ -1,6 +1,5 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
-import { bootWithApplicationContext, type ApplicationContext } from "./shared/application-context";
 
 function defaultTarget() {
   if (typeof document === "undefined") return null;
@@ -10,7 +9,6 @@ function defaultTarget() {
 export interface AppProps {
   readonly path?: string;
   readonly search?: string;
-  readonly applicationContext?: ApplicationContext;
 }
 
 export function mountApp({
@@ -18,9 +16,7 @@ export function mountApp({
   props = {},
 }: { readonly target?: Element | null; readonly props?: AppProps } = {}) {
   if (!target) return null;
-  return bootWithApplicationContext((applicationContext) =>
-    mount(App, { target, props: { ...props, applicationContext } }),
-  );
+  return mount(App, { target, props });
 }
 
 const appTarget = typeof document !== "undefined" ? defaultTarget() : null;
