@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -30,6 +31,7 @@ func TestAppShellPreservesPWAContract(t *testing.T) {
 		`<link rel="stylesheet" href="/custom-themes.css">`,
 		`<style id="pican-fonts">`,
 		`<div id="spa-root"></div>`,
+		`<script id="pican-application-context" type="application/json">{"mode":"standalone"}</script>`,
 		`<script type="module" src="/static/assets/app-test.js"></script>`,
 		`navigator.serviceWorker.register('/sw.js',{scope:'/'})`,
 	} {
@@ -37,6 +39,74 @@ func TestAppShellPreservesPWAContract(t *testing.T) {
 			t.Fatalf("app shell missing %q\n%s", want, html)
 		}
 	}
+}
+
+func TestHostedAppShellIncludesContextWithoutPWA(t *testing.T) {
+	var b strings.Builder
+	if err := RenderAppShellWithContext(&b, "", ApplicationContext{
+		Mode: ApplicationModeHosted,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{
+		`<script id="pican-application-context" type="application/json">{"mode":"hosted"}</script>`,
+		`<div id="spa-root"></div>`,
+		`<script type="module"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("hosted shell missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{
+		`rel="manifest"`,
+		`mobile-web-app-capable`,
+		`apple-mobile-web-app-title`,
+		`navigator.serviceWorker.register`,
+		`/sw.js`,
+	} {
+		if strings.Contains(html, forbidden) {
+			t.Errorf("hosted shell contains PWA markup %q", forbidden)
+		}
+	}
+}
+
+func TestAppShellEscapesOptionalHostNavigationURL(t *testing.T) {
+	hostNavigationURL := `https://host.example/workspaces/test?next=</script><script>alert("x")</script>&label=host`
+	var b strings.Builder
+	if err := RenderAppShellWithContext(&b, "", ApplicationContext{
+		Mode:              ApplicationModeHosted,
+		HostNavigationURL: hostNavigationURL,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	if strings.Contains(html, hostNavigationURL) || strings.Contains(html, `<script>alert`) {
+		t.Fatal("host navigation URL was not safely escaped")
+	}
+	contextJSON := applicationContextJSON(t, html)
+	var context ApplicationContext
+	if err := json.Unmarshal([]byte(contextJSON), &context); err != nil {
+		t.Fatalf("decode application context: %v", err)
+	}
+	if context.Mode != ApplicationModeHosted || context.HostNavigationURL != hostNavigationURL {
+		t.Fatalf("application context = %+v", context)
+	}
+}
+
+func applicationContextJSON(t *testing.T, html string) string {
+	t.Helper()
+	const start = `<script id="pican-application-context" type="application/json">`
+	startIndex := strings.Index(html, start)
+	if startIndex < 0 {
+		t.Fatal("application context script not found")
+	}
+	valueStart := startIndex + len(start)
+	valueEnd := strings.Index(html[valueStart:], `</script>`)
+	if valueEnd < 0 {
+		t.Fatal("application context script is not closed")
+	}
+	return html[valueStart : valueStart+valueEnd]
 }
 
 func TestAppShellUsesMountedLiveURLs(t *testing.T) {

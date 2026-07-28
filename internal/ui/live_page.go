@@ -11,6 +11,7 @@ type liveDocumentData struct {
 	Preload   template.HTML
 	Styles    template.HTML
 	BodyAttrs template.HTMLAttr
+	PWA       bool
 }
 
 // themeProvider returns the server-persisted theme so it can be injected into
@@ -120,13 +121,15 @@ func renderLiveDocumentStart(data liveDocumentData) string {
 	b.WriteString("<meta name=\"pican-base-path\" content=\"")
 	b.WriteString(template.HTMLEscapeString(liveBasePath.String()))
 	b.WriteString("\">\n")
-	b.WriteString("<link rel=\"icon\" type=\"image/png\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
-	b.WriteString("<link rel=\"apple-touch-icon\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
-	b.WriteString("<link rel=\"manifest\" href=\"" + template.HTMLEscapeString(liveURL("/manifest.webmanifest")) + "\">\n")
 	b.WriteString("<meta name=\"theme-color\" content=\"#0e0e13\">\n")
-	b.WriteString("<meta name=\"mobile-web-app-capable\" content=\"yes\">\n")
-	b.WriteString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n")
-	b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"pican\">\n")
+	if data.PWA {
+		b.WriteString("<link rel=\"icon\" type=\"image/png\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
+		b.WriteString("<link rel=\"apple-touch-icon\" href=\"" + template.HTMLEscapeString(liveURL("/app-icon.png")) + "\">\n")
+		b.WriteString("<link rel=\"manifest\" href=\"" + template.HTMLEscapeString(liveURL("/manifest.webmanifest")) + "\">\n")
+		b.WriteString("<meta name=\"mobile-web-app-capable\" content=\"yes\">\n")
+		b.WriteString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n")
+		b.WriteString("<meta name=\"apple-mobile-web-app-title\" content=\"pican\">\n")
+	}
 	b.WriteString("<meta name=\"pican-theme\" content=\"")
 	b.WriteString(template.HTMLEscapeString(themeProvider()))
 	b.WriteString("\">\n")
@@ -165,6 +168,7 @@ func liveDocumentStart(title string, preload, styles template.HTML) template.HTM
 		Title:   title,
 		Preload: preload,
 		Styles:  styles,
+		PWA:     true,
 	}))
 }
 

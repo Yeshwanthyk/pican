@@ -9,11 +9,17 @@
   import SubagentsPage from './routes/SubagentsPage.svelte';
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
+  import {
+    DEFAULT_APPLICATION_CONTEXT,
+    provideApplicationContext,
+    type ApplicationContext,
+  } from './shared/application-context';
   import { stripBasePath } from './shared/base-path';
 
   interface AppProps {
     readonly path?: string;
     readonly search?: string;
+    readonly applicationContext?: ApplicationContext;
   }
 
   let {
@@ -21,7 +27,10 @@
       ? stripBasePath(window.location.pathname)
       : '/',
     search: initialSearch = typeof window !== 'undefined' ? window.location.search : '',
+    applicationContext = DEFAULT_APPLICATION_CONTEXT,
   }: AppProps = $props();
+
+  provideApplicationContext(untrack(() => applicationContext));
 
   // Reactive current route. Seeded from the props (so prop-driven tests stay
   // deterministic) and thereafter updated only by real navigation events, never

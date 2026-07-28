@@ -14,11 +14,12 @@ func TestParseCLIHostedEnvironmentContract(t *testing.T) {
 	t.Setenv(workspaceEnvVar, workspaceRoot)
 	t.Setenv(stateRootEnvVar, stateRoot)
 	t.Setenv(authModeEnvVar, string(AuthModeProxy))
-	t.Setenv(proxyHeaderEnvVar, "X-Scotty-Pican")
+	t.Setenv(proxyHeaderEnvVar, "X-Host-Pican")
 	t.Setenv(proxyTokenEnvVar, "proxy-secret-fixture")
+	t.Setenv(hostNavigationEnvVar, "https://host.example/workspaces/test")
 	t.Setenv("CODEX_SENTINEL", "opaque-codex-sentinel")
 	t.Setenv("GITHUB_TOKEN", "opaque-github-sentinel")
-	t.Setenv("SCOTTY_REAL_CREDENTIAL", "real-secret-fixture")
+	t.Setenv("HOST_REAL_CREDENTIAL", "real-secret-fixture")
 
 	config, showVersion, err := ParseCLI([]string{"-runtime=codex"}, "test", &bytes.Buffer{})
 	if err != nil {
@@ -29,8 +30,9 @@ func TestParseCLIHostedEnvironmentContract(t *testing.T) {
 	}
 	if config.Mode != ModeHosted || config.AuthMode != AuthModeProxy ||
 		config.BasePath != "/s/test" || config.WorkspaceRoot != workspaceRoot ||
-		config.StateRoot != stateRoot || config.ProxyAuthHeader != "X-Scotty-Pican" ||
-		config.AuthToken != "proxy-secret-fixture" {
+		config.StateRoot != stateRoot || config.ProxyAuthHeader != "X-Host-Pican" ||
+		config.AuthToken != "proxy-secret-fixture" ||
+		config.HostNavigationURL != "https://host.example/workspaces/test" {
 		t.Fatalf("hosted config = %+v", config)
 	}
 	if !slices.Contains(config.ChildEnv, "CODEX_SENTINEL=opaque-codex-sentinel") ||
@@ -39,7 +41,7 @@ func TestParseCLIHostedEnvironmentContract(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"PICAN_PROXY_TOKEN=proxy-secret-fixture",
-		"SCOTTY_REAL_CREDENTIAL=real-secret-fixture",
+		"HOST_REAL_CREDENTIAL=real-secret-fixture",
 	} {
 		if slices.Contains(config.ChildEnv, forbidden) {
 			t.Fatalf("hosted child env leaked %q", forbidden)
