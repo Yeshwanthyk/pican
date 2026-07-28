@@ -1,16 +1,15 @@
 // Live wiring for the message pane (#messages). <SessionContent> renders
 // model.activePath as <SessionEntry> components and runs afterRender(container)
 // after each (re)render; this supplies that afterRender hook (toggle state +
-// lazy highlight), the per-message copy/fork/label delegated handler, and the
+// lazy highlight), the per-message link/fork delegated handler, and the
 // download-JSONL action. Also builds the sessionFormat object setupSessionUi
 // needs. Live-only — the static export wires its own afterRender in export-entry.
 
 import { Effect } from "effect";
-import { NetworkError, describeError } from "../lib/errors";
-import { runFork, runPromise } from "../lib/runtime";
+import { NetworkError } from "../lib/errors";
+import { runFork } from "../lib/runtime";
 import { setIconElement, Loader } from "../shared/icons.js";
-import { t } from "../shared/strings.js";
-import { openDiff, openLabel } from "./session-modals.svelte.js";
+import { openDiff } from "./session-modals.svelte.js";
 import { navigate } from "../shared/navigation.js";
 import { sessionRuntime } from "./session-runtime.js";
 import { extractContent } from "./tree/session-filter.js";
@@ -26,7 +25,7 @@ import {
   copyToClipboard,
   downloadSessionJson,
 } from "./render/session-entry-actions.js";
-import { forkSession, labelSession } from "./session-menu-actions.js";
+import { forkSession } from "./session-menu-actions.js";
 import type { SessionEntry, ToolCallInfo, UnknownRecord } from "./data/session-types.js";
 
 declare global {
@@ -39,7 +38,6 @@ interface SessionContentModel {
   readonly entries: ReadonlyArray<SessionEntry>;
   readonly header: UnknownRecord | null;
   readonly toolCallMap: ReadonlyMap<string, ToolCallInfo>;
-  readonly labelMap: Map<string, string>;
   readonly currentLeafId?: string;
 }
 
@@ -135,33 +133,6 @@ export function wireSessionContentRuntime({
     runFork(operation);
   };
 
-  // Set/clear an entry's tree label. The modal is <LabelModal>, opened via the
-  // shared sessionModals store; this owns the save (API + reactive labelMap update).
-  const labelEntry = (entryId: string): void => {
-    openLabel({
-      entryId,
-      currentLabel: model.labelMap.get(entryId) || "",
-      onSave: ({ entryId: id, label }) =>
-        runPromise(
-          Effect.tryPromise({
-            try: () => labelSession(sessionId, id, label, { fetchImpl: target.fetch.bind(target) }),
-            catch: (cause) => new NetworkError({ cause }),
-          }).pipe(
-            Effect.tap(() =>
-              Effect.sync(() => {
-                if (label) model.labelMap.set(id, label);
-                else model.labelMap.delete(id);
-              }),
-            ),
-            Effect.asVoid,
-            Effect.catch((error) =>
-              Effect.sync(() => target.alert(describeError(error) || t("session.labelSaveFailed"))),
-            ),
-          ),
-        ),
-    });
-  };
-
   // After each (re)render of <SessionContent>, re-apply persisted collapse/toggle
   // state and lazy-highlight any pending code blocks.
   if (contentRuntime) {
@@ -171,7 +142,7 @@ export function wireSessionContentRuntime({
     };
   }
 
-  // One delegated handler for the per-entry copy/fork/label buttons; survives the
+  // One delegated handler for the per-entry link/fork buttons; survives the
   // reactive re-renders of #messages.
   const messagesEl = documentImpl.getElementById("messages");
   const onMessagesClick = (e: MouseEvent) => {
@@ -199,11 +170,6 @@ export function wireSessionContentRuntime({
       e.stopPropagation();
       forkEntry(forkBtn.dataset.entryId, forkBtn);
       return;
-    }
-    const labelBtn = e.target.closest<HTMLElement>(".label-btn");
-    if (labelBtn?.dataset.entryId) {
-      e.stopPropagation();
-      labelEntry(labelBtn.dataset.entryId);
     }
   };
   messagesEl?.addEventListener("click", onMessagesClick);

@@ -1,9 +1,12 @@
-import { describe, expect, it, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/svelte";
+import { describe, expect, it, afterEach, vi } from "vitest";
+import { render, cleanup, fireEvent } from "@testing-library/svelte";
 import SessionEntry from "./SessionEntry.svelte";
 import type { SessionEntry as SessionEntryData } from "../../session/data/session-types.js";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 function model(entries: SessionEntryData[] = []) {
   return { entries, renderedTools: null };
@@ -20,13 +23,69 @@ describe("SessionEntry", () => {
     expect(node?.querySelector(".user-who")?.textContent).toContain("YOU");
   });
 
-  it("hides fork while keeping pican-local labels available", () => {
+  it("hides unavailable fork and removes message label editing", () => {
     const entry = { id: "u", type: "message", message: { role: "user", content: "hello" } };
     const { container } = render(SessionEntry, {
       props: { entry, model: model([entry]), live: true, canFork: false },
     });
     expect(container.querySelector(".fork-btn")).toBeNull();
-    expect(container.querySelector(".label-btn")).not.toBeNull();
+    expect(container.querySelector(".label-btn")).toBeNull();
+    expect(container.querySelector('[aria-label="Add or edit label"]')).toBeNull();
+  });
+
+  it("copies only the user message content and shows brief feedback", async () => {
+    vi.useFakeTimers();
+    const copyText = vi.fn(async () => true);
+    const entry = {
+      id: "u",
+      type: "message",
+      timestamp: "2026-01-01T00:00:00Z",
+      message: { role: "user", content: "hello **there**" },
+    };
+    const { container } = render(SessionEntry, {
+      props: { entry, model: model([entry]), copyText },
+    });
+
+    const copy = container.querySelector<HTMLButtonElement>(".copy-message-btn");
+    expect(copy).toHaveAttribute("aria-label", "Copy message");
+    if (!copy) return;
+    await fireEvent.click(copy);
+
+    expect(copyText).toHaveBeenCalledWith("hello **there**");
+    await Promise.resolve();
+    expect(copy).toHaveAttribute("aria-label", "Copied");
+    expect(copy.querySelector('[aria-live="polite"]')?.textContent).toBe("Copied");
+
+    vi.advanceTimersByTime(1500);
+    await vi.runAllTimersAsync();
+    expect(copy).toHaveAttribute("aria-label", "Copy message");
+  });
+
+  it("copies only assistant text blocks, excluding thinking and tool activity", async () => {
+    const copyText = vi.fn(async () => true);
+    const entry = {
+      id: "a",
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "private reasoning" },
+          { type: "text", text: "First paragraph." },
+          { type: "toolCall", id: "call-1", name: "read", arguments: {} },
+          { type: "text", text: "Second paragraph." },
+        ],
+      },
+    };
+    const { container } = render(SessionEntry, {
+      props: { entry, model: model([entry]), copyText },
+    });
+
+    const copy = container.querySelector<HTMLButtonElement>(".copy-message-btn");
+    expect(copy).not.toBeNull();
+    if (!copy) return;
+    await fireEvent.click(copy);
+
+    expect(copyText).toHaveBeenCalledWith("First paragraph.\n\nSecond paragraph.");
   });
 
   it("renders an assistant message", () => {

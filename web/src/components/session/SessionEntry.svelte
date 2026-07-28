@@ -4,9 +4,10 @@
   // (safeMarkedParse) — everything else is escaped Svelte template. The wrapper
   // keeps its `entry-<id>` anchor so scroll/toggle + deep links survive.
   // Shared by the live app and the static export (model passed as a prop).
+  import { onDestroy } from 'svelte';
   import { Schema } from 'effect';
   import { marked } from 'marked';
-  import { icon, CircleCheck, CircleX, GitFork, Link2, Tag } from '../../shared/icons.js';
+  import { icon, Check, CircleCheck, CircleX, Copy, GitFork, Link2 } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
   import { formatTimestamp } from '../../session/render/entry-format.js';
   import {
@@ -18,10 +19,9 @@
   import ToolOutput from './ToolOutput.svelte';
   import ActivityFold from './ActivityFold.svelte';
 
-  // `live` (passed from <SessionContent>) gates the fork/label buttons, which
-  // need the chat composer; copy-link is always shown. The static export passes
-  // false. (Replaces the former renderForkButton/renderLabelButton isLive check —
-  // a prop, not a DOM probe, since entries mount before the composer.)
+  // `live` (passed from <SessionContent>) gates the fork button, which needs the
+  // chat composer; message-copy and copy-link are available in both the live app
+  // and static export through environment-specific clipboard adapters.
   interface EntryModel {
     readonly entries?: readonly SessionEntryData[];
     readonly renderedTools?: unknown;
@@ -39,6 +39,7 @@
     modelLabel = '',
     sessionId = '',
     canFork = true,
+    copyText = async () => false,
   }: {
     entry: SessionEntryData;
     model?: EntryModel | null;
@@ -46,8 +47,11 @@
     modelLabel?: string;
     sessionId?: string;
     canFork?: boolean;
+    copyText?: (text: string) => Promise<boolean>;
   } = $props();
 
+  let copyState = $state<'idle' | 'copied' | 'failed'>('idle');
+  let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   const ts = $derived(formatTimestamp(entry.timestamp));
   const entryId = $derived(entry.id ?? '');
   const md = (text: string): string => marked.parse(text, { async: false });
@@ -83,6 +87,14 @@
           .join('\n');
   });
   const userImages = $derived(imageBlocks(msg?.content));
+  const messageCopyText = $derived.by(() => {
+    if (!msg || (msg.role !== 'user' && msg.role !== 'assistant')) return '';
+    if (typeof msg.content === 'string') return msg.content;
+    return contentBlocksFromUnknown(msg.content)
+      .filter((block) => block.type === 'text' && blockText(block))
+      .map(blockText)
+      .join('\n\n');
+  });
   const assistantToolCalls = $derived(messageBlocks.filter((block) => block.type === 'toolCall'));
   const assistantThinking = $derived(
     messageBlocks.filter(
@@ -121,6 +133,29 @@
   const assistantName = $derived(
     String(msg?.model || msg?.provider || modelLabel || '').trim() || t('session.assistant'),
   );
+  const copyLabel = $derived(
+    copyState === 'copied'
+      ? t('common.copied')
+      : copyState === 'failed'
+        ? t('common.copyFailed')
+        : t('session.copyMessage'),
+  );
+
+  async function copyMessage(event: MouseEvent): Promise<void> {
+    event.stopPropagation();
+    if (!messageCopyText) return;
+    const copied = await copyText(messageCopyText);
+    copyState = copied ? 'copied' : 'failed';
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+    copyResetTimer = setTimeout(() => {
+      copyState = 'idle';
+      copyResetTimer = null;
+    }, 1500);
+  }
+
+  onDestroy(() => {
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+  });
 </script>
 
 <!-- eslint-disable svelte/no-at-html-tags -- trusted: Lucide icon SVG and rendered session markdown -->
@@ -129,16 +164,27 @@
   {#if live && canFork}<button
       class="fork-btn"
       data-entry-id={id}
-      title={t('session.forkFromMessage')}>{@html icon(GitFork, { size: 13 })}</button
+      title={t('session.forkFromMessage')}
+      aria-label={t('session.forkFromMessage')}>{@html icon(GitFork, { size: 16 })}</button
     >{/if}
-  {#if live}<button
-      class="label-btn"
-      data-entry-id={id}
-      title={t('session.labelEntry')}
-      aria-label={t('session.labelEntry')}>{@html icon(Tag, { size: 13 })}</button
+  {#if messageCopyText}<button
+      class:copied={copyState === 'copied'}
+      class:copy-failed={copyState === 'failed'}
+      class="copy-message-btn"
+      type="button"
+      title={copyLabel}
+      aria-label={copyLabel}
+      onclick={copyMessage}
+      >{@html icon(copyState === 'copied' ? Check : copyState === 'failed' ? CircleX : Copy, {
+        size: 16,
+      })}<span class="sr-only" aria-live="polite">{copyState === 'idle' ? '' : copyLabel}</span
+      ></button
     >{/if}
-  <button class="copy-link-btn" data-entry-id={id} title={t('session.copyMessageLink')}
-    >{@html icon(Link2, { size: 14 })}</button
+  <button
+    class="copy-link-btn"
+    data-entry-id={id}
+    title={t('session.copyMessageLink')}
+    aria-label={t('session.copyMessageLink')}>{@html icon(Link2, { size: 16 })}</button
   >
 {/snippet}
 {#snippet timestamp()}{#if ts}<div class="message-timestamp">{ts}</div>{/if}{/snippet}

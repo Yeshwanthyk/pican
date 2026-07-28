@@ -13,7 +13,7 @@ describe("wireSessionContentRuntime", () => {
 
   it("removes delegated listeners and restores downloadSessionJson on dispose", () => {
     document.body.innerHTML =
-      '<div id="messages"><button class="label-btn" data-entry-id="e1"></button></div>';
+      '<div id="messages"><button class="copy-link-btn" data-entry-id="e1"></button></div>';
     const previousDownload = vi.fn();
     const messages = document.getElementById("messages");
     if (!(messages instanceof HTMLElement)) return;
@@ -28,7 +28,6 @@ describe("wireSessionContentRuntime", () => {
         entries: [],
         header: {},
         toolCallMap: new Map(),
-        labelMap: new Map(),
       },
       sessionId: "s.jsonl",
       contentRuntime: { afterRender: null },

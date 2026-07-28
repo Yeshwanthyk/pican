@@ -2204,171 +2204,113 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   }
 }
 
-/* Copy link button - appears on hover */
-.copy-link-btn {
+/* Per-message actions */
+.copy-link-btn,
+.copy-message-btn,
+.fork-btn {
   position: absolute;
-  top: 8px;
+  top: 0;
   right: 8px;
-  width: 28px;
-  height: 28px;
-  padding: 6px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   background: var(--container-bg);
   border: 1px solid var(--dim);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--muted);
   cursor: pointer;
   opacity: 0;
   transition:
-    opacity 0.15s,
-    background 0.15s,
-    color 0.15s;
+    opacity 0.12s ease,
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.12s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
 }
 
-.label-btn {
-  position: absolute;
-  top: 8px;
-  right: 42px;
-  width: 28px;
-  height: 28px;
-  padding: 6.5px;
-  background: var(--container-bg);
-  border: 1px solid var(--dim);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 0.15s,
-    background 0.15s,
-    color 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
+.copy-message-btn {
+  right: 52px;
+  opacity: 0.72;
 }
 
 .fork-btn {
-  position: absolute;
-  top: 8px;
-  right: 76px;
-  width: 28px;
-  height: 28px;
-  padding: 6.5px;
-  background: var(--container-bg);
-  border: 1px solid var(--dim);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 0.15s,
-    background 0.15s,
-    color 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
+  right: 96px;
 }
 
 .user-message:hover .copy-link-btn,
 .assistant-message:hover .copy-link-btn,
-.user-message:hover .label-btn,
-.assistant-message:hover .label-btn,
+.user-message:hover .copy-message-btn,
+.assistant-message:hover .copy-message-btn,
 .user-message:hover .fork-btn,
-.assistant-message:hover .fork-btn {
+.assistant-message:hover .fork-btn,
+.copy-link-btn:focus-visible,
+.copy-message-btn:focus-visible,
+.fork-btn:focus-visible {
   opacity: 1;
 }
 
 .copy-link-btn:hover,
-.label-btn:hover,
+.copy-message-btn:hover,
 .fork-btn:hover {
   background: var(--accent);
   color: var(--body-bg);
   border-color: var(--accent);
 }
 
+.copy-link-btn:active,
+.copy-message-btn:active,
+.fork-btn:active {
+  transform: scale(0.96);
+}
+
+.copy-message-btn.copied,
 .copy-link-btn.copied {
   background: var(--success, #22c55e);
   color: white;
   border-color: var(--success, #22c55e);
 }
 
-.label-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 2200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
+.copy-message-btn.copy-failed {
+  background: var(--error, #ef4444);
+  color: white;
+  border-color: var(--error, #ef4444);
 }
 
-.label-modal {
-  width: min(420px, 100%);
-  background: var(--container-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-  padding: 16px;
-  color: var(--text);
+@media (max-width: 900px) {
+  .copy-link-btn,
+  .copy-message-btn,
+  .fork-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .copy-message-btn {
+    right: 56px;
+  }
+
+  .fork-btn {
+    right: 104px;
+  }
 }
 
-.label-modal h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
+@media (hover: none) {
+  .copy-link-btn,
+  .copy-message-btn,
+  .fork-btn {
+    opacity: 0.72;
+  }
 }
 
-.label-modal-field {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.label-modal-field input {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--input-bg, var(--body-bg));
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 9px 10px;
-  font: inherit;
-}
-
-.label-modal-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.label-modal-spacer {
-  flex: 1;
-}
-
-.label-modal-actions button {
-  border: 1px solid var(--border);
-  background: var(--container-bg);
-  color: var(--text);
-  border-radius: 7px;
-  padding: 7px 10px;
-  cursor: pointer;
-}
-
-.label-modal-save {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: var(--body-bg) !important;
-}
-
-.label-modal-remove {
-  color: var(--error, #ef4444) !important;
+@media (prefers-reduced-motion: reduce) {
+  .copy-link-btn,
+  .copy-message-btn,
+  .fork-btn {
+    transition: none;
+  }
 }
 
 /* Highlight effect for deep-linked messages */
