@@ -174,18 +174,45 @@ half-initialized database that fails opaquely on first use.
 
 The worker factory parses the session header. Pi, Codex, and Claude retain their native per-session worker shapes. OpenCode creates a lightweight session worker over the supervised shared HTTP/SSE service. The manager reuses one worker per active session, evicts failed workers, and reaps workers after 10 minutes idle.
 
-On success, server creation starts:
+On success, server creation follows an explicit mode matrix:
 
-1. session file watching (fsnotify plus polling fallback);
-2. workflow and task watchers;
-3. Pi `session-status` watching;
-4. the one-second running-status sweeper;
-5. the schedule runner;
-6. the persistent chat-queue drainer.
+| Lifecycle | Hosted | Standalone |
+|-----------|--------|------------|
+| SQLite + durable session-create store | Start with pins/archive/create-only schema | Start with full schema |
+| Session file watcher | Start | Start |
+| Session status watcher + one-second sweeper | Start | Start |
+| Workflow watcher + task watcher | Do not construct | Start |
+| Schedule store + runner | Do not construct | Start |
+| Projects/Peers/Scratchpad/BTW persistence + handlers | Do not construct/register | Construct/register |
+| Push manager | Do not construct | Construct when available |
+| Subagent scan surface | Do not construct/register | Register; initialize lazily |
+| Persistent chat queue + autonomous drainer | Do not construct | Start |
+| Updater hooks + metrics state | Do not retain/initialize | Retain/initialize |
+| Sounds routes | Do not register | Register |
+
+Hosted startup also requires exactly one registered runtime (Codex), a Codex
+lifecycle service, and Codex as the default. Claude/OpenCode lifecycle services
+are not retained, and hosted session resolution rejects any non-Codex
+projection before a retained handler can act on it.
 
 ### 9. Route Registration and Mounting
 
-All routes are wrapped with `auth.Wrap`:
+Standalone registers the complete historical route surface. Hosted registers
+only the backend routes in this matrix; every other standalone endpoint is
+unregistered and returns `404`:
+
+| Route group | Hosted | Standalone |
+|-------------|--------|------------|
+| Session detail/list, create, local archive, rename, pins | Register | Register |
+| Native Codex archive/unarchive | Register | Register |
+| Chat/cancel, model list/set, effort, files, Git diff | Register | Register |
+| SSE, worker status, approvals/questions | Register | Register |
+| UI/settings/share/runtime/commands/queue/fork/clone/label/delete | 404 | Register |
+| Projects/locations/peers/fs browse/Git info/branch rename | 404 | Register |
+| Schedules/workflows/tasks/subagents/scratchpad/BTW | 404 | Register |
+| Push/sounds/metrics+pprof/updater | 404 | Register when available |
+
+Registered routes retain their existing `auth.Wrap` behavior:
 
 ```go
 mux.HandleFunc("/", s.auth.Wrap(s.handleIndex))
@@ -195,6 +222,14 @@ mux.HandleFunc("/api/runtimes", s.auth.Wrap(s.handleRuntimes))
 mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
 // … etc
 ```
+
+Hosted Thread creation normalizes an omitted path to the canonical configured
+`WorkspaceRoot` and an omitted runtime to Codex. Only that exact canonical root
+and Codex are accepted. A child, missing child, parent, sibling, traversal,
+symlink escape, non-Codex runtime, or `sourceSessionId` is rejected before an
+idempotency claim or Codex native mutation. `StartSession` therefore always
+receives the canonical root, and hosted creation never auto-registers a
+Project.
 
 `/api/models?runtime=<runtime>` scopes explicit discovery; `/api/models?id=<session-id>` resolves the session runtime. Global callers such as settings and schedules continue using the merged `/api/models` response.
 

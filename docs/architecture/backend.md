@@ -384,6 +384,31 @@ type piRPCWorker struct {
 
 ## HTTP Handler Map
 
+`Server.Register` has two explicit surfaces. Hosted mode is a backend-only,
+single-workspace API: the existing internal Session names remain, while each
+Session represents one Codex Thread in the configured workspace. Standalone
+mode retains the complete route set below.
+
+| Surface | Hosted | Standalone |
+|---------|--------|------------|
+| Session detail/list: `/api/session`, `/api/sessions` | Yes | Yes |
+| Create/local archive/native Codex archive+unarchive/rename/pins | Yes | Yes |
+| Chat+cancel/models+set model+thinking effort/files/Git diff | Yes | Yes |
+| SSE/worker status/extension approvals and questions | Yes | Yes |
+| Live UI, settings, share, runtime list, commands, queue, fork/clone/label/delete | No | Yes |
+| Projects/recent locations/peers/fs browse/Git info+branch rename | No | Yes |
+| Schedules/workflows/tasks/subagents/scratchpad/BTW | No | Yes |
+| Push/sounds/metrics+pprof/updater | No | Yes, when the optional service is available |
+
+Hosted `POST /api/new-session` requires `Idempotency-Key`. An omitted `path`
+becomes the canonical configured workspace root and an omitted `runtime`
+becomes `codex`. The canonical root is the only accepted working directory:
+children (existing or missing), parents, siblings, traversal, and symlink
+escapes are rejected before the idempotency record or native Codex service is
+mutated. `sourceSessionId` and non-Codex runtimes are rejected. Every accepted
+request passes the exact canonical root to Codex, and hosted creation does not
+add a Projects tracking row.
+
 | Route | Method | Handler | Description |
 |-------|--------|---------|-------------|
 | `/` | GET | `handleIndex` | Render SPA shell for the sessions route |
@@ -440,6 +465,30 @@ type piRPCWorker struct {
 | `/api/check-update` | POST | `handleCheckUpdate` | Force a version check |
 | `/api/update` | POST | `handleUpdate` | Install the latest pican |
 | `/api/restart` | POST | `handleRestart` | Restart the service onto the new binary |
+
+## Server-owned Service Matrix
+
+`server.New` constructs core state in both modes, but hosted mode does not
+construct dormant standalone services or start their goroutines.
+
+| Service/lifecycle | Hosted | Standalone |
+|-------------------|--------|------------|
+| SQLite (`session_pins`, `session_archives`, hosted-create idempotency only) | Start | Start with full standalone schema |
+| Session projection file watcher | Start | Start |
+| Session status watcher and one-second sweeper | Start | Start |
+| Schedules store and scheduler | Absent | Start |
+| Projects, Peers, Scratchpad, and BTW persistence/handlers | Absent | Construct/register |
+| Push manager | Absent | Construct when available |
+| Workflow and task watchers | Absent | Start |
+| Subagent scan surface | Absent | Register; initialize cache lazily |
+| Persistent chat queue and autonomous drainer | Absent | Start |
+| Updater checker/install/restart hooks | Absent | Retain when configured |
+| Metrics state and pprof routes | Absent | Initialize/register |
+| Sounds routes | Absent | Register |
+
+Hosted SQLite deliberately omits the standalone Scratchpad, Settings, Projects,
+Peers, BTW, Schedules, and persistent chat-queue tables and does not run their
+migrations.
 
 PWA / static asset routes (registered outside `Server.Register`):
 
