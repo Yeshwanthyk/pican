@@ -600,6 +600,10 @@ func (s *Server) handleNewSession(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
+	if err := s.normalizeHostedNewSessionRequest(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if body.Path == "" {
 		writeJSONError(w, http.StatusBadRequest, "path is required")
 		return

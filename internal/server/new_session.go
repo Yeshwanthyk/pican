@@ -23,6 +23,42 @@ type newSessionRequest struct {
 	InitialPrompt   string `json:"initialPrompt"`
 }
 
+// normalizeHostedNewSessionRequest enforces the hosted Thread-create contract
+// before the idempotency store or native Codex service can be touched.
+func (s *Server) normalizeHostedNewSessionRequest(body *newSessionRequest) error {
+	if !s.hosted {
+		return nil
+	}
+	if s.workspace == nil || s.workspaceRoot == "" {
+		return errors.New("hosted workspace is unavailable")
+	}
+	if strings.TrimSpace(body.SourceSessionID) != "" {
+		return errors.New("sourceSessionId is not supported in hosted mode")
+	}
+	runtime := strings.TrimSpace(body.Runtime)
+	if runtime == "" {
+		runtime = string(runtimes.CodexID)
+	}
+	if runtime != string(runtimes.CodexID) {
+		return errors.New("hosted session creation supports only the Codex runtime")
+	}
+	path := strings.TrimSpace(body.Path)
+	if path == "" {
+		path = s.workspaceRoot
+	}
+	canonical, err := s.workspace.ResolveForCreation(path)
+	if err != nil {
+		return err
+	}
+	if canonical != s.workspaceRoot {
+		return errors.New("path must equal the hosted workspace root")
+	}
+	body.Path = s.workspaceRoot
+	body.SourceSessionID = ""
+	body.Runtime = string(runtimes.CodexID)
+	return nil
+}
+
 func (s *Server) initialSettingsFromSource(ctx context.Context, sourceSessionID, targetRuntime string) sessions.InitialSettings {
 	if s.chatSender == nil || sourceSessionID == "" {
 		return sessions.InitialSettings{}
@@ -101,9 +137,15 @@ func (s *Server) handleIdempotentCodexCreate(
 		return
 	}
 
-	normalizedPath := ""
+	normalizedPath := body.Path
 	var err error
-	if s.workspace != nil {
+	if s.hosted {
+		if err = s.normalizeHostedNewSessionRequest(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		normalizedPath = body.Path
+	} else if s.workspace != nil {
 		normalizedPath, err = s.workspace.ResolveForCreation(body.Path)
 	} else {
 		// Standalone idempotent callers retain the existing create-path
@@ -156,11 +198,15 @@ func (s *Server) handleIdempotentCodexCreate(
 	}
 	record := claim.Record
 	if claim.Owner {
-		cwd, pathErr := s.prepareSessionPath(normalizedPath)
-		if pathErr != nil {
-			s.markCreateUnknown(key, fingerprint)
-			writeJSONError(w, http.StatusServiceUnavailable, "session creation state is unknown")
-			return
+		cwd := normalizedPath
+		if !s.hosted {
+			var pathErr error
+			cwd, pathErr = s.prepareSessionPath(normalizedPath)
+			if pathErr != nil {
+				s.markCreateUnknown(key, fingerprint)
+				writeJSONError(w, http.StatusServiceUnavailable, "session creation state is unknown")
+				return
+			}
 		}
 		model := settings.ModelID
 		if settings.ModelProvider != "" && settings.ModelProvider != codex.Provider {
@@ -217,7 +263,7 @@ func (s *Server) handleIdempotentCodexCreate(
 		writeJSONError(w, http.StatusBadRequest, boundaryErr.Error())
 		return
 	}
-	if resolved.Session.Project != "" && s.trackProject(resolved.Session.Project) == nil {
+	if !s.hosted && resolved.Session.Project != "" && s.trackProject(resolved.Session.Project) == nil {
 		s.publishCurationUpdated()
 	}
 

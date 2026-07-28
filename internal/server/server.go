@@ -42,6 +42,8 @@ import (
 // page subscribes to this so it can refresh when new sessions show up.
 const globalSessID = "__all__"
 
+var errHostedNonCodexSession = errors.New("hosted mode accepts only Codex sessions")
+
 // Deps groups everything the server needs that lives outside this package:
 // rendering (which depends on embedded templates in package main), the model
 // list (which depends on a process-wide cache), and the chat sender (which
@@ -181,6 +183,49 @@ type Server struct {
 	metrics   metricsState
 	autoTitle autoTitleState
 	tasks     tasksWatcherState
+	services  serviceSurface
+}
+
+// serviceSurface is the startup matrix for server-owned services. Core session
+// state, file/status watching, and the status sweeper exist in both modes.
+// Everything else in this matrix is standalone-only.
+type serviceSurface struct {
+	sqlite           bool
+	sessionCreate    bool
+	sessionFiles     bool
+	statusWatcher    bool
+	statusSweeper    bool
+	schedules        bool
+	push             bool
+	workflowsWatcher bool
+	tasksWatcher     bool
+	scheduler        bool
+	chatQueue        bool
+	queueDrainer     bool
+	updater          bool
+	metrics          bool
+}
+
+func serviceSurfaceFor(hosted bool) serviceSurface {
+	surface := serviceSurface{
+		sqlite:        true,
+		sessionCreate: true,
+		sessionFiles:  true,
+		statusWatcher: true,
+		statusSweeper: true,
+	}
+	if !hosted {
+		surface.schedules = true
+		surface.push = true
+		surface.workflowsWatcher = true
+		surface.tasksWatcher = true
+		surface.scheduler = true
+		surface.chatQueue = true
+		surface.queueDrainer = true
+		surface.updater = true
+		surface.metrics = true
+	}
+	return surface
 }
 
 // resolveSession is the canonical read path for server code. Tests and legacy
@@ -203,6 +248,9 @@ func (s *Server) resolveSession(id string) (sessions.ResolvedSession, error) {
 	canonical, boundaryErr := s.resolveWorkspacePath(cwd)
 	if boundaryErr != nil {
 		return sessions.ResolvedSession{}, boundaryErr
+	}
+	if s.hosted && resolved.Session.Runtime != string(runtimes.CodexID) {
+		return sessions.ResolvedSession{}, errHostedNonCodexSession
 	}
 	resolved.Session.Project = canonical
 	return resolved, nil
@@ -242,6 +290,7 @@ func New(deps Deps) (*Server, error) {
 		return nil, fmt.Errorf("create agent directory %s: %w", agentDir, err)
 	}
 	hosted := deps.Hosted || strings.TrimSpace(deps.WorkspaceRoot) != ""
+	services := serviceSurfaceFor(hosted)
 	var workspaceResolver *workspace.Resolver
 	if hosted {
 		if strings.TrimSpace(deps.WorkspaceRoot) == "" {
@@ -254,7 +303,7 @@ func New(deps Deps) (*Server, error) {
 		}
 	}
 
-	db, err := initDB(agentDir)
+	db, err := initDB(agentDir, hosted)
 	if err != nil {
 		return nil, err
 	}
@@ -281,23 +330,12 @@ func New(deps Deps) (*Server, error) {
 		models:              deps.Models,
 		modelsFor:           deps.ModelsFor,
 		defaultRuntime:      deps.DefaultRuntime,
-		claudeHome:          deps.ClaudeHome,
-		claude:              deps.Claude,
 		codex:               deps.Codex,
-		openCode:            deps.OpenCode,
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),
 		db:                  db,
-		schedules:           schedules.NewStore(db),
-		chatQueue:           chatqueue.NewStore(db),
 		sessionCreates:      sessionCreates,
-		updater:             deps.Updater,
-		runInstall:          deps.RunInstall,
-		runRestart:          deps.RunRestart,
-		metrics: metricsState{
-			startedAt: now(),
-			cpuLast:   make(map[int]cpuMark),
-		},
+		services:            services,
 		autoTitle: autoTitleState{
 			inFlight:  make(map[string]bool),
 			name:      make(map[string]string),
@@ -308,10 +346,26 @@ func New(deps Deps) (*Server, error) {
 	if workspaceResolver != nil {
 		s.workspaceRoot = workspaceResolver.Root()
 	}
+	if !hosted {
+		s.claudeHome = deps.ClaudeHome
+		s.claude = deps.Claude
+		s.openCode = deps.OpenCode
+	}
 	s.runtimeRegistry, err = serverRuntimeRegistry(deps)
 	if err != nil {
 		db.Close()
 		return nil, err
+	}
+	if hosted {
+		runtimeIDs := s.runtimeRegistry.IDs()
+		if len(runtimeIDs) != 1 || runtimeIDs[0] != runtimes.CodexID {
+			db.Close()
+			return nil, fmt.Errorf("hosted mode requires exactly the Codex runtime; configured %v", runtimeIDs)
+		}
+		if s.codex == nil {
+			db.Close()
+			return nil, errors.New("Codex service is required in hosted mode")
+		}
 	}
 	if s.defaultRuntime == "" {
 		// Legacy Deps defaulted to Pi regardless of list order. A supplied
@@ -319,44 +373,81 @@ func New(deps Deps) (*Server, error) {
 		// authoritative when no explicit default is provided.
 		s.defaultRuntime = defaultRuntimeID(s.runtimeRegistry, deps.RuntimeRegistry == nil)
 	}
+	if hosted && s.defaultRuntime != string(runtimes.CodexID) {
+		db.Close()
+		return nil, fmt.Errorf("hosted mode requires Codex as the default runtime, got %q", s.defaultRuntime)
+	}
 	if _, err := s.runtimeRegistry.Open(s.defaultRuntime); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("default runtime %q is not registered: %w", s.defaultRuntime, err)
 	}
-	s.schedules.Now = now
-	s.chatQueue.Now = now
-	if pm, err := NewPushManager(agentDir); err != nil {
-		fmt.Fprintf(os.Stderr, "push notifications unavailable: %v\n", err)
-	} else {
-		s.push = pm
+	if services.schedules {
+		s.schedules = schedules.NewStore(db)
+		s.schedules.Now = now
 	}
-	s.watchFiles()
-	s.startWorkflowsWatcher()
-	s.startTasksWatcher()
-	if err := s.startSessionStatusWatcher(); err != nil {
-		fmt.Fprintf(os.Stderr, "session-status watcher unavailable: %v\n", err)
+	if services.chatQueue {
+		s.chatQueue = chatqueue.NewStore(db)
+		s.chatQueue.Now = now
 	}
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.runStatusSweeper(s.stopCh, time.Second)
-	}()
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.runScheduler(s.stopCh, scheduleTickInterval)
-	}()
-	// Autonomous queue drainer: drains chat_queue items into the worker even
-	// when nobody has the session open in a browser. Stop in Shutdown.
-	s.queueDrainer = newQueueDrainer(s)
-	s.queueDrainer.start()
+	if services.updater {
+		s.updater = deps.Updater
+		s.runInstall = deps.RunInstall
+		s.runRestart = deps.RunRestart
+	}
+	if services.metrics {
+		s.metrics = metricsState{
+			startedAt: now(),
+			cpuLast:   make(map[int]cpuMark),
+		}
+	}
+	if services.push {
+		if pm, err := NewPushManager(agentDir); err != nil {
+			fmt.Fprintf(os.Stderr, "push notifications unavailable: %v\n", err)
+		} else {
+			s.push = pm
+		}
+	}
+	if services.sessionFiles {
+		s.watchFiles()
+	}
+	if services.workflowsWatcher {
+		s.startWorkflowsWatcher()
+	}
+	if services.tasksWatcher {
+		s.startTasksWatcher()
+	}
+	if services.statusWatcher {
+		if err := s.startSessionStatusWatcher(); err != nil {
+			fmt.Fprintf(os.Stderr, "session-status watcher unavailable: %v\n", err)
+		}
+	}
+	if services.statusSweeper {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.runStatusSweeper(s.stopCh, time.Second)
+		}()
+	}
+	if services.scheduler {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.runScheduler(s.stopCh, scheduleTickInterval)
+		}()
+	}
+	if services.queueDrainer {
+		// Autonomous queue drainer: drains chat_queue items into the worker even
+		// when nobody has the session open in a browser. Stop in Shutdown.
+		s.queueDrainer = newQueueDrainer(s)
+		s.queueDrainer.start()
+	}
 	return s, nil
 }
 
 // initDB opens the SQLite database and creates the schema. Any failure is
 // returned so the server refuses to start rather than running with a
 // half-initialized database that fails opaquely on first use.
-func initDB(agentDir string) (*sql.DB, error) {
+func initDB(agentDir string, hosted bool) (*sql.DB, error) {
 	dbPath := filepath.Join(agentDir, "pican.sqlite")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -380,34 +471,40 @@ func initDB(agentDir string) (*sql.DB, error) {
 		return nil, fmt.Errorf("set busy_timeout: %w", err)
 	}
 
-	schema := []struct {
+	type schemaStatement struct {
 		name string
 		stmt string
-	}{
-		{"scratchpads table", `CREATE TABLE IF NOT EXISTS scratchpads (
+	}
+	schema := []schemaStatement{
+		{"session_pins table", sessionPinsSchema},
+		{"session_archives table", sessionArchivesSchema},
+		{"hosted_session_creates table", sessioncreate.TableDDL},
+	}
+	if !hosted {
+		standaloneSchema := []schemaStatement{
+			{"scratchpads table", `CREATE TABLE IF NOT EXISTS scratchpads (
 			project_path TEXT PRIMARY KEY,
 			content TEXT,
 			updated_at DATETIME
 		)`},
-		{"settings table", `CREATE TABLE IF NOT EXISTS settings (
+			{"settings table", `CREATE TABLE IF NOT EXISTS settings (
 			key        TEXT PRIMARY KEY,
 			value      TEXT,
 			updated_at DATETIME
 		)`},
-		{"project_prefs table", projectPrefsSchema},
-		{"app_settings table", appSettingsSchema},
-		{"session_pins table", sessionPinsSchema},
-		{"session_archives table", sessionArchivesSchema},
-		{"peer_hosts table", peerHostsSchema},
-		{"btw_sessions table", btwSessionsSchema},
-		{"schedules table", schedules.SchedulesTableDDL},
-		{"schedule_runs table", schedules.RunsTableDDL},
-		{"schedule_runs schedule index", schedules.RunsScheduleIndexDDL},
-		{"schedule_runs session index", schedules.RunsSessionIndexDDL},
-		{"chat_queue_items table", chatqueue.ItemsTableDDL},
-		{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
-		{"chat_queue_state table", chatqueue.StateTableDDL},
-		{"hosted_session_creates table", sessioncreate.TableDDL},
+			{"project_prefs table", projectPrefsSchema},
+			{"app_settings table", appSettingsSchema},
+			{"peer_hosts table", peerHostsSchema},
+			{"btw_sessions table", btwSessionsSchema},
+			{"schedules table", schedules.SchedulesTableDDL},
+			{"schedule_runs table", schedules.RunsTableDDL},
+			{"schedule_runs schedule index", schedules.RunsScheduleIndexDDL},
+			{"schedule_runs session index", schedules.RunsSessionIndexDDL},
+			{"chat_queue_items table", chatqueue.ItemsTableDDL},
+			{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
+			{"chat_queue_state table", chatqueue.StateTableDDL},
+		}
+		schema = append(standaloneSchema, schema...)
 	}
 	for _, s := range schema {
 		if _, err := db.Exec(s.stmt); err != nil {
@@ -415,7 +512,9 @@ func initDB(agentDir string) (*sql.DB, error) {
 			return nil, fmt.Errorf("create %s: %w", s.name, err)
 		}
 	}
-	migrateLegacyBtwSession(db)
+	if !hosted {
+		migrateLegacyBtwSession(db)
+	}
 	return db, nil
 }
 
@@ -434,12 +533,89 @@ func (s *Server) Shutdown() {
 	s.wg.Wait()
 }
 
-// Register installs every HTTP handler on mux, wrapped with the auth
-// middleware from Deps.
+type routeSurface struct {
+	Pattern    string
+	Hosted     bool
+	Standalone bool
+}
+
+// routeSurfaceMatrix is the shipped backend contract. Hosted exposes only the
+// fixed-workspace Thread API; standalone retains the complete historical
+// surface. Conditional standalone rows are mounted when their service exists.
+var routeSurfaceMatrix = []routeSurface{
+	{Pattern: "/api/session", Hosted: true, Standalone: true},
+	{Pattern: "/api/sessions", Hosted: true, Standalone: true},
+	{Pattern: "/api/new-session", Hosted: true, Standalone: true},
+	{Pattern: "/api/archives", Hosted: true, Standalone: true},
+	{Pattern: "/api/codex/thread/archive", Hosted: true, Standalone: true},
+	{Pattern: "/api/codex/thread/unarchive", Hosted: true, Standalone: true},
+	{Pattern: "/api/rename-session", Hosted: true, Standalone: true},
+	{Pattern: "/api/pins", Hosted: true, Standalone: true},
+	{Pattern: "/api/chat", Hosted: true, Standalone: true},
+	{Pattern: "/api/chat/cancel", Hosted: true, Standalone: true},
+	{Pattern: "/api/models", Hosted: true, Standalone: true},
+	{Pattern: "/api/set-model", Hosted: true, Standalone: true},
+	{Pattern: "/api/set-thinking-level", Hosted: true, Standalone: true},
+	{Pattern: "/api/files", Hosted: true, Standalone: true},
+	{Pattern: "/api/git/diff", Hosted: true, Standalone: true},
+	{Pattern: "/events", Hosted: true, Standalone: true},
+	{Pattern: "/api/worker-status", Hosted: true, Standalone: true},
+	{Pattern: "/api/extension-ui/pending", Hosted: true, Standalone: true},
+	{Pattern: "/api/extension-ui/respond", Hosted: true, Standalone: true},
+
+	{Pattern: "/", Standalone: true},
+	{Pattern: "/session", Standalone: true},
+	{Pattern: "/settings", Standalone: true},
+	{Pattern: "/api/runtimes", Standalone: true},
+	{Pattern: "/api/codex/thread/delete", Standalone: true},
+	{Pattern: "/api/opencode/session/delete", Standalone: true},
+	{Pattern: "/api/commands", Standalone: true},
+	{Pattern: "/share", Standalone: true},
+	{Pattern: "/api/fork-session", Standalone: true},
+	{Pattern: "/api/clone-session", Standalone: true},
+	{Pattern: "/api/label-session", Standalone: true},
+	{Pattern: "/api/recent-locations", Standalone: true},
+	{Pattern: "/api/projects", Standalone: true},
+	{Pattern: "/api/peers", Standalone: true},
+	{Pattern: "/api/peers/sessions", Standalone: true},
+	{Pattern: "/api/fs/browse", Standalone: true},
+	{Pattern: "/api/git/info", Standalone: true},
+	{Pattern: "/api/git/rename-branch", Standalone: true},
+	{Pattern: "/custom-themes.css", Standalone: true},
+	{Pattern: "/api/scratchpad", Standalone: true},
+	{Pattern: "/api/chat/queue", Standalone: true},
+	{Pattern: "/api/settings", Standalone: true},
+	{Pattern: "/api/btw", Standalone: true},
+	{Pattern: "/api/btw/new", Standalone: true},
+	{Pattern: "/api/schedules", Standalone: true},
+	{Pattern: "/api/schedule", Standalone: true},
+	{Pattern: "/api/schedule/run", Standalone: true},
+	{Pattern: "/api/schedule/runs", Standalone: true},
+	{Pattern: "/api/workflows", Standalone: true},
+	{Pattern: "/api/workflows/run", Standalone: true},
+	{Pattern: "/api/tasks", Standalone: true},
+	{Pattern: "/api/tasks/output", Standalone: true},
+	{Pattern: "/api/subagents", Standalone: true},
+	{Pattern: "/metrics", Standalone: true},
+	{Pattern: "/api/metrics", Standalone: true},
+	{Pattern: "/api/debug/pprof/", Standalone: true},
+	{Pattern: "/api/debug/pprof/cmdline", Standalone: true},
+	{Pattern: "/api/debug/pprof/profile", Standalone: true},
+	{Pattern: "/api/debug/pprof/symbol", Standalone: true},
+	{Pattern: "/api/debug/pprof/trace", Standalone: true},
+	{Pattern: "/api/push/vapid", Standalone: true},
+	{Pattern: "/api/push/subscribe", Standalone: true},
+	{Pattern: "/api/push/unsubscribe", Standalone: true},
+	{Pattern: "/api/sounds", Standalone: true},
+	{Pattern: "/sounds/", Standalone: true},
+	{Pattern: "/api/version", Standalone: true},
+	{Pattern: "/api/check-update", Standalone: true},
+	{Pattern: "/api/update", Standalone: true},
+	{Pattern: "/api/restart", Standalone: true},
+}
+
+// Register installs the mode's HTTP handlers on mux.
 func (s *Server) Register(mux *http.ServeMux) {
-	mux.HandleFunc("/", s.auth.Wrap(s.handleIndex))
-	mux.HandleFunc("/session", s.auth.Wrap(s.handleSession))
-	mux.HandleFunc("/settings", s.auth.Wrap(s.handleSettingsPage))
 	mux.HandleFunc("/api/session", s.auth.Wrap(s.handleApiSession))
 	mux.HandleFunc("/api/sessions", s.auth.Wrap(s.handleApiSessions))
 	mux.HandleFunc("/api/chat", s.auth.Wrap(s.handleChat))
@@ -447,33 +623,40 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/set-model", s.auth.Wrap(s.handleSetModel))
 	mux.HandleFunc("/api/set-thinking-level", s.auth.Wrap(s.handleSetThinkingLevel))
 	mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
-	mux.HandleFunc("/api/runtimes", s.auth.Wrap(s.handleRuntimes))
 	mux.HandleFunc("/api/codex/thread/archive", s.auth.Wrap(s.handleCodexThreadArchive))
 	mux.HandleFunc("/api/codex/thread/unarchive", s.auth.Wrap(s.handleCodexThreadUnarchive))
-	mux.HandleFunc("/api/codex/thread/delete", s.auth.Wrap(s.handleCodexThreadDelete))
-	mux.HandleFunc("/api/opencode/session/delete", s.auth.Wrap(s.handleOpenCodeSessionDelete))
 	mux.HandleFunc("/api/worker-status", s.auth.Wrap(s.handleWorkerStatus))
-	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
 	mux.HandleFunc("/api/extension-ui/pending", s.auth.Wrap(s.handlePendingExtensionUI))
 	mux.HandleFunc("/api/extension-ui/respond", s.auth.Wrap(s.handleRespondExtensionUI))
-	mux.HandleFunc("/share", s.auth.Wrap(s.handleShare))
 	mux.HandleFunc("/events", s.auth.Wrap(s.handleEvents))
 	mux.HandleFunc("/api/new-session", s.auth.Wrap(s.handleNewSession))
+	mux.HandleFunc("/api/rename-session", s.auth.Wrap(s.handleRenameSession))
+	mux.HandleFunc("/api/pins", s.getPostHandler(s.handleListPins, s.handleSetPin))
+	mux.HandleFunc("/api/archives", s.auth.Wrap(s.handleSetArchive))
+	mux.HandleFunc("/api/files", s.auth.Wrap(s.handleApiFiles))
+	mux.HandleFunc("/api/git/diff", s.auth.Wrap(s.handleGitDiff))
+	if s.hosted {
+		return
+	}
+
+	mux.HandleFunc("/", s.auth.Wrap(s.handleIndex))
+	mux.HandleFunc("/session", s.auth.Wrap(s.handleSession))
+	mux.HandleFunc("/settings", s.auth.Wrap(s.handleSettingsPage))
+	mux.HandleFunc("/api/runtimes", s.auth.Wrap(s.handleRuntimes))
+	mux.HandleFunc("/api/codex/thread/delete", s.auth.Wrap(s.handleCodexThreadDelete))
+	mux.HandleFunc("/api/opencode/session/delete", s.auth.Wrap(s.handleOpenCodeSessionDelete))
+	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
+	mux.HandleFunc("/share", s.auth.Wrap(s.handleShare))
 	mux.HandleFunc("/api/fork-session", s.auth.Wrap(s.handleApiForkSession))
 	mux.HandleFunc("/api/clone-session", s.auth.Wrap(s.handleApiCloneSession))
-	mux.HandleFunc("/api/rename-session", s.auth.Wrap(s.handleRenameSession))
 	mux.HandleFunc("/api/label-session", s.auth.Wrap(s.handleLabelSessionEntry))
 	mux.HandleFunc("/api/recent-locations", s.auth.Wrap(s.handleRecentLocations))
 	mux.HandleFunc("/api/projects", s.getPostHandler(s.handleApiProjects, s.handleUpdateProject))
-	mux.HandleFunc("/api/pins", s.getPostHandler(s.handleListPins, s.handleSetPin))
-	mux.HandleFunc("/api/archives", s.auth.Wrap(s.handleSetArchive))
 	mux.HandleFunc("/api/peers", s.getPostHandler(s.handleApiPeers, s.handleUpdatePeer))
 	mux.HandleFunc("/api/peers/sessions", s.auth.Wrap(s.handlePeersSessions))
-	mux.HandleFunc("/api/files", s.auth.Wrap(s.handleApiFiles))
 	mux.HandleFunc("/api/fs/browse", s.auth.Wrap(s.handleFSBrowse))
 	mux.HandleFunc("/api/git/info", s.auth.Wrap(s.handleGitInfo))
 	mux.HandleFunc("/api/git/rename-branch", s.auth.Wrap(s.handleGitRenameBranch))
-	mux.HandleFunc("/api/git/diff", s.auth.Wrap(s.handleGitDiff))
 	// Public (no auth): the login gate needs the custom palette to theme
 	// correctly before the user authenticates. Contents are non-secret color
 	// variables only.
@@ -531,6 +714,9 @@ func (s *Server) loadSummaries() ([]sessions.SessionSummary, error) {
 	}
 	filtered := summaries[:0]
 	for _, summary := range summaries {
+		if s.hosted && summary.Runtime != string(runtimes.CodexID) {
+			continue
+		}
 		project, resolveErr := s.workspace.ResolveExisting(summary.Project)
 		if resolveErr != nil {
 			continue
