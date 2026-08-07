@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { normalizeSession } from "../../index/sessions";
 import { PinnedTabsModel } from "../../session/pinned-tabs-model.svelte";
 import PinnedTabsStrip from "./PinnedTabsStrip.svelte";
+import { resetSessionPrefetch } from "../../routes/session-prefetch";
+
+afterEach(() => {
+  resetSessionPrefetch();
+  vi.unstubAllGlobals();
+});
 
 const pinned = (id: string, pinOrder: number, runtime = "pi") =>
   normalizeSession({
@@ -39,6 +45,28 @@ describe("PinnedTabsStrip", () => {
       "s10",
     ]);
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("Session s10");
+  });
+
+  it("does not prefetch the active tab when it mounts under the pointer", async () => {
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ entries: [] })),
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+    const model = new PinnedTabsModel("current");
+    model.sessions = [pinned("current", 1), pinned("other", 2)];
+    const { container } = render(PinnedTabsStrip, {
+      props: { model, currentSession: model.sessions[0]! },
+    });
+
+    const current = container.querySelector<HTMLElement>('[data-session-id="current"] a');
+    const other = container.querySelector<HTMLElement>('[data-session-id="other"] a');
+    await fireEvent.pointerEnter(current!);
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    await fireEvent.pointerEnter(other!);
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("id=other");
   });
 
   it("counts the guest against capacity and renders all runtime marks", () => {

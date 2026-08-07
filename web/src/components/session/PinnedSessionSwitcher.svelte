@@ -4,6 +4,7 @@
   import { openSessionPalette } from '../../shared/command-palette-runtime';
   import { t } from '../../shared/strings';
   import { runtimeDisplay } from '../../lib/runtime-display';
+  import { prefetchSession } from '../../routes/session-prefetch';
   import type { NormalizedSession } from '../../index/sessions';
   import type { PinnedTabsModel } from '../../session/pinned-tabs-model.svelte';
 
@@ -39,6 +40,10 @@
   function openSession(id: string): void {
     close();
     if (id !== currentSession.id) navigate('/session?id=' + encodeURIComponent(id));
+  }
+
+  function startPrefetch(id: string): void {
+    if (id !== currentSession.id) prefetchSession(id);
   }
 
   async function toggleCurrentPin(): Promise<void> {
@@ -98,6 +103,9 @@
           class:pinned-session-switcher-row--current={session.id === currentSession.id}
           aria-current={session.id === currentSession.id ? 'page' : undefined}
           onclick={() => openSession(session.id)}
+          onpointerenter={() => startPrefetch(session.id)}
+          onmousedown={() => startPrefetch(session.id)}
+          ontouchstart={() => startPrefetch(session.id)}
         >
           {#if mark.icon}
             <img

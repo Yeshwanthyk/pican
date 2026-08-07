@@ -83,13 +83,66 @@ test.describe("pinned session tabs", () => {
       await page.locator(".pinned-tab--guest .pinned-tab-pin").click();
       await expect(page.locator(".pinned-tab")).toHaveCount(2);
 
-      await page.locator(`[data-session-id="${alphaId}"] > a`).click();
+      const targetSessionRequests: string[] = [];
+      const targetSessionStreams: string[] = [];
+      const isTargetSessionRequest = (rawURL: string) => {
+        const url = new URL(rawURL);
+        return (
+          url.pathname === "/api/session" &&
+          url.searchParams.get("id") === alphaId &&
+          url.searchParams.get("paginate") === "1"
+        );
+      };
+      const isTargetSessionStream = (rawURL: string) => {
+        const url = new URL(rawURL);
+        return url.pathname === "/events" && url.searchParams.get("id") === alphaId;
+      };
+      const trackTargetRequests = (request: import("@playwright/test").Request) => {
+        if (isTargetSessionRequest(request.url())) targetSessionRequests.push(request.url());
+        if (isTargetSessionStream(request.url())) targetSessionStreams.push(request.url());
+      };
+      page.on("request", trackTargetRequests);
+      const documentIdentity = await page.evaluate(() => {
+        const identity = crypto.randomUUID();
+        const markedWindow = window as Window & { __picanPinnedSwitchDocument?: string };
+        markedWindow.__picanPinnedSwitchDocument = identity;
+        return {
+          identity,
+          navigationCount: performance.getEntriesByType("navigation").length,
+        };
+      });
+
+      const alphaTab = page.locator(`[data-session-id="${alphaId}"] > a`);
+      const prefetched = page.waitForResponse((response) =>
+        isTargetSessionRequest(response.url()),
+      );
+      await alphaTab.hover();
+      await prefetched;
+      await alphaTab.click();
       await expect(page).toHaveURL(
         new RegExp(`id=${encodeURIComponent(alphaId)}`),
       );
       await expect(
         page.locator('.pinned-tabs-strip [aria-current="page"]'),
       ).toContainText("Tabs Alpha");
+      await expect.poll(() => targetSessionStreams.length).toBe(1);
+
+      expect(targetSessionRequests).toHaveLength(1);
+      expect(targetSessionStreams).toHaveLength(1);
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const markedWindow = window as Window & {
+              __picanPinnedSwitchDocument?: string;
+            };
+            return {
+              identity: markedWindow.__picanPinnedSwitchDocument,
+              navigationCount: performance.getEntriesByType("navigation").length,
+            };
+          }),
+        )
+        .toEqual(documentIdentity);
+      page.off("request", trackTargetRequests);
 
       await page.locator("#command-menu-btn").click();
       await page

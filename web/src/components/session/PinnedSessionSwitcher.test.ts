@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import PinnedSessionSwitcher from "./PinnedSessionSwitcher.svelte";
 import { normalizeSession } from "../../index/sessions";
 import { PinnedTabsModel } from "../../session/pinned-tabs-model.svelte";
+import { resetSessionPrefetch } from "../../routes/session-prefetch";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  resetSessionPrefetch();
+  vi.unstubAllGlobals();
+});
 
 describe("PinnedSessionSwitcher", () => {
   it("loads global pins and renders them in pin order", async () => {
@@ -83,5 +87,45 @@ describe("PinnedSessionSwitcher", () => {
       "/api/sessions?view=home",
       expect.objectContaining({ headers: expect.any(Object) }),
     );
+  });
+
+  it("prefetches each legacy switch target on hover, mousedown, and touch without opening SSE", async () => {
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ entries: [] })),
+    );
+    const EventSourceImpl = vi.fn();
+    vi.stubGlobal("fetch", fetchImpl);
+    vi.stubGlobal("EventSource", EventSourceImpl);
+
+    const model = new PinnedTabsModel("current.jsonl");
+    model.sessions = [
+      normalizeSession({ id: "hover.jsonl", name: "Hover", project: "/repo", pinned: true }),
+      normalizeSession({ id: "mouse.jsonl", name: "Mouse", project: "/repo", pinned: true }),
+      normalizeSession({ id: "touch.jsonl", name: "Touch", project: "/repo", pinned: true }),
+    ];
+    const { container } = render(PinnedSessionSwitcher, {
+      props: {
+        model,
+        currentSession: normalizeSession({
+          id: "current.jsonl",
+          name: "Current",
+          project: "/repo",
+        }),
+      },
+    });
+    const rows = container.querySelectorAll<HTMLElement>(".pinned-session-switcher-row");
+
+    await fireEvent.pointerEnter(rows[0]!);
+    await fireEvent.mouseDown(rows[1]!);
+    await fireEvent.touchStart(rows[2]!);
+
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
+    expect(fetchImpl.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/session?id=hover.jsonl&paginate=1",
+      "/api/session?id=mouse.jsonl&paginate=1",
+      "/api/session?id=touch.jsonl&paginate=1",
+    ]);
+    expect(EventSourceImpl).not.toHaveBeenCalled();
   });
 });

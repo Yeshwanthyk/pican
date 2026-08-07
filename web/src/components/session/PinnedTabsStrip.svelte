@@ -38,7 +38,9 @@
   }
 
   function startPrefetch(sessionId: string): void {
-    prefetchSession(sessionId);
+    // After a switch, the replacement active tab can mount under the stationary
+    // pointer and receive pointerenter. Never prefetch the session already loaded.
+    if (sessionId !== currentSession.id) prefetchSession(sessionId);
   }
 
   function isRunning(session: NormalizedSession): boolean {

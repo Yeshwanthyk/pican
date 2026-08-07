@@ -231,11 +231,11 @@ describe("session-page-data", () => {
     expect(calls).toEqual(["/api/session?id=s.jsonl&paginate=1"]);
   });
 
-  it("falls back to a fresh fetch when the prefetch rejects", async () => {
-    let attempt = 0;
-    const fetchImpl = async () => {
-      attempt++;
-      if (attempt === 1) return new Response("{}", { status: 500 });
+  it("falls back to exactly one fresh fetch when the consumed prefetch rejects", async () => {
+    const calls: string[] = [];
+    const fetchImpl = async (url: RequestInfo | URL) => {
+      calls.push(String(url));
+      if (calls.length === 1) return new Response("{}", { status: 500 });
       return new Response(JSON.stringify({ name: "Recovered", header: {}, entries: [] }));
     };
 
@@ -247,7 +247,41 @@ describe("session-page-data", () => {
     });
 
     expect(state.title).toBe("Recovered");
-    expect(attempt).toBe(2);
+    expect(calls).toEqual([
+      "/api/session?id=s.jsonl&paginate=1",
+      "/api/session?id=s.jsonl&paginate=1",
+    ]);
+  });
+
+  it("falls back to exactly one fresh fetch when the consumed prefetch is aborted", async () => {
+    const calls: string[] = [];
+    let prefetchedSignal: AbortSignal | undefined;
+    const fetchImpl = (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(url));
+      if (calls.length === 1) {
+        prefetchedSignal = init?.signal ?? undefined;
+        return new Promise<Response>(() => undefined);
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ name: "Recovered after abort", header: {}, entries: [] })),
+      );
+    };
+
+    prefetchSession("s.jsonl", { fetchImpl });
+    const statePromise = loadSessionPageState({
+      locationSearch: "?id=s.jsonl",
+      fetchImpl,
+      btoaImpl,
+    });
+    resetSessionPrefetch();
+    const state = await statePromise;
+
+    expect(prefetchedSignal?.aborted).toBe(true);
+    expect(state.title).toBe("Recovered after abort");
+    expect(calls).toEqual([
+      "/api/session?id=s.jsonl&paginate=1",
+      "/api/session?id=s.jsonl&paginate=1",
+    ]);
   });
 
   it("falls back to fetch when the bootstrap is for a different session", async () => {
