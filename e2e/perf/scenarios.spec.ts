@@ -59,11 +59,11 @@ test("bounded project home load", async ({ page, sessionsDir }, testInfo) => {
     );
     await page.goto("/");
     await Promise.all([sessionsResponse, projectsResponse]);
-    await expect(page.locator(".session-ticker-row").first()).toBeVisible();
+    await expect(page.locator(".activity-row").first()).toBeVisible();
     const firstRowMs = performance.now() - startedAt;
-    const rowCount = await page.locator(".session-ticker-row").count();
+    const rowCount = await page.locator(".activity-row").count();
     const projectCount = await page
-      .locator(".project-toggle[data-project]")
+      .locator('.activity-group--project[data-project]')
       .count();
     expect(projectCount).toBe(5);
     expect(rowCount).toBeLessThanOrEqual(40);

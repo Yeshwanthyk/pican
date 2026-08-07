@@ -6,6 +6,7 @@
     type DateBucket,
     groupSessionsByDate,
     groupTrackedProjectSessions,
+    projectDisplayName,
     sessionsCountLabel,
     splitHomeSessions,
     type NormalizedSession,
@@ -13,6 +14,7 @@
     type SessionView,
   } from '../../index/sessions.js';
   import type { Project } from '../../lib/schema';
+  import ActivityGroup from './ActivityGroup.svelte';
   import SessionCard from './SessionCard.svelte';
   import { withBasePath } from '../../shared/base-path.js';
 
@@ -38,35 +40,6 @@
     onAddProject?: () => void;
   }
 
-  type HomeFeedItem =
-    | {
-        readonly kind: 'section';
-        readonly key: string;
-        readonly bucket: 'now' | 'pinned';
-        readonly label: string;
-        readonly count: number;
-        readonly spaced: boolean;
-      }
-    | {
-        readonly kind: 'project';
-        readonly key: string;
-        readonly project: string;
-        readonly total: number;
-        readonly spaced: boolean;
-      }
-    | {
-        readonly kind: 'empty-project';
-        readonly key: string;
-        readonly project: string;
-      }
-    | {
-        readonly kind: 'session';
-        readonly key: string;
-        readonly bucket?: 'now' | 'pinned';
-        readonly project?: string;
-        readonly session: NormalizedSession;
-      };
-
   let {
     sessions = [],
     projects = [],
@@ -81,7 +54,9 @@
     onAddProject = () => {},
   }: Props = $props();
 
+  const PIN_PREVIEW_LIMIT = 8;
   let now = $state(Date.now());
+  let allPinsVisible = $state(false);
 
   const isHome = $derived(!project && view === 'home');
   const trackedProjects = $derived(projects.filter((candidate) => candidate.tracked));
@@ -89,58 +64,11 @@
   const split = $derived(splitHomeSessions(sessions, runningSessionIds, trackedProjectPaths));
   const nowSessions = $derived([...split.live, ...split.waiting]);
   const pinnedSessions = $derived(split.pinned);
+  const visiblePinnedSessions = $derived(
+    allPinsVisible ? pinnedSessions : pinnedSessions.slice(0, PIN_PREVIEW_LIMIT),
+  );
   const projectGroups = $derived(groupTrackedProjectSessions(split.rest, projects));
   const timelineGroups = $derived(groupSessionsByDate(isHome ? [] : sessions, now));
-  const homeFeed = $derived.by(() => {
-    const items: HomeFeedItem[] = [];
-    const addSection = (
-      bucket: 'now' | 'pinned',
-      label: string,
-      groupedSessions: ReadonlyArray<NormalizedSession>,
-    ) => {
-      if (groupedSessions.length === 0) return;
-      items.push({
-        kind: 'section',
-        key: `section:${bucket}`,
-        bucket,
-        label,
-        count: groupedSessions.length,
-        spaced: items.length > 0,
-      });
-      for (const session of groupedSessions) {
-        items.push({ kind: 'session', key: `session:${session.id}`, bucket, session });
-      }
-    };
-
-    addSection('now', t('index.now'), nowSessions);
-    addSection('pinned', t('index.pinned'), pinnedSessions);
-    for (const group of projectGroups) {
-      items.push({
-        kind: 'project',
-        key: `project:${group.project}`,
-        project: group.project,
-        total: group.total,
-        spaced: items.length > 0,
-      });
-      if (group.sessions.length === 0) {
-        items.push({
-          kind: 'empty-project',
-          key: `project-empty:${group.project}`,
-          project: group.project,
-        });
-        continue;
-      }
-      for (const session of group.sessions) {
-        items.push({
-          kind: 'session',
-          key: `session:${session.id}`,
-          project: group.project,
-          session,
-        });
-      }
-    }
-    return items;
-  });
 
   onMount(() => {
     const timer = setInterval(() => {
@@ -163,54 +91,96 @@
       <div class="plain-state-hint">{t('index.loadingSessionsHint')}</div>
     </div>
   {:else if isHome}
-    <div class="home-feed" data-home-feed>
-      {#each homeFeed as item (item.key)}
-        {#if item.kind === 'section'}
-          <div
-            class="date-separator home-feed-heading"
-            class:home-feed-heading--spaced={item.spaced}
-            data-bucket={item.bucket}
-          >
-            <span class="date-separator-label">{item.label}</span>
-            <span class="date-separator-count">{sessionsCountLabel(item.count)}</span>
-          </div>
-        {:else if item.kind === 'project'}
-          <div
-            class="project-toggle project-toggle--static home-feed-heading"
-            class:home-feed-heading--spaced={item.spaced}
-            data-project={item.project}
-          >
-            <a
-              class="project-name"
-              href={withBasePath('/?project=' + encodeURIComponent(item.project))}
-              title={item.project}
-              onclick={(event) =>
-                handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
-              >{item.project}</a
+    <div class="home-feed activity-feed" data-home-feed>
+      {#if pinnedSessions.length > 0}
+        <ActivityGroup
+          id="pinned"
+          title={t('index.pinned')}
+          count={pinnedSessions.length <= PIN_PREVIEW_LIMIT
+            ? sessionsCountLabel(pinnedSessions.length)
+            : ''}
+          actionLabel={pinnedSessions.length > PIN_PREVIEW_LIMIT
+            ? allPinsVisible
+              ? t('index.showFewerPins')
+              : t('index.showAllPins', { count: pinnedSessions.length })
+            : ''}
+          actionExpanded={allPinsVisible}
+          onAction={() => (allPinsVisible = !allPinsVisible)}
+          bucket="pinned"
+        >
+          {#each visiblePinnedSessions as session (session.id)}
+            <div class="home-feed-session" data-bucket="pinned">
+              <SessionCard
+                {session}
+                running={runningSessionIds.has(session.id)}
+                runningStatus={runningStatuses.get(session.id)}
+                {now}
+              />
+            </div>
+          {/each}
+        </ActivityGroup>
+      {/if}
+
+      {#if nowSessions.length > 0}
+        <ActivityGroup
+          id="now"
+          title={t('index.now')}
+          count={sessionsCountLabel(nowSessions.length)}
+          bucket="now"
+          spaced={pinnedSessions.length > 0}
+        >
+          {#each nowSessions as session (session.id)}
+            <div class="home-feed-session" data-bucket="now">
+              <SessionCard
+                {session}
+                running={runningSessionIds.has(session.id)}
+                runningStatus={runningStatuses.get(session.id)}
+                {now}
+              />
+            </div>
+          {/each}
+        </ActivityGroup>
+      {/if}
+
+      {#if trackedProjects.length > 0}
+        <ActivityGroup
+          id="projects"
+          title={t('index.projects')}
+          variant="projects"
+          spaced={pinnedSessions.length > 0 || nowSessions.length > 0}
+        >
+          {#each projectGroups as group, groupIndex (group.project)}
+            <ActivityGroup
+              id={`project-${groupIndex}`}
+              title={projectDisplayName(group.project)}
+              headingTitle={group.project}
+              href={'/?project=' + encodeURIComponent(group.project)}
+              actionLabel={t('index.viewAllCount', { count: group.total })}
+              level={3}
+              project={group.project}
+              variant="project"
+              spaced={true}
             >
-            <a
-              class="project-count project-view-all"
-              href={withBasePath('/?project=' + encodeURIComponent(item.project))}
-              onclick={(event) =>
-                handleNavClick(event, '/?project=' + encodeURIComponent(item.project))}
-              >{t('index.viewAllCount', { count: item.total })}</a
-            >
-          </div>
-        {:else if item.kind === 'empty-project'}
-          <div class="project-empty-preview" data-project={item.project}>
-            {t('index.noProjectSessions')}
-          </div>
-        {:else}
-          <div class="home-feed-session" data-bucket={item.bucket} data-project={item.project}>
-            <SessionCard
-              session={item.session}
-              running={runningSessionIds.has(item.session.id)}
-              runningStatus={runningStatuses.get(item.session.id)}
-              {now}
-            />
-          </div>
-        {/if}
-      {/each}
+              {#if group.sessions.length === 0}
+                <div class="project-empty-preview" data-project={group.project}>
+                  {t('index.noProjectSessions')}
+                </div>
+              {:else}
+                {#each group.sessions as session (session.id)}
+                  <div class="home-feed-session" data-project={group.project}>
+                    <SessionCard
+                      {session}
+                      running={runningSessionIds.has(session.id)}
+                      runningStatus={runningStatuses.get(session.id)}
+                      {now}
+                    />
+                  </div>
+                {/each}
+              {/if}
+            </ActivityGroup>
+          {/each}
+        </ActivityGroup>
+      {/if}
     </div>
     {#if trackedProjects.length === 0}
       <div class="empty-state plain-state tracked-projects-empty" data-empty="tracked-projects">
@@ -242,22 +212,21 @@
     </div>
   {:else}
     {#each timelineGroups as group (group.bucket)}
-      <section class="timeline-section" data-bucket={group.bucket}>
-        <div class="date-separator">
-          <span class="date-separator-label">{t(dateBucketLabels[group.bucket])}</span>
-          <span class="date-separator-count">{sessionsCountLabel(group.sessions.length)}</span>
-        </div>
-        <div class="session-grid">
-          {#each group.sessions as session (session.id)}
-            <SessionCard
-              {session}
-              running={runningSessionIds.has(session.id)}
-              runningStatus={runningStatuses.get(session.id)}
-              {now}
-            />
-          {/each}
-        </div>
-      </section>
+      <ActivityGroup
+        id={`timeline-${group.bucket}`}
+        title={t(dateBucketLabels[group.bucket])}
+        count={sessionsCountLabel(group.sessions.length)}
+        bucket={group.bucket}
+      >
+        {#each group.sessions as session (session.id)}
+          <SessionCard
+            {session}
+            running={runningSessionIds.has(session.id)}
+            runningStatus={runningStatuses.get(session.id)}
+            {now}
+          />
+        {/each}
+      </ActivityGroup>
     {/each}
   {/if}
   {#if !isHome && hasMore}
