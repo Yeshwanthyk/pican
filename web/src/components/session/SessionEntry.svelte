@@ -9,6 +9,7 @@
   import { marked } from 'marked';
   import { icon, Check, CircleCheck, CircleX, Copy, GitFork, Link2 } from '../../shared/icons.js';
   import { t } from '../../shared/strings.js';
+  import { createEntryMarkdownCache } from '../../session/render/entry-markdown-cache.js';
   import { formatTimestamp } from '../../session/render/entry-format.js';
   import {
     contentBlocksFromUnknown,
@@ -56,7 +57,10 @@
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   const ts = $derived(formatTimestamp(entry.timestamp));
   const entryId = $derived(entry.id ?? '');
-  const md = (text: string): string => marked.parse(text, { async: false });
+  const md = createEntryMarkdownCache(
+    (text) => marked.parse(text, { async: false }),
+    () => marked.defaults,
+  );
   const encodeJson = Schema.encodeUnknownSync(Schema.UnknownFromJsonString);
   const displayUnknown = (value: unknown): string =>
     typeof value === 'string' ? value : encodeJson(value);
@@ -198,7 +202,9 @@
             alt=""
           />{/each}
       </div>{/if}
-    {#if userText.trim()}<div class="markdown-content">{@html md(userText)}</div>{/if}
+    {#if userText.trim()}<div class="markdown-content">
+        {@html md(entry, 'user-text', userText)}
+      </div>{/if}
   </div>
 {:else if msg && msg.role === 'assistant'}
   <div class="assistant-message" id={`entry-${entryId}`}>
@@ -221,7 +227,7 @@
       {#if block.type === 'text' && blockText(block).trim()}<div
           class="assistant-text markdown-content"
         >
-          {@html md(blockText(block))}
+          {@html md(entry, `assistant-text-${blockIndex}`, blockText(block))}
         </div>{/if}
     {/each}
     {#if msg.stopReason === 'aborted'}<div class="error-text">
@@ -274,7 +280,7 @@
   <div class="branch-summary" id={`entry-${entryId}`}>
     {@render timestamp()}
     <div class="branch-summary-header">Branch Summary</div>
-    <div class="markdown-content">{@html md(entry.summary ?? '')}</div>
+    <div class="markdown-content">{@html md(entry, 'branch-summary', entry.summary ?? '')}</div>
   </div>
 {:else if entry?.type === 'custom_message' && entry.display}
   {#if entry.customType === 'subagent-result'}
@@ -295,7 +301,7 @@
       <details class="subagent-result-details">
         <summary>{t('session.showOutput')}</summary>
         <div class="markdown-content subagent-result-content">
-          {@html md(displayUnknown(entry.content))}
+          {@html md(entry, 'custom-content', displayUnknown(entry.content))}
         </div>
       </details>
     </div>
@@ -304,7 +310,7 @@
       {@render timestamp()}
       <div class="hook-type">[{entry.customType}]</div>
       <div class="markdown-content">
-        {@html md(displayUnknown(entry.content))}
+        {@html md(entry, 'custom-content', displayUnknown(entry.content))}
       </div>
     </div>
   {/if}

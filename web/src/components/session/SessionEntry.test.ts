@@ -1,5 +1,6 @@
+import { marked } from "marked";
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/svelte";
+import { render, cleanup, fireEvent, waitFor } from "@testing-library/svelte";
 import SessionEntry from "./SessionEntry.svelte";
 import type { SessionEntry as SessionEntryData } from "../../session/data/session-types.js";
 import type { ToolResultLookup } from "../../session/data/session-data.svelte.js";
@@ -7,6 +8,7 @@ import type { ToolResultLookup } from "../../session/data/session-data.svelte.js
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 function model(entries: SessionEntryData[] = []) {
@@ -22,6 +24,31 @@ describe("SessionEntry", () => {
     expect(node).toHaveClass("user-message");
     expect(node?.textContent).toContain("hello");
     expect(node?.querySelector(".user-who")?.textContent).toContain("YOU");
+  });
+
+  it("reactively reparses a same-ID replacement entry without changing its anchor", async () => {
+    const original: SessionEntryData = {
+      id: "stable-id",
+      type: "message",
+      message: { role: "user", content: "**before**" },
+    };
+    const replacement: SessionEntryData = {
+      id: "stable-id",
+      type: "message",
+      message: { role: "user", content: "**after**" },
+    };
+    const parse = vi.spyOn(marked, "parse");
+    const { container, rerender } = render(SessionEntry, {
+      props: { entry: original, model: model([original]) },
+    });
+
+    expect(container.querySelector("#entry-stable-id strong")?.textContent).toBe("before");
+    await rerender({ entry: replacement, model: model([replacement]) });
+    await waitFor(() =>
+      expect(container.querySelector("#entry-stable-id strong")?.textContent).toBe("after"),
+    );
+    expect(parse.mock.calls.filter(([content]) => content === "**before**")).toHaveLength(1);
+    expect(parse.mock.calls.filter(([content]) => content === "**after**")).toHaveLength(1);
   });
 
   it("hides unavailable fork and removes message label editing", () => {
@@ -102,7 +129,7 @@ describe("SessionEntry", () => {
     expect(node?.querySelector(".assistant-who")?.textContent).toBe("ASSISTANT");
   });
 
-  it("uses indexed activity results without scanning entries", () => {
+  it("uses indexed activity results without scanning entries", async () => {
     const entry: SessionEntryData = {
       id: "indexed-assistant",
       type: "message",
@@ -149,12 +176,17 @@ describe("SessionEntry", () => {
     const { container } = render(SessionEntry, { props: { entry, model: indexedModel } });
 
     expect(entriesRead).not.toHaveBeenCalled();
-    expect(container.querySelector(".activity-fold.error")).not.toBeNull();
+    const fold = container.querySelector<HTMLDetailsElement>(".activity-fold.error");
+    const summary = fold?.querySelector<HTMLElement>("summary");
+    expect(fold).not.toBeNull();
+    if (!summary) return;
+    await fireEvent.click(summary);
+    await waitFor(() => expect(fold?.dataset.activityBodyMounted).toBe("true"));
     expect(container.querySelector(".tool-fold-status")?.classList).toContain("error");
     expect(container.querySelector(".tool-diff-sheet")).not.toBeNull();
   });
 
-  it("renders thinking through the safe Markdown pipeline", () => {
+  it("renders thinking through the safe Markdown pipeline", async () => {
     const entry = {
       id: "thinking",
       type: "message",
@@ -164,9 +196,13 @@ describe("SessionEntry", () => {
       },
     };
     const { container } = render(SessionEntry, { props: { entry, model: model([entry]) } });
-
-    expect(container.querySelector(".activity-thinking-text strong")?.textContent).toBe(
-      "Checking the package",
+    const summary = container.querySelector<HTMLElement>(".activity-fold summary");
+    if (!summary) return;
+    await fireEvent.click(summary);
+    await waitFor(() =>
+      expect(container.querySelector(".activity-thinking-text strong")?.textContent).toBe(
+        "Checking the package",
+      ),
     );
     expect(container.querySelector(".activity-thinking-text li")?.textContent).toBe(
       "inspect exports",

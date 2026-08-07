@@ -6,6 +6,7 @@
     getToolResultLookup,
     type ToolResultLookupSource,
   } from '../../session/data/session-data.svelte.js';
+  import { createEntryMarkdownCache } from '../../session/render/entry-markdown-cache.js';
   import { formatToolFoldSummary } from '../../session/render/session-format.js';
   import type { ToolRunStatus } from '../../session/render/group-tool-runs.js';
   import { t } from '../../shared/strings.js';
@@ -40,14 +41,20 @@
   const blocks = $derived(
     entries.flatMap((entry) =>
       entry.type === 'message' && entry.message?.role === 'assistant'
-        ? contentBlocksFromUnknown(entry.message.content)
+        ? contentBlocksFromUnknown(entry.message.content).map((block, blockIndex) => ({
+            entry,
+            block,
+            blockIndex,
+          }))
         : [],
     ),
   );
   const thinkingBlocks = $derived(
-    blocks.filter((block) => block.type === 'thinking' && String(block.thinking ?? '').trim()),
+    blocks.filter(({ block }) => block.type === 'thinking' && String(block.thinking ?? '').trim()),
   );
-  const toolCalls = $derived(blocks.filter((block) => block.type === 'toolCall'));
+  const toolCalls = $derived(
+    blocks.filter(({ block }) => block.type === 'toolCall').map(({ block }) => block),
+  );
   const activeTool = $derived(toolCalls.at(-1));
   const activeToolResult = $derived(
     getToolResultLookup(model, typeof activeTool?.id === 'string' ? activeTool.id : ''),
@@ -83,7 +90,10 @@
   const elapsed = $derived(
     Number.isFinite(startedAtMs) ? Math.max(0, Math.floor((now - startedAtMs) / 1000)) : 0,
   );
-  const md = (text: string): string => marked.parse(text, { async: false });
+  const md = createEntryMarkdownCache(
+    (text) => marked.parse(text, { async: false }),
+    () => marked.defaults,
+  );
 
   function handleToggle(event: Event): void {
     const details = event.currentTarget as HTMLDetailsElement;
@@ -148,11 +158,11 @@
   </summary>
   {#if shouldMountBody}
     <div class="activity-body" bind:this={bodyEl}>
-      {#each thinkingBlocks as block, index (`thinking-${index}`)}
+      {#each thinkingBlocks as item, index (`thinking-${index}`)}
         <div class="activity-thinking">
           <span class="activity-row-label">{t('session.activityThinking')}</span>
           <div class="activity-thinking-text markdown-content">
-            {@html md(String(block.thinking ?? ''))}
+            {@html md(item.entry, item.blockIndex, String(item.block.thinking ?? ''))}
           </div>
         </div>
       {/each}

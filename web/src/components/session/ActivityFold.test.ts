@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { marked } from "marked";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ToolResultLookup,
   ToolResultLookupSource,
@@ -7,6 +8,10 @@ import type {
 import type { SessionEntry } from "../../session/data/session-types.js";
 import type { ToolRunStatus } from "../../session/render/group-tool-runs.js";
 import ActivityFold from "./ActivityFold.svelte";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const assistantEntry: SessionEntry = {
   id: "assistant-tools",
@@ -124,6 +129,43 @@ describe("ActivityFold", () => {
     expect(container.textContent).not.toContain("private working");
     expect(container.textContent).not.toContain("expensive output");
     expect(container.textContent).not.toContain("Nested extension card");
+  });
+
+  it("parses thinking lazily and caches each unchanged entry revision once mounted", async () => {
+    const thinkingBlock = { type: "thinking", thinking: "**cache this thought**" };
+    const entry: SessionEntry = {
+      id: "cache-thinking",
+      type: "message",
+      message: { role: "assistant", content: [thinkingBlock] },
+    };
+    const props = {
+      entries: [entry],
+      model: { entries: [entry], toolResultMap: new Map(), renderedTools: null },
+      toolCount: 0,
+      durationSeconds: 1,
+      hasEdits: false,
+      status: "success" as const,
+    };
+    const parse = vi.spyOn(marked, "parse");
+    const parseCount = (content: string) =>
+      parse.mock.calls.filter(([parsed]) => parsed === content).length;
+    const { container, rerender } = render(ActivityFold, { props });
+    const summary = container.querySelector<HTMLElement>("summary");
+    if (!summary) return;
+
+    expect(parseCount("**cache this thought**")).toBe(0);
+    await fireEvent.click(summary);
+    await waitFor(() => expect(parseCount("**cache this thought**")).toBe(1));
+
+    await rerender({ ...props, entries: [entry], durationSeconds: 2 });
+    expect(parseCount("**cache this thought**")).toBe(1);
+
+    thinkingBlock.thinking = "**revised thought**";
+    await rerender({ ...props, entries: [entry], durationSeconds: 3 });
+    await waitFor(() => expect(parseCount("**revised thought**")).toBe(1));
+    expect(container.querySelector(".activity-thinking strong")?.textContent).toBe(
+      "revised thought",
+    );
   });
 
   it("mounts on first open and retains the same nested DOM when reclosed", async () => {
