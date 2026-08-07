@@ -144,6 +144,26 @@ describe("groupToolRuns", () => {
     ).toMatchObject([{ kind: "group", toolCount: 3, status: "success" }]);
   });
 
+  it("preserves first-entry group identities and completion status", () => {
+    const completed = assistantTools("completed", ["bash"]);
+    const completedResult = toolResultFor("completed-0");
+    const boundary = user("next-turn");
+    const pending = assistantTools("pending", ["read"]);
+
+    const groups = groupToolRuns([completed, completedResult, boundary, pending]);
+    expect(groups).toMatchObject([
+      { kind: "group", status: "success" },
+      { kind: "entry", entry: boundary },
+      { kind: "group", status: "pending" },
+    ]);
+    expect(groups.flatMap((item) => (item.kind === "group" ? [item.entries[0]?.id] : []))).toEqual([
+      "completed",
+      "pending",
+    ]);
+    expect(groups[0]?.kind === "group" ? groups[0].entries[0] : null).toBe(completed);
+    expect(groups[2]?.kind === "group" ? groups[2].entries[0] : null).toBe(pending);
+  });
+
   it("marks failed groups so the renderer can open them", () => {
     const calls = assistantTools("a1", ["bash", "edit"]);
     const [group] = groupToolRuns([

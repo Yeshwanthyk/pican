@@ -70,6 +70,34 @@ describe("session navigator (nav + scroll)", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
   });
 
+  it("opens and mounts the activity fold identified for an absent deep result", () => {
+    document.body.innerHTML = `<div id="content">
+      <details
+        class="activity-fold success"
+        data-activity-target-ids="id=assistant-a&amp;id=result-b"
+        data-activity-body-mounted="false"
+      ><summary>2 tool runs</summary></details>
+    </div>`;
+    const fold = document.querySelector<HTMLDetailsElement>(".activity-fold");
+    const scrollIntoView = vi.fn();
+    fold?.addEventListener("toggle", () => {
+      if (fold.dataset.activityBodyMounted === "true") return;
+      fold.dataset.activityBodyMounted = "true";
+      const result = document.createElement("div");
+      result.id = "entry-result-b";
+      result.scrollIntoView = scrollIntoView;
+      fold.append(result);
+    });
+
+    const nav = createSessionNavigator({ setTimeoutImpl: runImmediate });
+    nav.navigateTo("assistant-a", "target", "result-b");
+
+    expect(fold?.open).toBe(true);
+    expect(fold?.dataset.activityBodyMounted).toBe("true");
+    expect(document.getElementById("entry-result-b")?.classList).toContain("highlight");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+  });
+
   it("does not scroll in none mode", () => {
     document.body.innerHTML = '<div id="content"></div><div id="entry-b"></div>';
     const target = document.getElementById("entry-b");

@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/svelte";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { render, waitFor } from "@testing-library/svelte";
 import SessionContent from "./SessionContent.svelte";
 import { SessionDataModel } from "../../session/data/session-data.svelte.js";
+import { createSessionNavigator } from "../../session/navigation/session-navigation.js";
 import { sessionEntryFromUnknown, type SessionEntry } from "../../session/data/session-types.js";
 
 const entries: SessionEntry[] = [
@@ -135,7 +136,9 @@ describe("SessionContent", () => {
       header: {},
       leafId: "assistant-tool",
     });
-    const { container } = render(SessionContent, { props: { model: contentModel(model) } });
+    const { container } = render(SessionContent, {
+      props: { model: contentModel(model), live: true },
+    });
     expect(container.querySelector(".tool-fold-status")?.classList).toContain("pending");
 
     const runningResult = {
@@ -196,6 +199,67 @@ describe("SessionContent", () => {
     expect(group?.open).toBe(false);
     expect(group?.querySelector("summary")?.textContent).toContain("5 tool runs");
     expect(group?.id).toBe("entry-tools");
+    expect(group?.dataset.activityBodyMounted).toBe("false");
+    expect(group?.querySelector(".activity-body")).not.toBeInTheDocument();
+  });
+
+  it("mounts and opens a closed fold before navigating to a deep tool result", async () => {
+    const groupedEntries = [
+      ...entries.slice(0, 1),
+      {
+        id: "tools",
+        parentId: "root",
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "deep-call",
+              name: "bash",
+              arguments: { command: "printf deep" },
+            },
+          ],
+        },
+      },
+      {
+        id: "deep-result",
+        parentId: "tools",
+        type: "message",
+        message: {
+          role: "toolResult",
+          toolCallId: "deep-call",
+          content: [{ type: "text", text: "deep output" }],
+        },
+      },
+    ];
+    const model = new SessionDataModel({
+      entries: groupedEntries,
+      header: {},
+      leafId: "deep-result",
+    });
+    const { container } = render(SessionContent, { props: { model: contentModel(model) } });
+    container.id = "content";
+    const fold = container.querySelector<HTMLDetailsElement>(".activity-fold");
+    expect(fold?.open).toBe(false);
+    expect(fold?.querySelector("#entry-deep-result")).not.toBeInTheDocument();
+
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    });
+
+    const nav = createSessionNavigator();
+    nav.navigateTo("deep-result", "target", "deep-result");
+
+    await waitFor(() => {
+      expect(fold?.open).toBe(true);
+      expect(fold?.dataset.activityBodyMounted).toBe("true");
+      expect(fold?.querySelector("#entry-deep-result")).toBeInTheDocument();
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    });
   });
 
   it("keeps completed and failed activity closed when it is not the live turn", () => {
@@ -270,6 +334,8 @@ describe("SessionContent", () => {
 
     const fold = container.querySelector<HTMLDetailsElement>(".activity-fold.pending");
     expect(fold?.open).toBe(true);
+    expect(fold?.dataset.activityBodyMounted).toBe("true");
+    expect(fold?.querySelector(".activity-body")).toBeInTheDocument();
     expect(fold?.querySelector("summary")?.textContent).toContain("running bash make test");
   });
 

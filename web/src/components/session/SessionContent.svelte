@@ -48,12 +48,24 @@
     return entry?.id ?? `${item.kind}-${index}`;
   }
 
+  function runAfterRender(): void {
+    if (containerEl && typeof afterRender === 'function') afterRender(containerEl);
+  }
+
   // Re-run post-render side effects whenever the rendered path changes.
   $effect(() => {
     void renderItems;
-    if (containerEl && typeof afterRender === 'function') {
-      afterRender(containerEl);
-    }
+    runAfterRender();
+  });
+
+  // A lazy ActivityFold body is a child-only render, so it does not change
+  // renderItems. Re-apply toggle state and highlighting when that body first mounts.
+  $effect(() => {
+    const container = containerEl;
+    if (!container) return;
+    const handleBodyMounted = () => runAfterRender();
+    container.addEventListener('activityfoldbodymounted', handleBodyMounted);
+    return () => container.removeEventListener('activityfoldbodymounted', handleBodyMounted);
   });
 </script>
 
