@@ -79,6 +79,13 @@ export function setupChatSubmission({
   getRoute = () => "send",
 }: SubmissionOptions) {
   let refreshWorkerStatus = async (): Promise<void> => {};
+  // Programmatic clearing after submit does not emit `input`. Any user edit
+  // while the request is pending advances this revision, even if they type and
+  // delete back to an empty value, so a failed request cannot overwrite it.
+  let textareaRevision = 0;
+  textarea.addEventListener("input", () => {
+    textareaRevision += 1;
+  });
 
   cancelButton?.addEventListener("click", () => {
     cancelButton.disabled = true;
@@ -151,7 +158,9 @@ export function setupChatSubmission({
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!canSend()) return;
-    const typed = textarea.value.trim();
+    const rawTyped = textarea.value;
+    const typed = rawTyped.trim();
+    const submittedRevision = textareaRevision;
     const filesToSend = attachments.files().slice();
     const textAttachmentsToSend = attachments.textAttachments().slice();
     const message = attachments.composeMessage(typed);
@@ -166,9 +175,13 @@ export function setupChatSubmission({
     updateSendEnabled();
 
     void sendChatMessage(message, filesToSend).then((sent) => {
-      if (sent) return;
-      textarea.value = typed;
-      attachments.restore({ files: filesToSend, textAttachments: textAttachmentsToSend });
+      if (sent || textareaRevision !== submittedRevision) return;
+      textarea.value = rawTyped;
+      // Do not replace attachments deliberately added while the request was in
+      // flight. The submitted snapshot is restored only into the cleared state.
+      if (attachments.files().length === 0 && attachments.textAttachments().length === 0) {
+        attachments.restore({ files: filesToSend, textAttachments: textAttachmentsToSend });
+      }
       autoResizeTextarea();
       updateSendEnabled();
     });

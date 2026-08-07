@@ -24,12 +24,20 @@ function createAttachments({
   readonly textAttachments?: TextAttachment[];
   readonly message?: string;
 } = {}) {
+  let currentFiles = files.slice();
+  let currentTextAttachments = textAttachments.slice();
   return {
-    files: vi.fn(() => files),
-    textAttachments: vi.fn(() => textAttachments),
+    files: vi.fn(() => currentFiles),
+    textAttachments: vi.fn(() => currentTextAttachments),
     composeMessage: vi.fn(() => message),
-    clear: vi.fn(),
-    restore: vi.fn(),
+    clear: vi.fn(() => {
+      currentFiles = [];
+      currentTextAttachments = [];
+    }),
+    restore: vi.fn((value: { readonly files: File[]; readonly textAttachments: TextAttachment[] }) => {
+      currentFiles = value.files.slice();
+      currentTextAttachments = value.textAttachments.slice();
+    }),
   };
 }
 
@@ -146,12 +154,50 @@ describe("chat submit", () => {
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(textarea.value).toBe("retry");
+    expect(textarea.value).toBe(" retry ");
     expect(attachments.restore).toHaveBeenCalledWith({
       files: [file],
       textAttachments: [textAttachment],
     });
     expect(autoResizeTextarea).toHaveBeenCalled();
+  });
+
+  it("does not overwrite a newer draft when the failed send settles", async () => {
+    const { form, textarea, sendButton, cancelButton } = setupDom();
+    textarea.value = "original";
+    let resolveSend!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => {
+      resolveSend = resolve;
+    });
+    const attachments = createAttachments({ message: "original" });
+
+    setupChatSubmission({
+      windowImpl: window,
+      form,
+      textarea,
+      sendButton,
+      cancelButton,
+      attachments,
+      chatApi: {
+        sendChat: vi.fn(() => response),
+        cancelChat: vi.fn(),
+      },
+      sessionId: "s1",
+      setStatus: vi.fn(),
+      autoResizeTextarea: vi.fn(),
+      updateSendEnabled: vi.fn(),
+      FormDataImpl: FormData,
+      CustomEventImpl: CustomEvent,
+    });
+
+    form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    textarea.value = "newer draft";
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    resolveSend(new Response('{"error":"offline"}', { status: 503 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(textarea.value).toBe("newer draft");
+    expect(attachments.restore).not.toHaveBeenCalled();
   });
 
   it("rejects an empty draft without sending", async () => {
