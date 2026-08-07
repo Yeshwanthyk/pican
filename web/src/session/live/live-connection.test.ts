@@ -293,6 +293,19 @@ describe("live connection", () => {
     harness.connection.dispose();
   });
 
+  it("ignores the initial pageshow so bounded bootstrap data is not refetched", async () => {
+    const harness = connectionHarness();
+    harness.connection.connect();
+    harness.wired[0]?.onOpen?.();
+    await flush();
+
+    harness.dom.window.dispatchEvent(new harness.dom.window.Event("pageshow"));
+    await flush();
+    expect(harness.sources).toHaveLength(1);
+    expect(harness.onReload).not.toHaveBeenCalled();
+    harness.connection.dispose();
+  });
+
   it("closes on pagehide and catches up after pageshow opens a new generation", async () => {
     const harness = connectionHarness();
     harness.connection.connect();

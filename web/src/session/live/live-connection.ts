@@ -103,6 +103,7 @@ export function setupSessionLiveConnection({
   let disposed = false;
   let sourceOpen = false;
   let everOpened = false;
+  let pageWasHidden = false;
   let state: SessionConnectionState = "connecting";
   let lastHeartbeatAt: number | null = null;
   let reconnectTimer: number | null = null;
@@ -312,9 +313,17 @@ export function setupSessionLiveConnection({
     replaceStream("reconnecting");
   };
   const onPageHide = () => {
-    if (!disposed) retireStream();
+    if (disposed) return;
+    pageWasHidden = true;
+    retireStream();
   };
-  const onPageShow = () => resumeFromLifecycle();
+  const onPageShow = () => {
+    // Browsers emit pageshow for the initial navigation too. Only a return from
+    // an observed pagehide represents a possible missed-event window.
+    if (!pageWasHidden) return;
+    pageWasHidden = false;
+    resumeFromLifecycle();
+  };
 
   documentImpl.addEventListener("visibilitychange", onVisibilityChange);
   windowImpl.addEventListener("online", onOnline);
