@@ -12,18 +12,20 @@
   import { formatTimestamp } from '../../session/render/entry-format.js';
   import {
     contentBlocksFromUnknown,
-    isUnknownRecord,
     type ContentBlock,
     type SessionEntry as SessionEntryData,
   } from '../../session/data/session-types.js';
+  import {
+    getToolResultLookup,
+    type ToolResultLookupSource,
+  } from '../../session/data/session-data.svelte.js';
   import ToolOutput from './ToolOutput.svelte';
   import ActivityFold from './ActivityFold.svelte';
 
   // `live` (passed from <SessionContent>) gates the fork button, which needs the
   // chat composer; message-copy and copy-link are available in both the live app
   // and static export through environment-specific clipboard adapters.
-  interface EntryModel {
-    readonly entries?: readonly SessionEntryData[];
+  interface EntryModel extends ToolResultLookupSource {
     readonly renderedTools?: unknown;
   }
 
@@ -109,27 +111,21 @@
   );
   const activityResults = $derived(
     assistantToolCalls.flatMap((call) => {
-      const id = typeof call.id === 'string' ? call.id : '';
-      return (
-        model?.entries?.filter(
-          (candidate) => candidate.type === 'message' && candidate.message?.toolCallId === id,
-        ) ?? []
-      );
+      const result = getToolResultLookup(model, typeof call.id === 'string' ? call.id : '');
+      return result ? [result] : [];
     }),
   );
+  const embeddedActivityResultCount = $derived(
+    activityResults.reduce((count, result) => count + result.resultCount, 0),
+  );
   const embeddedActivityStatus = $derived(
-    activityResults.some((candidate) => candidate.message?.isError)
+    activityResults.some((result) => result.hasError)
       ? 'error'
-      : assistantToolCalls.length > activityResults.length
+      : assistantToolCalls.length > embeddedActivityResultCount
         ? 'pending'
         : 'success',
   );
-  const embeddedActivityHasEdits = $derived(
-    activityResults.some((candidate) => {
-      const details = candidate.message?.details;
-      return isUnknownRecord(details) && typeof details.diff === 'string';
-    }),
-  );
+  const embeddedActivityHasEdits = $derived(activityResults.some((result) => result.hasEdits));
   const assistantName = $derived(
     String(msg?.model || msg?.provider || modelLabel || '').trim() || t('session.assistant'),
   );

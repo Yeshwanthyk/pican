@@ -49,6 +49,9 @@ function contentModel(model: SessionDataModel) {
     get entries(): SessionEntry[] {
       return normalizedEntries(model.entries);
     },
+    get toolResultMap() {
+      return model.toolResultMap;
+    },
     get renderedTools(): unknown {
       return model.renderedTools;
     },
@@ -101,6 +104,71 @@ describe("SessionContent", () => {
     model.navigateTo("leaf2");
     await Promise.resolve();
     expect(container.querySelector("#entry-leaf2")).toBeInTheDocument();
+  });
+
+  it("reactively updates indexed tool results across append and same-id replacement", async () => {
+    const activeEntries = [
+      {
+        id: "root-tool",
+        type: "message",
+        message: { role: "user", content: "run it" },
+      },
+      {
+        id: "assistant-tool",
+        parentId: "root-tool",
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "live-tool-call",
+              name: "bash",
+              arguments: { command: "printf live" },
+            },
+          ],
+        },
+      },
+    ];
+    const model = new SessionDataModel({
+      entries: activeEntries,
+      header: {},
+      leafId: "assistant-tool",
+    });
+    const { container } = render(SessionContent, { props: { model: contentModel(model) } });
+    expect(container.querySelector(".tool-fold-status")?.classList).toContain("pending");
+
+    const runningResult = {
+      id: "live-tool-result",
+      parentId: "assistant-tool",
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolCallId: "live-tool-call",
+        isRunning: true,
+        content: [{ type: "text", text: "partial output" }],
+      },
+    };
+    model.reconcile([runningResult], { isDelta: true });
+    await Promise.resolve();
+
+    expect(container.querySelector(".tool-fold-status")?.classList).toContain("pending");
+    expect(container.textContent).toContain("partial output");
+
+    const completedResult = {
+      ...runningResult,
+      message: {
+        ...runningResult.message,
+        isRunning: false,
+        content: [{ type: "text", text: "complete output" }],
+      },
+    };
+    model.reconcile([...activeEntries, completedResult], { replaceExisting: true });
+    await Promise.resolve();
+
+    expect(container.querySelector(".tool-fold-status")?.classList).toContain("success");
+    expect(container.textContent).toContain("complete output");
+    expect(container.textContent).not.toContain("partial output");
   });
 
   it("renders a long tool run in a collapsed group without changing entry anchors", () => {

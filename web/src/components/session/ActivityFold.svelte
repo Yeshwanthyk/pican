@@ -2,13 +2,16 @@
   import { marked } from 'marked';
   import type { SessionEntry as SessionEntryData } from '../../session/data/session-types.js';
   import { contentBlocksFromUnknown, isUnknownRecord } from '../../session/data/session-types.js';
+  import {
+    getToolResultLookup,
+    type ToolResultLookupSource,
+  } from '../../session/data/session-data.svelte.js';
   import { formatToolFoldSummary } from '../../session/render/session-format.js';
   import type { ToolRunStatus } from '../../session/render/group-tool-runs.js';
   import { t } from '../../shared/strings.js';
   import ToolCall from './ToolCall.svelte';
 
-  interface ActivityModel {
-    readonly entries?: readonly SessionEntryData[];
+  interface ActivityModel extends ToolResultLookupSource {
     readonly renderedTools?: unknown;
   }
 
@@ -47,19 +50,12 @@
   const toolCalls = $derived(blocks.filter((block) => block.type === 'toolCall'));
   const activeTool = $derived(toolCalls.at(-1));
   const activeToolResult = $derived(
-    model?.entries?.find(
-      (entry) =>
-        entry.type === 'message' &&
-        entry.message?.role === 'toolResult' &&
-        entry.message.toolCallId === activeTool?.id,
-    ),
+    getToolResultLookup(model, typeof activeTool?.id === 'string' ? activeTool.id : ''),
   );
   const activeCommand = $derived.by(() => {
     const name = String(activeTool?.name ?? t('session.activityTool'));
     const args = isUnknownRecord(activeTool?.arguments) ? activeTool.arguments : {};
-    const details = isUnknownRecord(activeToolResult?.message?.details)
-      ? activeToolResult.message.details
-      : null;
+    const details = activeToolResult?.details ?? null;
     const summary = formatToolFoldSummary(name, args, details ? { details } : null);
     return summary ? `${name} ${summary}` : name;
   });

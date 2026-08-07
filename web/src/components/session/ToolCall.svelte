@@ -9,10 +9,13 @@
     contentBlocksFromUnknown,
     isUnknownRecord,
     type ContentBlock,
-    type SessionEntry,
     type SessionMessage,
     type UnknownRecord,
   } from '../../session/data/session-types.js';
+  import {
+    getToolResultLookup,
+    type ToolResultLookupSource,
+  } from '../../session/data/session-data.svelte.js';
   import { t } from '../../shared/strings.js';
   import { parseWordsDiff } from '../../session/render/words-diff.js';
   import { getLanguageFromPath, str } from '../../session/render/entry-format.js';
@@ -22,8 +25,7 @@
   import SubagentToolCard from './SubagentToolCard.svelte';
   import WorkflowToolCard from './WorkflowToolCard.svelte';
 
-  interface ToolCallModel {
-    readonly entries?: readonly SessionEntry[];
+  interface ToolCallModel extends ToolResultLookupSource {
     readonly renderedTools?: unknown;
   }
 
@@ -55,19 +57,10 @@
   const toolName = $derived(typeof call.name === 'string' ? call.name : 'tool');
   const callId = $derived(typeof call.id === 'string' ? call.id : '');
 
-  const resultEntry = $derived.by(() => {
-    for (const entry of model?.entries || []) {
-      if (
-        entry.type === 'message' &&
-        entry.message?.role === 'toolResult' &&
-        entry.message.toolCallId === callId
-      )
-        return entry;
-    }
-    return null;
-  });
-  const result = $derived<SessionMessage | null>(resultEntry?.message ?? null);
-  const resultDetails = $derived(isUnknownRecord(result?.details) ? result.details : null);
+  const resultLookup = $derived(getToolResultLookup(model, callId));
+  const resultEntry = $derived(resultLookup?.entry ?? null);
+  const result = $derived<SessionMessage | null>(resultLookup?.message ?? null);
+  const resultDetails = $derived(resultLookup?.details ?? null);
   const statusClass = $derived(
     result ? (result.isRunning ? 'pending' : result.isError ? 'error' : 'success') : 'pending',
   );

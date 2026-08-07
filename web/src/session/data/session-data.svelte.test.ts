@@ -32,6 +32,30 @@ const entries = [
   },
 ];
 
+const toolEntries = [
+  {
+    id: "tool-call-entry",
+    timestamp: "2026-01-01T00:00:00Z",
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call-1", name: "read", arguments: { path: "a.ts" } }],
+    },
+  },
+  {
+    id: "tool-result-entry",
+    parentId: "tool-call-entry",
+    timestamp: "2026-01-01T00:00:01Z",
+    type: "message",
+    message: {
+      role: "toolResult",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "initial" }],
+      details: { source: "initial" },
+    },
+  },
+];
+
 function model(extra = {}) {
   return new SessionDataModel({ entries, header: { cwd: "/x" }, leafId: "leaf", ...extra });
 }
@@ -49,6 +73,93 @@ describe("SessionDataModel", () => {
     const m = model();
     expect(m.byId.get("mid")?.parentId).toBe("root");
     expect([...m.byId.keys()]).toEqual(["root", "old", "mid", "leaf"]);
+  });
+
+  it("indexes the canonical tool result on initial load", () => {
+    const m = new SessionDataModel({
+      entries: toolEntries,
+      header: {},
+      leafId: "tool-result-entry",
+    });
+
+    const lookup = m.toolResultMap.get("call-1");
+    expect(lookup?.entry.id).toBe("tool-result-entry");
+    expect(lookup?.message.content).toEqual([{ type: "text", text: "initial" }]);
+    expect(lookup?.details).toEqual({ source: "initial" });
+    expect(lookup?.resultCount).toBe(1);
+  });
+
+  it("keeps the tool-result map stable while indexing an append delta", () => {
+    const m = new SessionDataModel({
+      entries: toolEntries.slice(0, 1),
+      header: {},
+      leafId: "tool-call-entry",
+    });
+    const stableMap = m.toolResultMap;
+    expect(stableMap.has("call-1")).toBe(false);
+
+    m.reconcile([toolEntries[1]!], { isDelta: true });
+
+    expect(m.toolResultMap).toBe(stableMap);
+    expect(stableMap.get("call-1")?.entry.id).toBe("tool-result-entry");
+    expect(stableMap.get("call-1")?.message.content).toEqual([{ type: "text", text: "initial" }]);
+  });
+
+  it("clears and refills the stable tool-result map on full and replaceable reconciles", () => {
+    const m = new SessionDataModel({
+      entries: toolEntries,
+      header: {},
+      leafId: "tool-result-entry",
+    });
+    const stableMap = m.toolResultMap;
+    const originalResult = stableMap.get("call-1")?.entry;
+
+    m.reconcile(toolEntries.slice(0, 1));
+    expect(m.toolResultMap).toBe(stableMap);
+    expect(stableMap.has("call-1")).toBe(false);
+
+    const replacementResult = {
+      ...toolEntries[1]!,
+      message: {
+        ...toolEntries[1]!.message,
+        content: [{ type: "text", text: "replacement" }],
+        details: { source: "replacement" },
+      },
+    };
+    m.reconcile([toolEntries[0]!, replacementResult], { replaceExisting: true });
+
+    expect(m.toolResultMap).toBe(stableMap);
+    expect(stableMap.get("call-1")?.entry).not.toBe(originalResult);
+    expect(stableMap.get("call-1")?.message.content).toEqual([
+      { type: "text", text: "replacement" },
+    ]);
+    expect(stableMap.get("call-1")?.details).toEqual({ source: "replacement" });
+  });
+
+  it("uses the first duplicate as canonical while retaining aggregate activity semantics", () => {
+    const duplicate = {
+      ...toolEntries[1]!,
+      id: "tool-result-duplicate",
+      message: {
+        ...toolEntries[1]!.message,
+        content: [{ type: "text", text: "duplicate" }],
+        isError: true,
+        details: { diff: "@@ -1 +1 @@" },
+      },
+    };
+    const m = new SessionDataModel({
+      entries: [...toolEntries, duplicate],
+      header: {},
+      leafId: "tool-result-duplicate",
+    });
+
+    const lookup = m.toolResultMap.get("call-1");
+    expect(lookup?.entry.id).toBe("tool-result-entry");
+    expect(lookup?.message.content).toEqual([{ type: "text", text: "initial" }]);
+    expect(lookup?.details).toEqual({ source: "initial" });
+    expect(lookup?.resultCount).toBe(2);
+    expect(lookup?.hasError).toBe(true);
+    expect(lookup?.hasEdits).toBe(true);
   });
 
   it("derives the tree from entries", () => {

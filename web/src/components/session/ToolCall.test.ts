@@ -1,7 +1,8 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/svelte";
 import ToolCall from "./ToolCall.svelte";
 import type { SessionEntry } from "../../session/data/session-types.js";
+import type { ToolResultLookup } from "../../session/data/session-data.svelte.js";
 
 afterEach(cleanup);
 
@@ -49,6 +50,42 @@ describe("ToolCall", () => {
     expect(container.querySelector(".tool-fold-status")?.classList).toContain("pending");
     expect(container.querySelector(".tool-fold-status")?.classList).not.toContain("success");
     expect(container.textContent).toContain("ok");
+  });
+
+  it("uses the indexed result without reading the entries collection", () => {
+    const call = { id: "indexed-call", name: "bash", arguments: { command: "echo indexed" } };
+    const result: SessionEntry = {
+      id: "indexed-result",
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolCallId: "indexed-call",
+        content: [{ type: "text", text: "indexed output" }],
+      },
+    };
+    const lookup: ToolResultLookup = {
+      entry: result,
+      message: result.message!,
+      details: null,
+      resultCount: 1,
+      hasError: false,
+      hasEdits: false,
+    };
+    const entriesRead = vi.fn((): SessionEntry[] => []);
+    const indexedModel = {
+      get entries(): SessionEntry[] {
+        return entriesRead();
+      },
+      toolResultMap: new Map([["indexed-call", lookup]]),
+      renderedTools: null,
+    };
+
+    const { container } = render(ToolCall, { props: { call, model: indexedModel } });
+
+    expect(entriesRead).not.toHaveBeenCalled();
+    expect(container.querySelector(".tool-fold-status")?.classList).toContain("success");
+    expect(container.querySelector(".tool-execution")?.id).toBe("entry-indexed-result");
+    expect(container.textContent).toContain("indexed output");
   });
 
   it("opens failed tool calls and keeps the result anchor on the outer wrapper", () => {

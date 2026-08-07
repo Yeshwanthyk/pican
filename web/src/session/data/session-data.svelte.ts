@@ -4,13 +4,13 @@
 // data-shape-compatible replacement for the plain model produced by
 // createSessionDataModel() (session-data.js): it exposes the same fields
 // (entries, header, byId, toolCallMap, labelMap, leafId, urlTargetId,
-// systemPrompt, tools, renderedTools, total/from/truncated) so live components
-// and the static export can share session render helpers without field changes,
-// while also being reactive so Svelte views update automatically.
+// systemPrompt, tools, renderedTools, total/from/truncated), plus the indexed
+// toolResultMap used by reactive renderers, so live components and the static
+// export can share session render helpers while Svelte views update automatically.
 //
 // Key reactivity rules:
 //   • `entries` is a $state array, so reconcile()'s in-place splice is tracked.
-//   • byId / toolCallMap / labelMap are STABLE SvelteMaps, refilled IN PLACE
+//   • byId / toolCallMap / toolResultMap / labelMap are STABLE SvelteMaps, refilled IN PLACE
 //     (clear+set). Stable identity matters because the entry renderer / chat
 //     composer capture these Map references once; mutating-in-place keeps that
 //     capture live. SvelteMap (not a plain `$state(new Map())`) is required so
@@ -25,10 +25,11 @@
 
 import { SvelteMap } from "svelte/reactivity";
 import { buildSessionLookups } from "./session-data.js";
-import { sessionEntryFromUnknown } from "./session-types.js";
+import { isUnknownRecord, sessionEntryFromUnknown } from "./session-types.js";
 import type {
   SessionDataShape,
   SessionEntry,
+  SessionMessage,
   SessionPayload,
   ToolCallInfo,
   UnknownRecord,
@@ -59,6 +60,76 @@ function refillMap<K, V>(target: Map<K, V>, source?: ReadonlyMap<K, V>): void {
   if (source) source.forEach((value, key) => target.set(key, value));
 }
 
+export interface ToolResultLookup {
+  readonly entry: SessionEntry;
+  readonly message: SessionMessage;
+  readonly details: UnknownRecord | null;
+  readonly resultCount: number;
+  readonly hasError: boolean;
+  readonly hasEdits: boolean;
+}
+
+export interface ToolResultLookupSource {
+  readonly entries?: ReadonlyArray<SessionEntry>;
+  readonly toolResultMap?: ReadonlyMap<string, ToolResultLookup>;
+}
+
+function buildToolResultMap(entries: ReadonlyArray<SessionEntry>): Map<string, ToolResultLookup> {
+  const results = new Map<string, ToolResultLookup>();
+  for (const entry of entries) {
+    if (entry.type !== "message" || entry.message?.role !== "toolResult") continue;
+    const message = entry.message;
+    const toolCallId = message.toolCallId;
+    if (!toolCallId) continue;
+
+    const details = isUnknownRecord(message.details) ? message.details : null;
+    const existing = results.get(toolCallId);
+    results.set(
+      toolCallId,
+      existing
+        ? {
+            ...existing,
+            resultCount: existing.resultCount + 1,
+            hasError: existing.hasError || Boolean(message.isError),
+            hasEdits: existing.hasEdits || (details !== null && typeof details.diff === "string"),
+          }
+        : {
+            entry,
+            message,
+            details,
+            resultCount: 1,
+            hasError: Boolean(message.isError),
+            hasEdits: details !== null && typeof details.diff === "string",
+          },
+    );
+  }
+  return results;
+}
+
+const fallbackToolResultMaps = new WeakMap<
+  ReadonlyArray<SessionEntry>,
+  ReadonlyMap<string, ToolResultLookup>
+>();
+
+// Shared render components also receive snapshot-shaped models in static export.
+// Reactive SessionDataModel consumers always take the O(1) map path; snapshots
+// build one cached index for their entries array instead of rescanning per tool.
+export function getToolResultLookup(
+  model: ToolResultLookupSource | null | undefined,
+  toolCallId: string,
+): ToolResultLookup | null {
+  if (!model || !toolCallId) return null;
+  if (model.toolResultMap) return model.toolResultMap.get(toolCallId) ?? null;
+  if (!model.entries) return null;
+
+  let results = fallbackToolResultMaps.get(model.entries);
+  if (!results) {
+    results = buildToolResultMap(model.entries);
+    fallbackToolResultMaps.set(model.entries, results);
+  }
+  return results.get(toolCallId) ?? null;
+}
+
 export class SessionDataModel {
   // ── raw data (compatible fields for the plain model shape) ──────────────
   entries = $state<SessionEntry[]>([]);
@@ -79,6 +150,7 @@ export class SessionDataModel {
   // SvelteMap makes .set/.clear reactive while keeping a stable object identity.
   byId = new SvelteMap<string, SessionEntry>();
   toolCallMap = new SvelteMap<string, ToolCallInfo>();
+  toolResultMap = new SvelteMap<string, ToolResultLookup>();
   labelMap = new SvelteMap<string, string>();
 
   // ── view state ──────────────────────────────────────────────────────────
@@ -171,6 +243,7 @@ export class SessionDataModel {
     const lk = buildSessionLookups(this.entries);
     refillMap(this.byId, lk.byId);
     refillMap(this.toolCallMap, lk.toolCallMap);
+    refillMap(this.toolResultMap, buildToolResultMap(this.entries));
     refillMap(this.labelMap, lk.labelMap);
 
     this.leafId = data.leafId ?? data.defaultLeafId ?? "";
@@ -250,6 +323,7 @@ export class SessionDataModel {
     const lk = buildSessionLookups(this.entries);
     refillMap(this.byId, lk.byId);
     refillMap(this.toolCallMap, lk.toolCallMap);
+    refillMap(this.toolResultMap, buildToolResultMap(this.entries));
     refillMap(this.labelMap, lk.labelMap);
 
     // Reuse the $derived tree instead of building a second one here — reading

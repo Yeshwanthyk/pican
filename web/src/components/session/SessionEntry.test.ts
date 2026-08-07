@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach, vi } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/svelte";
 import SessionEntry from "./SessionEntry.svelte";
 import type { SessionEntry as SessionEntryData } from "../../session/data/session-types.js";
+import type { ToolResultLookup } from "../../session/data/session-data.svelte.js";
 
 afterEach(() => {
   cleanup();
@@ -99,6 +100,58 @@ describe("SessionEntry", () => {
     expect(node).toHaveClass("assistant-message");
     expect(node?.textContent).toContain("hi");
     expect(node?.querySelector(".assistant-who")?.textContent).toBe("ASSISTANT");
+  });
+
+  it("uses indexed activity results without scanning entries", () => {
+    const entry: SessionEntryData = {
+      id: "indexed-assistant",
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "indexed-edit",
+            name: "edit",
+            arguments: { path: "indexed.ts" },
+          },
+        ],
+      },
+    };
+    const resultEntry: SessionEntryData = {
+      id: "indexed-edit-result",
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolCallId: "indexed-edit",
+        isError: true,
+        content: [],
+        details: { diff: "@@ -1 +1 @@\n-old\n+new" },
+      },
+    };
+    const lookup: ToolResultLookup = {
+      entry: resultEntry,
+      message: resultEntry.message!,
+      details: { diff: "@@ -1 +1 @@\n-old\n+new" },
+      resultCount: 1,
+      hasError: true,
+      hasEdits: true,
+    };
+    const entriesRead = vi.fn((): SessionEntryData[] => []);
+    const indexedModel = {
+      get entries(): SessionEntryData[] {
+        return entriesRead();
+      },
+      toolResultMap: new Map([["indexed-edit", lookup]]),
+      renderedTools: null,
+    };
+
+    const { container } = render(SessionEntry, { props: { entry, model: indexedModel } });
+
+    expect(entriesRead).not.toHaveBeenCalled();
+    expect(container.querySelector(".activity-fold.error")).not.toBeNull();
+    expect(container.querySelector(".tool-fold-status")?.classList).toContain("error");
+    expect(container.querySelector(".tool-diff-sheet")).not.toBeNull();
   });
 
   it("renders thinking through the safe Markdown pipeline", () => {
