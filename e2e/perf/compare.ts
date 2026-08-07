@@ -7,7 +7,11 @@ import {
   type PerfEnvironment,
   type PerfResult,
 } from "./result-schema.ts";
-import { summarizeSamples, type SampleStatistics } from "./statistics.ts";
+import {
+  summarizeSamples,
+  type DistributionStatistic,
+  type SampleStatistics,
+} from "./statistics.ts";
 
 export class IncompatiblePerformanceEnvironmentError extends Error {
   constructor(message: string) {
@@ -16,13 +20,28 @@ export class IncompatiblePerformanceEnvironmentError extends Error {
   }
 }
 
+export type StatisticVerdict = "informational" | "passed" | "failed";
+
+export interface StatisticComparison {
+  readonly baseline: number;
+  readonly candidate: number;
+  /** Null when a zero baseline and non-zero candidate make a ratio undefined. */
+  readonly changeRatio: number | null;
+  readonly maxRegressionRatio: number;
+  readonly verdict: StatisticVerdict;
+}
+
 export interface MetricComparison {
   readonly scenario: string;
   readonly metric: string;
   readonly baseline: SampleStatistics;
   readonly candidate: SampleStatistics;
-  /** Null when a zero baseline makes a ratio undefined. */
+  readonly median: StatisticComparison;
+  readonly p95: StatisticComparison;
+  readonly max: StatisticComparison;
+  /** @deprecated Read median.changeRatio instead. */
   readonly medianChangeRatio: number | null;
+  /** True when any distribution statistic exceeds its threshold. */
   readonly regressed: boolean;
 }
 
@@ -30,6 +49,8 @@ export interface PerformanceComparison {
   readonly status: "provisional" | "passed" | "failed";
   readonly baselineAccepted: boolean;
   readonly maxMedianRegressionRatio: number;
+  readonly maxP95RegressionRatio: number;
+  readonly maxMaxRegressionRatio: number;
   readonly comparisons: readonly MetricComparison[];
   readonly message: string;
 }
@@ -37,6 +58,8 @@ export interface PerformanceComparison {
 export interface CompareOptions {
   readonly baselineAccepted?: boolean;
   readonly maxMedianRegressionRatio?: number;
+  readonly maxP95RegressionRatio?: number;
+  readonly maxMaxRegressionRatio?: number;
 }
 
 function stableJson(value: unknown): string {
@@ -140,16 +163,65 @@ function changeRatio(baseline: number, candidate: number): number | null {
   return (candidate - baseline) / baseline;
 }
 
+function regressionThreshold(
+  value: number | undefined,
+  name: string,
+  defaultValue: number,
+): number {
+  const threshold = value ?? defaultValue;
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    throw new Error(`${name} must be a non-negative number`);
+  }
+  return threshold;
+}
+
+function compareStatistic(
+  statistic: DistributionStatistic,
+  baseline: SampleStatistics,
+  candidate: SampleStatistics,
+  maxRegressionRatio: number,
+  baselineAccepted: boolean,
+): StatisticComparison {
+  const baselineValue = baseline[statistic];
+  const candidateValue = candidate[statistic];
+  const ratio = changeRatio(baselineValue, candidateValue);
+  const exceeded =
+    ratio === null ? candidateValue > 0 : ratio > maxRegressionRatio;
+  return {
+    baseline: baselineValue,
+    candidate: candidateValue,
+    changeRatio: ratio,
+    maxRegressionRatio,
+    verdict: baselineAccepted
+      ? exceeded
+        ? "failed"
+        : "passed"
+      : "informational",
+  };
+}
+
 export function comparePerformanceResults(
   baseline: readonly PerfResult[],
   candidate: readonly PerfResult[],
   options: CompareOptions = {},
 ): PerformanceComparison {
   assertCompatibleEnvironments(baseline, candidate);
-  const threshold = options.maxMedianRegressionRatio ?? 0.1;
-  if (!Number.isFinite(threshold) || threshold < 0) {
-    throw new Error("maxMedianRegressionRatio must be a non-negative number");
-  }
+  const baselineAccepted = options.baselineAccepted ?? false;
+  const maxMedianRegressionRatio = regressionThreshold(
+    options.maxMedianRegressionRatio,
+    "maxMedianRegressionRatio",
+    0.1,
+  );
+  const maxP95RegressionRatio = regressionThreshold(
+    options.maxP95RegressionRatio,
+    "maxP95RegressionRatio",
+    0.2,
+  );
+  const maxMaxRegressionRatio = regressionThreshold(
+    options.maxMaxRegressionRatio,
+    "maxMaxRegressionRatio",
+    0.25,
+  );
 
   const baselineGroups = groupByScenario(baseline);
   const candidateGroups = groupByScenario(candidate);
@@ -197,31 +269,54 @@ export function comparePerformanceResults(
       });
       const baselineStatistics = summarizeSamples(baselineSamples);
       const candidateStatistics = summarizeSamples(candidateSamples);
-      const medianChangeRatio = changeRatio(
-        baselineStatistics.median,
-        candidateStatistics.median,
+      const median = compareStatistic(
+        "median",
+        baselineStatistics,
+        candidateStatistics,
+        maxMedianRegressionRatio,
+        baselineAccepted,
+      );
+      const p95 = compareStatistic(
+        "p95",
+        baselineStatistics,
+        candidateStatistics,
+        maxP95RegressionRatio,
+        baselineAccepted,
+      );
+      const max = compareStatistic(
+        "max",
+        baselineStatistics,
+        candidateStatistics,
+        maxMaxRegressionRatio,
+        baselineAccepted,
       );
       comparisons.push({
         scenario,
         metric,
         baseline: baselineStatistics,
         candidate: candidateStatistics,
-        medianChangeRatio,
-        regressed:
-          medianChangeRatio === null
-            ? candidateStatistics.median > 0
-            : medianChangeRatio > threshold,
+        median,
+        p95,
+        max,
+        medianChangeRatio: median.changeRatio,
+        regressed: [median, p95, max].some(
+          (comparison) =>
+            comparison.changeRatio === null
+              ? comparison.candidate > 0
+              : comparison.changeRatio > comparison.maxRegressionRatio,
+        ),
       });
     }
   }
 
-  const baselineAccepted = options.baselineAccepted ?? false;
   const hasRegression = comparisons.some((comparison) => comparison.regressed);
   if (!baselineAccepted) {
     return {
       status: "provisional",
       baselineAccepted,
-      maxMedianRegressionRatio: threshold,
+      maxMedianRegressionRatio,
+      maxP95RegressionRatio,
+      maxMaxRegressionRatio,
       comparisons,
       message:
         "Timing differences are informational because the baseline was not explicitly accepted.",
@@ -230,7 +325,9 @@ export function comparePerformanceResults(
   return {
     status: hasRegression ? "failed" : "passed",
     baselineAccepted,
-    maxMedianRegressionRatio: threshold,
+    maxMedianRegressionRatio,
+    maxP95RegressionRatio,
+    maxMaxRegressionRatio,
     comparisons,
     message: hasRegression
       ? "An accepted-baseline timing threshold was exceeded."
@@ -294,7 +391,7 @@ export function runComparatorCli(args: readonly string[]): number {
   const candidatePaths = flagValues(args, "--candidate");
   if (baselinePaths.length === 0 || candidatePaths.length === 0) {
     throw new Error(
-      "usage: compare.ts --baseline <file-or-dir> --candidate <file-or-dir> [--baseline-accepted] [--max-median-regression <ratio>]",
+      "usage: compare.ts --baseline <file-or-dir> --candidate <file-or-dir> [--baseline-accepted] [--max-median-regression <ratio>] [--max-p95-regression <ratio>] [--max-max-regression <ratio>]",
     );
   }
   const comparison = comparePerformanceResults(
@@ -305,6 +402,8 @@ export function runComparatorCli(args: readonly string[]): number {
         hasFlag(args, "--baseline-accepted") ||
         process.env.PICAN_PERF_BASELINE_ACCEPTED === "1",
       maxMedianRegressionRatio: numericFlag(args, "--max-median-regression"),
+      maxP95RegressionRatio: numericFlag(args, "--max-p95-regression"),
+      maxMaxRegressionRatio: numericFlag(args, "--max-max-regression"),
     },
   );
   console.log(JSON.stringify(comparison, null, 2));

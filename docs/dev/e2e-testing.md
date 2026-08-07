@@ -196,7 +196,7 @@ make e2e-perf-compare \
 make e2e-perf-compare \
   PERF_BASELINE=e2e/perf-results/accepted-run \
   PERF_CANDIDATE=e2e/perf-results/candidate-run \
-  PERF_COMPARE_FLAGS="--baseline-accepted --max-median-regression 0.10"
+  PERF_COMPARE_FLAGS="--baseline-accepted --max-median-regression 0.10 --max-p95-regression 0.20 --max-max-regression 0.25"
 ```
 
 `make e2e-perf` remains an alias for `e2e-perf-correctness`. The correctness target runs the
@@ -262,9 +262,18 @@ and candidate to have identical project, temperature, OS/architecture/release, N
 browser/version, viewport/DPR, headless state, profile/version/parameters, and capability identity.
 It refuses mixed or mismatched environments rather than producing a misleading comparison.
 
-Timing gates are **provisional by default**: regressions are reported, but the comparator exits
-successfully. Only the explicit `--baseline-accepted` flag (or
-`PICAN_PERF_BASELINE_ACCEPTED=1`) makes the median regression threshold gating. Baseline acceptance
-is a human release/process decision; recording a file does not accept it automatically. Pin runner
-conditions and review repeated samples before accepting a baseline, and keep real-device checks for
-release candidates.
+For every task metric, the JSON comparison includes explicit baseline/candidate values, change
+ratio, configured threshold, and verdict for median, p95, and max. The default accepted-baseline
+limits are 10% for median, 20% for p95, and 25% for max. The max limit is intentionally a slightly
+wider but still conservative guardrail for a statistic that is more outlier-sensitive than p95.
+Override them independently with `--max-median-regression`, `--max-p95-regression`, and
+`--max-max-regression`; each takes a non-negative ratio such as `0.10`.
+
+Timing gates are **provisional by default**: threshold crossings and ratios are reported, every
+statistic verdict is `informational`, and the comparator exits successfully. Only the explicit
+`--baseline-accepted` flag (or `PICAN_PERF_BASELINE_ACCEPTED=1`) changes those verdicts to `passed`
+or `failed` and makes any failed median, p95, or max verdict fail the comparison. A non-zero
+candidate against a zero baseline has a `null` change ratio and fails when accepted; zero against
+zero has ratio `0`. Baseline acceptance is a human release/process decision; recording a file does
+not accept it automatically. Pin runner conditions and review repeated samples before accepting a
+baseline, and keep real-device checks for release candidates.

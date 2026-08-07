@@ -1,3 +1,7 @@
+export const DISTRIBUTION_STATISTICS = ["median", "p95", "max"] as const;
+
+export type DistributionStatistic = (typeof DISTRIBUTION_STATISTICS)[number];
+
 export interface SampleStatistics {
   readonly count: number;
   readonly median: number;
