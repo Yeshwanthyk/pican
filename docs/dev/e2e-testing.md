@@ -13,7 +13,8 @@ binaries and a running server, so it runs as its own target and CI job.
 ```bash
 make e2e-setup           # one-time: install deps + Playwright browsers
 make e2e                 # build the binary, then run the whole suite
-make e2e-perf            # serial Pixel 5 performance/resilience measurements
+make e2e-perf            # one serial Pixel 5 performance correctness sample
+make e2e-perf-record     # isolated repetitions: 20 local / 5 in CI by default
 
 # or, from e2e/ directly (assumes ./pican is already built):
 cd e2e
@@ -49,6 +50,7 @@ PWDEBUG=1 npx playwright test --project="Desktop Chrome" tests/chat.spec.ts
 ```
 
 Tips for eyeballing:
+
 - Always add `--project=...` in headed mode — otherwise all 7 browsers open together.
 - `--workers=1` runs tests one at a time so windows don't stack up.
 - `--ui` (the Playwright UI runner) is usually the nicest way to watch + re-run.
@@ -61,18 +63,18 @@ Tips for eyeballing:
 
 Layout follows a **900px breakpoint**, not device type. Seven projects:
 
-| Project | Engine | Viewport | Layout |
-|---|---|---|---|
-| Desktop Chrome | Chromium | 1280 | desktop |
-| Desktop Firefox | Firefox | 1280 | desktop |
-| Desktop Safari | WebKit | 1280 | desktop |
-| Mobile Chrome (Pixel 5) | Chromium | 393 | mobile |
-| Mobile Safari (iPhone 13) | WebKit | 390 | mobile |
-| iPad (gen 7) | WebKit | 810 portrait | mobile |
-| iPad landscape | WebKit | ~1080 | desktop |
+| Project                   | Engine   | Viewport     | Layout  |
+| ------------------------- | -------- | ------------ | ------- |
+| Desktop Chrome            | Chromium | 1280         | desktop |
+| Desktop Firefox           | Firefox  | 1280         | desktop |
+| Desktop Safari            | WebKit   | 1280         | desktop |
+| Mobile Chrome (Pixel 5)   | Chromium | 393          | mobile  |
+| Mobile Safari (iPhone 13) | WebKit   | 390          | mobile  |
+| iPad (gen 7)              | WebKit   | 810 portrait | mobile  |
+| iPad landscape            | WebKit   | ~1080        | desktop |
 
 These are Playwright **device emulation** (real viewport/touch/UA/DPR, desktop
-engine binary), not real devices. `webkit` is the Safari *engine*, not literal
+engine binary), not real devices. `webkit` is the Safari _engine_, not literal
 Safari.app — good enough for layout/touch regressions and runs on Linux CI.
 
 Tests that depend on layout resolve it at runtime with `isMobileLayout(page)`
@@ -168,23 +170,101 @@ The `e2e` job in `.github/workflows/ci.yml`: `npm ci` →
 
 Keep this doc in sync when specs, fixtures, or the project matrix change.
 
-## Performance and resilience harness
+## Performance harness
 
-`make e2e-perf` runs the separate `e2e/perf/` suite against the built binary with production
-large-transcript thresholds. It is deliberately serial and Chromium-only so functional-test
-contention and cross-engine timing variance do not pollute the measurements.
+The performance suite is separate from the normal E2E matrix. It is serial, uses one Pixel 5
+Chromium project, and runs against the built binary with production large-transcript thresholds.
+This reduces functional-test contention and cross-engine timing variance; it does not make the
+emulated device a real phone.
 
-The first slice records three scenarios:
+### Commands
 
-- bounded tracked-project home with ordered pins;
-- a 1,600-message transcript, including one Load Earlier prepend; and
-- offline-to-online SSE catch-up with an exact-once visible marker.
+```bash
+make e2e-perf-correctness # build, type-check, and run each app scenario once
+make e2e-perf-record      # build, type-check, then record isolated repetitions
 
-Each test writes a JSON result under `e2e/perf-results/` and attaches the same payload to the
-Playwright test result. The payload includes the git SHA/dirty state, fixture counts and bytes,
-task timings, navigation/resource timing, long tasks, layout shift, DOM size, and Chromium memory
-counters where supported. Set `PICAN_PERF_PROFILE=mobile4g` to apply the named 150 ms / 4 Mbps /
-4x-CPU Chromium lab profile. It is an approximation, not a real-phone claim.
+# Override the default 20 local samples (CI defaults to 5).
+make e2e-perf-record PERF_REPETITIONS=3
+PICAN_PERF_REPETITIONS=3 make e2e-perf-record
 
-Timing values are baseline-only today. Correctness invariants fail the run; numeric budgets should
-be ratcheted only after repeated samples on a pinned runner and real-phone release-candidate checks.
+# Compare files or directories containing only V2 results.
+make e2e-perf-compare \
+  PERF_BASELINE=e2e/perf-results/accepted-run \
+  PERF_CANDIDATE=e2e/perf-results/candidate-run
+
+# Only after the baseline has been deliberately accepted:
+make e2e-perf-compare \
+  PERF_BASELINE=e2e/perf-results/accepted-run \
+  PERF_CANDIDATE=e2e/perf-results/candidate-run \
+  PERF_COMPARE_FLAGS="--baseline-accepted --max-median-regression 0.10"
+```
+
+`make e2e-perf` remains an alias for `e2e-perf-correctness`. The correctness target runs the
+existing bounded-home, long-transcript/Load Earlier, and one offline-to-online exact-once catch-up
+check. That last check is not a general recovery, crash, replay, or data-loss scenario suite; no
+such coverage is claimed here.
+
+The record target starts a fresh Playwright process, global setup, server, and temporary session
+directory for every repetition. This prevents tracked projects, pins, generated sessions, and
+other server state from leaking into the next sample. Do **not** replace that loop with
+Playwright's `--repeat-each`: global setup is process-scoped, and the current app scenarios are not
+fully isolated from their shared server fixture within one process. The record target labels these
+fresh-process samples `cold`. `PICAN_PERF_TEMPERATURE=warm` can label a separately controlled warm
+experiment, but this increment does not provide a trustworthy automated warm-cache protocol.
+
+For contract-only checks that do not start pican or use app scenario behavior:
+
+```bash
+cd e2e
+PICAN_PERF_HARNESS_ONLY=1 npx playwright test \
+  --config=playwright.perf.config.ts perf/harness.spec.ts
+```
+
+### Result contract and artifacts
+
+Every sample is checked at runtime before it is written as
+`pican-performance-result` schema version 2. Invalid versions, missing identity fields,
+non-finite measurements, invalid profile parameters, and malformed capabilities are rejected.
+Schema V1 files are intentionally not accepted by the comparator.
+
+Each result records:
+
+- git SHA and dirty state;
+- run ID, unique sample ID, one-based repetition, and explicit `cold`/`warm` label;
+- OS platform/release/architecture, Node and Playwright versions, browser name and browser version
+  when supplied/available (`PICAN_PERF_BROWSER_VERSION` may supply it);
+- viewport, device-pixel ratio, headless state, and the full versioned profile parameters;
+- explicit supported, unsupported, unavailable, or not-requested capability states;
+- scenario fixtures and task timings, browser snapshots, long tasks, layout shift, DOM size, and
+  memory counters where the engine exposes them; and
+- per-resource pathname **plus query**, initiator type, transfer bytes, decoded bytes, start time,
+  and duration. `snapshotDelta()` can attribute newly observed resources, long tasks, DOM entries,
+  and heap change to two explicit task boundaries.
+
+The persistent filename contains the SHA, profile, scenario, run ID, and unique sample ID, and is
+created without overwrite permission. Repetitions therefore cannot silently replace an earlier
+JSON file. The same checked payload is attached to its Playwright result. Persistent output
+defaults to `e2e/perf-results/`; set `PICAN_PERF_OUTPUT_DIR` to separate baseline and candidate
+runs.
+
+The profile contract is versioned independently. `PICAN_PERF_PROFILE=mobile4g` currently means
+profile V1: 150 ms latency, 500,000 B/s down (approximately 4 Mbps), 250,000 B/s up, and 4x CPU
+slowdown. It is a Chromium CDP lab approximation. The metric/profile helpers do not attempt CDP on
+WebKit; results explicitly report CDP/network/CPU throttling as unsupported there. The current
+Playwright perf project remains Chromium-only.
+
+### Statistics and timing gates
+
+The comparator groups numeric `measurements.task` timing values whose names end in `Ms` by
+scenario and reports sample count, median, nearest-rank p95, and max. Counts remain correctness
+observations rather than being misclassified as timing regressions. Before computing timing differences it requires the baseline
+and candidate to have identical project, temperature, OS/architecture/release, Node, Playwright,
+browser/version, viewport/DPR, headless state, profile/version/parameters, and capability identity.
+It refuses mixed or mismatched environments rather than producing a misleading comparison.
+
+Timing gates are **provisional by default**: regressions are reported, but the comparator exits
+successfully. Only the explicit `--baseline-accepted` flag (or
+`PICAN_PERF_BASELINE_ACCEPTED=1`) makes the median regression threshold gating. Baseline acceptance
+is a human release/process decision; recording a file does not accept it automatically. Pin runner
+conditions and review repeated samples before accepting a baseline, and keep real-device checks for
+release candidates.

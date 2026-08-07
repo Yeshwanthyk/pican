@@ -1,4 +1,4 @@
-.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-typecheck frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-perf e2e-setup
+.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-typecheck frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-perf e2e-perf-correctness e2e-perf-record e2e-perf-compare e2e-setup
 
 BINARY ?= pican
 WEB_DIR := web
@@ -87,15 +87,49 @@ e2e-setup:
 e2e: build
 	cd $(E2E_DIR) && npx playwright test
 
-# Serial mobile performance/resilience measurements. This is baseline-first:
-# correctness invariants fail the run, while timings are recorded as JSON and
-# remain non-gating until a stable baseline has been accepted.
-e2e-perf: build
+# Serial mobile performance measurements. Correctness is one isolated sample;
+# record starts a fresh server process for every sample so scenario-side state
+# cannot leak between repetitions.
+PERF_REPETITIONS ?= $(if $(filter 1 true yes,$(CI)),5,20)
+
+e2e-perf: e2e-perf-correctness
+
+e2e-perf-correctness: build
 	cd $(E2E_DIR) && \
 		../web/node_modules/.bin/tsc --noEmit -p tsconfig.perf.json && \
 		PICAN_LARGE_SESSION_THRESHOLD=1500 \
 		PICAN_LARGE_SESSION_TAIL_ENTRIES=1000 \
-		npx playwright test --config=playwright.perf.config.ts
+		npx playwright test --config=playwright.perf.config.ts perf/scenarios.spec.ts
+
+e2e-perf-record: build
+	cd $(E2E_DIR) && ../web/node_modules/.bin/tsc --noEmit -p tsconfig.perf.json
+	@set -eu; \
+		repetitions="$${PICAN_PERF_REPETITIONS:-$(PERF_REPETITIONS)}"; \
+		case "$$repetitions" in ''|*[!0-9]*|0) echo "PICAN_PERF_REPETITIONS/PERF_REPETITIONS must be a positive integer" >&2; exit 2;; esac; \
+		run_id="$${PICAN_PERF_RUN_ID:-$$(date -u +%Y%m%dT%H%M%SZ)-$$$$}"; \
+		temperature="$${PICAN_PERF_TEMPERATURE:-cold}"; \
+		i=1; \
+		while [ "$$i" -le "$$repetitions" ]; do \
+			echo "[perf] isolated sample $$i/$$repetitions (run $$run_id, $$temperature)"; \
+			cd $(E2E_DIR) && \
+				PICAN_PERF_RUN_ID="$$run_id" \
+				PICAN_PERF_REPETITION="$$i" \
+				PICAN_PERF_TEMPERATURE="$$temperature" \
+				PICAN_LARGE_SESSION_THRESHOLD=1500 \
+				PICAN_LARGE_SESSION_TAIL_ENTRIES=1000 \
+				npx playwright test --config=playwright.perf.config.ts perf/scenarios.spec.ts; \
+			cd ..; \
+			i=$$((i + 1)); \
+		done
+
+e2e-perf-compare:
+	@test -n "$(PERF_BASELINE)" || (echo "PERF_BASELINE=<file-or-dir> is required" >&2; exit 2)
+	@test -n "$(PERF_CANDIDATE)" || (echo "PERF_CANDIDATE=<file-or-dir> is required" >&2; exit 2)
+	cd $(E2E_DIR) && ../web/node_modules/.bin/tsc --noEmit -p tsconfig.perf.json
+	node --experimental-strip-types $(E2E_DIR)/perf/compare.ts \
+		--baseline "$(PERF_BASELINE)" \
+		--candidate "$(PERF_CANDIDATE)" \
+		$(PERF_COMPARE_FLAGS)
 
 clean:
 	rm -f $(BINARY)
