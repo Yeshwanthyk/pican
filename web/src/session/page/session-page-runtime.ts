@@ -52,7 +52,7 @@ export function startSessionPageRuntime({
   runtime = getSessionRuntime(),
 }: {
   readonly sessionId: string;
-  readonly applyLazyHighlighting: (documentImpl: Document) => void;
+  readonly applyLazyHighlighting: (root: ParentNode) => void;
   readonly onSettingsHydrated?: () => void;
   readonly windowImpl?: Window & typeof globalThis;
   readonly documentImpl?: Document;

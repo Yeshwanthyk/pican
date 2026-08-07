@@ -51,7 +51,7 @@ interface WireSessionContentOptions {
   readonly model: SessionContentModel;
   readonly sessionId?: string;
   readonly contentRuntime?: ContentRuntime | null;
-  readonly applyLazyHighlighting: (documentImpl: Document) => void;
+  readonly applyLazyHighlighting: (root: ParentNode) => void;
 }
 
 export function wireSessionContentRuntime({
@@ -138,7 +138,7 @@ export function wireSessionContentRuntime({
   if (contentRuntime) {
     contentRuntime.afterRender = (container: HTMLElement) => {
       sessionRuntime.toggleState?.applyToNode(container);
-      applyLazyHighlighting(documentImpl);
+      applyLazyHighlighting(container);
     };
   }
 

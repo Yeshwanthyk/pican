@@ -11,6 +11,28 @@ describe("wireSessionContentRuntime", () => {
     vi.restoreAllMocks();
   });
 
+  it("scopes post-render highlighting to the rendered transcript container", () => {
+    document.body.innerHTML = '<div id="messages"><div id="rendered"></div></div>';
+    const contentRuntime = { afterRender: null as ((container: HTMLElement) => void) | null };
+    const applyLazyHighlighting = vi.fn();
+
+    const runtime = wireSessionContentRuntime({
+      windowImpl: window,
+      documentImpl: document,
+      model: { entries: [], header: {}, toolCallMap: new Map() },
+      contentRuntime,
+      applyLazyHighlighting,
+    });
+    const rendered = document.getElementById("rendered");
+    if (!(rendered instanceof HTMLElement)) return;
+
+    contentRuntime.afterRender?.(rendered);
+
+    expect(applyLazyHighlighting).toHaveBeenCalledOnce();
+    expect(applyLazyHighlighting).toHaveBeenCalledWith(rendered);
+    runtime.dispose();
+  });
+
   it("removes delegated listeners and restores downloadSessionJson on dispose", () => {
     document.body.innerHTML =
       '<div id="messages"><button class="copy-link-btn" data-entry-id="e1"></button></div>';
