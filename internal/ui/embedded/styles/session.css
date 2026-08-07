@@ -1129,6 +1129,52 @@ body.right-sidebar-expanded .right-sidebar {
   -webkit-backdrop-filter: blur(16px);
 }
 
+.connection-status {
+  position: fixed;
+  top: 58px;
+  left: 50%;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  padding: 4px 8px;
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--chrome-bg) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dim) 72%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--body-bg) 35%, transparent);
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: connection-status-in 0.14s ease both;
+}
+
+.connection-status--stale {
+  color: var(--attention);
+}
+
+.connection-status-dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+@keyframes connection-status-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -3px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 /* Standalone (installed PWA without WCO) keeps the normal browser header
        look — the same translucent --chrome-bg bar used in a browser tab. Only
        WCO mode (below) repaints it to merge into the OS title bar. */
@@ -1636,6 +1682,10 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   .session-header-title-chevron,
   .pinned-tab {
     transition: none;
+  }
+
+  .connection-status {
+    animation: none;
   }
 
   .pinned-tab--running .pinned-tab-status {
@@ -3521,6 +3571,10 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     height: calc(52px + env(safe-area-inset-top));
     padding: env(safe-area-inset-top) 8px 0;
     gap: 0;
+  }
+
+  .connection-status {
+    top: calc(58px + env(safe-area-inset-top));
   }
 
   .session-header-left {

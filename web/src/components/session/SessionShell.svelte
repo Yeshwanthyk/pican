@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import ChatComposer from './ChatComposer.svelte';
   import LiveReload from './LiveReload.svelte';
+  import ConnectionStatus from './ConnectionStatus.svelte';
   import CommandMenu from './CommandMenu.svelte';
   import RightSidebar from './RightSidebar.svelte';
   import SessionHeader from './SessionHeader.svelte';
@@ -30,6 +31,7 @@
   } from '../../session/session-modals.svelte.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import type { WorkerProcessStatus } from '../../session/data/session-types.js';
+  import type { SessionConnectionState } from '../../session/live/live-connection.js';
   import { defaultRuntimeCapabilities } from '../../lib/runtime-capabilities.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
 
@@ -57,6 +59,7 @@
   } = $props();
 
   const liveRuntime = getSessionRuntime();
+  let connectionState = $state<SessionConnectionState>('connecting');
   const workerStatus = $derived(
     (sessionModel.workerStatus ?? { state: 'idle' }) as WorkerProcessStatus,
   );
@@ -167,7 +170,8 @@
 
 <!-- Live reload (SSE) mounts before <ChatComposer> so its optimistic
      "message sent" listener is attached before the user can send. -->
-<LiveReload />
+<LiveReload onConnectionState={(state) => (connectionState = state)} />
+<ConnectionStatus state={connectionState} />
 
 <div id="app" class:worker-down={workerDown}>
   <div id="content-container" class="content-container">

@@ -340,6 +340,8 @@ export default {
   "session.viewOnly": "view only",
   "session.viewOnlyResume": "view only · resume in terminal: {command}",
   "session.workerDown": "worker down",
+  "session.connectionReconnecting": "reconnecting · restoring latest session",
+  "session.connectionStale": "connection stale · restoring latest session",
   "session.workerExited": "worker exited ({code}) — stream ended here",
   "session.workerExitedHint": "send your next message to restart the worker · transcript is saved",
   "session.noWorkingDirectory": "No working directory available for this session",

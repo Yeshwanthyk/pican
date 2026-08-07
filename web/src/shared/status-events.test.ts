@@ -6,7 +6,9 @@ type Listener = (event: Event) => void;
 class FakeEventSource {
   static instances: Array<FakeEventSource> = [];
   readonly url: string;
+  onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
   readonly listeners: Record<string, Array<Listener>> = {};
   readonly close = vi.fn();
 
@@ -21,6 +23,14 @@ class FakeEventSource {
 
   emit(name: string, data = "") {
     const event = new MessageEvent(name, { data });
+    if (name === "open") {
+      this.onopen?.(event);
+      return;
+    }
+    if (name === "error") {
+      this.onerror?.(event);
+      return;
+    }
     if (name === "message") {
       this.onmessage?.(event);
       return;
@@ -143,6 +153,48 @@ describe("createStatusEvents", () => {
     expect(FakeEventSource.instances).toHaveLength(2);
     FakeEventSource.instances[1]?.emit("open");
     expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("generation-fences old global events and reports valid heartbeat/error telemetry", () => {
+    const onOpen = vi.fn();
+    const onError = vi.fn();
+    const onHeartbeat = vi.fn();
+    const onMessage = vi.fn();
+    const sub = createStatusEvents({
+      EventSourceImpl: FakeEventSource,
+      onOpen,
+      onError,
+      onHeartbeat,
+      onMessage,
+    });
+    sub.connect();
+    const oldSource = FakeEventSource.instances[0];
+    sub.connect();
+    const currentSource = FakeEventSource.instances[1];
+
+    oldSource?.emit("open");
+    oldSource?.emit("message", "new-session");
+    oldSource?.emit(
+      "heartbeat",
+      '{"timestamp":"2026-05-08T09:00:00Z","freshness":"transport-only"}',
+    );
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(onHeartbeat).not.toHaveBeenCalled();
+
+    currentSource?.emit("open");
+    currentSource?.emit(
+      "heartbeat",
+      '{"timestamp":"2026-05-08T09:00:00Z","freshness":"transport-only"}',
+    );
+    currentSource?.emit("heartbeat", '{"timestamp":"bad","freshness":"transport-only"}');
+    currentSource?.emit("error");
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onHeartbeat).toHaveBeenCalledWith({
+      timestamp: "2026-05-08T09:00:00Z",
+      freshness: "transport-only",
+    });
+    expect(onError).toHaveBeenCalledTimes(2);
   });
 
   it("calls onMessage before routing reload broadcasts", () => {

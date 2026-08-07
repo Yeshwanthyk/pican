@@ -14,6 +14,7 @@ export interface SessionEvent {
 }
 
 export interface EventSourceLike {
+  onopen?: ((event: Event) => void) | null;
   onmessage?: ((event: SessionEvent) => void) | null;
   onerror?: ((event: Event) => void) | null;
   readonly readyState?: number;
@@ -27,11 +28,13 @@ export interface EventSourceConstructor {
 
 class BrowserEventSource implements EventSourceLike {
   readonly #source: EventSource;
+  onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: SessionEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
 
   constructor(url: string) {
     this.#source = new EventSource(url);
+    this.#source.onopen = (event) => this.onopen?.(event);
     this.#source.onmessage = (event) => this.onmessage?.({ data: event.data });
     this.#source.onerror = (event) => this.onerror?.(event);
   }
@@ -64,6 +67,11 @@ interface EntryState {
 
 type FetchImpl = (url: string) => Promise<unknown>;
 type MaybePromise = unknown;
+
+export interface TransportHeartbeat {
+  readonly timestamp: string;
+  readonly freshness: "transport-only";
+}
 
 const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
   isUnknownRecord(value) && typeof value.then === "function";
@@ -166,24 +174,32 @@ export async function handleSessionReload({
     Effect.tryPromise({
       try: async () => {
         const response = await fetchImpl(withBasePath(url));
-        if (response instanceof Response) return response.json();
-        if (isUnknownRecord(response) && typeof response.json === "function")
-          return response.json();
-        return {};
+        if (
+          !isUnknownRecord(response) ||
+          response.ok !== true ||
+          typeof response.json !== "function"
+        ) {
+          throw new Error("Session recovery returned an unsuccessful response");
+        }
+        return response.json();
       },
       catch: (cause) => cause,
     }),
   );
-  const data = isUnknownRecord(dataValue) ? dataValue : {};
   if (!shouldApply()) {
     return { entries: [], newCount: 0, stale: true };
   }
-  const entries = Array.isArray(data.entries)
-    ? data.entries.flatMap((entry) => {
-        const normalized = sessionEntryFromUnknown(entry);
-        return normalized ? [normalized] : [];
-      })
-    : [];
+  if (!isUnknownRecord(dataValue) || !Array.isArray(dataValue.entries)) {
+    throw new Error("Session recovery response is missing canonical entries");
+  }
+  const data = dataValue;
+  const rawEntries: unknown[] = dataValue.entries;
+  const entries: SessionEntry[] = [];
+  for (const candidate of rawEntries) {
+    const entry = sessionEntryFromUnknown(candidate);
+    if (!entry) throw new Error("Session recovery response contains an invalid entry");
+    entries.push(entry);
+  }
   const isDelta = hasValidAfterCount && data.deltaOk === true;
   // Reactive callers may return a render barrier (for example Svelte's tick).
   // Wait for canonical entries to reach the DOM before removing the imperative
@@ -261,7 +277,11 @@ export function wireSessionEvents({
   onReload,
   onChatPreview,
   onWorkerStatus = () => {},
+  onOpen = () => {},
+  onHeartbeat = () => {},
   onError = () => {},
+  onTransportError = onError,
+  shouldHandle = () => true,
   windowImpl = typeof window !== "undefined" ? window : null,
   CustomEventImpl = typeof CustomEvent !== "undefined" ? CustomEvent : null,
 }: {
@@ -269,14 +289,18 @@ export function wireSessionEvents({
   readonly onReload: (event?: SessionEvent) => MaybePromise;
   readonly onChatPreview: (payload: UnknownRecord) => void;
   readonly onWorkerStatus?: (status: WorkerProcessStatus) => void;
+  readonly onOpen?: () => void;
+  readonly onHeartbeat?: (heartbeat: TransportHeartbeat) => void;
   readonly onError?: (error?: unknown) => void;
+  readonly onTransportError?: (error?: unknown) => void;
+  readonly shouldHandle?: () => boolean;
   readonly windowImpl?: { dispatchEvent(event: unknown): boolean } | null;
   readonly CustomEventImpl?:
     | (new (type: string, init?: { readonly detail?: unknown }) => unknown)
     | null;
 }): EventSourceLike {
   const dispatch = (type: string, detail?: unknown): void => {
-    if (!windowImpl || !CustomEventImpl) return;
+    if (!shouldHandle() || !windowImpl || !CustomEventImpl) return;
     runSync(
       Effect.try({
         try: () => windowImpl.dispatchEvent(new CustomEventImpl(type, { detail })),
@@ -291,6 +315,7 @@ export function wireSessionEvents({
     event: SessionEvent,
     consume: (payload: UnknownRecord) => void,
   ): void => {
+    if (!shouldHandle()) return;
     runSync(
       decodeEventRecord(event.data).pipe(
         Effect.match({
@@ -301,8 +326,11 @@ export function wireSessionEvents({
     );
   };
 
+  eventSource.onopen = () => {
+    if (shouldHandle()) onOpen();
+  };
   eventSource.onmessage = (event) => {
-    if (event.data !== "reload") return;
+    if (!shouldHandle() || event.data !== "reload") return;
     // `onReload` returns a Promise once handleSessionReload starts; await it so
     // the broadcast fires *after* the model has the new entries. Otherwise
     // listeners that read the model on this event (e.g. steer-queue reconciling
@@ -315,6 +343,19 @@ export function wireSessionEvents({
       dispatchReloadedEvent();
     }
   };
+  eventSource.addEventListener("heartbeat", (event) => {
+    withEventRecord(event, (payload) => {
+      if (
+        payload.freshness !== "transport-only" ||
+        typeof payload.timestamp !== "string" ||
+        !Number.isFinite(Date.parse(payload.timestamp))
+      ) {
+        onError(new Error("Invalid heartbeat payload"));
+        return;
+      }
+      onHeartbeat({ timestamp: payload.timestamp, freshness: "transport-only" });
+    });
+  });
   eventSource.addEventListener("chat-preview", (event) => {
     withEventRecord(event, (payload) => {
       onChatPreview(payload);
@@ -347,7 +388,7 @@ export function wireSessionEvents({
   // changes — autonomous drainer, another tab, etc. ChatComposer listens for
   // pi-queue-event on the window and refetches /api/chat/queue.
   eventSource.addEventListener("queue", () => {
-    dispatch("pi-queue-event");
+    if (shouldHandle()) dispatch("pi-queue-event");
   });
   const extensionEvents: ReadonlyArray<readonly [string, string]> = [
     ["extension-ui-request", "pi-extension-ui-request"],
@@ -359,6 +400,8 @@ export function wireSessionEvents({
       withEventRecord(event, (payload) => dispatch(windowEvent, payload));
     });
   }
-  eventSource.onerror = (event) => onError(event);
+  eventSource.onerror = (event) => {
+    if (shouldHandle()) onTransportError(event);
+  };
   return eventSource;
 }

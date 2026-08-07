@@ -329,6 +329,85 @@ describe("live events", () => {
     expect(scrollAfterLayout).not.toHaveBeenCalled();
   });
 
+  it("retains canonical state on HTTP errors or malformed entry payloads", async () => {
+    const onReloaded = vi.fn();
+    const clearChatPreview = vi.fn();
+    const base = {
+      sessionId: "s",
+      entryState: { seen: new Set(["kept"]), liveRendered: new Set() },
+      onReloaded,
+      clearChatPreview,
+    };
+
+    await expect(
+      handleSessionReload({
+        ...base,
+        fetchImpl: () =>
+          Promise.resolve(
+            new Response(JSON.stringify({ entries: [{ id: "new" }] }), { status: 503 }),
+          ),
+      }),
+    ).rejects.toThrow("unsuccessful response");
+    await expect(
+      handleSessionReload({
+        ...base,
+        fetchImpl: () =>
+          Promise.resolve(new Response(JSON.stringify({ entries: [{ message: "missing id" }] }))),
+      }),
+    ).rejects.toThrow("invalid entry");
+    await expect(
+      handleSessionReload({
+        ...base,
+        fetchImpl: () => Promise.resolve(new Response(JSON.stringify({ name: "missing entries" }))),
+      }),
+    ).rejects.toThrow("missing canonical entries");
+
+    expect(onReloaded).not.toHaveBeenCalled();
+    expect(clearChatPreview).not.toHaveBeenCalled();
+    expect(base.entryState.seen).toEqual(new Set(["kept"]));
+  });
+
+  it("handles open and heartbeat only while its generation is current", () => {
+    const handlers = new Map<string, (event: SessionEvent) => void>();
+    const eventSource: EventSourceLike = {
+      addEventListener: vi.fn((name: string, handler: (event: SessionEvent) => void) => {
+        handlers.set(name, handler);
+      }),
+    };
+    const onOpen = vi.fn();
+    const onHeartbeat = vi.fn();
+    const onError = vi.fn();
+    let current = true;
+    wireSessionEvents({
+      eventSource,
+      onReload: vi.fn(),
+      onChatPreview: vi.fn(),
+      onOpen,
+      onHeartbeat,
+      onError,
+      shouldHandle: () => current,
+    });
+
+    eventSource.onopen?.(new Event("open"));
+    handlers.get("heartbeat")?.({
+      data: '{"timestamp":"2026-05-08T09:00:00Z","freshness":"transport-only"}',
+    });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onHeartbeat).toHaveBeenCalledWith({
+      timestamp: "2026-05-08T09:00:00Z",
+      freshness: "transport-only",
+    });
+
+    current = false;
+    eventSource.onmessage?.({ data: "reload" });
+    eventSource.onerror?.(new Event("error"));
+    handlers.get("heartbeat")?.({
+      data: '{"timestamp":"2026-05-08T09:00:15Z","freshness":"transport-only"}',
+    });
+    expect(onHeartbeat).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("wires event source messages", () => {
     const addEventListener =
       vi.fn<(type: string, listener: (event: SessionEvent) => void) => void>();
@@ -342,7 +421,9 @@ describe("live events", () => {
     eventSource.onmessage?.({ data: "noop" });
     eventSource.onmessage?.({ data: "reload" });
     expect(onReload).toHaveBeenCalledTimes(1);
-    const previewHandler = eventSource.addEventListener.mock.calls[0]?.[1];
+    const previewHandler = eventSource.addEventListener.mock.calls.find(
+      ([type]) => type === "chat-preview",
+    )?.[1];
     previewHandler?.({ data: JSON.stringify({ content: "x" }) });
     expect(onChatPreview).toHaveBeenCalledWith({ content: "x" });
     previewHandler?.({ data: "{bad" });
@@ -386,7 +467,9 @@ describe("live events", () => {
     const onReload = vi.fn();
     const onChatPreview = vi.fn();
     wireSessionEvents({ eventSource, onReload, onChatPreview });
-    const previewHandler = eventSource.addEventListener.mock.calls[0]?.[1];
+    const previewHandler = eventSource.addEventListener.mock.calls.find(
+      ([type]) => type === "chat-preview",
+    )?.[1];
 
     previewHandler?.({ data: JSON.stringify({ content: "streaming", done: false }) });
     expect(onReload).not.toHaveBeenCalled();

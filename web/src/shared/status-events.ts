@@ -4,7 +4,9 @@ import { parseStatusEvent } from "../lib/sse";
 import { withBasePath } from "./base-path";
 
 interface LegacyEventSource {
+  onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent<string>) => void) | null;
+  onerror: ((event: Event) => void) | null;
   addEventListener(name: string, listener: EventListener): void;
   close(): void;
 }
@@ -31,6 +33,11 @@ interface Delta {
   readonly modelProvider: string;
 }
 
+export interface StatusHeartbeat {
+  readonly timestamp: string;
+  readonly freshness: "transport-only";
+}
+
 export interface StatusEventsOptions {
   readonly topic?: string;
   readonly EventSourceImpl?: EventSourceConstructor;
@@ -42,10 +49,34 @@ export interface StatusEventsOptions {
   readonly onWorkflowUpdate?: (payload: { readonly runId: string }) => void;
   readonly onTasksUpdate?: (payload: { readonly project: string }) => void;
   readonly onCurationUpdate?: () => void;
+  readonly onOpen?: () => void;
+  readonly onError?: (error?: unknown) => void;
+  readonly onHeartbeat?: (heartbeat: StatusHeartbeat) => void;
   readonly onReconnect?: () => void;
 }
 
 const parse = (type: string, data: string) => runSync(Effect.option(parseStatusEvent(type, data)));
+
+const parseHeartbeat = (data: string): StatusHeartbeat | null => {
+  try {
+    const value: unknown = JSON.parse(data);
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      (value as { freshness?: unknown }).freshness !== "transport-only" ||
+      typeof (value as { timestamp?: unknown }).timestamp !== "string" ||
+      !Number.isFinite(Date.parse((value as { timestamp: string }).timestamp))
+    ) {
+      return null;
+    }
+    return {
+      timestamp: (value as { timestamp: string }).timestamp,
+      freshness: "transport-only",
+    };
+  } catch {
+    return null;
+  }
+};
 
 export function createStatusEvents({
   topic = "__all__",
@@ -58,48 +89,79 @@ export function createStatusEvents({
   onWorkflowUpdate = () => undefined,
   onTasksUpdate = () => undefined,
   onCurationUpdate = () => undefined,
+  onOpen = () => undefined,
+  onError = () => undefined,
+  onHeartbeat = () => undefined,
   onReconnect = () => undefined,
 }: StatusEventsOptions = {}) {
   let stream: LegacyEventSource | null = null;
-  let pagehideHandler: EventListener | null = null;
-  let pageshowHandler: EventListener | null = null;
-  let everConnected = false;
+  let generation = 0;
+  let listening = false;
+  let disposed = false;
+  let everOpened = false;
 
-  const closeStream = () => {
-    stream?.close();
+  const isCurrent = (targetGeneration: number, source: LegacyEventSource): boolean =>
+    !disposed && generation === targetGeneration && stream === source;
+
+  const retireStream = () => {
+    generation += 1;
+    const previous = stream;
     stream = null;
+    previous?.close();
   };
 
-  const cleanup = () => {
-    closeStream();
-    if (pagehideHandler !== null && windowImpl.removeEventListener) {
-      windowImpl.removeEventListener("pagehide", pagehideHandler);
-      pagehideHandler = null;
-    }
-    if (pageshowHandler !== null && windowImpl.removeEventListener) {
-      windowImpl.removeEventListener("pageshow", pageshowHandler);
-      pageshowHandler = null;
-    }
+  const pagehideHandler: EventListener = () => retireStream();
+  const pageshowHandler: EventListener = () => {
+    if (stream === null) replaceStream();
   };
 
-  const connect = () => {
-    if (EventSourceImpl === undefined) return;
-    cleanup();
+  const removeLifecycleListeners = () => {
+    if (!listening || !windowImpl.removeEventListener) return;
+    windowImpl.removeEventListener("pagehide", pagehideHandler);
+    windowImpl.removeEventListener("pageshow", pageshowHandler);
+    listening = false;
+  };
+
+  const addLifecycleListeners = () => {
+    if (listening || !windowImpl.addEventListener) return;
+    windowImpl.addEventListener("pagehide", pagehideHandler);
+    windowImpl.addEventListener("pageshow", pageshowHandler);
+    listening = true;
+  };
+
+  function replaceStream(): void {
+    if (disposed || EventSourceImpl === undefined) return;
+    retireStream();
+    const targetGeneration = generation;
     const eventSource = new EventSourceImpl(
       withBasePath(`/events?id=${encodeURIComponent(topic)}`),
     );
     stream = eventSource;
+    const shouldHandle = () => isCurrent(targetGeneration, eventSource);
 
-    eventSource.addEventListener("open", () => {
-      if (everConnected) onReconnect();
-      everConnected = true;
-    });
+    eventSource.onopen = () => {
+      if (!shouldHandle()) return;
+      onOpen();
+      if (everOpened) onReconnect();
+      everOpened = true;
+    };
+    eventSource.onerror = (event) => {
+      if (shouldHandle()) onError(event);
+    };
     eventSource.onmessage = (event) => {
+      if (!shouldHandle()) return;
       onMessage(event.data);
       const parsed = Option.getOrUndefined(parse("message", event.data));
       if (parsed?.type === "reload") onReload({ id: parsed.id });
     };
+    eventSource.addEventListener("heartbeat", (event) => {
+      if (!shouldHandle()) return;
+      const heartbeat = parseHeartbeat((event as MessageEvent<string>).data);
+      if (heartbeat) onHeartbeat(heartbeat);
+      else onError(new Error("Invalid heartbeat payload"));
+    });
     eventSource.addEventListener("status-snapshot", (event) => {
+      if (!shouldHandle()) return;
       const parsed = Option.getOrUndefined(
         parse("status-snapshot", (event as MessageEvent<string>).data),
       );
@@ -107,6 +169,7 @@ export function createStatusEvents({
       onSnapshot({ ids: parsed.data.running, statuses: parsed.data.statuses });
     });
     eventSource.addEventListener("status-delta", (event) => {
+      if (!shouldHandle()) return;
       const parsed = Option.getOrUndefined(
         parse("status-delta", (event as MessageEvent<string>).data),
       );
@@ -120,32 +183,39 @@ export function createStatusEvents({
       });
     });
     eventSource.addEventListener("workflows-updated", (event) => {
+      if (!shouldHandle()) return;
       const parsed = Option.getOrUndefined(
         parse("workflows-updated", (event as MessageEvent<string>).data),
       );
       if (parsed?.type === "workflows-updated") onWorkflowUpdate(parsed.data);
     });
     eventSource.addEventListener("tasks-updated", (event) => {
+      if (!shouldHandle()) return;
       const parsed = Option.getOrUndefined(
         parse("tasks-updated", (event as MessageEvent<string>).data),
       );
       if (parsed?.type === "tasks-updated") onTasksUpdate(parsed.data);
     });
     eventSource.addEventListener("curation-updated", (event) => {
+      if (!shouldHandle()) return;
       const parsed = Option.getOrUndefined(
         parse("curation-updated", (event as MessageEvent<string>).data),
       );
       if (parsed?.type === "curation-updated") onCurationUpdate();
     });
+  }
 
-    if (windowImpl.addEventListener) {
-      pagehideHandler = () => closeStream();
-      pageshowHandler = () => {
-        if (stream === null) connect();
-      };
-      windowImpl.addEventListener("pagehide", pagehideHandler);
-      windowImpl.addEventListener("pageshow", pageshowHandler);
-    }
+  const connect = () => {
+    if (disposed) return;
+    addLifecycleListeners();
+    replaceStream();
+  };
+
+  const cleanup = () => {
+    if (disposed) return;
+    disposed = true;
+    retireStream();
+    removeLifecycleListeners();
   };
 
   return { connect, cleanup };

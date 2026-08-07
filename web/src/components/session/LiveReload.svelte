@@ -27,7 +27,10 @@
     projectionContainsPreview,
     shouldReplaceProjectionEntries,
   } from '../../session/live/live-events.js';
-  import { setupSessionLiveConnection } from '../../session/live/live-connection.js';
+  import {
+    setupSessionLiveConnection,
+    type SessionConnectionState,
+  } from '../../session/live/live-connection.js';
   import { createFollowScrollController } from '../../session/live/live-follow.js';
   import { updateStatsDom } from '../../session/live/live-stats.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
@@ -40,6 +43,10 @@
 
   const ChatSentDetailSchema = Schema.Struct({ message: Schema.optional(Schema.Unknown) });
   const decodeChatSentDetail = Schema.decodeUnknownOption(ChatSentDetailSchema);
+
+  let {
+    onConnectionState = () => {},
+  }: { readonly onConnectionState?: (state: SessionConnectionState) => void } = $props();
 
   onMount(() => {
     const documentImpl = document;
@@ -195,8 +202,12 @@
     const getEntryCount = () => getReloadEntryCount(model);
     let reloadGeneration = 0;
 
-    function triggerReload(): Promise<void> {
+    function triggerReload(
+      _event?: unknown,
+      connectionShouldApply: () => boolean = () => true,
+    ): Promise<boolean> {
       const generation = ++reloadGeneration;
+      const shouldApply = () => generation === reloadGeneration && connectionShouldApply();
       return runPromise(
         Effect.tryPromise({
           try: () =>
@@ -214,7 +225,7 @@
               incrementPending,
               showFollowButton,
               getEntryCount,
-              shouldApply: () => generation === reloadGeneration,
+              shouldApply,
               onReloaded: async (data) => {
                 reconcileEntries(data.entries, {
                   isDelta: data.isDelta,
@@ -226,17 +237,24 @@
             }),
           catch: (cause) => new NetworkError({ cause }),
         }).pipe(
-          Effect.catch((error) => Effect.sync(() => console.error('Live update failed:', error))),
-          Effect.asVoid,
+          Effect.map((result) => result.stale !== true),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              console.error('Live update failed:', error);
+              return false;
+            }),
+          ),
         ),
       );
     }
+
+    let recoverAuthoritatively = (): Promise<boolean> => triggerReload();
 
     on(windowImpl, 'pi-worker-done', () => {
       // If the final filesystem reload is missed/delayed, don't leave the
       // streaming preview "working"; proactively reconcile from /api/session.
       finishChatPreview();
-      triggerReload();
+      void recoverAuthoritatively();
     });
 
     on(windowImpl, 'pi-chat-cancel-accepted', () => {
@@ -244,7 +262,7 @@
       // idle. The optimistic transcript is no longer trustworthy, though, so
       // clear it immediately and reconcile any persisted partial/final output.
       clearChatPreviewState(CHAT_PREVIEW_STATE);
-      triggerReload();
+      void recoverAuthoritatively();
     });
 
     on(windowImpl, 'pi-worker-status', (event: Event) => {
@@ -264,7 +282,9 @@
       onReload: triggerReload,
       onChatPreview: renderChatPreview,
       onWorkerStatus: (status) => model?.setWorkerStatus(status),
+      onStateChange: onConnectionState,
     });
+    recoverAuthoritatively = liveConnection.recover;
     liveConnection.connect();
     cleanups.push(liveConnection.dispose);
 
