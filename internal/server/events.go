@@ -6,17 +6,36 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 )
 
+const (
+	sseHeartbeatInterval  = 15 * time.Second
+	sseHeartbeatFreshness = "transport-only"
+)
+
+type sseHeartbeat struct {
+	Timestamp time.Time `json:"timestamp"`
+	Freshness string    `json:"freshness"`
+}
+
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	ticker := time.NewTicker(sseHeartbeatInterval)
+	defer ticker.Stop()
+	s.handleEventsWithHeartbeat(w, r, ticker.C)
+}
+
+// handleEventsWithHeartbeat owns one bounded mailbox and one caller-owned
+// heartbeat source for the lifetime of the stream. Tests pass a manually
+// driven channel so heartbeat behavior does not depend on wall-clock sleeps.
+func (s *Server) handleEventsWithHeartbeat(w http.ResponseWriter, r *http.Request, heartbeat <-chan time.Time) {
 	sessID := r.URL.Query().Get("id")
 	if sessID == "" {
-		http.Error(w, "missing id", 400)
+		http.Error(w, "missing id", http.StatusBadRequest)
 		return
 	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
+	if _, ok := w.(http.Flusher); !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
@@ -29,18 +48,21 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	client := s.addClient(sessID)
 	defer s.removeClient(client)
 
-	fmt.Fprintf(w, ":ok\n\n")
-	flusher.Flush()
+	if err := writeSSEFrame(w, ":ok"); err != nil {
+		return
+	}
 
 	if sessID == globalSessID {
-		s.writeStatusSnapshot(w)
-		flusher.Flush()
+		if err := s.writeStatusSnapshot(w); err != nil {
+			return
+		}
 	} else if s.chatSender != nil {
 		status := s.chatSender.Status(sessID)
 		if status.State == "error" {
 			data, _ := json.Marshal(status)
-			fmt.Fprintf(w, "event: worker-status\ndata: %s\n\n", data)
-			flusher.Flush()
+			if err := writeSSEFrame(w, fmt.Sprintf("event: worker-status\ndata: %s", data)); err != nil {
+				return
+			}
 		}
 	}
 
@@ -51,23 +73,52 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			msg := client.resolveToken(token)
-			if strings.HasPrefix(msg, "event: ") {
-				// Already-formatted named SSE event; pass through with the
-				// terminating blank line.
-				fmt.Fprint(w, msg+"\n\n")
-			} else {
-				fmt.Fprintf(w, "data: %s\n\n", msg)
+			if !strings.HasPrefix(msg, "event: ") {
+				msg = "data: " + msg
 			}
-			flusher.Flush()
+			if err := writeSSEFrame(w, msg); err != nil {
+				return
+			}
+		case tick, open := <-heartbeat:
+			if !open {
+				heartbeat = nil
+				continue
+			}
+			msg, err := formatSSEJSONEvent("heartbeat", sseHeartbeat{
+				Timestamp: tick.UTC(),
+				Freshness: sseHeartbeatFreshness,
+			})
+			if err != nil {
+				return
+			}
+			if err := writeSSEFrame(w, msg); err != nil {
+				return
+			}
+			recordSSEHeartbeat()
 		case <-r.Context().Done():
 			return
 		}
 	}
 }
 
+// writeSSEFrame writes and flushes exactly one SSE frame. A write or flush
+// failure is terminal for the connection; continuing would only retain a dead
+// client and consume mailbox capacity.
+func writeSSEFrame(w http.ResponseWriter, frame string) error {
+	if _, err := fmt.Fprint(w, frame+"\n\n"); err != nil {
+		recordSSEWriteError()
+		return err
+	}
+	if err := http.NewResponseController(w).Flush(); err != nil {
+		recordSSEFlushError()
+		return err
+	}
+	return nil
+}
+
 // writeStatusSnapshot emits a single SSE event listing every session id that
 // is currently broadcast as running. Sorted for deterministic test output.
-func (s *Server) writeStatusSnapshot(w http.ResponseWriter) {
+func (s *Server) writeStatusSnapshot(w http.ResponseWriter) error {
 	s.lastKnownMu.Lock()
 	ids := make([]string, 0, len(s.lastKnown))
 	for id := range s.lastKnown {
@@ -98,5 +149,5 @@ func (s *Server) writeStatusSnapshot(w http.ResponseWriter) {
 	}
 	sb.WriteString("}}")
 
-	fmt.Fprintf(w, "event: status-snapshot\ndata: %s\n\n", sb.String())
+	return writeSSEFrame(w, "event: status-snapshot\ndata: "+sb.String())
 }

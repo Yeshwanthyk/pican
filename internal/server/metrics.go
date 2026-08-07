@@ -6,6 +6,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/process"
@@ -69,12 +70,17 @@ type sessionCacheMetrics struct {
 }
 
 type processMetrics struct {
-	PID            int     `json:"pid"`
-	UptimeS        float64 `json:"uptime_s"`
-	Goroutines     int     `json:"goroutines"`
-	HeapAllocBytes uint64  `json:"heap_alloc_bytes"`
-	SSEClients     int     `json:"sse_clients"`
-	WatchedFiles   int     `json:"watched_files"`
+	PID               int     `json:"pid"`
+	UptimeS           float64 `json:"uptime_s"`
+	Goroutines        int     `json:"goroutines"`
+	HeapAllocBytes    uint64  `json:"heap_alloc_bytes"`
+	SSEClients        int     `json:"sse_clients"`
+	SSEGlobalStreams  int     `json:"sse_global_streams"`
+	SSESessionStreams int     `json:"sse_session_streams"`
+	SSEHeartbeats     uint64  `json:"sse_heartbeats"`
+	SSEWriteErrors    uint64  `json:"sse_write_errors"`
+	SSEFlushErrors    uint64  `json:"sse_flush_errors"`
+	WatchedFiles      int     `json:"watched_files"`
 }
 
 type workerMetrics struct {
@@ -97,6 +103,18 @@ type cpuMark struct {
 	cpuTimeS float64
 	at       time.Time
 }
+
+// sseProcessMetrics are process-lifetime counters. pican owns one Server per
+// process, so package-level atomics add no per-stream state and remain bounded.
+var sseProcessMetrics struct {
+	heartbeats atomic.Uint64
+	writeErrs  atomic.Uint64
+	flushErrs  atomic.Uint64
+}
+
+func recordSSEHeartbeat()  { sseProcessMetrics.heartbeats.Add(1) }
+func recordSSEWriteError() { sseProcessMetrics.writeErrs.Add(1) }
+func recordSSEFlushError() { sseProcessMetrics.flushErrs.Add(1) }
 
 //go:embed metrics_dashboard.html
 var metricsDashboardHTML []byte
@@ -138,7 +156,14 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	s.clientsMu.RLock()
 	sseClients := len(s.clients)
+	sseGlobalStreams := 0
+	for _, client := range s.clients {
+		if client.sessID == globalSessID {
+			sseGlobalStreams++
+		}
+	}
 	s.clientsMu.RUnlock()
+	sseSessionStreams := sseClients - sseGlobalStreams
 
 	s.fileModMu.RLock()
 	watched := len(s.fileMod)
@@ -146,12 +171,17 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	resp := metricsResponse{
 		Process: processMetrics{
-			PID:            os.Getpid(),
-			UptimeS:        now.Sub(s.metrics.startedAt).Seconds(),
-			Goroutines:     runtime.NumGoroutine(),
-			HeapAllocBytes: ms.HeapAlloc,
-			SSEClients:     sseClients,
-			WatchedFiles:   watched,
+			PID:               os.Getpid(),
+			UptimeS:           now.Sub(s.metrics.startedAt).Seconds(),
+			Goroutines:        runtime.NumGoroutine(),
+			HeapAllocBytes:    ms.HeapAlloc,
+			SSEClients:        sseClients,
+			SSEGlobalStreams:  sseGlobalStreams,
+			SSESessionStreams: sseSessionStreams,
+			SSEHeartbeats:     sseProcessMetrics.heartbeats.Load(),
+			SSEWriteErrors:    sseProcessMetrics.writeErrs.Load(),
+			SSEFlushErrors:    sseProcessMetrics.flushErrs.Load(),
+			WatchedFiles:      watched,
 		},
 		Workers: []workerMetrics{},
 	}

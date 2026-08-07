@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,6 +35,32 @@ func (s *syncRecorder) body() string {
 	defer s.mu.Unlock()
 	return s.buf.String()
 }
+
+type failingSSEWriter struct {
+	header   http.Header
+	writeErr error
+	flushErr error
+}
+
+func (w *failingSSEWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (*failingSSEWriter) WriteHeader(int) {}
+
+func (w *failingSSEWriter) Write(p []byte) (int, error) {
+	if w.writeErr != nil {
+		return 0, w.writeErr
+	}
+	return len(p), nil
+}
+
+func (*failingSSEWriter) Flush() {}
+
+func (w *failingSSEWriter) FlushError() error { return w.flushErr }
 
 func waitFor(t *testing.T, rec *syncRecorder, want string) {
 	t.Helper()
@@ -72,11 +99,116 @@ func TestHandleEventsSendsStatusSnapshotForAllSubscribers(t *testing.T) {
 	<-done
 
 	body := w.body()
-	if !strings.Contains(body, "event: status-snapshot") {
-		t.Fatalf("missing snapshot event header in body:\n%s", body)
+	if !strings.HasPrefix(body, ":ok\n\nevent: status-snapshot\ndata: ") {
+		t.Fatalf("initial comment/status snapshot order changed:\n%s", body)
 	}
 	if !strings.Contains(body, `"a.jsonl"`) || !strings.Contains(body, `"b.jsonl"`) {
 		t.Fatalf("snapshot did not include both ids:\n%s", body)
+	}
+}
+
+func TestHandleEventsEmitsNamedHeartbeatFromDrivenCadence(t *testing.T) {
+	s := &Server{
+		sessionsDir: t.TempDir(),
+		chatSender:  &fakeSender{},
+		clients:     make([]*sseClient, 0),
+		lastKnown:   make(map[string]struct{}),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/events?id=__all__", nil)
+	ctx, cancel := context.WithCancel(req.Context())
+	req = req.WithContext(ctx)
+	w := newSyncRecorder()
+	ticks := make(chan time.Time, 1)
+
+	done := make(chan struct{})
+	go func() {
+		s.handleEventsWithHeartbeat(w, req, ticks)
+		close(done)
+	}()
+
+	waitFor(t, w, "event: status-snapshot\ndata: {\"running\":[],\"statuses\":{}}")
+	before := sseProcessMetrics.heartbeats.Load()
+	ticks <- time.Date(2026, 5, 8, 11, 0, 0, 123456789, time.FixedZone("test", 2*60*60))
+	waitFor(t, w, "event: heartbeat")
+	cancel()
+	<-done
+
+	body := w.body()
+	want := "event: heartbeat\ndata: {\"timestamp\":\"2026-05-08T09:00:00.123456789Z\",\"freshness\":\"transport-only\"}\n\n"
+	if !strings.Contains(body, want) {
+		t.Fatalf("heartbeat frame missing or malformed; want %q in:\n%s", want, body)
+	}
+	if got := sseProcessMetrics.heartbeats.Load(); got != before+1 {
+		t.Fatalf("heartbeat metric = %d, want %d", got, before+1)
+	}
+}
+
+func TestHandleEventsDisconnectRemovesClient(t *testing.T) {
+	s := &Server{
+		sessionsDir: t.TempDir(),
+		chatSender:  &fakeSender{},
+		clients:     make([]*sseClient, 0),
+		lastKnown:   make(map[string]struct{}),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/events?id=session.jsonl", nil)
+	ctx, cancel := context.WithCancel(req.Context())
+	req = req.WithContext(ctx)
+	w := newSyncRecorder()
+	done := make(chan struct{})
+	go func() {
+		s.handleEventsWithHeartbeat(w, req, nil)
+		close(done)
+	}()
+
+	waitFor(t, w, ":ok\n\n")
+	s.clientsMu.RLock()
+	connected := len(s.clients)
+	s.clientsMu.RUnlock()
+	if connected != 1 {
+		t.Fatalf("connected clients = %d, want 1", connected)
+	}
+
+	cancel()
+	<-done
+	s.clientsMu.RLock()
+	connected = len(s.clients)
+	s.clientsMu.RUnlock()
+	if connected != 0 {
+		t.Fatalf("clients after disconnect = %d, want 0", connected)
+	}
+}
+
+func TestHandleEventsWriteErrorTerminatesAndCleansUp(t *testing.T) {
+	s := &Server{clients: make([]*sseClient, 0), lastKnown: make(map[string]struct{})}
+	req := httptest.NewRequest(http.MethodGet, "/events?id=session.jsonl", nil)
+	before := sseProcessMetrics.writeErrs.Load()
+
+	w := &failingSSEWriter{writeErr: errors.New("client disconnected")}
+	s.handleEventsWithHeartbeat(w, req, nil)
+
+	if got := len(s.clients); got != 0 {
+		t.Fatalf("clients after write error = %d, want 0", got)
+	}
+	if got := sseProcessMetrics.writeErrs.Load(); got != before+1 {
+		t.Fatalf("write error metric = %d, want %d", got, before+1)
+	}
+}
+
+func TestHandleEventsFlushErrorTerminatesAndCleansUp(t *testing.T) {
+	s := &Server{clients: make([]*sseClient, 0), lastKnown: make(map[string]struct{})}
+	req := httptest.NewRequest(http.MethodGet, "/events?id=session.jsonl", nil)
+	before := sseProcessMetrics.flushErrs.Load()
+	w := &failingSSEWriter{flushErr: errors.New("flush failed")}
+
+	s.handleEventsWithHeartbeat(w, req, nil)
+
+	if got := len(s.clients); got != 0 {
+		t.Fatalf("clients after flush error = %d, want 0", got)
+	}
+	if got := sseProcessMetrics.flushErrs.Load(); got != before+1 {
+		t.Fatalf("flush error metric = %d, want %d", got, before+1)
 	}
 }
 

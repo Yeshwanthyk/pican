@@ -401,7 +401,7 @@ type piRPCWorker struct {
 | `/api/worker-status` | GET | `handleWorkerStatus` | Get worker state for session |
 | `/api/commands` | GET | `handleCommands` | List slash commands exposed by the session worker |
 | `/metrics` | GET | `handleMetricsPage` | Worker metrics dashboard (self-contained HTML) |
-| `/api/metrics` | GET | `handleMetrics` | JSON snapshot: process + per-worker CPU/RSS (gopsutil); see `docs/dev/metrics-dashboard.md` |
+| `/api/metrics` | GET | `handleMetrics` | JSON snapshot: process, SSE stream/heartbeat/error observability, and per-worker CPU/RSS (gopsutil); see `docs/dev/metrics-dashboard.md` |
 | `/api/debug/pprof/` | GET | `pprof.Index` (+ cmdline/profile/symbol/trace) | Go runtime profiler, auth-gated (`/api`-stripped before Index) |
 | `/share` | POST | `handleShare` | Create private GitHub Gist |
 | `/events` | GET | `handleEvents` | SSE stream |
@@ -482,7 +482,32 @@ The server maintains a slice of `sseClient` structs. Each client subscribes to a
 - `__all__` — index and workflows pages subscribe here; receives `new-session`, `status-snapshot`, `status-delta`, and named `workflows-updated` events
 - Specific session ID — session page subscribes here; receives `reload` when the file changes and `chat-preview` during streaming
 
-Broadcasting is fire-and-forget with a buffered channel (16). If the client is slow, keyless events are dropped rather than blocking. Duplicate `reload` and `new-session` events are coalesced per-client while pending.
+Every accepted stream first receives the compatibility comment `:ok`. A `__all__`
+stream then receives its `status-snapshot`; a session stream may receive an
+initial error `worker-status`. The server subsequently emits a named
+`heartbeat` event about every 15 seconds on either topic:
+
+```text
+event: heartbeat
+data: {"timestamp":"2026-05-08T09:00:00Z","freshness":"transport-only"}
+```
+
+The timestamp is the UTC server tick represented by that heartbeat.
+`freshness:"transport-only"` means only that the SSE path was live when the
+frame was flushed. It is not conversation or status authority and never
+replaces a canonical API refetch.
+
+Broadcasting retains a buffered mailbox of 16 tokens per client. If the client
+is slow, keyless events are dropped rather than blocking. Keyed reload,
+new-session, workflow/task, worker-status, and chat-preview events retain their
+existing coalescing/replacement behavior. Each stream adds one 15-second ticker,
+not a goroutine or growing queue; request cancellation, a closed mailbox, or any
+write/flush error removes the client and stops the ticker.
+
+`/api/metrics` reports current `sse_clients`, `sse_global_streams`, and
+`sse_session_streams`, plus process-lifetime `sse_heartbeats` (successfully
+flushed heartbeat frames), `sse_write_errors`, and `sse_flush_errors`. The
+counters are bounded atomics rather than per-client history.
 
 ## Running-Status Computation
 

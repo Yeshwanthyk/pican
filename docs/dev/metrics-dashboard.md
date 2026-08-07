@@ -5,8 +5,8 @@ workers and overall process health — useful when the app feels slow or you
 suspect a worker is leaking or stuck.
 
 It is intentionally **decoupled** from the session UI: a single JSON endpoint
-plus a standalone HTML page. Nothing here touches session rendering, chat, SSE,
-or export.
+plus a standalone HTML page. It observes bounded SSE counters but does not alter
+session rendering, chat, stream behavior, or export.
 
 ## Routes
 
@@ -27,7 +27,14 @@ auth cookie.
 - `pid`, `uptime_s`
 - `goroutines`, `heap_alloc_bytes` (from the Go runtime)
 - `sse_clients` — currently connected SSE clients
+- `sse_global_streams`, `sse_session_streams` — current streams by topic
+- `sse_heartbeats` — process-lifetime heartbeat frames successfully flushed
+- `sse_write_errors`, `sse_flush_errors` — process-lifetime terminal stream errors
 - `watched_files` — session files tracked by the watcher
+
+The heartbeat and error totals are bounded atomic counters, not retained event
+history. A heartbeat proves transport freshness only; canonical API reads remain
+authoritative.
 
 **Per-worker block** (resource hogs + leak/zombie detection):
 

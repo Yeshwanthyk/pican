@@ -103,6 +103,31 @@ func TestMetricsReportsProcessAndWorkers(t *testing.T) {
 	}
 }
 
+func TestMetricsReportsSSEStreamsByTopicAndProcessCounters(t *testing.T) {
+	s := newMetricsServer(&snapshotSender{}, stubSampler{})
+	global := s.addClient(globalSessID)
+	sessionA := s.addClient("a.jsonl")
+	sessionB := s.addClient("b.jsonl")
+	defer s.removeClient(global)
+	defer s.removeClient(sessionA)
+	defer s.removeClient(sessionB)
+
+	resp := decodeMetrics(t, s)
+
+	if resp.Process.SSEClients != 3 {
+		t.Fatalf("SSE clients = %d, want 3", resp.Process.SSEClients)
+	}
+	if resp.Process.SSEGlobalStreams != 1 || resp.Process.SSESessionStreams != 2 {
+		t.Fatalf("SSE stream topics = global %d/session %d, want 1/2", resp.Process.SSEGlobalStreams, resp.Process.SSESessionStreams)
+	}
+	if resp.Process.SSEHeartbeats != sseProcessMetrics.heartbeats.Load() {
+		t.Fatalf("SSE heartbeat metric = %d, want process counter %d", resp.Process.SSEHeartbeats, sseProcessMetrics.heartbeats.Load())
+	}
+	if resp.Process.SSEWriteErrors != sseProcessMetrics.writeErrs.Load() || resp.Process.SSEFlushErrors != sseProcessMetrics.flushErrs.Load() {
+		t.Fatalf("SSE error metrics = write %d/flush %d, want process counters %d/%d", resp.Process.SSEWriteErrors, resp.Process.SSEFlushErrors, sseProcessMetrics.writeErrs.Load(), sseProcessMetrics.flushErrs.Load())
+	}
+}
+
 func TestMetricsReportsSessionCacheCounters(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "--tmp--project--")

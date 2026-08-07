@@ -12,6 +12,39 @@ There are five cooperating live-update mechanisms:
 4. **OpenCode shared event stream** — one native global SSE connection is demultiplexed by canonical directory/session ID, followed by native read and projection replacement
 5. **Running Status Updates** — when a session starts/stops running, the index page updates card badges in real time
 
+A sixth transport concern, the **SSE heartbeat**, makes an otherwise idle
+connection observable without becoming another state-reconciliation mechanism.
+
+## SSE Connection and Heartbeat
+
+An accepted `/events?id=<topic>` stream is initialized in this order:
+
+1. compatibility comment `:ok`
+2. for `__all__`, named `status-snapshot` (or for a session topic, an initial
+   error `worker-status` when applicable)
+3. mailbox events and periodic named `heartbeat` events
+
+Production uses one 15-second ticker per connection. The heartbeat bypasses the
+broadcast mailbox, so it cannot consume the bounded 16-token queue or alter
+reload/status coalescing:
+
+```text
+event: heartbeat
+data: {"timestamp":"2026-05-08T09:00:00Z","freshness":"transport-only"}
+```
+
+`timestamp` is the UTC server tick carried by the frame.
+`freshness:"transport-only"` proves only that the connection was writable and
+flushable at that point. Persisted session/projection state and canonical API
+refetches remain authoritative; receiving a heartbeat does not authorize a
+client to infer that conversation or running status is current.
+
+The handler removes the registered client and stops its ticker on request
+cancellation, mailbox closure, write failure, or flush failure. It does not
+spawn a per-client goroutine or retain heartbeat history. `/api/metrics` exposes
+current total/global/session stream counts and process-lifetime successful
+heartbeat, SSE write-error, and SSE flush-error counters.
+
 ## 1. File Change Reload
 
 ### Sequence Diagram
@@ -189,9 +222,10 @@ This catches cases where a signal goes stale (e.g., terminal process crashes wit
 | `reload` | `sessID` | `"reload"` | Session file modified |
 | `reload` | `__all__` | `"reload:<sessID>"` | Session file modified (index-wide echo, carries the touched id so the index page can skip refetching unrelated/already-known sessions) |
 | `new-session` | `__all__` | `"new-session"` | New `.jsonl` file created |
-| `status-snapshot` | `__all__` | `{"running": ["id1", "id2"]}` | Client connects to `/events?id=__all__` |
+| `status-snapshot` | `__all__` | `{"running":["id1","id2"],"statuses":{"id1":{...}}}` | Client connects to `/events?id=__all__` |
 | `status-delta` | `__all__` | `{"id": "abc", "running": true}` | Running status changes |
 | `chat-preview` | `sessID` | `{"content": "...", "done": false}` | Best-effort runtime preview before authoritative transcript/projection convergence |
+| `heartbeat` | any accepted topic | `{"timestamp":"<UTC RFC3339>","freshness":"transport-only"}` | Approximately every 15 seconds while idle or active |
 
 ### Browser Handling
 
@@ -224,6 +258,10 @@ es.onmessage = (e) => {
 }
 es.addEventListener('chat-preview', (e) => renderChatPreview(JSON.parse(e.data)))
 ```
+
+Unhandled named heartbeat events do not invoke `onmessage`; consumers that want
+transport telemetry may attach `addEventListener('heartbeat', ...)`. They must
+not refetch or mutate canonical state solely because a heartbeat arrived.
 
 Both `/api/session` and the embedded first-paint bootstrap include additive `projectionMode`. The browser sends `afterCount` only when the current model is untruncated and explicitly `append-only-native`. A replaceable or unknown mode requests a full snapshot. During that full reconcile, fresh objects replace existing objects with the same ID because canonical tool output/status may evolve under stable native IDs. Append-only sessions continue reusing known entry objects. The server independently applies the same projection-mode policy to `afterCount`, so a stale or malformed client request still falls back safely to a full snapshot. Claude assistant projections also expose `claudeMessageId`; when it matches the active preview item, the browser removes that preview even if the worker is still finishing result-time convergence, preventing canonical/preview duplication during watcher races.
 
