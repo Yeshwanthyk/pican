@@ -47,6 +47,13 @@ describe("session search/filter UI", () => {
     expect(input.value).toBe("");
     expect(setSearchQuery).toHaveBeenLastCalledWith("");
     expect(navigateTo).toHaveBeenCalledWith("leaf", "bottom");
+
+    controls.dispose();
+    input.value = "detached";
+    input.dispatchEvent(new jsdom.window.Event("input", { bubbles: true }));
+    jsdom.window.document.querySelector<HTMLButtonElement>('[data-filter="default"]')?.click();
+    expect(setSearchQuery).not.toHaveBeenCalledWith("detached");
+    expect(setFilterMode).toHaveBeenCalledTimes(1);
   });
 
   it("detects editable targets", () => {
@@ -62,7 +69,7 @@ describe("session search/filter UI", () => {
     const toggleThinking = vi.fn();
     const toggleToolsVisibility = vi.fn();
     const toggleToolOutputs = vi.fn();
-    setupSessionKeyboardShortcuts({
+    const dispose = setupSessionKeyboardShortcuts({
       documentImpl: jsdom.window.document,
       clearSearch,
       toggleThinking,
@@ -81,5 +88,9 @@ describe("session search/filter UI", () => {
     expect(toggleThinking).toHaveBeenCalled();
     expect(toggleToolsVisibility).toHaveBeenCalled();
     expect(toggleToolOutputs).toHaveBeenCalled();
+
+    dispose();
+    jsdom.window.document.dispatchEvent(new jsdom.window.KeyboardEvent("keydown", { key: "t" }));
+    expect(toggleThinking).toHaveBeenCalledTimes(1);
   });
 });

@@ -126,5 +126,6 @@ export function startSessionPageRuntime({
   return () => {
     disposeGlobals?.();
     contentWiring.dispose?.();
+    ui.dispose();
   };
 }

@@ -65,6 +65,17 @@ describe("session UI runner", () => {
     expect(typeof result.closeSidebar).toBe("function");
   });
 
+  it("removes session UI listeners on disposal", () => {
+    const dom = baseDom();
+    const { result } = setupUi(dom);
+    const sidebar = dom.window.document.getElementById("sidebar");
+
+    result.dispose();
+    dom.window.document.getElementById("hamburger")?.click();
+
+    expect(sidebar?.classList.contains("open")).toBe(false);
+  });
+
   it("the export-only hamburger opens and overlay/close close the docked sidebar", () => {
     const dom = baseDom();
     setupUi(dom);

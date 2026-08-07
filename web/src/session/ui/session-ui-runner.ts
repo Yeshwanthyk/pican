@@ -46,14 +46,14 @@ interface SetupSessionUiOptions {
       readonly setFilterMode: (value: string) => void;
       readonly forceTreeRerender: () => void;
       readonly navigateTo: NavigateTo;
-    }): { clearAndNavigateBottom(): void };
+    }): { clearAndNavigateBottom(): void; dispose(): void };
     setupSessionKeyboardShortcuts(options: {
       readonly documentImpl: Document;
       readonly clearSearch: () => void;
       readonly toggleThinking: () => void;
       readonly toggleToolsVisibility: () => void;
       readonly toggleToolOutputs: () => void;
-    }): void;
+    }): () => void;
   };
   readonly sidebarApi: {
     isMobileLayout(options: { readonly windowImpl: UiWindow }): boolean;
@@ -111,17 +111,16 @@ export function setupSessionUi({
   const closeSidebar = () => sidebarApi.setSidebarOpen(false, { documentImpl });
   const openSidebar = () => sidebarApi.setSidebarOpen(true, { documentImpl });
   const overlayEl = documentImpl.getElementById("sidebar-overlay");
+  const onOverlayTouch = (event: TouchEvent) => {
+    event.preventDefault();
+    closeSidebar();
+  };
+  const hamburger = documentImpl.getElementById("hamburger");
+  const sidebarClose = documentImpl.getElementById("sidebar-close");
   overlayEl?.addEventListener("click", closeSidebar);
-  overlayEl?.addEventListener(
-    "touchstart",
-    (e) => {
-      e.preventDefault();
-      closeSidebar();
-    },
-    { passive: false },
-  );
-  documentImpl.getElementById("hamburger")?.addEventListener("click", openSidebar);
-  documentImpl.getElementById("sidebar-close")?.addEventListener("click", closeSidebar);
+  overlayEl?.addEventListener("touchstart", onOverlayTouch, { passive: false });
+  hamburger?.addEventListener("click", openSidebar);
+  sidebarClose?.addEventListener("click", closeSidebar);
 
   const toggleController = toggleStateApi.createToggleController({
     documentImpl,
@@ -137,7 +136,7 @@ export function setupSessionUi({
   const toggleToolsVisibility = () => toggleController.toggleToolsVisibility();
   const toggleToolOutputs = () => toggleController.toggleToolOutputs();
 
-  searchFiltersApi.setupSessionKeyboardShortcuts({
+  const disposeKeyboardShortcuts = searchFiltersApi.setupSessionKeyboardShortcuts({
     documentImpl,
     clearSearch: () => searchFilterControls.clearAndNavigateBottom(),
     toggleThinking,
@@ -158,5 +157,13 @@ export function setupSessionUi({
     openRightSidebar: () => sessionRuntime.rightSidebar?.open?.(),
     collapseRightSidebar: () => sessionRuntime.rightSidebar?.collapse?.(),
     activateRightTab: (pane: string) => sessionRuntime.rightSidebar?.activateTab?.(pane),
+    dispose: () => {
+      disposeKeyboardShortcuts();
+      searchFilterControls.dispose();
+      overlayEl?.removeEventListener("click", closeSidebar);
+      overlayEl?.removeEventListener("touchstart", onOverlayTouch);
+      hamburger?.removeEventListener("click", openSidebar);
+      sidebarClose?.removeEventListener("click", closeSidebar);
+    },
   };
 }
