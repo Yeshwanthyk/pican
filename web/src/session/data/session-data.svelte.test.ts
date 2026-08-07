@@ -315,6 +315,72 @@ describe("SessionDataModel", () => {
     expect(m.nodeMap.get("leaf")?.children.map((n) => n.entry.id)).toEqual(["leaf2"]);
   });
 
+  it("deduplicates append deltas while incrementally updating labels and tool calls", () => {
+    const m = model();
+    const duplicateLeaf = { ...entries.at(-1) };
+    m.reconcile(
+      [
+        duplicateLeaf,
+        {
+          id: "tool-call-tail",
+          parentId: "leaf",
+          type: "message",
+          message: {
+            role: "assistant",
+            content: [
+              { type: "toolCall", id: "tail-call", name: "read", arguments: { path: "tail.ts" } },
+            ],
+          },
+        },
+        {
+          id: "tail-label",
+          type: "label",
+          targetId: "tool-call-tail",
+          label: "Tail work",
+        },
+      ],
+      { isDelta: true },
+    );
+
+    expect(m.entries.filter((entry) => entry.id === "leaf")).toHaveLength(1);
+    expect(m.toolCallMap.get("tail-call")).toEqual({
+      name: "read",
+      arguments: { path: "tail.ts" },
+    });
+    expect(m.labelMap.get("tool-call-tail")).toBe("Tail work");
+    expect(m.currentLeafId).toBe("tool-call-tail");
+  });
+
+  it("incrementally stitches a resumed root onto the existing conversation leaf", () => {
+    const m = model();
+    m.reconcile(
+      [
+        {
+          id: "resumed-root",
+          parentId: null,
+          type: "message",
+          message: { role: "user", content: "resume" },
+        },
+        {
+          id: "resumed-leaf",
+          parentId: "resumed-root",
+          type: "message",
+          message: { role: "assistant", content: "continued" },
+        },
+      ],
+      { isDelta: true },
+    );
+
+    expect(m.byId.get("resumed-root")?.parentId).toBe("leaf");
+    expect(m.activePath.map((entry) => entry.id)).toEqual([
+      "root",
+      "mid",
+      "leaf",
+      "resumed-root",
+      "resumed-leaf",
+    ]);
+  });
+
   it("reconcile(entries) (full resync) reuses existing object references for known ids even when the incoming objects are fresh duplicates", () => {
     const m = model();
     const originalRoot = m.byId.get("root");

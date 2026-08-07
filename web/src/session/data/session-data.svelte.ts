@@ -25,7 +25,11 @@
 
 import { SvelteMap } from "svelte/reactivity";
 import { buildSessionLookups } from "./session-data.js";
-import { isUnknownRecord, sessionEntryFromUnknown } from "./session-types.js";
+import {
+  contentBlockFromUnknown,
+  isUnknownRecord,
+  sessionEntryFromUnknown,
+} from "./session-types.js";
 import type {
   SessionDataShape,
   SessionEntry,
@@ -74,36 +78,104 @@ export interface ToolResultLookupSource {
   readonly toolResultMap?: ReadonlyMap<string, ToolResultLookup>;
 }
 
+function indexToolResult(
+  results: Map<string, ToolResultLookup>,
+  entry: SessionEntry,
+): void {
+  if (entry.type !== "message" || entry.message?.role !== "toolResult") return;
+  const message = entry.message;
+  const toolCallId = message.toolCallId;
+  if (!toolCallId) return;
+
+  const details = isUnknownRecord(message.details) ? message.details : null;
+  const existing = results.get(toolCallId);
+  results.set(
+    toolCallId,
+    existing
+      ? {
+          ...existing,
+          resultCount: existing.resultCount + 1,
+          hasError: existing.hasError || Boolean(message.isError),
+          hasEdits: existing.hasEdits || (details !== null && typeof details.diff === "string"),
+        }
+      : {
+          entry,
+          message,
+          details,
+          resultCount: 1,
+          hasError: Boolean(message.isError),
+          hasEdits: details !== null && typeof details.diff === "string",
+        },
+  );
+}
+
 function buildToolResultMap(entries: ReadonlyArray<SessionEntry>): Map<string, ToolResultLookup> {
   const results = new Map<string, ToolResultLookup>();
-  for (const entry of entries) {
-    if (entry.type !== "message" || entry.message?.role !== "toolResult") continue;
-    const message = entry.message;
-    const toolCallId = message.toolCallId;
-    if (!toolCallId) continue;
-
-    const details = isUnknownRecord(message.details) ? message.details : null;
-    const existing = results.get(toolCallId);
-    results.set(
-      toolCallId,
-      existing
-        ? {
-            ...existing,
-            resultCount: existing.resultCount + 1,
-            hasError: existing.hasError || Boolean(message.isError),
-            hasEdits: existing.hasEdits || (details !== null && typeof details.diff === "string"),
-          }
-        : {
-            entry,
-            message,
-            details,
-            resultCount: 1,
-            hasError: Boolean(message.isError),
-            hasEdits: details !== null && typeof details.diff === "string",
-          },
-    );
-  }
+  for (const entry of entries) indexToolResult(results, entry);
   return results;
+}
+
+function indexAppendEntry(
+  entry: SessionEntry,
+  lookups: {
+    readonly byId: Map<string, SessionEntry>;
+    readonly toolCallMap: Map<string, ToolCallInfo>;
+    readonly toolResultMap: Map<string, ToolResultLookup>;
+    readonly labelMap: Map<string, string>;
+  },
+): void {
+  lookups.byId.set(entry.id, entry);
+  if (entry.type === "message" && entry.message?.role === "assistant") {
+    const content = entry.message.content;
+    if (Array.isArray(content)) {
+      for (const candidate of content) {
+        const block = contentBlockFromUnknown(candidate);
+        if (block?.type === "toolCall" && block.id) {
+          lookups.toolCallMap.set(block.id, {
+            name: block.name,
+            arguments: block.arguments,
+          });
+        }
+      }
+    }
+  }
+  indexToolResult(lookups.toolResultMap, entry);
+  if (entry.type === "label" && entry.targetId) {
+    if (entry.label) lookups.labelMap.set(entry.targetId, entry.label);
+    else lookups.labelMap.delete(entry.targetId);
+  }
+}
+
+function stitchAppendDelta(
+  existing: ReadonlyArray<SessionEntry>,
+  incoming: ReadonlyArray<SessionEntry>,
+): SessionEntry[] {
+  const knownIds = new Set(existing.map((entry) => entry.id));
+  let previousConversationId: string | null = null;
+  let hasConversationRoot = false;
+  for (const entry of existing) {
+    if (entry.type === "session" || entry.type === "label") continue;
+    const isRoot = !entry.parentId || entry.parentId === entry.id;
+    if (isRoot) hasConversationRoot = true;
+    previousConversationId = entry.id;
+  }
+
+  const appended: SessionEntry[] = [];
+  for (const entry of incoming) {
+    if (knownIds.has(entry.id)) continue;
+    knownIds.add(entry.id);
+    let next = entry;
+    if (entry.type !== "session" && entry.type !== "label") {
+      const isRoot = !entry.parentId || entry.parentId === entry.id;
+      if (isRoot && hasConversationRoot && previousConversationId) {
+        next = { ...entry, parentId: previousConversationId };
+      }
+      if (isRoot) hasConversationRoot = true;
+      previousConversationId = next.id;
+    }
+    appended.push(next);
+  }
+  return appended;
 }
 
 const fallbackToolResultMaps = new WeakMap<
@@ -306,20 +378,38 @@ export class SessionDataModel {
       return normalized ? [normalized] : [];
     });
     if (isDelta) {
-      const combined = normalizeStitchedEntries(
-        stitchOrphanRoots([...this.entries, ...normalizedEntries]),
-      );
-      this.entries.push(...combined.slice(this.entries.length));
-    } else {
-      const stitched = normalizeStitchedEntries(stitchOrphanRoots(normalizedEntries));
-      // Pi entries are append-only, so retaining known objects avoids needless
-      // rerenders. Codex projections replace in-progress tool entries under
-      // stable IDs; those callers must accept the freshly fetched objects.
-      const merged = replaceExisting
-        ? stitched
-        : stitched.map((entry) => (entry?.id && this.byId.get(entry.id)) || entry);
-      this.entries.splice(0, this.entries.length, ...merged);
+      // afterCount deltas are append-only-native. Normalize and stitch only the
+      // incoming suffix, then extend stable lookup maps in place. Full resyncs,
+      // prepends, and replaceable projections retain the authoritative rebuild
+      // path below.
+      const appended = stitchAppendDelta(this.entries, normalizedEntries);
+      if (appended.length === 0) return;
+      let nextLeafId = this.currentLeafId;
+      const currentEntry = nextLeafId ? this.byId.get(nextLeafId) : null;
+      if (!nextLeafId || currentEntry?.type === "session") nextLeafId = "";
+      for (const entry of appended) {
+        if (entry.type !== "label" && entry.type !== "session") {
+          if (!nextLeafId || entry.parentId === nextLeafId) nextLeafId = entry.id;
+        }
+        indexAppendEntry(entry, this);
+      }
+      this.entries.push(...appended);
+      if (nextLeafId) {
+        this.leafId = nextLeafId;
+        this.currentLeafId = nextLeafId;
+        if (!this.currentTargetId) this.currentTargetId = nextLeafId;
+      }
+      return;
     }
+
+    const stitched = normalizeStitchedEntries(stitchOrphanRoots(normalizedEntries));
+    // Pi entries are append-only, so retaining known objects avoids needless
+    // rerenders. Codex projections replace in-progress tool entries under
+    // stable IDs; those callers must accept the freshly fetched objects.
+    const merged = replaceExisting
+      ? stitched
+      : stitched.map((entry) => (entry?.id && this.byId.get(entry.id)) || entry);
+    this.entries.splice(0, this.entries.length, ...merged);
     const lk = buildSessionLookups(this.entries);
     refillMap(this.byId, lk.byId);
     refillMap(this.toolCallMap, lk.toolCallMap);
