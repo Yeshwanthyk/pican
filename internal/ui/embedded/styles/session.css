@@ -12,6 +12,15 @@
   --palette-surface-2: var(--surface-2);
   --palette-text-soft: var(--text-soft);
   --viewport-height: 100svh;
+  /* V6 shared material contract. Keep this declaration aligned with the home
+     stylesheet because static export intentionally renders without index.css. */
+  --pi-material-opaque: var(--surface);
+  --pi-material-translucent: color-mix(in srgb, var(--chrome-bg) 88%, transparent);
+  --pi-material-border: color-mix(in srgb, var(--dim) 88%, transparent);
+  --pi-material-shadow: 0 6px 8px color-mix(in srgb, var(--body-bg) 42%, transparent);
+  --pi-material-filter: blur(12px) saturate(115%);
+  --pi-focus-ring: color-mix(in srgb, var(--accent) 88%, var(--text));
+  --pi-focus-halo: var(--body-bg);
 }
 /* Theme palettes are owned exclusively by theme.css. */
 
@@ -1123,10 +1132,10 @@ body.right-sidebar-expanded .right-sidebar {
   z-index: 101;
   height: 52px;
   padding: 0 18px;
-  background: color-mix(in srgb, var(--chrome-bg) 92%, transparent);
+  background: var(--pi-material-opaque);
   border-bottom: 1px solid var(--pi-menu-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .connection-status {
@@ -3714,8 +3723,9 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     inset: 0 !important;
     background: rgba(0, 0, 0, 0.5) !important;
     z-index: 1199 !important;
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
+    /* The drawer is already an opaque sheet; dim without a second blur layer. */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   body:not(.right-sidebar-collapsed) .right-sidebar-backdrop {
@@ -6504,9 +6514,9 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   min-height: 52px;
   padding: env(safe-area-inset-top) 12px 0;
   border-bottom: 1px solid var(--pi-menu-border);
-  background: color-mix(in srgb, var(--body-bg) 92%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--pi-material-opaque);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .pi-sheet-panel.pi-sheet-mobile.fork-sheet-panel .pi-sheet-back {
@@ -6634,8 +6644,8 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 /* Shortcuts Modal Styles */
 .pi-sheet-backdrop.shortcuts-sheet-backdrop {
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .pi-sheet-panel.shortcuts-sheet-panel {
@@ -6880,9 +6890,9 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 .pi-chat-context-popover {
   position: absolute;
   width: 200px;
-  background: color-mix(in srgb, var(--container-bg, #1e1e24) 88%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--pi-material-opaque);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid color-mix(in srgb, var(--dim) 40%, transparent);
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -7090,4 +7100,259 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   flex: 0 0 auto;
   font-size: 12px;
   color: var(--text-soft, var(--muted));
+}
+
+/* V6 — one restrained material for persistent chrome, sheet chrome, and
+   transient menus. Transcript content, rows, and the composer remain opaque. */
+.session-header-bar,
+.connection-status,
+.pinned-session-switcher,
+.pi-sheet-panel:not(.pi-sheet-mobile),
+.pi-sheet-panel.pi-sheet-mobile .pi-sheet-header,
+html body .web-menu,
+html body .command-menu-popover,
+html body .mobile-command-panel,
+html body .command-palette,
+.pi-chat-model-popup,
+.pi-chat-thinking-popup,
+.pi-chat-slash-popup,
+.model-selector-dropdown,
+.pi-chat-context-popover {
+  color: var(--text-soft);
+  background: var(--pi-material-opaque) !important;
+  border-color: var(--pi-material-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.session-header-bar,
+.connection-status,
+.pinned-session-switcher,
+.pi-sheet-panel:not(.pi-sheet-mobile),
+html body .web-menu,
+html body .command-menu-popover,
+html body .command-palette,
+.pi-chat-model-popup,
+.pi-chat-thinking-popup,
+.pi-chat-slash-popup,
+.model-selector-dropdown,
+.pi-chat-context-popover {
+  box-shadow: var(--pi-material-shadow);
+}
+
+/* Dimmed backdrops are deliberately filter-free: a panel is the only
+   composited material layer in its screen region. */
+.pi-sheet-backdrop,
+.right-sidebar-backdrop,
+html body .mobile-command-backdrop,
+.command-palette-overlay,
+.shortcuts-sheet-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .session-header-bar,
+  .connection-status,
+  .pinned-session-switcher,
+  .pi-sheet-panel:not(.pi-sheet-mobile),
+  .pi-sheet-panel.pi-sheet-mobile .pi-sheet-header,
+  html body .web-menu,
+  html body .command-menu-popover,
+  html body .mobile-command-panel,
+  html body .command-palette,
+  .pi-chat-model-popup,
+  .pi-chat-thinking-popup,
+  .pi-chat-slash-popup,
+  .model-selector-dropdown,
+  .pi-chat-context-popover {
+    background: var(--pi-material-translucent) !important;
+    backdrop-filter: var(--pi-material-filter) !important;
+    -webkit-backdrop-filter: var(--pi-material-filter) !important;
+  }
+}
+
+/* The body of a fullscreen sheet is an opaque scrolling surface. Only its
+   fixed header is enhanced above, avoiding nested sheet/header filters. */
+.pi-sheet-panel.pi-sheet-mobile,
+.pi-sheet-panel.pi-sheet-mobile .pi-sheet-body,
+#content,
+.messages-list,
+.pi-chat-composer,
+.pi-chat-shell {
+  background-color: var(--body-bg);
+}
+
+/* A keyboard ring includes geometry and a contrasting halo, so state remains
+   clear on translucent, light, dark, and custom theme surfaces. */
+:where(button, a[href], input, textarea, select, summary, [role="button"], [role="menuitem"], [role="treeitem"], [tabindex]):focus-visible {
+  outline: 2px solid var(--pi-focus-ring) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 1px var(--pi-focus-halo) !important;
+}
+
+:where(input, textarea)::placeholder {
+  color: var(--text-soft);
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #app,
+  #content,
+  .messages-list,
+  .pi-sheet-panel,
+  .pi-sheet-body,
+  .pi-chat-composer,
+  .pi-chat-shell {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .pi-sheet-panel.pi-sheet-mobile {
+    width: 100%;
+    height: var(--viewport-height, calc(100dvh - env(keyboard-inset-height, 0px)));
+    max-height: var(--viewport-height, calc(100dvh - env(keyboard-inset-height, 0px)));
+  }
+
+  .pinned-session-switcher {
+    bottom: env(keyboard-inset-height, 0px);
+  }
+
+  .session-header-title-copy,
+  .session-header-title-text,
+  .session-header-project,
+  .markdown-content,
+  .pi-sheet-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Keep the compact icon-only back control named for assistive technology. */
+  .session-header-back-label {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Increase hit geometry, not icon or label size. Flat rows remain visually
+     quiet while every primary phone interaction has a 44px target. */
+  .session-header-bar :is(a, button),
+  .pinned-session-switcher button,
+  .pinned-chip,
+  .pinned-chip > a,
+  .pinned-chip-pin,
+  .pinned-chips-new,
+  .pi-sheet-panel :is(button, input, select, textarea, [role="button"], [role="treeitem"]),
+  .pi-chat-toolbar :is(button, input, select),
+  .pi-chat-expand-button,
+  .pi-btw-send,
+  .follow-button,
+  .model-item,
+  .slash-item,
+  .load-earlier-button,
+  html body .web-menu-item,
+  html body .mobile-command-item,
+  html body .palette-result,
+  html body .palette-action,
+  html body .palette-search-close,
+  html body .command-palette input {
+    min-height: 44px;
+  }
+
+  .session-header-back,
+  .session-header-actions,
+  .session-header-new,
+  .pinned-session-switcher-close,
+  .pinned-chip,
+  .pinned-chip-pin,
+  .pinned-chips-new,
+  .pi-sheet-back,
+  .pi-sheet-close-x,
+  .pi-chat-icon-button,
+  .pi-chat-expand-button,
+  .pi-btw-send,
+  .follow-button,
+  html body .palette-search-close {
+    min-width: 44px;
+  }
+
+  .pinned-chip {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+
+  .pinned-chip-pin {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pinned-chips-new {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+
+  .pi-chat-shell.composer-collapsed:not(.expanded) #pi-chat-message {
+    min-height: 44px;
+    height: 44px;
+    max-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  .session-header-bar,
+  .connection-status,
+  .pinned-session-switcher,
+  .pi-sheet-panel,
+  .pi-sheet-panel.pi-sheet-mobile .pi-sheet-header,
+  html body .web-menu,
+  html body .command-menu-popover,
+  html body .mobile-command-panel,
+  html body .command-palette,
+  .pi-chat-model-popup,
+  .pi-chat-thinking-popup,
+  .pi-chat-slash-popup,
+  .model-selector-dropdown,
+  .pi-chat-context-popover {
+    background: var(--pi-material-opaque) !important;
+    border-color: var(--dim) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --pi-material-opaque: Canvas;
+    --pi-material-border: ButtonBorder;
+    --pi-focus-ring: Highlight;
+    --pi-focus-halo: Canvas;
+  }
+
+  :where(button, a[href], input, textarea, select, summary, [role="button"], [role="menuitem"], [role="treeitem"], [tabindex]):focus-visible {
+    outline-color: Highlight !important;
+    forced-color-adjust: auto;
+  }
 }

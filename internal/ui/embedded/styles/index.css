@@ -7,6 +7,15 @@
     --index-activity-hover: color-mix(in srgb, var(--surface-2) 58%, transparent);
     --index-activity-title: var(--text);
     --index-activity-meta: color-mix(in srgb, var(--muted) 92%, var(--text-soft));
+    /* V6 shared material contract. Opaque is the baseline; capable browsers
+       opt into the translucent value below without changing surface roles. */
+    --pi-material-opaque: var(--surface);
+    --pi-material-translucent: color-mix(in srgb, var(--chrome-bg) 88%, transparent);
+    --pi-material-border: color-mix(in srgb, var(--dim) 88%, transparent);
+    --pi-material-shadow: 0 6px 8px color-mix(in srgb, var(--body-bg) 42%, transparent);
+    --pi-material-filter: blur(12px) saturate(115%);
+    --pi-focus-ring: color-mix(in srgb, var(--accent) 88%, var(--text));
+    --pi-focus-halo: var(--body-bg);
 }
 
 
@@ -38,10 +47,10 @@ a { color: inherit; }
     position: sticky;
     top: 0;
     z-index: 20;
-    background: color-mix(in srgb, var(--chrome-bg) 92%, transparent);
+    background: var(--pi-material-opaque);
     border-bottom: 1px solid var(--dim);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 .header-inner {
     max-width: 1040px;
@@ -276,8 +285,9 @@ a { color: inherit; }
     right: max(28px, calc((100vw - 1040px) / 2 + 28px));
     bottom: calc(28px + env(safe-area-inset-bottom));
     z-index: 50;
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    /* A floating control is not a chrome layer: keep it opaque and cheap. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     box-shadow:
         0 12px 32px rgba(0, 0, 0, 0.35),
         0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
@@ -1328,9 +1338,9 @@ body.modal-sheet-open { overflow: hidden; }
         padding: env(safe-area-inset-top) 0 0;
         margin: 0 -16px 16px;
         border-bottom: 1px solid var(--dim);
-        background: color-mix(in srgb, var(--body-bg) 92%, transparent);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: var(--pi-material-opaque);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
     .modal-sheet-back {
         display: inline-flex;
@@ -1389,9 +1399,9 @@ body.modal-sheet-open { overflow: hidden; }
         margin: auto -16px calc(-16px - env(safe-area-inset-bottom));
         padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
         border-top: 1px solid var(--dim);
-        background: color-mix(in srgb, var(--body-bg) 94%, transparent);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: var(--pi-material-opaque);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
     .modal-actions .btn-secondary { display: none; }
     .modal-actions .btn-primary {
@@ -1991,9 +2001,9 @@ body.modal-sheet-open { overflow: hidden; }
         padding: 6px;
         border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent);
         border-radius: 10px;
-        background: color-mix(in srgb, var(--chrome-bg) 94%, transparent);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: var(--pi-material-opaque);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
     .mobile-thumb-bar button { min-height: 46px; border-radius: 6px; cursor: pointer; transition: color 0.12s ease, background 0.12s ease, transform 0.12s ease; }
     .mobile-thumb-bar button:active { transform: scale(0.96); }
@@ -2027,4 +2037,181 @@ body.modal-sheet-open { overflow: hidden; }
     .session-ticker-more:active,
     .rail-answer-options button:active,
     .rail-open-session:active { transform: none; }
+}
+
+/* V6 — restrained material, accessibility, and mobile resilience.
+   The scrolling home feed remains the opaque --body-bg. Only persistent
+   chrome, sheet chrome, and transient menus receive this single material. */
+.header,
+.mobile-thumb-bar,
+html body .web-menu,
+html body .command-menu-popover,
+html body .mobile-command-panel,
+html body .command-palette,
+html body .version-modal,
+.session-ticker-action-menu {
+    color: var(--text-soft);
+    background: var(--pi-material-opaque) !important;
+    border-color: var(--pi-material-border) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.header,
+.mobile-thumb-bar,
+html body .web-menu,
+html body .command-menu-popover,
+html body .command-palette,
+html body .version-modal,
+.session-ticker-action-menu {
+    box-shadow: var(--pi-material-shadow);
+}
+
+/* Backdrops dim; they never blur. This avoids a second composited layer under
+   a material panel and keeps scrolling rows out of the filter graph. */
+html body .mobile-command-backdrop,
+.modal-overlay,
+.command-palette-overlay,
+.version-modal-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .header,
+    .mobile-thumb-bar,
+    html body .web-menu,
+    html body .command-menu-popover,
+    html body .mobile-command-panel,
+    html body .command-palette,
+    html body .version-modal,
+    .session-ticker-action-menu,
+    .modal-sheet-header,
+    .modal-actions {
+        background: var(--pi-material-translucent) !important;
+        backdrop-filter: var(--pi-material-filter) !important;
+        -webkit-backdrop-filter: var(--pi-material-filter) !important;
+    }
+}
+
+/* Headers/actions are the only glass inside a mobile sheet. The scrolling
+   sheet body itself stays opaque, so there is no nested or per-row blur. */
+@media (max-width: 900px) {
+    .modal { background: var(--body-bg); }
+    .modal-sheet-header,
+    .modal-actions {
+        color: var(--text-soft);
+        background: var(--pi-material-opaque);
+        border-color: var(--pi-material-border);
+    }
+
+    html,
+    body,
+    .home-layout,
+    .content,
+    .modal,
+    .command-palette {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .modal-overlay,
+    .command-palette-overlay {
+        height: 100dvh;
+        max-height: calc(100dvh - env(keyboard-inset-height, 0px));
+    }
+
+    .mobile-thumb-bar {
+        bottom: calc(10px + max(env(safe-area-inset-bottom), env(keyboard-inset-height, 0px)));
+    }
+
+    /* Hit areas grow independently of type and icon size, preserving the flat
+       row language while meeting the phone target contract. */
+    .mobile-thumb-bar button,
+    .activity-row-link,
+    .activity-group-action,
+    .session-ticker-more,
+    .session-ticker-action-menu button,
+    .modal :is(button, input, select, textarea, [role="button"]),
+    html body .web-menu-item,
+    html body .mobile-command-item,
+    html body .palette-result,
+    html body .palette-action,
+    html body .palette-search-close,
+    html body .command-palette input {
+        min-height: 44px;
+    }
+
+    .mobile-thumb-new,
+    .mobile-thumb-menu,
+    .session-ticker-more,
+    .modal-sheet-back,
+    html body .palette-search-close {
+        min-width: 44px;
+    }
+
+    .activity-row-title,
+    .activity-row-meta,
+    .header-project-name,
+    .header-project-path,
+    .modal,
+    .command-palette {
+        overflow-wrap: anywhere;
+    }
+}
+
+/* A keyboard ring is never encoded by color alone: the body-color halo keeps
+   it distinct on both light and dark themes and on translucent material. */
+:where(button, a[href], input, textarea, select, summary, [role="button"], [role="menuitem"], [tabindex]):focus-visible {
+    outline: 2px solid var(--pi-focus-ring) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 1px var(--pi-focus-halo) !important;
+}
+
+:where(input, textarea)::placeholder {
+    color: var(--text-soft);
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+    .header,
+    .mobile-thumb-bar,
+    html body .web-menu,
+    html body .command-menu-popover,
+    html body .mobile-command-panel,
+    html body .command-palette,
+    html body .version-modal,
+    .session-ticker-action-menu,
+    .modal-sheet-header,
+    .modal-actions {
+        background: var(--pi-material-opaque) !important;
+        border-color: var(--dim) !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+}
+
+@media (forced-colors: active) {
+    :root {
+        --pi-material-opaque: Canvas;
+        --pi-material-border: ButtonBorder;
+        --pi-focus-ring: Highlight;
+        --pi-focus-halo: Canvas;
+    }
+
+    :where(button, a[href], input, textarea, select, summary, [role="button"], [role="menuitem"], [tabindex]):focus-visible {
+        outline-color: Highlight !important;
+        forced-color-adjust: auto;
+    }
 }
