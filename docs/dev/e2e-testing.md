@@ -13,6 +13,7 @@ binaries and a running server, so it runs as its own target and CI job.
 ```bash
 make e2e-setup           # one-time: install deps + Playwright browsers
 make e2e                 # build the binary, then run the whole suite
+make e2e-perf            # serial Pixel 5 performance/resilience measurements
 
 # or, from e2e/ directly (assumes ./pican is already built):
 cd e2e
@@ -166,3 +167,24 @@ The `e2e` job in `.github/workflows/ci.yml`: `npm ci` →
    `e2e/lib/sessions.ts`; never mutate the committed fixtures.
 
 Keep this doc in sync when specs, fixtures, or the project matrix change.
+
+## Performance and resilience harness
+
+`make e2e-perf` runs the separate `e2e/perf/` suite against the built binary with production
+large-transcript thresholds. It is deliberately serial and Chromium-only so functional-test
+contention and cross-engine timing variance do not pollute the measurements.
+
+The first slice records three scenarios:
+
+- bounded tracked-project home with ordered pins;
+- a 1,600-message transcript, including one Load Earlier prepend; and
+- offline-to-online SSE catch-up with an exact-once visible marker.
+
+Each test writes a JSON result under `e2e/perf-results/` and attaches the same payload to the
+Playwright test result. The payload includes the git SHA/dirty state, fixture counts and bytes,
+task timings, navigation/resource timing, long tasks, layout shift, DOM size, and Chromium memory
+counters where supported. Set `PICAN_PERF_PROFILE=mobile4g` to apply the named 150 ms / 4 Mbps /
+4x-CPU Chromium lab profile. It is an approximation, not a real-phone claim.
+
+Timing values are baseline-only today. Correctness invariants fail the run; numeric budgets should
+be ratcheted only after repeated samples on a pinned runner and real-phone release-candidate checks.

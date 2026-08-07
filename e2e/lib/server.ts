@@ -104,8 +104,10 @@ export async function startServer(): Promise<StartedServer> {
       // thousands of messages (which flaked under parallel CPU contention).
       // Comfortably above every other spec's session size (max ~34 entries).
       // Keep in sync with tests/load-earlier.spec.ts.
-      PICAN_LARGE_SESSION_THRESHOLD: "100",
-      PICAN_LARGE_SESSION_TAIL_ENTRIES: "50",
+      PICAN_LARGE_SESSION_THRESHOLD:
+        process.env.PICAN_LARGE_SESSION_THRESHOLD ?? "100",
+      PICAN_LARGE_SESSION_TAIL_ENTRIES:
+        process.env.PICAN_LARGE_SESSION_TAIL_ENTRIES ?? "50",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

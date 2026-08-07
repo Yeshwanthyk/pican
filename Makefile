@@ -1,4 +1,4 @@
-.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-typecheck frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-setup
+.PHONY: build setup frontend-setup go-setup root-setup frontend-build frontend-test frontend-knip frontend-lint frontend-typecheck frontend-format-check extension-test memory-test go-test install-test vet test check clean dev docs docs-dev release-patch release-minor release-major release-beta e2e e2e-perf e2e-setup
 
 BINARY ?= pican
 WEB_DIR := web
@@ -86,6 +86,16 @@ e2e-setup:
 
 e2e: build
 	cd $(E2E_DIR) && npx playwright test
+
+# Serial mobile performance/resilience measurements. This is baseline-first:
+# correctness invariants fail the run, while timings are recorded as JSON and
+# remain non-gating until a stable baseline has been accepted.
+e2e-perf: build
+	cd $(E2E_DIR) && \
+		../web/node_modules/.bin/tsc --noEmit -p tsconfig.perf.json && \
+		PICAN_LARGE_SESSION_THRESHOLD=1500 \
+		PICAN_LARGE_SESSION_TAIL_ENTRIES=1000 \
+		npx playwright test --config=playwright.perf.config.ts
 
 clean:
 	rm -f $(BINARY)

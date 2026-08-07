@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "playwright.perf.config.ts",
+    "perf/**/*.ts",
+    "global-setup.ts",
+    "global-teardown.ts",
+    "lib/paths.ts",
+    "lib/server.ts",
+    "lib/sessions.ts",
+    "lib/test.ts"
+  ]
+}

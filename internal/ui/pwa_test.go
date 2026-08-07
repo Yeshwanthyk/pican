@@ -87,6 +87,10 @@ func TestAppIconIsServedAndInstalled(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); got != "image/png" {
 		t.Fatalf("Content-Type = %q, want image/png", got)
 	}
+	const maxAppIconBytes = 128 * 1024
+	if got := rec.Body.Len(); got > maxAppIconBytes {
+		t.Fatalf("app icon size = %d bytes, want at most %d", got, maxAppIconBytes)
+	}
 	image, err := png.Decode(strings.NewReader(rec.Body.String()))
 	if err != nil {
 		t.Fatalf("decode app icon: %v", err)
