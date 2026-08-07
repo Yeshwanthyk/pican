@@ -9,8 +9,15 @@ import {
 } from "./compare.ts";
 import {
   applyOptionalThrottle,
+  beginMeasuredTemperatureBoundary,
+  collectChromiumPerformance,
+  collectRetainedState,
+  collectServerMetrics,
   collectSnapshot,
   installPerformanceObservers,
+  parseServerMetricsSnapshot,
+  prepareTemperature,
+  retainedStateDelta,
   snapshotDelta,
   writePerfArtifact,
   type PerfSnapshot,
@@ -24,6 +31,8 @@ import {
   type PerfResult,
 } from "./result-schema.ts";
 import { summarizeSamples } from "./statistics.ts";
+
+test.use({ baseURL: "http://harness.test" });
 
 function result(
   overrides: {
@@ -42,6 +51,13 @@ function result(
       sampleId: overrides.sampleId ?? "sample-1",
       repetition: 1,
       temperature: "cold",
+      temperatureSetup: {
+        strategy: "cold-unprimed-route",
+        targetPathnameAndQuery: "/harness",
+        initialPageUrl: "about:blank",
+        prime: null,
+        measuredBoundaryStartedAtUnixMs: 2,
+      },
     },
     project: "harness Chromium",
     scenario: "harness-scenario",
@@ -77,6 +93,9 @@ function result(
           "largestContentfulPaint",
           "performanceMemory",
           "chromiumMemory",
+          "cdpPerformanceMetrics",
+          "forcedGarbageCollection",
+          "serverMetrics",
         ].map((name) => [name, { status: "supported", reason: null }]),
       ),
     },
@@ -92,12 +111,14 @@ function results(timingsMs: readonly number[], prefix: string): PerfResult[] {
 
 function snapshot(overrides: Partial<PerfSnapshot> = {}): PerfSnapshot {
   return {
+    timeOriginUnixMs: 1_000,
     nowMs: 10,
     navigation: null,
     paints: [],
     largestContentfulPaintMs: null,
     cumulativeLayoutShift: 0,
     longTasks: [],
+    longTasksTruncated: false,
     observerCapabilities: {
       longTasks: true,
       layoutShift: true,
@@ -108,6 +129,7 @@ function snapshot(overrides: Partial<PerfSnapshot> = {}): PerfSnapshot {
       transferBytes: 0,
       decodedBytes: 0,
       entries: [],
+      entriesTruncated: false,
       byKind: {},
     },
     domElements: 10,
@@ -153,6 +175,106 @@ test("validates the checked versioned result contract", () => {
       },
     }),
   ).toThrow(/viewport.width/);
+  expect(() =>
+    parsePerfResult({
+      ...result(),
+      environment: {
+        ...result().environment,
+        capabilities: {
+          ...result().environment.capabilities,
+          cdpPerformanceMetrics: { status: "unsupported", reason: null },
+        },
+      },
+    }),
+  ).toThrow(/cdpPerformanceMetrics.reason.*require a reason/);
+});
+
+test("requires temperature setup to prove cold and warm semantics", () => {
+  const cold = result();
+  expect(cold.run.temperatureSetup).toMatchObject({
+    strategy: "cold-unprimed-route",
+    prime: null,
+  });
+  expect(() =>
+    parsePerfResult({
+      ...cold,
+      run: {
+        ...cold.run,
+        temperature: "warm",
+      },
+    }),
+  ).toThrow(/warm samples must use the primed-route strategy/);
+
+  const warm = parsePerfResult({
+    ...cold,
+    run: {
+      ...cold.run,
+      temperature: "warm",
+      temperatureSetup: {
+        strategy: "warm-primed-route",
+        targetPathnameAndQuery: "/session?id=warm",
+        initialPageUrl: "about:blank",
+        prime: {
+          pathnameAndQuery: "/session?id=warm",
+          responseStatus: 200,
+          completedAtUnixMs: 10,
+        },
+        measuredBoundaryStartedAtUnixMs: 11,
+      },
+    },
+  });
+  expect(warm.run.temperatureSetup.prime).toMatchObject({ responseStatus: 200 });
+  expect(() =>
+    parsePerfResult({
+      ...warm,
+      run: {
+        ...warm.run,
+        temperatureSetup: {
+          ...warm.run.temperatureSetup,
+          measuredBoundaryStartedAtUnixMs: 9,
+        },
+      },
+    }),
+  ).toThrow(/must follow warm-route priming/);
+});
+
+test("warm setup primes the exact route before the measured boundary", async ({
+  page,
+}) => {
+  const previousTemperature = process.env.PICAN_PERF_TEMPERATURE;
+  process.env.PICAN_PERF_TEMPERATURE = "warm";
+  let documentRequests = 0;
+  await page.route("http://harness.test/**", async (route) => {
+    documentRequests += 1;
+    await route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><div id=ready>ready</div>",
+    });
+  });
+  try {
+    const preparation = await prepareTemperature(
+      page,
+      "/warm?resource=route",
+      async () => page.locator("#ready").waitFor(),
+    );
+    const proof = beginMeasuredTemperatureBoundary(preparation);
+    expect(documentRequests).toBe(1);
+    expect(page.url()).toBe("about:blank");
+    expect(proof).toMatchObject({
+      strategy: "warm-primed-route",
+      targetPathnameAndQuery: "/warm?resource=route",
+      prime: {
+        pathnameAndQuery: "/warm?resource=route",
+        responseStatus: 200,
+      },
+    });
+    expect(proof.prime!.completedAtUnixMs).toBeLessThanOrEqual(
+      proof.measuredBoundaryStartedAtUnixMs,
+    );
+  } finally {
+    if (previousTemperature === undefined) delete process.env.PICAN_PERF_TEMPERATURE;
+    else process.env.PICAN_PERF_TEMPERATURE = previousTemperature;
+  }
 });
 
 test("writes unique validated artifact paths for repeated samples", async () => {
@@ -161,12 +283,21 @@ test("writes unique validated artifact paths for repeated samples", async () => 
   process.env.PICAN_PERF_OUTPUT_DIR = resolve(root, "results");
   try {
     const testInfo = fakeTestInfo(root);
+    const temperatureSetup = {
+      strategy: "cold-unprimed-route",
+      targetPathnameAndQuery: "/artifact-contract",
+      initialPageUrl: "about:blank",
+      prime: null,
+      measuredBoundaryStartedAtUnixMs: 2,
+    } as const;
     const first = await writePerfArtifact(testInfo, {
       scenario: "artifact-contract",
+      temperatureSetup,
       task: { renderMs: 10 },
     });
     const second = await writePerfArtifact(testInfo, {
       scenario: "artifact-contract",
+      temperatureSetup,
       task: { renderMs: 11 },
     });
     expect(first).not.toBe(second);
@@ -225,6 +356,166 @@ test("reports the CDP profile as unsupported without calling CDP on WebKit", asy
   }
 });
 
+test("maps the fixed Chromium CPU, DOM, layout, and heap metric set", async () => {
+  const names = [
+    "Timestamp",
+    "TaskDuration",
+    "ScriptDuration",
+    "LayoutDuration",
+    "RecalcStyleDuration",
+    "LayoutCount",
+    "RecalcStyleCount",
+    "Nodes",
+    "Documents",
+    "Frames",
+    "JSEventListeners",
+    "JSHeapUsedSize",
+    "JSHeapTotalSize",
+  ];
+  const calls: string[] = [];
+  const chromiumPage = {
+    context: () => ({
+      browser: () => ({ browserType: () => ({ name: () => "chromium" }) }),
+      newCDPSession: async () => ({
+        send: async (method: string) => {
+          calls.push(method);
+          return method === "Performance.getMetrics"
+            ? {
+                metrics: names.map((name, index) => ({ name, value: index + 1 })),
+              }
+            : {};
+        },
+      }),
+    }),
+  } as unknown as Page;
+
+  const captured = await collectChromiumPerformance(chromiumPage);
+  expect(calls).toEqual(["Performance.enable", "Performance.getMetrics"]);
+  expect(captured).toEqual({
+    capability: { status: "supported", reason: null },
+    metrics: {
+      timestampSeconds: 1,
+      taskDurationSeconds: 2,
+      scriptDurationSeconds: 3,
+      layoutDurationSeconds: 4,
+      recalcStyleDurationSeconds: 5,
+      layoutCount: 6,
+      recalcStyleCount: 7,
+      nodes: 8,
+      documents: 9,
+      frames: 10,
+      jsEventListeners: 11,
+      jsHeapUsedBytes: 12,
+      jsHeapTotalBytes: 13,
+    },
+  });
+});
+
+test("marks Chromium metrics and forced GC unsupported without attempting CDP on WebKit", async () => {
+  let attemptedCdp = false;
+  const webkitPage = {
+    context: () => ({
+      browser: () => ({ browserType: () => ({ name: () => "webkit" }) }),
+      newCDPSession: () => {
+        attemptedCdp = true;
+        throw new Error("CDP must not be attempted for WebKit");
+      },
+    }),
+    evaluate: async () => ({ domElements: 12, visibleTranscriptEntries: 3 }),
+  } as unknown as Page;
+
+  const performanceMetrics = await collectChromiumPerformance(webkitPage);
+  const retained = await collectRetainedState(webkitPage);
+  expect(attemptedCdp).toBe(false);
+  expect(performanceMetrics).toEqual({
+    capability: expect.objectContaining({ status: "unsupported" }),
+    metrics: null,
+  });
+  expect(retained).toMatchObject({
+    forcedGarbageCollection: { status: "unsupported" },
+    browserDom: { domElements: 12, visibleTranscriptEntries: 3 },
+    chromium: {
+      capability: { status: "unsupported" },
+      metrics: null,
+    },
+  });
+});
+
+test("marks an unavailable server metrics endpoint without fabricating a snapshot", async () => {
+  const unavailablePage = {
+    url: () => "about:blank",
+    request: {
+      get: async () => ({ ok: () => false, status: () => 503 }),
+    },
+  } as unknown as Page;
+  await expect(collectServerMetrics(unavailablePage)).resolves.toEqual({
+    capability: {
+      status: "unavailable",
+      reason: "/api/metrics returned HTTP 503",
+    },
+    snapshot: null,
+  });
+});
+
+test("collects bounded server metric snapshots without worker identifiers", () => {
+  const captured = parseServerMetricsSnapshot(
+    {
+      process: {
+        pid: 42,
+        uptime_s: 10,
+        goroutines: 5,
+        heap_alloc_bytes: 1_000,
+        sse_clients: 2,
+        sse_global_streams: 1,
+        sse_session_streams: 1,
+        sse_heartbeats: 3,
+        sse_write_errors: 0,
+        sse_flush_errors: 0,
+        watched_files: 4,
+      },
+      session_cache: {
+        summary_parses: 7,
+        summary_hits: 6,
+        session_parses: 5,
+        session_hits: 4,
+        session_entries: 3,
+        session_bytes: 2_000,
+        session_evictions: 2,
+      },
+      workers: [
+        {
+          session_id: "must-not-leak",
+          sampled: true,
+          zombie: false,
+          rss_bytes: 100,
+          cpu_time_s: 2,
+        },
+        {
+          session_id: "also-private",
+          sampled: false,
+          zombie: true,
+          rss_bytes: 50,
+          cpu_time_s: 1,
+        },
+      ],
+    },
+    123,
+  );
+  expect(captured).toMatchObject({
+    capturedAtUnixMs: 123,
+    process: { pid: 42, heapAllocBytes: 1_000 },
+    workers: {
+      count: 2,
+      sampledCount: 1,
+      zombieCount: 1,
+      rssBytes: 150,
+      cpuTimeSeconds: 3,
+    },
+  });
+  expect(JSON.stringify(captured)).not.toContain("must-not-leak");
+  expect(JSON.stringify(captured)).not.toContain("also-private");
+});
+
 test("attributes pathname plus query and computes task-boundary deltas", async ({
   page,
 }) => {
@@ -274,6 +565,7 @@ test("attributes pathname plus query and computes task-boundary deltas", async (
       transferBytes: 120,
       decodedBytes: 80,
       entries: [resource],
+      entriesTruncated: false,
       byKind: {},
     },
     domElements: 14,
@@ -281,7 +573,7 @@ test("attributes pathname plus query and computes task-boundary deltas", async (
     jsHeapUsedBytes: 1_250,
   });
   expect(snapshotDelta(before, after)).toEqual({
-    boundary: { startMs: 10, endMs: 20, durationMs: 10 },
+    boundary: { startMs: 1010, endMs: 1020, durationMs: 10 },
     longTasks: {
       count: 1,
       totalDurationMs: 5,
@@ -297,6 +589,31 @@ test("attributes pathname plus query and computes task-boundary deltas", async (
     domElementsDelta: 4,
     visibleTranscriptEntriesDelta: 1,
     jsHeapUsedBytesDelta: 250,
+  });
+});
+
+test("computes retained DOM growth and leaves unsupported heap ratios null", () => {
+  const capability = {
+    status: "unsupported",
+    reason: "non-Chromium test fixture",
+  } as const;
+  const before = {
+    forcedGarbageCollection: capability,
+    browserDom: { domElements: 100, visibleTranscriptEntries: 20 },
+    chromium: { capability, metrics: null },
+  };
+  const after = {
+    forcedGarbageCollection: capability,
+    browserDom: { domElements: 110, visibleTranscriptEntries: 25 },
+    chromium: { capability, metrics: null },
+  };
+  expect(retainedStateDelta(before, after)).toEqual({
+    domElements: 10,
+    domElementsChangeRatio: 0.1,
+    visibleTranscriptEntries: 5,
+    chromium: null,
+    chromiumNodesChangeRatio: null,
+    jsHeapUsedBytesChangeRatio: null,
   });
 });
 

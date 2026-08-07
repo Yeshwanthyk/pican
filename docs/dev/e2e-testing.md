@@ -187,7 +187,7 @@ make e2e-perf-record      # build, type-check, then record isolated repetitions
 make e2e-perf-record PERF_REPETITIONS=3
 PICAN_PERF_REPETITIONS=3 make e2e-perf-record
 
-# Compare files or directories containing only V2 results.
+# Compare files or directories containing only V3 results.
 make e2e-perf-compare \
   PERF_BASELINE=e2e/perf-results/accepted-run \
   PERF_CANDIDATE=e2e/perf-results/candidate-run
@@ -200,17 +200,24 @@ make e2e-perf-compare \
 ```
 
 `make e2e-perf` remains an alias for `e2e-perf-correctness`. The correctness target runs the
-existing bounded-home, long-transcript/Load Earlier, and one offline-to-online exact-once catch-up
-check. That last check is not a general recovery, crash, replay, or data-loss scenario suite; no
-such coverage is claimed here.
+bounded-home, long-transcript/Load Earlier plus a 100-entry retained-state append, and the existing
+offline-to-online exact-once catch-up check. That last check is not a general recovery, crash,
+replay, or data-loss scenario suite; no additional recovery scenario is claimed here.
 
 The record target starts a fresh Playwright process, global setup, server, and temporary session
 directory for every repetition. This prevents tracked projects, pins, generated sessions, and
 other server state from leaking into the next sample. Do **not** replace that loop with
 Playwright's `--repeat-each`: global setup is process-scoped, and the current app scenarios are not
-fully isolated from their shared server fixture within one process. The record target labels these
-fresh-process samples `cold`. `PICAN_PERF_TEMPERATURE=warm` can label a separately controlled warm
-experiment, but this increment does not provide a trustworthy automated warm-cache protocol.
+fully isolated from their shared server fixture within one process.
+
+Temperature is now setup behavior, not a free-form label. `cold` (the default) requires a fresh
+`about:blank` page and does not visit the measured route before the task boundary. With
+`PICAN_PERF_TEMPERATURE=warm`, each scenario first visits its exact measured route, waits for that
+route's relevant UI/resource readiness gate, records the document status and completed prime route,
+navigates back to `about:blank`, and only then starts the measured boundary. Schema V3 rejects a
+warm sample without matching pre-boundary prime evidence, or a cold sample carrying prime evidence.
+This warms browser route resources and the relevant server read path; it does not claim to emulate
+a real phone's long-lived cache, OS process state, or radio state.
 
 For contract-only checks that do not start pican or use app scenario behavior:
 
@@ -223,9 +230,10 @@ PICAN_PERF_HARNESS_ONLY=1 npx playwright test \
 ### Result contract and artifacts
 
 Every sample is checked at runtime before it is written as
-`pican-performance-result` schema version 2. Invalid versions, missing identity fields,
-non-finite measurements, invalid profile parameters, and malformed capabilities are rejected.
-Schema V1 files are intentionally not accepted by the comparator.
+`pican-performance-result` schema version 3. Invalid versions, missing identity fields,
+non-finite measurements, invalid profile parameters, malformed capabilities, and inconsistent
+cold/warm setup proof are rejected. Earlier schema versions are intentionally not accepted by the
+comparator.
 
 Each result records:
 
@@ -234,12 +242,23 @@ Each result records:
 - OS platform/release/architecture, Node and Playwright versions, browser name and browser version
   when supplied/available (`PICAN_PERF_BROWSER_VERSION` may supply it);
 - viewport, device-pixel ratio, headless state, and the full versioned profile parameters;
-- explicit supported, unsupported, unavailable, or not-requested capability states;
-- scenario fixtures and task timings, browser snapshots, long tasks, layout shift, DOM size, and
-  memory counters where the engine exposes them; and
-- per-resource pathname **plus query**, initiator type, transfer bytes, decoded bytes, start time,
-  and duration. `snapshotDelta()` can attribute newly observed resources, long tasks, DOM entries,
-  and heap change to two explicit task boundaries.
+- explicit supported, unsupported, unavailable, or not-requested capability states (unsupported
+  and unavailable states require a reason);
+- scenario fixtures and task timings plus reusable before/after task boundaries for initial load,
+  Load Earlier, recovery, switch, or append work;
+- browser snapshots and deltas for long tasks, layout shift, DOM size, visible transcript entries,
+  resource bytes/counts, and `performance.memory` where exposed;
+- Chromium `Performance.getMetrics` CPU (`TaskDuration`, `ScriptDuration`), DOM, layout/style, and
+  JS heap fields before and after a task, with deltas only when the document time origin is stable,
+  plus retained DOM/heap snapshots after `HeapProfiler.collectGarbage`; and
+- bounded `/api/metrics` before/after snapshots for process and session-cache values, with bounded
+  worker aggregates that deliberately omit session IDs.
+
+Per-resource evidence retains pathname **plus query**, initiator type, transfer bytes, decoded
+bytes, start time, and duration. Browser entry arrays are capped at 200, resource-kind buckets at
+100 plus `other`, and server workers are aggregated so artifacts cannot grow with an unbounded
+worker list. Task boundaries use absolute browser time origins, so their deltas remain valid across
+document navigation as well as same-document switch/append work.
 
 The persistent filename contains the SHA, profile, scenario, run ID, and unique sample ID, and is
 created without overwrite permission. Repetitions therefore cannot silently replace an earlier
@@ -250,8 +269,12 @@ runs.
 The profile contract is versioned independently. `PICAN_PERF_PROFILE=mobile4g` currently means
 profile V1: 150 ms latency, 500,000 B/s down (approximately 4 Mbps), 250,000 B/s up, and 4x CPU
 slowdown. It is a Chromium CDP lab approximation. The metric/profile helpers do not attempt CDP on
-WebKit; results explicitly report CDP/network/CPU throttling as unsupported there. The current
-Playwright perf project remains Chromium-only.
+WebKit; results explicitly report CDP, `Performance.getMetrics`, forced GC, and CDP network/CPU
+throttling as unsupported there while
+still retaining standards-based browser DOM/resource evidence and `/api/metrics` server snapshots.
+Unsupported fields stay `null`; they are never filled with WebKit estimates. The current timed
+Playwright perf project remains Chromium-only, so WebKit results are correctness evidence rather
+than directly comparable timing samples.
 
 ### Statistics and timing gates
 

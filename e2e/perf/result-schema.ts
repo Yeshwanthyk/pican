@@ -1,5 +1,5 @@
 export const PERF_RESULT_KIND = "pican-performance-result";
-export const PERF_RESULT_SCHEMA_VERSION = 2 as const;
+export const PERF_RESULT_SCHEMA_VERSION = 3 as const;
 export const PERF_PROFILE_VERSION = 1 as const;
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -28,6 +28,18 @@ export interface PerfProfile {
     readonly uploadBytesPerSecond: number | null;
     readonly cpuSlowdownFactor: number | null;
   };
+}
+
+export interface PerfTemperatureSetup {
+  readonly strategy: "cold-unprimed-route" | "warm-primed-route";
+  readonly targetPathnameAndQuery: string;
+  readonly initialPageUrl: "about:blank";
+  readonly prime: {
+    readonly pathnameAndQuery: string;
+    readonly responseStatus: number;
+    readonly completedAtUnixMs: number;
+  } | null;
+  readonly measuredBoundaryStartedAtUnixMs: number;
 }
 
 export interface PerfEnvironment {
@@ -59,6 +71,9 @@ export interface PerfEnvironment {
     readonly largestContentfulPaint: Capability;
     readonly performanceMemory: Capability;
     readonly chromiumMemory: Capability;
+    readonly cdpPerformanceMetrics: Capability;
+    readonly forcedGarbageCollection: Capability;
+    readonly serverMetrics: Capability;
   };
 }
 
@@ -75,6 +90,7 @@ export interface PerfResult {
     readonly sampleId: string;
     readonly repetition: number;
     readonly temperature: "cold" | "warm";
+    readonly temperatureSetup: PerfTemperatureSetup;
   };
   readonly project: string;
   readonly scenario: string;
@@ -142,6 +158,12 @@ function positiveIntegerAt(value: unknown, path: string): number {
   return number;
 }
 
+function nonNegativeIntegerAt(value: unknown, path: string): number {
+  const number = nonNegativeNumberAt(value, path);
+  if (!Number.isInteger(number)) fail(path, "expected a non-negative integer");
+  return number;
+}
+
 function nullableNonNegativeNumberAt(
   value: unknown,
   path: string,
@@ -172,14 +194,19 @@ function enumAt<const T extends readonly string[]>(
 
 function capabilityAt(value: unknown, path: string): Capability {
   const capability = objectAt(value, path);
-  return {
-    status: enumAt(
-      capability.status,
-      ["supported", "unsupported", "unavailable", "not-requested"] as const,
-      `${path}.status`,
-    ),
-    reason: nullableStringAt(capability.reason, `${path}.reason`),
-  };
+  const status = enumAt(
+    capability.status,
+    ["supported", "unsupported", "unavailable", "not-requested"] as const,
+    `${path}.status`,
+  );
+  const reason = nullableStringAt(capability.reason, `${path}.reason`);
+  if ((status === "supported" || status === "not-requested") && reason !== null) {
+    fail(`${path}.reason`, `${status} capabilities must have a null reason`);
+  }
+  if ((status === "unsupported" || status === "unavailable") && reason === null) {
+    fail(`${path}.reason`, `${status} capabilities require a reason`);
+  }
+  return { status, reason };
 }
 
 function jsonValueAt(value: unknown, path: string): JsonValue {
@@ -235,6 +262,80 @@ function profileAt(value: unknown, path: string): PerfProfile {
         `${path}.parameters.cpuSlowdownFactor`,
       ),
     },
+  };
+}
+
+function temperatureSetupAt(
+  value: unknown,
+  temperature: "cold" | "warm",
+  path: string,
+): PerfTemperatureSetup {
+  const setup = objectAt(value, path);
+  const strategy = enumAt(
+    setup.strategy,
+    ["cold-unprimed-route", "warm-primed-route"] as const,
+    `${path}.strategy`,
+  );
+  const targetPathnameAndQuery = stringAt(
+    setup.targetPathnameAndQuery,
+    `${path}.targetPathnameAndQuery`,
+  );
+  if (!targetPathnameAndQuery.startsWith("/")) {
+    fail(`${path}.targetPathnameAndQuery`, "expected an origin-relative route");
+  }
+  literalAt(setup.initialPageUrl, "about:blank", `${path}.initialPageUrl`);
+  const measuredBoundaryStartedAtUnixMs = nonNegativeNumberAt(
+    setup.measuredBoundaryStartedAtUnixMs,
+    `${path}.measuredBoundaryStartedAtUnixMs`,
+  );
+
+  if (temperature === "cold") {
+    if (strategy !== "cold-unprimed-route") {
+      fail(`${path}.strategy`, "cold samples must use the unprimed-route strategy");
+    }
+    if (setup.prime !== null) {
+      fail(`${path}.prime`, "cold samples must not contain warm-prime evidence");
+    }
+    return {
+      strategy,
+      targetPathnameAndQuery,
+      initialPageUrl: "about:blank",
+      prime: null,
+      measuredBoundaryStartedAtUnixMs,
+    };
+  }
+
+  if (strategy !== "warm-primed-route") {
+    fail(`${path}.strategy`, "warm samples must use the primed-route strategy");
+  }
+  const prime = objectAt(setup.prime, `${path}.prime`);
+  const pathnameAndQuery = stringAt(
+    prime.pathnameAndQuery,
+    `${path}.prime.pathnameAndQuery`,
+  );
+  if (pathnameAndQuery !== targetPathnameAndQuery) {
+    fail(`${path}.prime.pathnameAndQuery`, "must match the measured target route");
+  }
+  const responseStatus = nonNegativeIntegerAt(
+    prime.responseStatus,
+    `${path}.prime.responseStatus`,
+  );
+  if (responseStatus < 200 || responseStatus > 399) {
+    fail(`${path}.prime.responseStatus`, "expected a successful document response");
+  }
+  const completedAtUnixMs = nonNegativeNumberAt(
+    prime.completedAtUnixMs,
+    `${path}.prime.completedAtUnixMs`,
+  );
+  if (completedAtUnixMs > measuredBoundaryStartedAtUnixMs) {
+    fail(`${path}.measuredBoundaryStartedAtUnixMs`, "must follow warm-route priming");
+  }
+  return {
+    strategy,
+    targetPathnameAndQuery,
+    initialPageUrl: "about:blank",
+    prime: { pathnameAndQuery, responseStatus, completedAtUnixMs },
+    measuredBoundaryStartedAtUnixMs,
   };
 }
 
@@ -306,6 +407,18 @@ function environmentAt(value: unknown, path: string): PerfEnvironment {
         capabilities.chromiumMemory,
         `${path}.capabilities.chromiumMemory`,
       ),
+      cdpPerformanceMetrics: capabilityAt(
+        capabilities.cdpPerformanceMetrics,
+        `${path}.capabilities.cdpPerformanceMetrics`,
+      ),
+      forcedGarbageCollection: capabilityAt(
+        capabilities.forcedGarbageCollection,
+        `${path}.capabilities.forcedGarbageCollection`,
+      ),
+      serverMetrics: capabilityAt(
+        capabilities.serverMetrics,
+        `${path}.capabilities.serverMetrics`,
+      ),
     },
   };
 }
@@ -325,6 +438,11 @@ export function parsePerfResult(value: unknown): PerfResult {
   const git = objectAt(result.git, "result.git");
   const run = objectAt(result.run, "result.run");
   const measurements = objectAt(result.measurements, "result.measurements");
+  const temperature = enumAt(
+    run.temperature,
+    ["cold", "warm"] as const,
+    "result.run.temperature",
+  );
 
   return {
     kind: PERF_RESULT_KIND,
@@ -338,10 +456,11 @@ export function parsePerfResult(value: unknown): PerfResult {
       runId: stringAt(run.runId, "result.run.runId"),
       sampleId: stringAt(run.sampleId, "result.run.sampleId"),
       repetition: positiveIntegerAt(run.repetition, "result.run.repetition"),
-      temperature: enumAt(
-        run.temperature,
-        ["cold", "warm"] as const,
-        "result.run.temperature",
+      temperature,
+      temperatureSetup: temperatureSetupAt(
+        run.temperatureSetup,
+        temperature,
+        "result.run.temperatureSetup",
       ),
     },
     project: stringAt(result.project, "result.project"),
