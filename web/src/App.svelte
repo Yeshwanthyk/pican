@@ -10,6 +10,10 @@
   import NotFoundPage from './routes/NotFoundPage.svelte';
   import VersionController from './components/shared/VersionController.svelte';
   import { stripBasePath } from './shared/base-path';
+  import {
+    SessionSwitchStateCache,
+    type SessionSwitchUiStatePatch,
+  } from './session/session-switch-state';
 
   interface AppProps {
     readonly path?: string;
@@ -28,6 +32,17 @@
   // re-read on mount.
   let path = $state(untrack(() => initialPath));
   let search = $state(untrack(() => initialSearch));
+
+  // Ephemeral UI only: keyed session pages still fully unmount, while this
+  // bounded App-lifetime cache keeps just enough state to resume reading and
+  // typing when the user switches back through pinned sessions.
+  const sessionSwitchState = new SessionSwitchStateCache(16);
+
+  function captureSessionUiStateFor(sessionId: string) {
+    return (patch: SessionSwitchUiStatePatch): void => {
+      sessionSwitchState.update(sessionId, patch);
+    };
+  }
 
   // The session route is keyed on this so a session→session navigation (same
   // pathname, different ?id=) tears down and remounts <SessionPage>, which reads
@@ -91,7 +106,10 @@
   {/key}
 {:else if path === '/session'}
   {#key sessionId}
-    <SessionPage />
+    <SessionPage
+      initialUiState={sessionSwitchState.get(sessionId)}
+      onUiStateCapture={captureSessionUiStateFor(sessionId)}
+    />
   {/key}
 {:else if path === '/settings'}
   <SettingsPage />

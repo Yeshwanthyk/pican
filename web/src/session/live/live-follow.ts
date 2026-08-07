@@ -26,6 +26,11 @@ interface FollowWindow {
 const KeyboardEventSchema = Schema.Struct({ key: Schema.String });
 const decodeKeyboardEvent = Schema.decodeUnknownOption(KeyboardEventSchema);
 
+export interface FollowScrollState {
+  readonly scrollTop: number;
+  readonly following: boolean;
+}
+
 // Owns the follow-scroll decision state for the live session viewer: whether we
 // auto-stick to the bottom as new entries stream in, the floating "scroll to
 // bottom" button, the pending-entry counter, and the short window after a sent
@@ -37,18 +42,26 @@ export function createFollowScrollController({
   windowImpl = window,
   requestAnimationFrameImpl = windowImpl.requestAnimationFrame.bind(windowImpl),
   setTimeoutImpl = windowImpl.setTimeout.bind(windowImpl),
+  initialState,
+  onStateCapture = () => {},
 }: {
   readonly documentImpl?: Document;
   readonly windowImpl?: FollowWindow;
   readonly requestAnimationFrameImpl?: (callback: FrameRequestCallback) => number | void;
   readonly setTimeoutImpl?: (handler: () => void, timeout?: number) => unknown;
+  readonly initialState?: FollowScrollState;
+  readonly onStateCapture?: (state: FollowScrollState) => void;
 } = {}) {
   const scrollImpls = { documentImpl, windowImpl };
-  let following = true;
+  let following = initialState?.following ?? true;
   let followBtn: HTMLButtonElement | null = null;
   let pendingCount = 0;
   let forcePreviewFollowUntil = 0;
   let lastScrollTop = 0;
+  let lastCapturedScrollTop = initialState?.scrollTop ?? 0;
+  let lastCapturedFollowing = initialState?.following ?? true;
+  let restoring = initialState !== undefined;
+  let disposed = false;
   const contentEl = documentImpl.getElementById("content");
   const cleanups: Array<() => void> = [];
   const on = (
@@ -71,6 +84,7 @@ export function createFollowScrollController({
         pendingCount = 0;
         scrollToBottom(true, scrollImpls);
         hideFollowButton();
+        captureState();
       },
     });
     setFollowButtonText(followBtn, pendingCount);
@@ -92,6 +106,24 @@ export function createFollowScrollController({
     }
     return scrolled;
   }
+  function captureState(): FollowScrollState {
+    const state =
+      restoring && initialState
+        ? initialState
+        : {
+            scrollTop: contentEl ? contentEl.scrollTop : getScrollPosition(),
+            following,
+          };
+    lastCapturedScrollTop = state.scrollTop;
+    lastCapturedFollowing = state.following;
+    onStateCapture(state);
+    return state;
+  }
+  function publishLastCapturedState(): FollowScrollState {
+    const state = { scrollTop: lastCapturedScrollTop, following: lastCapturedFollowing };
+    onStateCapture(state);
+    return state;
+  }
   lastScrollTop = getScrollPosition();
 
   function disableFollowOnUserInteraction(event: Event): void {
@@ -108,9 +140,11 @@ export function createFollowScrollController({
       following = false;
       showFollowButton();
     }
+    captureState();
   }
 
   function onScroll(): void {
+    if (restoring) return;
     const currentScroll = getScrollPosition();
     const scrolledUp = currentScroll < lastScrollTop;
     lastScrollTop = currentScroll;
@@ -132,6 +166,7 @@ export function createFollowScrollController({
     } else {
       showFollowButton();
     }
+    captureState();
   }
 
   function scrollAfterLayout(smooth: boolean, target?: Element | null): void {
@@ -147,6 +182,7 @@ export function createFollowScrollController({
     pendingCount = 0;
     hideFollowButton();
     scrollAfterLayout(!!smooth);
+    captureState();
   }
 
   on(windowImpl, "scroll", onScroll, { passive: true });
@@ -155,7 +191,41 @@ export function createFollowScrollController({
   on(windowImpl, "touchmove", disableFollowOnUserInteraction, { passive: true });
   on(windowImpl, "keydown", disableFollowOnUserInteraction, { passive: true });
 
-  scrollToBottom(false, scrollImpls);
+  if (initialState) {
+    const restoreInitialState = (): void => {
+      following = initialState.following;
+      if (following) {
+        scrollToBottom(false, scrollImpls);
+        hideFollowButton();
+      } else {
+        if (contentEl) contentEl.scrollTop = initialState.scrollTop;
+        else windowImpl.scrollTo({ top: initialState.scrollTop, behavior: "auto" });
+        showFollowButton();
+      }
+      lastScrollTop = getScrollPosition();
+    };
+    // SessionPage's initial navigator also schedules a bottom scroll. Restore
+    // after that fresh model render, then once more after layout settles.
+    requestAnimationFrameImpl(() => {
+      if (disposed) return;
+      restoreInitialState();
+      setTimeoutImpl(() => {
+        if (disposed) return;
+        restoreInitialState();
+        // Large transcripts can finish their reactive DOM/layout after the
+        // page runtime's first navigation pass. One final bounded retry avoids
+        // the browser clamping an early scrollTop assignment to zero.
+        setTimeoutImpl(() => {
+          if (disposed) return;
+          restoreInitialState();
+          restoring = false;
+          captureState();
+        }, 200);
+      }, 40);
+    });
+  } else {
+    scrollToBottom(false, scrollImpls);
+  }
 
   return {
     isFollowing: () => following,
@@ -170,8 +240,15 @@ export function createFollowScrollController({
     showFollowButton,
     forceFollowToBottom,
     scrollAfterLayout,
+    captureState,
     dispose: () => {
+      // DOM teardown may already have clamped the detached pane to zero. Use
+      // the controller-owned last capture rather than querying during unmount.
+      publishLastCapturedState();
+      disposed = true;
       for (const fn of cleanups) fn();
+      followBtn?.remove();
+      followBtn = null;
     },
   };
 }

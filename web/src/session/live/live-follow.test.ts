@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import { createFollowScrollController } from "./live-follow.js";
+import { createFollowScrollController, type FollowScrollState } from "./live-follow.js";
 
 function setup({
   scrollHeight = 2000,
   innerHeight = 1000,
-}: { readonly scrollHeight?: number; readonly innerHeight?: number } = {}) {
+  initialState,
+  onStateCapture,
+}: {
+  readonly scrollHeight?: number;
+  readonly innerHeight?: number;
+  readonly initialState?: FollowScrollState;
+  readonly onStateCapture?: (state: FollowScrollState) => void;
+} = {}) {
   const dom = new JSDOM('<body><main id="content"></main></body>');
   const documentImpl = dom.window.document;
   Object.defineProperty(documentImpl.documentElement, "scrollHeight", {
@@ -57,6 +64,8 @@ function setup({
       cb();
       return 0;
     },
+    initialState,
+    onStateCapture,
   });
   return { dom, documentImpl, windowImpl, handlers, fire, controller };
 }
@@ -67,6 +76,40 @@ describe("createFollowScrollController", () => {
     expect(controller.isFollowing()).toBe(true);
     expect(controller.shouldFollow()).toBe(true);
     expect(windowImpl.scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores an exact non-follow transcript position after layout", () => {
+    const onStateCapture = vi.fn();
+    const { documentImpl, controller } = setup({
+      initialState: { scrollTop: 417.5, following: false },
+      onStateCapture,
+    });
+
+    expect(documentImpl.getElementById("content")?.scrollTop).toBe(417.5);
+    expect(controller.isFollowing()).toBe(false);
+    expect(documentImpl.querySelector(".follow-button")).not.toBeNull();
+    expect(onStateCapture).toHaveBeenLastCalledWith({ scrollTop: 417.5, following: false });
+  });
+
+  it("captures transcript scroll and follow changes", () => {
+    const onStateCapture = vi.fn();
+    const { documentImpl, fire, controller } = setup({ onStateCapture });
+    const content = documentImpl.getElementById("content");
+    expect(content).not.toBeNull();
+    Object.defineProperty(content, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(content, "clientHeight", { value: 500, configurable: true });
+    if (content) content.scrollTop = 321;
+
+    fire("scroll");
+
+    expect(controller.isFollowing()).toBe(false);
+    expect(onStateCapture).toHaveBeenLastCalledWith({ scrollTop: 321, following: false });
+
+    // A keyed teardown can clamp the old element before cleanup runs. Disposal
+    // must publish the controller-owned capture, not query the tearing-down DOM.
+    if (content) content.scrollTop = 0;
+    controller.dispose();
+    expect(onStateCapture).toHaveBeenLastCalledWith({ scrollTop: 321, following: false });
   });
 
   it("stops following and shows the follow button when scrolled away from bottom", () => {

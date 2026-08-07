@@ -110,6 +110,78 @@ describe("chat composer runner", () => {
     ).not.toThrow();
   });
 
+  it("restores and captures exact composer text without connection recovery replacing it", async () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send"></button><span id="pi-chat-status"></span></form></body>',
+    );
+    const captures: string[] = [];
+    const runtime = runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      initialComposerText: "  exact draft\nnext line  ",
+      onComposerTextCapture: (text) => captures.push(text),
+      chatApi: { getWorkerStatus: () => Promise.resolve(new Response("{}", { status: 500 })) },
+      chatSelectors: { THINKING_LEVELS: [] },
+      modelSelector: { setupModelSelector: vi.fn() },
+      thinkingSelector: { setupThinkingLevelSelector: vi.fn() },
+      setIntervalImpl: () => {},
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const textarea = getById(dom, "pi-chat-message");
+
+    expect(textarea.value).toBe("  exact draft\nnext line  ");
+    dom.window.dispatchEvent(new dom.window.Event("pi-session-reload"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(textarea.value).toBe("  exact draft\nnext line  ");
+
+    textarea.value = "  newer edit after recovery  ";
+    textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    runtime.dispose();
+    expect(captures).toEqual(["  newer edit after recovery  ", "  newer edit after recovery  "]);
+  });
+
+  it("captures a newer edit while a failed send settles", async () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send" type="submit"></button><span id="pi-chat-status"></span></form></body>',
+    );
+    let resolveSend!: (response: Response) => void;
+    const pendingSend = new Promise<Response>((resolve) => {
+      resolveSend = resolve;
+    });
+    const captures: string[] = [];
+    const runtime = runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      initialComposerText: "  original draft  ",
+      onComposerTextCapture: (text) => captures.push(text),
+      chatApi: {
+        getWorkerStatus: () => Promise.resolve(new Response("{}", { status: 500 })),
+        sendChat: () => pendingSend,
+      },
+      chatSelectors: { THINKING_LEVELS: [] },
+      modelSelector: { setupModelSelector: vi.fn() },
+      thinkingSelector: { setupThinkingLevelSelector: vi.fn() },
+      FormDataImpl: dom.window.FormData,
+      CustomEventImpl: dom.window.CustomEvent,
+      setIntervalImpl: () => {},
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const textarea = getById(dom, "pi-chat-message");
+    getById(dom, "pi-chat-composer").dispatchEvent(
+      new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+    );
+    textarea.value = "  newer failed-send edit  ";
+    textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+    resolveSend(new Response('{"error":"offline"}', { status: 503 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(textarea.value).toBe("  newer failed-send edit  ");
+    runtime.dispose();
+    expect(captures).toContain("  newer failed-send edit  ");
+    expect(captures.at(-1)).toBe("  newer failed-send edit  ");
+  });
+
   it("marks unavailable composer", () => {
     const dom = new JSDOM(
       '<body><form id="pi-chat-composer" data-chat-available="false" data-chat-disabled-reason="no cwd"></form><span id="pi-chat-status"></span></body>',

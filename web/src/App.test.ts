@@ -12,6 +12,7 @@ beforeEach(() => {
 afterEach(() => {
   if (mounted) unmount(mounted);
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("App", () => {
@@ -204,6 +205,86 @@ describe("App", () => {
     window.history.pushState({}, "", "/session?id=B");
     flushSync();
     expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("id=B"))).toBe(true);
+  });
+
+  it("restores exact per-session draft and transcript state across keyed remounts", async () => {
+    class FakeEventSource {
+      readonly readyState = 1;
+      onopen: ((event: Event) => void) | null = null;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+      constructor(_url: string | URL) {}
+      addEventListener(): void {}
+      close(): void {}
+    }
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    vi.spyOn(window, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === "/api/session") {
+        const id = url.searchParams.get("id") || "unknown";
+        return Promise.resolve(
+          Response.json({
+            header: { cwd: "" },
+            name: `Session ${id}`,
+            entries: [
+              {
+                type: "message",
+                id: `${id}-message`,
+                parentId: null,
+                message: { role: "user", content: "hello" },
+              },
+            ],
+          }),
+        );
+      }
+      if (url.pathname === "/api/sessions") {
+        return Promise.resolve(Response.json({ sessions: [], total: 0 }));
+      }
+      if (url.pathname === "/api/settings") {
+        return Promise.resolve(Response.json({ settings: {} }));
+      }
+      return Promise.resolve(new Response("{}", { status: 500 }));
+    });
+
+    document.body.innerHTML = '<div id="app"></div>';
+    window.history.pushState({}, "", "/session?id=alpha");
+    mounted = mountApp({ props: { path: "/session", search: "?id=alpha" } });
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(document.querySelector<HTMLTextAreaElement>("#pi-chat-message")).not.toBeNull();
+    });
+    const alphaTextarea = document.querySelector<HTMLTextAreaElement>("#pi-chat-message");
+    const alphaContent = document.querySelector<HTMLElement>("#content");
+    expect(alphaTextarea).not.toBeNull();
+    expect(alphaContent).not.toBeNull();
+    if (!alphaTextarea || !alphaContent) return;
+
+    alphaTextarea.value = "  alpha draft\nwith exact spacing  ";
+    alphaTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+    Object.defineProperty(alphaContent, "scrollHeight", { value: 2000, configurable: true });
+    Object.defineProperty(alphaContent, "clientHeight", { value: 500, configurable: true });
+    alphaContent.scrollTop = 321;
+    alphaContent.dispatchEvent(new Event("scroll"));
+
+    window.history.pushState({}, "", "/session?id=beta");
+    flushSync();
+    await vi.waitFor(() => {
+      expect(document.querySelector("#session-header-title")?.textContent).toContain(
+        "Session beta",
+      );
+    });
+
+    window.history.pushState({}, "", "/session?id=alpha");
+    flushSync();
+    await vi.waitFor(() => {
+      const restoredTextarea = document.querySelector<HTMLTextAreaElement>("#pi-chat-message");
+      expect(restoredTextarea).not.toBe(alphaTextarea);
+      expect(restoredTextarea?.value).toBe("  alpha draft\nwith exact spacing  ");
+      expect(document.querySelector<HTMLElement>("#content")?.scrollTop).toBe(321);
+      expect(document.querySelector(".follow-button")).not.toBeNull();
+    });
   });
 
   it("does not remount SessionPage when the id is unchanged", () => {

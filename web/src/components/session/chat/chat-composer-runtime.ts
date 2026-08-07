@@ -81,6 +81,8 @@ interface ChatComposerRuntimeOptions {
   readonly queueApi?: QueueApi | null;
   readonly getLiveEntries?: (() => readonly SessionEntry[]) | null;
   readonly capabilities?: CompleteRuntimeCapabilities;
+  readonly initialComposerText?: string;
+  readonly onComposerTextCapture?: (text: string) => void;
 }
 
 export function runChatComposer({
@@ -109,6 +111,8 @@ export function runChatComposer({
   queueApi = null,
   getLiveEntries = null,
   capabilities = defaultRuntimeCapabilities("pi"),
+  initialComposerText = "",
+  onComposerTextCapture = () => {},
 }: ChatComposerRuntimeOptions = {}) {
   const document = documentImpl;
   const window = documentImpl.defaultView ?? globalThis.window;
@@ -214,6 +218,18 @@ export function runChatComposer({
       shell,
       expandButton,
     } = getComposerElements({ documentImpl: document, form });
+
+    // Restore only at this fresh component mount. Connection recovery reuses
+    // the component/runtime and therefore never clears or replaces this value.
+    if (textarea) {
+      textarea.value = initialComposerText;
+      const captureComposerText = (): void => onComposerTextCapture(textarea.value);
+      textarea.addEventListener("input", captureComposerText);
+      disposables.push(() => {
+        captureComposerText();
+        textarea.removeEventListener("input", captureComposerText);
+      });
+    }
 
     const { update: updateComposerHeightVar } = setupComposerHeightVar({
       documentImpl: document,

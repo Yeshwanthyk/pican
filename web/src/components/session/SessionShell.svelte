@@ -32,6 +32,10 @@
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import type { WorkerProcessStatus } from '../../session/data/session-types.js';
   import type { SessionConnectionState } from '../../session/live/live-connection.js';
+  import type {
+    SessionSwitchUiState,
+    SessionSwitchUiStatePatch,
+  } from '../../session/session-switch-state.js';
   import { defaultRuntimeCapabilities } from '../../lib/runtime-capabilities.js';
   import { copyToClipboard } from '../../shared/clipboard.js';
 
@@ -54,6 +58,8 @@
     archived = false,
     waiting = false,
     sessionTabsEnabled = false,
+    initialUiState = undefined as SessionSwitchUiState | undefined,
+    onUiStateCapture = (() => {}) as (patch: SessionSwitchUiStatePatch) => void,
     onArchiveChange = null,
     dataEl = $bindable(null),
   } = $props();
@@ -170,7 +176,20 @@
 
 <!-- Live reload (SSE) mounts before <ChatComposer> so its optimistic
      "message sent" listener is attached before the user can send. -->
-<LiveReload onConnectionState={(state) => (connectionState = state)} />
+<LiveReload
+  initialState={initialUiState
+    ? {
+        scrollTop: initialUiState.transcriptScrollTop,
+        following: initialUiState.following,
+      }
+    : undefined}
+  onStateCapture={(state) =>
+    onUiStateCapture({
+      transcriptScrollTop: state.scrollTop,
+      following: state.following,
+    })}
+  onConnectionState={(state) => (connectionState = state)}
+/>
 <ConnectionStatus state={connectionState} />
 
 <div id="app" class:worker-down={workerDown}>
@@ -199,6 +218,8 @@
       {capabilities}
       {resumeCommand}
       {workerStatus}
+      initialComposerText={initialUiState?.composerText ?? ''}
+      onComposerTextCapture={(composerText) => onUiStateCapture({ composerText })}
       pinnedTabs={sessionTabsEnabled ? pinnedTabs : null}
       {currentSession}
       currentRunning={running}

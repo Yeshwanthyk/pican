@@ -51,6 +51,8 @@
     capabilities = defaultRuntimeCapabilities('pi'),
     resumeCommand = '',
     workerStatus = { state: 'idle' },
+    initialComposerText = '',
+    onComposerTextCapture = () => {},
     pinnedTabs = null,
     currentSession = null,
     currentRunning = false,
@@ -65,6 +67,8 @@
     capabilities?: CompleteRuntimeCapabilities;
     resumeCommand?: string;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
+    initialComposerText?: string;
+    onComposerTextCapture?: (text: string) => void;
     pinnedTabs?: PinnedTabsModel | null;
     currentSession?: NormalizedSession | null;
     currentRunning?: boolean;
@@ -186,6 +190,8 @@
       queueStore,
       queueApi,
       capabilities,
+      initialComposerText,
+      onComposerTextCapture,
     });
 
     // Initial hydration from the server-side queue + subscribe to SSE 'queue'

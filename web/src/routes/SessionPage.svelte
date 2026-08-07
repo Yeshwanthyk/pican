@@ -23,6 +23,10 @@
   import { SESSION_TABS_SETTING_KEY } from '../shared/settings-store';
   import { errorMessage, settle } from '../components/shared/ui-effect';
   import { withBasePath } from '../shared/base-path';
+  import type {
+    SessionSwitchUiState,
+    SessionSwitchUiStatePatch,
+  } from '../session/session-switch-state';
   import {
     defaultRuntimeCapabilities,
     type CompleteRuntimeCapabilities,
@@ -32,11 +36,6 @@
   // and provided via context so descendant components read from it. Hydrated
   // from the session payload below; the live runtime (startSessionPageRuntime in
   // onMount) mutates it on reload.
-  // oxlint-disable-next-line typescript/no-unsafe-declaration-merging -- compatibility shim for the session partition's string-indexed runtime contract
-  interface RouteSessionDataModel {
-    [key: string]: unknown;
-  }
-
   class RouteSessionDataModel extends SessionDataModel {
     override load(data: unknown): void {
       if (isUnknownRecord(data)) super.load(data);
@@ -52,7 +51,21 @@
     }
   }
 
+  let {
+    initialUiState,
+    onUiStateCapture = () => {},
+  }: {
+    readonly initialUiState?: SessionSwitchUiState;
+    readonly onUiStateCapture?: (patch: SessionSwitchUiStatePatch) => void;
+  } = $props();
+
   const sessionModel = setSessionModel(new RouteSessionDataModel());
+  // The runtime helpers retain their legacy string-indexed model contract; this
+  // is the same SessionDataModel object, not a wrapper or retained second model.
+  // oxlint-disable-next-line pican/no-double-cast -- typed compatibility boundary for the legacy helper contract; runtime identity is unchanged
+  const runtimeSessionModel = sessionModel as unknown as Parameters<
+    typeof hydrateSessionModel
+  >[0]['sessionModel'];
 
   // Post-render hook for the message pane: <SessionContent> renders
   // model.activePath as <SessionEntry> components and runs afterRender after each
@@ -142,12 +155,16 @@
         chatDisabledReason = state.chatDisabledReason;
         modelLabel = state.modelLabel;
         hydrateSessionModel({
-          sessionModel,
+          sessionModel: runtimeSessionModel,
           payloadBase64,
           locationSearch: window.location.search,
           windowImpl: window,
         });
-        createLiveSessionRuntime({ sessionModel, contentRuntime, documentImpl: document });
+        createLiveSessionRuntime({
+          sessionModel: runtimeSessionModel,
+          contentRuntime,
+          documentImpl: document,
+        });
         loading = false;
         clearTimeout(loadingTimer);
         await tick();
@@ -227,6 +244,8 @@
     {archived}
     {waiting}
     {sessionTabsEnabled}
+    {initialUiState}
+    {onUiStateCapture}
     onArchiveChange={(next: boolean) => (archived = next)}
     bind:dataEl
   />

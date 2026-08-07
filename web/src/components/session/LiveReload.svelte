@@ -31,7 +31,10 @@
     setupSessionLiveConnection,
     type SessionConnectionState,
   } from '../../session/live/live-connection.js';
-  import { createFollowScrollController } from '../../session/live/live-follow.js';
+  import {
+    createFollowScrollController,
+    type FollowScrollState,
+  } from '../../session/live/live-follow.js';
   import { updateStatsDom } from '../../session/live/live-stats.js';
   import { getSessionRuntime } from '../../session/session-runtime-context.js';
   import { setSessionTitle } from '../../session/session-title.svelte.js';
@@ -45,8 +48,14 @@
   const decodeChatSentDetail = Schema.decodeUnknownOption(ChatSentDetailSchema);
 
   let {
+    initialState,
+    onStateCapture = () => {},
     onConnectionState = () => {},
-  }: { readonly onConnectionState?: (state: SessionConnectionState) => void } = $props();
+  }: {
+    readonly initialState?: FollowScrollState;
+    readonly onStateCapture?: (state: FollowScrollState) => void;
+    readonly onConnectionState?: (state: SessionConnectionState) => void;
+  } = $props();
 
   onMount(() => {
     const documentImpl = document;
@@ -117,6 +126,8 @@
       documentImpl,
       requestAnimationFrameImpl: requestAnimationFrame,
       setTimeoutImpl: setTimeout,
+      initialState,
+      onStateCapture,
     });
     cleanups.push(followScroll.dispose);
     const {
