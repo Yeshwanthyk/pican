@@ -84,12 +84,14 @@ export interface StartedHostedServer {
   logs(): string;
 }
 
-export async function startServer(): Promise<StartedServer> {
-  ensureBinary();
-  const { agentDir, sessionsDir } = seedAgentDir();
-  const port = await findFreePort();
-  const baseURL = `http://127.0.0.1:${port}`;
+export interface StartedIsolatedServer extends StartedServer {
+  /** Restart against the same port and agent directory, preserving browser URLs and server state. */
+  restart(whileStopped?: () => void | Promise<void>): Promise<ChildProcess>;
+  /** Stop the current process and remove this server's isolated agent directory. */
+  stop(): Promise<void>;
+}
 
+function spawnTestServer(agentDir: string, port: number, logLabel = "pican"): ChildProcess {
   const child = spawn(BINARY, ["-p", String(port), "-host", "127.0.0.1", "-runtime", "pi"], {
     cwd: REPO_ROOT,
     env: {
@@ -111,11 +113,103 @@ export async function startServer(): Promise<StartedServer> {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  child.stdout?.on("data", (d) => process.stdout.write(`[pican] ${d}`));
-  child.stderr?.on("data", (d) => process.stderr.write(`[pican] ${d}`));
+  child.stdout?.on("data", (d) => process.stdout.write(`[${logLabel}] ${d}`));
+  child.stderr?.on("data", (d) => process.stderr.write(`[${logLabel}] ${d}`));
+  return child;
+}
+
+async function waitForExit(child: ChildProcess, timeoutMs = 5_000): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise<void>((resolve, reject) => {
+    const onExit = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      child.removeListener("exit", onExit);
+      reject(new Error(`server process ${child.pid ?? "unknown"} did not exit`));
+    }, timeoutMs);
+    child.once("exit", onExit);
+  });
+}
+
+async function terminateServer(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    return;
+  }
+  try {
+    await waitForExit(child);
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      return;
+    }
+    await waitForExit(child, 2_000);
+  }
+}
+
+export async function startServer(): Promise<StartedServer> {
+  ensureBinary();
+  const { agentDir, sessionsDir } = seedAgentDir();
+  const port = await findFreePort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const child = spawnTestServer(agentDir, port);
 
   await waitForReady(baseURL);
   return { baseURL, agentDir, sessionsDir, child };
+}
+
+/**
+ * Start a test-owned server that can be restarted on the same port without
+ * disturbing the process-wide E2E server or another worker's metrics.
+ */
+export async function startIsolatedServer(): Promise<StartedIsolatedServer> {
+  ensureBinary();
+  mkdirSync(TMP_DIR, { recursive: true });
+  const agentDir = mkdtempSync(join(TMP_DIR, "agent-isolated-"));
+  const sessionsDir = join(agentDir, "sessions");
+  mkdirSync(sessionsDir, { recursive: true });
+  cpSync(FIXTURES_SESSIONS, sessionsDir, { recursive: true });
+
+  const port = await findFreePort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  let child = spawnTestServer(agentDir, port, `pican:${port}`);
+  let stopped = false;
+
+  try {
+    await waitForReady(baseURL);
+  } catch (error) {
+    await terminateServer(child);
+    rmSync(agentDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  return {
+    baseURL,
+    agentDir,
+    sessionsDir,
+    get child() {
+      return child;
+    },
+    async restart(whileStopped) {
+      if (stopped) throw new Error("cannot restart a stopped isolated server");
+      await terminateServer(child);
+      await whileStopped?.();
+      child = spawnTestServer(agentDir, port, `pican:${port}`);
+      await waitForReady(baseURL);
+      return child;
+    },
+    async stop() {
+      if (stopped) return;
+      stopped = true;
+      await terminateServer(child);
+      rmSync(agentDir, { recursive: true, force: true });
+    },
+  };
 }
 
 export async function startHostedCodexServer(): Promise<StartedHostedServer> {
