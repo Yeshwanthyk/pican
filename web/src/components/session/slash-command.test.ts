@@ -208,6 +208,18 @@ describe("setupSlashCommands controller", () => {
     el.remove();
   });
 
+  it("disposes listeners idempotently", () => {
+    const { el, api, getCommands, textarea, popup } = setup();
+
+    api.dispose?.();
+    api.dispose?.();
+    typeSlash(textarea, "/");
+
+    expect(popup.style.display).toBe("none");
+    expect(getCommands).not.toHaveBeenCalled();
+    el.remove();
+  });
+
   it("ignores keys when the palette is closed", () => {
     const { el, api } = setup();
     expect(api.handleKeydown(new KeyboardEvent("keydown", { key: "Enter" }))).toBe(false);

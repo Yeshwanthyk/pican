@@ -86,7 +86,7 @@ describe("btw geometry", () => {
     const saveGeometry = vi.fn();
     vi.stubGlobal("Element", dom.window.Element);
 
-    enableBtwDrag(root, handle, {
+    const dispose = enableBtwDrag(root, handle, {
       documentImpl: dom.window.document,
       windowImpl: { innerWidth: 250, innerHeight: 180 },
       saveGeometry,
@@ -109,6 +109,17 @@ describe("btw geometry", () => {
     expect(root.style.left).toBe("50px");
     expect(root.style.top).toBe("30px");
     expect(saveGeometry).toHaveBeenCalledWith({ left: 50, top: 30 });
+
+    dispose();
+    dispose();
+    saveGeometry.mockClear();
+    handle.dispatchEvent(
+      new dom.window.MouseEvent("pointerdown", { bubbles: true, clientX: 100, clientY: 80 }),
+    );
+    dom.window.document.dispatchEvent(
+      new dom.window.MouseEvent("pointermove", { clientX: 120, clientY: 100 }),
+    );
+    expect(saveGeometry).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
@@ -120,16 +131,17 @@ describe("btw geometry", () => {
     Object.defineProperty(root, "offsetHeight", { value: 260 });
     const saveGeometry = vi.fn();
     const resizeCallbacks: ResizeObserverCallback[] = [];
+    const disconnect = vi.fn();
     class FakeResizeObserver implements ResizeObserver {
       constructor(cb: ResizeObserverCallback) {
         resizeCallbacks.push(cb);
       }
       observe = vi.fn();
-      disconnect = vi.fn();
+      disconnect = disconnect;
       unobserve = vi.fn();
     }
 
-    persistBtwResize(root, {
+    const dispose = persistBtwResize(root, {
       windowImpl: {
         ResizeObserver: FakeResizeObserver,
         requestAnimationFrame: (cb: FrameRequestCallback) => {
@@ -145,5 +157,9 @@ describe("btw geometry", () => {
     resizeCallback([], new FakeResizeObserver(resizeCallback));
 
     expect(saveGeometry).toHaveBeenCalledWith({ width: 420, height: 260 });
+
+    dispose();
+    dispose();
+    expect(disconnect).toHaveBeenCalledTimes(1);
   });
 });

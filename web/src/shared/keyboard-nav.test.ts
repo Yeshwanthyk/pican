@@ -112,6 +112,12 @@ describe("setupKeyboardNav", () => {
       addEventListener(type: "keydown", handler: (event: KeyboardEvent) => void, options) {
         listeners.push({ type, handler, options });
       },
+      removeEventListener(type: "keydown", handler: (event: KeyboardEvent) => void) {
+        const index = listeners.findIndex(
+          (listener) => listener.type === type && listener.handler === handler,
+        );
+        if (index >= 0) listeners.splice(index, 1);
+      },
       _dispatch(type: string, init: DispatchInit) {
         const e = {
           key: init.key || "",
@@ -417,6 +423,27 @@ describe("setupKeyboardNav", () => {
 
     expect(doc.querySelector).toHaveBeenCalledWith("#pi-chat-message");
     expect(focus).toHaveBeenCalled();
+  });
+
+  it("removes listeners and clears the pending gg timer idempotently", () => {
+    const doc = createMockDocument();
+    const win = createMockWindow();
+    const timers = createFakeTimers();
+    const clearTimeout = vi.fn(timers.clearTimeout);
+    const dispose = setupKeyboardNav({
+      windowImpl: win,
+      documentImpl: doc,
+      setTimeoutImpl: timers.setTimeout,
+      clearTimeoutImpl: clearTimeout,
+    });
+    doc._dispatch("keydown", { key: "g" });
+
+    dispose();
+    dispose();
+    doc._dispatch("keydown", { key: "j" });
+
+    expect(clearTimeout).toHaveBeenCalledTimes(1);
+    expect(win.scrollBy).not.toHaveBeenCalled();
   });
 
   it("uses custom focusSelector", () => {

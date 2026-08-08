@@ -79,8 +79,9 @@ export function enableBtwDrag(
     readonly windowImpl?: Pick<Window, "innerWidth" | "innerHeight">;
     readonly saveGeometry?: GeometrySaver;
   } = {},
-): void {
+): () => void {
   let dragging = false;
+  let disposed = false;
   let startX = 0;
   let startY = 0;
   let originLeft = 0;
@@ -105,7 +106,7 @@ export function enableBtwDrag(
     documentImpl.removeEventListener("pointermove", onMove);
     documentImpl.removeEventListener("pointerup", onUp);
   };
-  handle.addEventListener("pointerdown", (event) => {
+  const onPointerDown = (event: PointerEvent): void => {
     if (event.target instanceof Element && event.target.closest(".pi-btw-actions")) return;
     dragging = true;
     const rect = root.getBoundingClientRect();
@@ -115,7 +116,15 @@ export function enableBtwDrag(
     startY = event.clientY;
     documentImpl.addEventListener("pointermove", onMove);
     documentImpl.addEventListener("pointerup", onUp);
-  });
+  };
+  handle.addEventListener("pointerdown", onPointerDown);
+
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    onUp();
+    handle.removeEventListener("pointerdown", onPointerDown);
+  };
 }
 
 export function persistBtwResize(
@@ -131,15 +140,26 @@ export function persistBtwResize(
     };
     readonly saveGeometry?: GeometrySaver;
   } = {},
-): ResizeObserver | null {
-  if (!windowImpl.ResizeObserver) return null;
+): () => void {
+  if (!windowImpl.ResizeObserver) return () => undefined;
   let frame = 0;
+  let disposed = false;
   const observer = new windowImpl.ResizeObserver(() => {
+    if (disposed) return;
     if (frame) windowImpl.cancelAnimationFrame(frame);
-    frame = windowImpl.requestAnimationFrame(() =>
-      saveGeometry({ width: root.offsetWidth, height: root.offsetHeight }),
-    );
+    frame = windowImpl.requestAnimationFrame(() => {
+      frame = 0;
+      if (!disposed) saveGeometry({ width: root.offsetWidth, height: root.offsetHeight });
+    });
   });
   observer.observe(root);
-  return observer;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    observer.disconnect();
+    if (frame) {
+      windowImpl.cancelAnimationFrame(frame);
+      frame = 0;
+    }
+  };
 }

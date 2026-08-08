@@ -78,6 +78,7 @@ class FakeEventSource extends EventTarget implements EventSource {
   }
 }
 
+const disconnectResizeObservers = vi.fn();
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 5; i++) {
@@ -163,7 +164,9 @@ function setupEnv({
     configurable: true,
     value: class FakeResizeObserver {
       observe(): void {}
-      disconnect(): void {}
+      disconnect(): void {
+        disconnectResizeObservers();
+      }
       unobserve(): void {}
     },
   });
@@ -186,6 +189,7 @@ function setupEnv({
 
 beforeEach(() => {
   FakeEventSource.instances = [];
+  disconnectResizeObservers.mockClear();
   localStorage.clear();
 });
 
@@ -447,6 +451,16 @@ describe("BtwPopup", () => {
     expect(byId("pi-btw-button").hidden).toBe(true);
     expect(query<HTMLElement>(".pi-btw-window").hidden).toBe(true);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("disconnects mounted geometry observers on unmount", async () => {
+    setupEnv();
+    const view = render(BtwPopup);
+    await settle();
+
+    view.unmount();
+
+    expect(disconnectResizeObservers).toHaveBeenCalledTimes(1);
   });
 
   it("toggles closed on a second button click", async () => {

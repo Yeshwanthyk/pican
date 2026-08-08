@@ -185,6 +185,20 @@ describe("setupMentionAutocomplete controller", () => {
     el.remove();
   });
 
+  it("disposes listeners and pending debounce work idempotently", async () => {
+    const { el, api, getFiles, textarea, popup } = setup();
+    type(textarea, "@stale");
+
+    api.dispose?.();
+    api.dispose?.();
+    await flush();
+    type(textarea, "@again");
+
+    expect(popup.style.display).toBe("none");
+    expect(getFiles).not.toHaveBeenCalled();
+    el.remove();
+  });
+
   it("ignores keys when the popup is closed", () => {
     const { el, api } = setup();
     expect(api.handleKeydown(new KeyboardEvent("keydown", { key: "Enter" }))).toBe(false);

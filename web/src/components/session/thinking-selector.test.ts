@@ -26,6 +26,22 @@ describe("setupThinkingLevelSelector", () => {
     cleanupDom(el);
   });
 
+  it("disposes listeners idempotently", () => {
+    const el = createDom();
+    const chatApi = { setThinkingLevel: vi.fn() };
+    const api = setupThinkingLevelSelector({ documentImpl: document, chatApi });
+
+    api.dispose();
+    api.dispose();
+    document.querySelector<HTMLButtonElement>("#pi-chat-thinking-label")?.click();
+
+    expect(document.querySelector<HTMLElement>("#pi-chat-thinking-popup")?.style.display).toBe(
+      "none",
+    );
+    expect(chatApi.setThinkingLevel).not.toHaveBeenCalled();
+    cleanupDom(el);
+  });
+
   it("returns false when required elements are missing", () => {
     const api = setupThinkingLevelSelector({ documentImpl: document });
     expect(api).toBe(false);

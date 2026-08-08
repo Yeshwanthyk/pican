@@ -35,7 +35,7 @@ export function setupContextPopover({
     }
   }
 
-  if (!usageCapsule || !popover) return { position };
+  if (!usageCapsule || !popover) return { position, dispose: () => undefined };
 
   const hide = (): void => {
     popover.style.display = "none";

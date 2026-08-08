@@ -110,6 +110,93 @@ describe("chat composer runner", () => {
     ).not.toThrow();
   });
 
+  it("owns selector sub-runtimes and disposes them idempotently", () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send"></button><span id="pi-chat-status"></span></form></body>',
+    );
+    const disposeModel = vi.fn();
+    const disposeThinking = vi.fn();
+    const disposeSlash = vi.fn();
+    const disposeMention = vi.fn();
+    const runtime = runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      chatApi: { getWorkerStatus: () => Promise.resolve(new Response("{}", { status: 500 })) },
+      modelSelector: {
+        setupModelSelector: vi.fn(() => ({ open: vi.fn(), dispose: disposeModel })),
+      },
+      thinkingSelector: {
+        setupThinkingLevelSelector: vi.fn(() => ({ cycle: vi.fn(), dispose: disposeThinking })),
+      },
+      slashSelector: {
+        setupSlashCommands: vi.fn(() => ({ handleKeydown: () => false, dispose: disposeSlash })),
+      },
+      mentionSelector: {
+        setupMentionAutocomplete: vi.fn(() => ({
+          handleKeydown: () => false,
+          dispose: disposeMention,
+        })),
+      },
+      setIntervalImpl: () => {},
+    });
+    dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+    runtime.dispose();
+    runtime.dispose();
+
+    expect(disposeModel).toHaveBeenCalledTimes(1);
+    expect(disposeThinking).toHaveBeenCalledTimes(1);
+    expect(disposeSlash).toHaveBeenCalledTimes(1);
+    expect(disposeMention).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not dispatch stale worker events after disposal", async () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><button id="pi-chat-send"></button></form></body>',
+    );
+    let resolveStatus!: (response: { ok: boolean; json(): Promise<unknown> }) => void;
+    const status = new Promise<{ ok: boolean; json(): Promise<unknown> }>((resolve) => {
+      resolveStatus = resolve;
+    });
+    const onWorkerStatus = vi.fn();
+    dom.window.addEventListener("pi-worker-status", onWorkerStatus);
+    const runtime = runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      chatApi: { getWorkerStatus: () => status },
+      setIntervalImpl: () => {},
+    });
+    dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+    runtime.dispose();
+    resolveStatus({ ok: true, json: () => Promise.resolve({ state: "running" }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onWorkerStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not initialize after disposal while waiting for DOMContentLoaded", () => {
+    const dom = new JSDOM(
+      '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><button id="pi-chat-send"></button></form></body>',
+    );
+    Object.defineProperty(dom.window.document, "readyState", {
+      configurable: true,
+      value: "loading",
+    });
+    const setupModelSelector = vi.fn(() => ({ open: vi.fn() }));
+    const runtime = runChatComposer({
+      documentImpl: dom.window.document,
+      windowImpl: dom.window,
+      modelSelector: { setupModelSelector },
+      setIntervalImpl: () => {},
+    });
+
+    runtime.dispose();
+    dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+    expect(setupModelSelector).not.toHaveBeenCalled();
+  });
+
   it("restores and captures exact composer text without connection recovery replacing it", async () => {
     const dom = new JSDOM(
       '<body><form id="pi-chat-composer" data-chat-available="true" data-session-id="s1"><textarea id="pi-chat-message"></textarea><input id="pi-chat-images"><button id="pi-chat-attach"></button><div id="pi-chat-attachments"></div><button id="pi-chat-send"></button><span id="pi-chat-status"></span></form></body>',

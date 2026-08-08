@@ -43,6 +43,7 @@ export function setupAttachmentManager({
   const objectUrls = new WeakMap<File, string>();
   let selectedFiles: File[] = [];
   let selectedTextAttachments: TextAttachment[] = [];
+  let disposed = false;
 
   function getAttachmentObjectUrl(file: File): string {
     if (!file.type || !file.type.startsWith("image/")) return "";
@@ -173,13 +174,13 @@ export function setupAttachmentManager({
     return added;
   }
 
-  attachButton?.addEventListener("click", () => fileInput?.click());
-  fileInput?.addEventListener("change", () => {
+  const onAttachClick = (): void => fileInput?.click();
+  const onFileInputChange = (): void => {
+    if (!fileInput) return;
     addFiles(fileInput.files || []);
     fileInput.value = "";
-  });
-
-  textarea?.addEventListener("paste", (event: ClipboardEvent) => {
+  };
+  const onPaste = (event: ClipboardEvent): void => {
     const data = event.clipboardData;
     if (!data) return;
     const imageFiles: File[] = [];
@@ -207,11 +208,11 @@ export function setupAttachmentManager({
       if (!pastedText) {
         event.preventDefault();
       }
-      textarea.focus();
+      textarea?.focus();
     }
-  });
+  };
 
-  windowImpl.addEventListener("pi-chat-attach-text", (event: Event) => {
+  const onAttachText = (event: Event): void => {
     if (!allowFiles) return;
     const detail = (event as CustomEvent<unknown>).detail;
     if (!isTextAttachmentEventDetail(detail)) return;
@@ -223,7 +224,12 @@ export function setupAttachmentManager({
     });
     render();
     if (textarea && typeof textarea.focus === "function") textarea.focus();
-  });
+  };
+
+  attachButton?.addEventListener("click", onAttachClick);
+  fileInput?.addEventListener("change", onFileInputChange);
+  textarea?.addEventListener("paste", onPaste);
+  windowImpl.addEventListener("pi-chat-attach-text", onAttachText);
 
   return {
     files: () => selectedFiles,
@@ -247,6 +253,18 @@ export function setupAttachmentManager({
       render();
     },
     render,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      attachButton?.removeEventListener("click", onAttachClick);
+      fileInput?.removeEventListener("change", onFileInputChange);
+      textarea?.removeEventListener("paste", onPaste);
+      windowImpl.removeEventListener("pi-chat-attach-text", onAttachText);
+      textAttachmentViewer.dispose();
+      clearFiles();
+      selectedTextAttachments = [];
+      attachmentList?.replaceChildren();
+    },
   };
 }
 import { Schema } from "effect";

@@ -107,4 +107,33 @@ describe("attachment manager", () => {
     manager.restore({ files, textAttachments });
     expect(attachmentList.children.length).toBe(2);
   });
+
+  it("disposes global, input, paste, and viewer listeners idempotently", () => {
+    const { textarea, fileInput, attachButton, attachmentList } = setupDom();
+    const manager = setupAttachmentManager({
+      documentImpl: document,
+      windowImpl: window,
+      textarea,
+      fileInput,
+      attachButton,
+      attachmentList,
+    });
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-attach-text", { detail: { original: "selected text" } }),
+    );
+    attachmentList.querySelector<HTMLElement>(".pi-chat-attachment-text")?.click();
+    const modal = document.querySelector<HTMLElement>("#pi-chat-attachment-modal");
+    expect(modal?.hidden).toBe(false);
+
+    manager.dispose();
+    manager.dispose();
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-attach-text", { detail: { original: "stale text" } }),
+    );
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+    expect(manager.hasAttachments()).toBe(false);
+    expect(attachmentList.children.length).toBe(0);
+    expect(modal?.hidden).toBe(false);
+  });
 });

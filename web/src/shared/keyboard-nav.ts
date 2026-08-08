@@ -38,6 +38,11 @@ export interface KeyboardDocument {
     handler: (event: KeyboardEvent) => void,
     options?: { readonly capture?: boolean },
   ): void;
+  removeEventListener(
+    type: "keydown",
+    handler: (event: KeyboardEvent) => void,
+    options?: { readonly capture?: boolean },
+  ): void;
   querySelector(selector: string): KeyboardElement | null;
   querySelectorAll?(selector: string): Iterable<KeyboardElement>;
   getElementById?(id: string): KeyboardElement | null;
@@ -100,49 +105,45 @@ export function setupKeyboardNav({
   setTimeoutImpl = (callback, millis) => setTimeout(callback, millis),
   clearTimeoutImpl = (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
   focusSelector = "#pi-chat-message",
-}: KeyboardNavOptions = {}): void {
+}: KeyboardNavOptions = {}): () => void {
   let ggTimer: unknown | null = null;
 
   // Capture phase so Escape blurs the main input *before* bubble-phase
   // handlers see the event — but only when the user isn't inside a popup
   // or modal that has its own Escape handling (model popup, palette, etc.).
-  documentImpl.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key === "Escape") {
-        const active = documentImpl.activeElement;
-        if (!isEditableTarget(active)) return;
-        if (!active) return;
-        // Don't steal Escape from popups / modals / overlays.
-        if (
-          active.closest?.(
-            '.pi-chat-model-popup, .pi-chat-thinking-popup, [role="menu"], [role="dialog"], .command-menu-popover, .mobile-command-panel, .share-overlay-backdrop, .mobile-command-backdrop, #commandPalette, #sessionPalette, .model-selector-dropdown, .modal-overlay, .modal',
-          )
+  const onEscape = (e: KeyboardEvent): void => {
+    if (e.key === "Escape") {
+      const active = documentImpl.activeElement;
+      if (!isEditableTarget(active)) return;
+      if (!active) return;
+      // Don't steal Escape from popups / modals / overlays.
+      if (
+        active.closest?.(
+          '.pi-chat-model-popup, .pi-chat-thinking-popup, [role="menu"], [role="dialog"], .command-menu-popover, .mobile-command-panel, .share-overlay-backdrop, .mobile-command-backdrop, #commandPalette, #sessionPalette, .model-selector-dropdown, .modal-overlay, .modal',
         )
-          return;
-        // The slash and @mention popups anchor to the main composer textarea (a
-        // sibling, not an ancestor), so closest() above can't see them. When one
-        // is open, let Escape bubble to the composer's own close handler instead
-        // of blurring the textarea.
-        if (isComposerPopupOpen(documentImpl)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        active?.blur?.();
-      }
-    },
-    { capture: true },
-  );
+      )
+        return;
+      // The slash and @mention popups anchor to the main composer textarea (a
+      // sibling, not an ancestor), so closest() above can't see them. When one
+      // is open, let Escape bubble to the composer's own close handler instead
+      // of blurring the textarea.
+      if (isComposerPopupOpen(documentImpl)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      active?.blur?.();
+    }
+  };
 
   // Cmd/Ctrl+, opens the global settings page (standard macOS preferences
   // shortcut). Works regardless of focus, like a native app.
-  documentImpl.addEventListener("keydown", (e) => {
+  const onSettingsShortcut = (e: KeyboardEvent): void => {
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === ",") {
       e.preventDefault();
       navigate("/settings", { windowImpl });
     }
-  });
+  };
 
-  documentImpl.addEventListener("keydown", (e) => {
+  const onNavigate = (e: KeyboardEvent): void => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (isEditableTarget(documentImpl.activeElement)) return;
 
@@ -208,5 +209,23 @@ export function setupKeyboardNav({
       const el = documentImpl.querySelector(focusSelector);
       el?.focus?.();
     }
-  });
+  };
+
+  const captureOptions = { capture: true } as const;
+  documentImpl.addEventListener("keydown", onEscape, captureOptions);
+  documentImpl.addEventListener("keydown", onSettingsShortcut);
+  documentImpl.addEventListener("keydown", onNavigate);
+
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    if (ggTimer) {
+      clearTimeoutImpl(ggTimer);
+      ggTimer = null;
+    }
+    documentImpl.removeEventListener("keydown", onEscape, captureOptions);
+    documentImpl.removeEventListener("keydown", onSettingsShortcut);
+    documentImpl.removeEventListener("keydown", onNavigate);
+  };
 }

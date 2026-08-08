@@ -138,6 +138,7 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
   const setWorkerModelUpdate = options.setWorkerModelUpdate ?? (() => undefined);
   let allModels: ModelOption[] = [];
   let selectedModel: ModelOption | null = null;
+  let disposed = false;
   const setSelected = (model: ModelOption | null) => {
     selectedModel = model;
     setCurrentModelForThinking(model);
@@ -165,13 +166,13 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
     if (popup) popup.style.display = "none";
     if (focusTextarea) documentImpl.querySelector<HTMLTextAreaElement>("#pi-chat-message")?.focus();
   };
-  modelLabelBtn?.addEventListener("click", (event) => {
+  const onModelLabelClick = (event: MouseEvent): void => {
     event.stopPropagation();
     if (popup?.style.display !== "none") close();
     else open();
-  });
-  popupSearch?.addEventListener("input", () => renderPopupList(popupSearch.value));
-  popupSearch?.addEventListener("keydown", (event) => {
+  };
+  const onSearchInput = (): void => renderPopupList(popupSearch?.value ?? "");
+  const onSearchKeydown = (event: KeyboardEvent): void => {
     const items = popupList?.querySelectorAll<HTMLButtonElement>(".model-item") ?? [];
     let active = Number.parseInt(popupList?.dataset.activeIndex ?? "-1", 10);
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -194,8 +195,8 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
     if (popupList) popupList.dataset.activeIndex = String(active);
     items.forEach((item, index) => item.classList.toggle("active", index === active));
     items[active]?.scrollIntoView({ block: "nearest" });
-  });
-  popupList?.addEventListener("click", (event) => {
+  };
+  const onModelListClick = (event: MouseEvent): void => {
     const item =
       event.target instanceof Element ? event.target.closest<HTMLElement>(".model-item") : null;
     const provider = item?.dataset.provider;
@@ -210,8 +211,11 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
     }).pipe(
       Effect.flatMap((response) => decodeSetModelResponse(response, url)),
       Effect.match({
-        onFailure: (error) => setChatStatus(describeError(error), "error"),
+        onFailure: (error) => {
+          if (!disposed) setChatStatus(describeError(error), "error");
+        },
         onSuccess: () => {
+          if (disposed) return;
           const model = findModel(allModels, provider, modelId) ?? {
             provider,
             id: modelId,
@@ -225,8 +229,8 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
       }),
     );
     void runPromise(effect);
-  });
-  documentImpl.addEventListener("click", (event) => {
+  };
+  const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target;
     if (
       popup &&
@@ -236,7 +240,12 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
       target !== modelLabelBtn
     )
       close();
-  });
+  };
+  modelLabelBtn?.addEventListener("click", onModelLabelClick);
+  popupSearch?.addEventListener("input", onSearchInput);
+  popupSearch?.addEventListener("keydown", onSearchKeydown);
+  popupList?.addEventListener("click", onModelListClick);
+  documentImpl.addEventListener("click", onDocumentClick);
   if (chatApi) {
     const url = "/api/models";
     const effect = Effect.tryPromise({
@@ -246,11 +255,13 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
       Effect.flatMap((response) => decodeModelsResponse(response, url)),
       Effect.match({
         onFailure: () => {
+          if (disposed) return;
           if (popupList)
             popupList.innerHTML =
               '<div class="model-empty">Failed to load models<br><small>Check that <code>pi</code> is on PATH</small></div>';
         },
         onSuccess: (data) => {
+          if (disposed) return;
           allModels = [...(data.models ?? [])];
           if (allModels.length === 0 && popupList)
             popupList.innerHTML =
@@ -277,5 +288,18 @@ export function setupModelSelector(options: ModelSelectorOptions = {}) {
     );
     void runPromise(effect);
   }
-  return { open, close };
+  return {
+    open,
+    close,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      modelLabelBtn?.removeEventListener("click", onModelLabelClick);
+      popupSearch?.removeEventListener("input", onSearchInput);
+      popupSearch?.removeEventListener("keydown", onSearchKeydown);
+      popupList?.removeEventListener("click", onModelListClick);
+      documentImpl.removeEventListener("click", onDocumentClick);
+      setWorkerModelUpdate(() => undefined);
+    },
+  };
 }

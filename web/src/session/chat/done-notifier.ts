@@ -40,11 +40,13 @@ interface DoneWindow {
   readonly console?: Pick<Console, "warn">;
   focus?(): void;
   addEventListener(type: string, listener: EventListener): void;
+  removeEventListener(type: string, listener: EventListener): void;
 }
 
 interface VisibilityDocument {
   hidden: boolean;
   addEventListener?(type: string, listener: EventListener): void;
+  removeEventListener?(type: string, listener: EventListener): void;
 }
 
 interface StorageOptions {
@@ -331,11 +333,13 @@ export function setupDoneNotifyToggle({
   readonly windowImpl?: DoneWindow;
   readonly storage?: SettingsStorage;
   readonly fetchImpl?: FetchLike | null;
-} = {}): void {
+} = {}): () => void {
   const btn = documentImpl.getElementById("notify-toggle");
-  if (!btn) return;
+  if (!btn) return () => undefined;
+  let disposed = false;
 
   const render = () => {
+    if (disposed) return;
     const enabled = isDoneNotifyEnabled({ storage });
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
     btn.classList.toggle("active", enabled);
@@ -353,7 +357,7 @@ export function setupDoneNotifyToggle({
     registerPushSubscription({ windowImpl, fetchImpl });
   }
 
-  btn.addEventListener("click", async () => {
+  const onClick = async (): Promise<void> => {
     const enabled = isDoneNotifyEnabled({ storage });
     if (enabled) {
       setDoneNotifyEnabled(false, { storage });
@@ -368,7 +372,14 @@ export function setupDoneNotifyToggle({
       await registerPushSubscription({ windowImpl, fetchImpl });
     }
     render();
-  });
+  };
+  btn.addEventListener("click", onClick);
+
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    btn.removeEventListener("click", onClick);
+  };
 }
 
 export function notifyDone({
@@ -401,13 +412,20 @@ export function clearAppBadge({ windowImpl = globalThis.window }: WindowOptions 
 export function setupAppBadgeClearing({
   documentImpl = globalThis.document,
   windowImpl = globalThis.window,
-}: WindowOptions & { readonly documentImpl?: VisibilityDocument } = {}): void {
+}: WindowOptions & { readonly documentImpl?: VisibilityDocument } = {}): () => void {
+  let disposed = false;
   const clear = () => {
     if (!documentImpl.hidden) clearAppBadge({ windowImpl });
   };
   clear();
   documentImpl.addEventListener?.("visibilitychange", clear);
   windowImpl.addEventListener("focus", clear);
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    documentImpl.removeEventListener?.("visibilitychange", clear);
+    windowImpl.removeEventListener("focus", clear);
+  };
 }
 
 export async function fetchAvailableSounds({

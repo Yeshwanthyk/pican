@@ -106,6 +106,15 @@ describe("setupSessionGlobals — keyboard shortcuts", () => {
     expect(sessionModals.shortcuts).toBe(true);
   });
 
+  it("disposes per-session shortcuts idempotently", () => {
+    dispose?.();
+    dispose?.();
+
+    dispatchKey("b", { meta: true });
+
+    expect(sessionModals.tree.open).toBe(false);
+  });
+
   it("the header new-session button clicks the hidden new-session relay", () => {
     const click = vi.fn();
     document.getElementById("new-btn")?.addEventListener("click", click);

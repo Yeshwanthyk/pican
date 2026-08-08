@@ -64,6 +64,7 @@ export function setupSteerQueue({
   getLiveEntries = null,
 }: SteerQueueOptions) {
   let activeRun = false;
+  let disposed = false;
 
   function hasContent() {
     const typed = textarea ? textarea.value.trim() : "";
@@ -272,10 +273,17 @@ export function setupSteerQueue({
     queuedCount: () => store.queuedCount,
     steerCount: () => store.steerCount,
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      queueButton?.removeEventListener("click", enqueueFromComposer);
+      textarea?.removeEventListener("input", updateQueueEnabled);
       windowImpl.removeEventListener("pi-chat-message-sent", onMessageSent);
       windowImpl.removeEventListener("pi-worker-done", onWorkerDone);
       windowImpl.removeEventListener("pi-worker-status", onWorkerStatus);
       windowImpl.removeEventListener("pi-session-reload", reconcileSteersAgainstEntries);
+      if (store.actions.sendNow === sendNow) store.actions.sendNow = () => undefined;
+      if (store.actions.edit === edit) store.actions.edit = () => undefined;
+      if (store.actions.resume === resume) store.actions.resume = () => undefined;
     },
   };
 }

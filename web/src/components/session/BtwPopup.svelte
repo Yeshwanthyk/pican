@@ -373,14 +373,19 @@
   });
 
   onMount(() => {
+    const geometryDisposers: Array<() => void> = [];
     if (winEl) document.body.appendChild(winEl);
     if (winEl && headerEl) {
-      enableBtwDrag(winEl, headerEl, {
-        documentImpl: document,
-        windowImpl: window,
-        saveGeometry: saveGeom,
-      });
-      persistBtwResize(winEl, { windowImpl: window, saveGeometry: saveGeom });
+      geometryDisposers.push(
+        enableBtwDrag(winEl, headerEl, {
+          documentImpl: document,
+          windowImpl: window,
+          saveGeometry: saveGeom,
+        }),
+      );
+      geometryDisposers.push(
+        persistBtwResize(winEl, { windowImpl: window, saveGeometry: saveGeom }),
+      );
     }
     const onBodyScroll = (): void => {
       nearBottom = atBottom();
@@ -417,6 +422,7 @@
       btnEl?.removeEventListener('click', onBtnClick);
       composerTextarea?.removeEventListener('focus', onComposerFocus);
       bodyEl?.removeEventListener('scroll', onBodyScroll);
+      geometryDisposers.splice(0).forEach((dispose) => dispose());
       // eslint-disable-next-line svelte/no-dom-manipulating -- imperatively-created popup window, not a Svelte-rendered node
       winEl?.remove();
     };

@@ -58,4 +58,29 @@ describe("setupComposerHeightVar", () => {
     expect(constructorCallback).toHaveBeenCalledWith(expect.any(Function));
     expect(observe).toHaveBeenCalledWith(form);
   });
+
+  it("removes the resize listener and disconnects the observer idempotently", () => {
+    const form = makeForm(12);
+    const disconnect = vi.fn();
+    class FakeResizeObserver implements ResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+      observe = vi.fn();
+      disconnect = disconnect;
+      unobserve = vi.fn();
+    }
+    const controller = setupComposerHeightVar({
+      documentImpl: document,
+      windowImpl: window,
+      form,
+      ResizeObserverImpl: FakeResizeObserver,
+    });
+    vi.mocked(form.getBoundingClientRect).mockClear();
+
+    controller.dispose();
+    controller.dispose();
+    window.dispatchEvent(new Event("resize"));
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(form.getBoundingClientRect).not.toHaveBeenCalled();
+  });
 });

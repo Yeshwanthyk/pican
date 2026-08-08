@@ -37,13 +37,13 @@ export function setupSessionGlobals({
   };
 
   // Done-notifier (desktop notification + app badge when a worker finishes).
-  doneNotifier.setupDoneNotifyToggle({ documentImpl, windowImpl: target });
-  doneNotifier.setupAppBadgeClearing({ documentImpl, windowImpl: target });
+  cleanups.push(doneNotifier.setupDoneNotifyToggle({ documentImpl, windowImpl: target }));
+  cleanups.push(doneNotifier.setupAppBadgeClearing({ documentImpl, windowImpl: target }));
   on(target, "pi-worker-done", () => {
     doneNotifier.notifyDone({ documentImpl, windowImpl: target });
   });
 
-  setupKeyboardNav({ windowImpl: target, documentImpl });
+  cleanups.push(setupKeyboardNav({ windowImpl: target, documentImpl }));
 
   // Session list palette (Cmd+K / "List Sessions" menu item). The Svelte
   // <CommandPalette> component owns the palette and registers its API in

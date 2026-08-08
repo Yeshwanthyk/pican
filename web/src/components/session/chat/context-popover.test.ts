@@ -75,4 +75,17 @@ describe("setupContextPopover", () => {
 
     expect(popover?.style.left).toBe("50px");
   });
+
+  it("disposes all listeners idempotently", () => {
+    renderDom();
+    const controller = setupContextPopover({ documentImpl: document, windowImpl: window });
+    const popover = document.querySelector<HTMLElement>("#pi-chat-context-popover");
+
+    controller.dispose?.();
+    controller.dispose?.();
+    document.getElementById("pi-chat-context-usage")?.click();
+    window.dispatchEvent(new Event("resize"));
+
+    expect(popover?.style.display).toBe("none");
+  });
 });

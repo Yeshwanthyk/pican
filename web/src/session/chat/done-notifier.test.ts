@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   notifyDone,
   setupAppBadgeClearing,
+  setupDoneNotifyToggle,
   clearAppBadge,
   DONE_NOTIFY_STORAGE_KEY,
 } from "./done-notifier.js";
@@ -35,10 +36,32 @@ function makeWindow({ badgeApi = true } = {}) {
       Audio: null,
       Notification: null,
       addEventListener: (_type: string, _listener: EventListener) => undefined,
+      removeEventListener: (_type: string, _listener: EventListener) => undefined,
     },
     badge,
   };
 }
+
+describe("setupDoneNotifyToggle", () => {
+  it("removes its click listener idempotently", () => {
+    document.body.innerHTML = '<button id="notify-toggle"><span></span></button>';
+    const storage = makeStorage(false);
+    const { windowImpl } = makeWindow();
+    const dispose = setupDoneNotifyToggle({
+      documentImpl: document,
+      windowImpl,
+      storage,
+      fetchImpl: null,
+    });
+
+    dispose();
+    dispose();
+    document.getElementById("notify-toggle")?.click();
+
+    expect(storage.getItem(DONE_NOTIFY_STORAGE_KEY)).toBe("false");
+    document.body.innerHTML = "";
+  });
+});
 
 describe("notifyDone — app badge", () => {
   it("sets badge when document is hidden", () => {
@@ -138,5 +161,26 @@ describe("setupAppBadgeClearing", () => {
 
     listeners["focus"]?.(new Event("focus"));
     expect(badge.cleared).toBe(1);
+  });
+
+  it("removes badge-clearing listeners idempotently", () => {
+    const { windowImpl } = makeWindow();
+    const removeDocument = vi.fn();
+    const removeWindow = vi.fn();
+    const documentImpl = {
+      hidden: false,
+      addEventListener: vi.fn(),
+      removeEventListener: removeDocument,
+    };
+    windowImpl.removeEventListener = removeWindow;
+
+    const dispose = setupAppBadgeClearing({ documentImpl, windowImpl });
+    dispose();
+    dispose();
+
+    expect(removeDocument).toHaveBeenCalledTimes(1);
+    expect(removeDocument).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    expect(removeWindow).toHaveBeenCalledTimes(1);
+    expect(removeWindow).toHaveBeenCalledWith("focus", expect.any(Function));
   });
 });

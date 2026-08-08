@@ -76,6 +76,26 @@ describe("setupModelSelector", () => {
     });
   });
 
+  it("disposes listeners idempotently", () => {
+    const el = createDom();
+    const api = setupModelSelector({
+      documentImpl: document,
+      sessionId: "s",
+      chatApi: {
+        listModels: () =>
+          Promise.resolve({ ok: true, json: () => Promise.resolve({ models: [] }) }),
+      },
+    });
+    const popup = document.querySelector<HTMLElement>("#pi-chat-model-popup");
+
+    api.dispose();
+    api.dispose();
+    document.querySelector<HTMLButtonElement>("#pi-chat-model-label")?.click();
+
+    expect(popup?.style.display).toBe("none");
+    cleanupDom(el);
+  });
+
   describe("close", () => {
     it("hides the popup", () => {
       const el = createDom();

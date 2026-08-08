@@ -31,6 +31,7 @@ interface ThinkingController {
   open(): void;
   close(): void;
   cycle(): Promise<void>;
+  dispose(): void;
 }
 class ThinkingUpdateError extends Schema.TaggedErrorClass<ThinkingUpdateError>()(
   "ThinkingUpdateError",
@@ -82,6 +83,7 @@ export function setupThinkingLevelSelector(
   if (!labelButton || !popup || !list) return false;
   let generation = 0;
   let queue: Promise<void> = Promise.resolve();
+  let disposed = false;
   let queuedCycles = 0;
   let confirmed = getKnownThinkingLevel() || "";
   const render = (selectedLevel: string) => {
@@ -142,14 +144,14 @@ export function setupThinkingLevelSelector(
       }),
       Effect.match({
         onFailure: (message) => {
-          if (currentGeneration !== generation) return;
+          if (disposed || currentGeneration !== generation) return;
           setKnownThinkingLevel(confirmed);
           setThinkingLabel(confirmed);
           setChatStatus(message, "error");
         },
         onSuccess: (effectiveLevel) => {
           confirmed = effectiveLevel;
-          if (currentGeneration === generation) {
+          if (!disposed && currentGeneration === generation) {
             setKnownThinkingLevel(effectiveLevel);
             setThinkingLabel(effectiveLevel);
           }
@@ -161,12 +163,12 @@ export function setupThinkingLevelSelector(
     queue = queue.then(() => runPromise(effect));
     return queue;
   };
-  labelButton.addEventListener("click", (event) => {
+  const onLabelClick = (event: MouseEvent): void => {
     event.stopPropagation();
     if (popup.style.display !== "none") close();
     else open();
-  });
-  list.addEventListener("click", (event) => {
+  };
+  const onListClick = (event: MouseEvent): void => {
     const item =
       event.target instanceof Element
         ? event.target.closest<HTMLButtonElement>(".thinking-level-item")
@@ -176,8 +178,8 @@ export function setupThinkingLevelSelector(
     close();
     const currentGeneration = ++generation;
     void enqueue(level, currentGeneration, false);
-  });
-  documentImpl.addEventListener("click", (event) => {
+  };
+  const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target;
     if (
       popup.style.display !== "none" &&
@@ -186,8 +188,12 @@ export function setupThinkingLevelSelector(
       target !== labelButton
     )
       close();
-  });
+  };
+  labelButton.addEventListener("click", onLabelClick);
+  list.addEventListener("click", onListClick);
+  documentImpl.addEventListener("click", onDocumentClick);
   const cycle = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     const supported = supportedThinkingLevels(getCurrentModel(), THINKING_LEVELS);
     const current = getKnownThinkingLevel() || "";
     const next = supported[(supported.indexOf(current) + 1) % supported.length];
@@ -205,5 +211,16 @@ export function setupThinkingLevelSelector(
     setKnownThinkingLevel(detected);
     setThinkingLabel(detected);
   }
-  return { open, close, cycle };
+  return {
+    open,
+    close,
+    cycle,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      labelButton.removeEventListener("click", onLabelClick);
+      list.removeEventListener("click", onListClick);
+      documentImpl.removeEventListener("click", onDocumentClick);
+    },
+  };
 }

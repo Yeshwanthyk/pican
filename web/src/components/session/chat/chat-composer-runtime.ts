@@ -38,6 +38,12 @@ import type { ChatApiLike, ChatApiResponse } from "./selector-loaders.js";
 
 type RuntimeSessionEntry = Omit<SessionEntry, "id"> & { readonly id?: string };
 
+function createContextDocument(documentImpl: Document, isDisposed: () => boolean): Document {
+  return {
+    getElementById: (id: string) => (isDisposed() ? null : documentImpl.getElementById(id)),
+  } as Document;
+}
+
 type ComposerChatApi = Partial<ChatApiLike> & {
   readonly cancelChat?: (sessionId: string) => Promise<ChatApiResponse>;
   readonly sendChat?: (sessionId: string, body: FormData) => Promise<ChatApiResponse>;
@@ -61,12 +67,13 @@ interface ChatComposerRuntimeOptions {
     readonly setupModelSelector?: (options?: Parameters<typeof setupModelSelector>[0]) => {
       open(): void;
       close?(focusTextarea?: boolean): void;
+      dispose?(): void;
     };
   };
   readonly thinkingSelector?: {
     readonly setupThinkingLevelSelector?: (
       options?: Parameters<typeof setupThinkingLevelSelector>[0],
-    ) => { cycle(): void; open?(): void; close?(): void } | false;
+    ) => { cycle(): void; open?(): void; close?(): void; dispose?(): void } | false;
   };
   readonly slashSelector?: { readonly setupSlashCommands?: typeof setupSlashCommands } | null;
   readonly mentionSelector?: {
@@ -134,15 +141,49 @@ export function runChatComposer({
     setThinkingLevel: chatApi.setThinkingLevel ?? defaultChatApi.setThinkingLevel,
   };
   void chatSelectors;
+  let initialized = false;
+  let disposed = false;
+  const disposables: Array<() => void> = [];
+  const own = <Resource extends { readonly dispose?: () => void }>(
+    resource: Resource,
+  ): Resource => {
+    if (resource.dispose) disposables.push(() => resource.dispose?.());
+    return resource;
+  };
+  const setupModel = modelSelector.setupModelSelector ?? setupModelSelector;
   const __piModelSelector = {
-    setupModelSelector: modelSelector.setupModelSelector ?? setupModelSelector,
+    setupModelSelector: (options?: Parameters<typeof setupModelSelector>[0]) =>
+      own(setupModel(options)),
   };
+  const setupThinking = thinkingSelector.setupThinkingLevelSelector ?? setupThinkingLevelSelector;
   const __piThinkingSelector = {
-    setupThinkingLevelSelector:
-      thinkingSelector.setupThinkingLevelSelector ?? setupThinkingLevelSelector,
+    setupThinkingLevelSelector: (options?: Parameters<typeof setupThinkingLevelSelector>[0]) => {
+      const resource = setupThinking(options);
+      return resource ? own(resource) : false;
+    },
   };
-  const __piSlashSelector = slashSelector;
-  const __piMentionSelector = mentionSelector;
+  const __piSlashSelector = slashSelector?.setupSlashCommands
+    ? {
+        setupSlashCommands: (options?: Parameters<typeof setupSlashCommands>[0]) =>
+          own(
+            slashSelector.setupSlashCommands?.(options) ?? {
+              handleKeydown: () => false,
+              dispose: () => undefined,
+            },
+          ),
+      }
+    : slashSelector;
+  const __piMentionSelector = mentionSelector?.setupMentionAutocomplete
+    ? {
+        setupMentionAutocomplete: (options?: Parameters<typeof setupMentionAutocomplete>[0]) =>
+          own(
+            mentionSelector.setupMentionAutocomplete?.(options) ?? {
+              handleKeydown: () => false,
+              dispose: () => undefined,
+            },
+          ),
+      }
+    : mentionSelector;
   const FormData = FormDataImpl;
   const URLSearchParams = URLSearchParamsImpl;
   const CustomEvent = CustomEventImpl;
@@ -151,9 +192,9 @@ export function runChatComposer({
   let onWorkerModelUpdate: ((provider: string, modelId: string) => void) | null = null;
   let currentModelForThinking: ModelOption | null = null;
   let positionPopover: () => void = () => {};
-  const disposables: Array<() => void> = [];
+  const contextDocument = createContextDocument(document, () => disposed);
   const contextUsage = createContextUsageController({
-    documentImpl: document,
+    documentImpl: contextDocument,
     entries,
     sessionId,
     chatApi: { listModels: __piChatApi.listModels ?? defaultChatApi.listModels },
@@ -161,7 +202,7 @@ export function runChatComposer({
     positionPopover: () => positionPopover(),
   });
   const updateContextUsage = () => {
-    if (capabilities.modelListing) contextUsage.update();
+    if (!disposed && capabilities.modelListing) contextUsage.update();
   };
   toolbar.updateContextUsage = updateContextUsage;
 
@@ -231,11 +272,13 @@ export function runChatComposer({
       });
     }
 
-    const { update: updateComposerHeightVar } = setupComposerHeightVar({
-      documentImpl: document,
-      windowImpl: window,
-      form,
-    });
+    const { update: updateComposerHeightVar } = own(
+      setupComposerHeightVar({
+        documentImpl: document,
+        windowImpl: window,
+        form,
+      }),
+    );
 
     // Expand/collapse the composer for larger typing area. State persists
     // per-session in localStorage.
@@ -248,31 +291,35 @@ export function runChatComposer({
     });
     const updateSendEnabled = sendState.updateSendEnabled;
 
-    attachments = setupAttachmentManager({
-      documentImpl: document,
-      windowImpl: window,
-      textarea,
-      fileInput,
-      attachButton,
-      attachmentList,
-      updateSendEnabled,
-      allowImages: capabilities.images,
-      allowFiles: capabilities.files,
-    });
+    attachments = own(
+      setupAttachmentManager({
+        documentImpl: document,
+        windowImpl: window,
+        textarea,
+        fileInput,
+        attachButton,
+        attachmentList,
+        updateSendEnabled,
+        allowImages: capabilities.images,
+        allowFiles: capabilities.files,
+      }),
+    );
 
-    const textareaControls = setupTextareaControls({
-      windowImpl: window,
-      textarea,
-      shell,
-      form,
-      isMobileTextInputMode,
-      getSlashSelector: () => _slashSelectorApi,
-      getMentionSelector: () => _mentionSelectorApi,
-      getThinkingSelector: () => _thinkingSelectorApi || null,
-      getModelSelector: () => _modelSelectorApi,
-      updateSendEnabled,
-      updateComposerHeight: updateComposerHeightVar,
-    });
+    const textareaControls = own(
+      setupTextareaControls({
+        windowImpl: window,
+        textarea,
+        shell,
+        form,
+        isMobileTextInputMode,
+        getSlashSelector: () => _slashSelectorApi,
+        getMentionSelector: () => _mentionSelectorApi,
+        getThinkingSelector: () => _thinkingSelectorApi || null,
+        getModelSelector: () => _modelSelectorApi,
+        updateSendEnabled,
+        updateComposerHeight: updateComposerHeightVar,
+      }),
+    );
     const autoResizeTextarea = textareaControls.autoResize;
 
     setupComposerExpansion({
@@ -309,46 +356,59 @@ export function runChatComposer({
     });
 
     if (capabilities.userQuestions) {
-      setupAskQuestionHandlers({
-        documentImpl: document,
-        sendChatMessage: submission.sendChatMessage,
-      });
+      own(
+        setupAskQuestionHandlers({
+          documentImpl: document,
+          sendChatMessage: submission.sendChatMessage,
+        }),
+      );
     }
 
     if (capabilities.persistentQueue) {
-      setupSteerQueue({
-        windowImpl: window,
-        store: queueStore,
-        queueButton,
-        textarea,
-        attachments,
-        sendChatMessage: submission.sendChatMessage,
-        autoResizeTextarea,
-        updateSendEnabled,
-        queueApi,
-        getLiveEntries,
-      });
+      own(
+        setupSteerQueue({
+          windowImpl: window,
+          store: queueStore,
+          queueButton,
+          textarea,
+          attachments,
+          sendChatMessage: submission.sendChatMessage,
+          autoResizeTextarea,
+          updateSendEnabled,
+          queueApi,
+          getLiveEntries,
+        }),
+      );
     }
 
-    const workerStatus = setupWorkerStatusPolling({
-      windowImpl: window,
-      chatApi: __piChatApi,
-      sessionId,
-      setStatus,
-      setModelLabel,
-      setThinkingLabel,
-      updateContextUsage,
-      getKnownModelLabel: toolbar.getKnownModelLabel,
-      setKnownModelLabel: toolbar.setKnownModelLabel,
-      getKnownThinkingLevel: toolbar.getKnownThinkingLevel,
-      setKnownThinkingLevel: toolbar.setKnownThinkingLevel,
-      getWorkerModelUpdate: () => onWorkerModelUpdate,
-      getStatusText: () => toolbar.statusText,
-      setIntervalImpl: setInterval,
-      CustomEventImpl: CustomEvent,
-    });
+    const workerStatusWindow = {
+      CustomEvent,
+      addEventListener: window.addEventListener.bind(window),
+      removeEventListener: window.removeEventListener.bind(window),
+      dispatchEvent: (event: Event): boolean => !disposed && window.dispatchEvent(event),
+      setInterval: window.setInterval.bind(window),
+      clearInterval: window.clearInterval.bind(window),
+    };
+    const workerStatus = own(
+      setupWorkerStatusPolling({
+        windowImpl: workerStatusWindow,
+        chatApi: __piChatApi,
+        sessionId,
+        setStatus,
+        setModelLabel,
+        setThinkingLabel,
+        updateContextUsage,
+        getKnownModelLabel: toolbar.getKnownModelLabel,
+        setKnownModelLabel: toolbar.setKnownModelLabel,
+        getKnownThinkingLevel: toolbar.getKnownThinkingLevel,
+        setKnownThinkingLevel: toolbar.setKnownThinkingLevel,
+        getWorkerModelUpdate: () => onWorkerModelUpdate,
+        getStatusText: () => toolbar.statusText,
+        setIntervalImpl: setInterval,
+        CustomEventImpl: CustomEvent,
+      }),
+    );
     submission.setRefreshWorkerStatus(workerStatus.refresh);
-    disposables.push(workerStatus.dispose);
 
     // Keep phones compact until the user taps the input; desktop retains its
     // existing ready-to-type autofocus behavior.
@@ -357,11 +417,13 @@ export function runChatComposer({
       textarea.focus();
     }
 
-    const contextPopover = setupContextPopover({
-      documentImpl: document,
-      windowImpl: window,
-      updateContextUsage,
-    });
+    const contextPopover = own(
+      setupContextPopover({
+        documentImpl: document,
+        windowImpl: window,
+        updateContextUsage,
+      }),
+    );
     positionPopover = contextPopover.position;
 
     return true;
@@ -373,6 +435,8 @@ export function runChatComposer({
   let _mentionSelectorApi: { handleKeydown?(event: KeyboardEvent): boolean } | null = null;
 
   function initPiChatControls(): void {
+    if (disposed || initialized) return;
+    initialized = true;
     setupCwdCopy({ documentImpl: document, windowImpl: window });
     if (!setupPiChatComposer()) return;
 
@@ -390,6 +454,7 @@ export function runChatComposer({
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initPiChatControls);
+    disposables.push(() => document.removeEventListener("DOMContentLoaded", initPiChatControls));
   } else {
     initPiChatControls();
   }
@@ -398,7 +463,19 @@ export function runChatComposer({
 
   return {
     dispose: () => {
-      disposables.splice(0).forEach((dispose) => dispose?.());
+      if (disposed) return;
+      disposed = true;
+      disposables
+        .splice(0)
+        .reverse()
+        .forEach((dispose) => dispose());
+      _modelSelectorApi = null;
+      _thinkingSelectorApi = null;
+      _slashSelectorApi = null;
+      _mentionSelectorApi = null;
+      onWorkerModelUpdate = null;
+      positionPopover = () => {};
+      toolbar.updateContextUsage = () => {};
     },
   };
 }

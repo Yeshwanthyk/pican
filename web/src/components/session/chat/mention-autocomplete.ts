@@ -80,7 +80,14 @@ export function renderFileList(
     .join("");
 }
 
-export function setupMentionAutocomplete(options: MentionOptions = {}) {
+export function setupMentionAutocomplete(options: MentionOptions = {}): {
+  handleKeydown(event: KeyboardEvent): boolean;
+  open?(): void;
+  close?(): void;
+  isOpen?(): boolean;
+  refresh?(): void;
+  dispose?(): void;
+} {
   const documentImpl = options.documentImpl ?? document;
   const windowImpl = options.windowImpl ?? window;
   const sessionId = options.sessionId ?? "";
@@ -93,12 +100,13 @@ export function setupMentionAutocomplete(options: MentionOptions = {}) {
   const textarea = documentImpl.querySelector<HTMLTextAreaElement>("#pi-chat-message");
   const popup = documentImpl.querySelector<HTMLElement>("#pi-chat-mention-popup");
   const list = documentImpl.querySelector<HTMLElement>("#pi-chat-mention-list");
-  if (!textarea || !popup || !list) return { handleKeydown: () => false };
+  if (!textarea || !popup || !list) return { handleKeydown: () => false, dispose: () => undefined };
 
   let trigger: AtTrigger | null = null;
   let debounceTimer: TimerToken | null = null;
   let inflight: AbortController | null = null;
   let reqSeq = 0;
+  let disposed = false;
   const isOpen = () => popup.style.display !== "none" && popup.style.display !== "";
   const items = () => list.querySelectorAll<HTMLButtonElement>(".slash-item");
   const setActive = (index: number) => {
@@ -151,17 +159,18 @@ export function setupMentionAutocomplete(options: MentionOptions = {}) {
       ),
       Effect.match({
         onFailure: () => {
-          if (seq !== reqSeq || !isOpen()) return;
+          if (disposed || seq !== reqSeq || !isOpen()) return;
           renderFiles([], false);
         },
         onSuccess: (data) => {
-          if (seq === reqSeq && isOpen()) renderFiles(data.files ?? [], false);
+          if (!disposed && seq === reqSeq && isOpen()) renderFiles(data.files ?? [], false);
         },
       }),
     );
     void runPromise(effect);
   };
   const refresh = () => {
+    if (disposed) return;
     const next = parseAtTrigger(textarea.value, textarea.selectionStart);
     if (!next) {
       if (isOpen()) close();
@@ -211,16 +220,32 @@ export function setupMentionAutocomplete(options: MentionOptions = {}) {
     }
     return false;
   };
-  textarea.addEventListener("input", refresh);
-  list.addEventListener("click", (event) => {
+  const onListClick = (event: MouseEvent): void => {
     const item =
       event.target instanceof Element ? event.target.closest<HTMLElement>(".slash-item") : null;
     if (item) insert(item.dataset.insert ?? "", item.dataset.isdir === "1");
-  });
-  documentImpl.addEventListener("click", (event) => {
+  };
+  const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target;
     if (isOpen() && target instanceof Node && !popup.contains(target) && target !== textarea)
       close();
-  });
-  return { handleKeydown, open, close, isOpen, refresh };
+  };
+  textarea.addEventListener("input", refresh);
+  list.addEventListener("click", onListClick);
+  documentImpl.addEventListener("click", onDocumentClick);
+  return {
+    handleKeydown,
+    open,
+    close,
+    isOpen,
+    refresh,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      textarea.removeEventListener("input", refresh);
+      list.removeEventListener("click", onListClick);
+      documentImpl.removeEventListener("click", onDocumentClick);
+      close();
+    },
+  };
 }

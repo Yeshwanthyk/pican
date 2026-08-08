@@ -328,6 +328,23 @@ describe("setupSteerQueue (server-backed)", () => {
     expect(store.steerCount).toBe(1);
   });
 
+  it("disposes element and window listeners plus store callbacks idempotently", () => {
+    const { queueButton, textarea } = makeDom();
+    const store = new QueueStore();
+    const handle = setupSteerQueue({ store, queueButton, textarea });
+
+    handle.dispose();
+    handle.dispose();
+    type(textarea, "stale");
+    window.dispatchEvent(
+      new CustomEvent("pi-chat-message-sent", { detail: { message: "stale steer" } }),
+    );
+    store.actions.sendNow("missing");
+
+    expect(queueButton?.disabled).toBe(true);
+    expect(store.steerCount).toBe(0);
+  });
+
   it("resume PATCHes paused=false through the api", async () => {
     const { queueButton, textarea } = makeDom();
     const api = makeApi();

@@ -129,7 +129,14 @@ export function renderCommandList(
     .join("");
 }
 
-export function setupSlashCommands(options: SlashOptions = {}) {
+export function setupSlashCommands(options: SlashOptions = {}): {
+  handleKeydown(event: KeyboardEvent): boolean;
+  open?(): void;
+  close?(): void;
+  isOpen?(): boolean;
+  refresh?(): void;
+  dispose?(): void;
+} {
   const documentImpl = options.documentImpl ?? document;
   const sessionId = options.sessionId ?? "";
   const chatApi = options.chatApi;
@@ -137,11 +144,12 @@ export function setupSlashCommands(options: SlashOptions = {}) {
   const textarea = documentImpl.querySelector<HTMLTextAreaElement>("#pi-chat-message");
   const popup = documentImpl.querySelector<HTMLElement>("#pi-chat-slash-popup");
   const list = documentImpl.querySelector<HTMLElement>("#pi-chat-slash-list");
-  if (!textarea || !popup || !list) return { handleKeydown: () => false };
+  if (!textarea || !popup || !list) return { handleKeydown: () => false, dispose: () => undefined };
   let allCommands: SlashCommand[] = [];
   let loaded = false;
   let loading = false;
   let trigger: Trigger | null = null;
+  let disposed = false;
   const isOpen = () => popup.style.display !== "none" && popup.style.display !== "";
   const items = () => list.querySelectorAll<HTMLButtonElement>(".slash-item");
   const setActive = (index: number) => {
@@ -186,14 +194,15 @@ export function setupSlashCommands(options: SlashOptions = {}) {
       ),
       Effect.match({
         onFailure: () => {
-          allCommands = [];
+          if (!disposed) allCommands = [];
         },
         onSuccess: (data) => {
-          allCommands = (data.commands ?? []).filter(isPaletteCommand);
+          if (!disposed) allCommands = (data.commands ?? []).filter(isPaletteCommand);
         },
       }),
       Effect.andThen(
         Effect.sync(() => {
+          if (disposed) return;
           loaded = true;
           loading = false;
           if (isOpen()) render();
@@ -258,16 +267,32 @@ export function setupSlashCommands(options: SlashOptions = {}) {
     }
     return false;
   };
-  textarea.addEventListener("input", refresh);
-  list.addEventListener("click", (event) => {
+  const onListClick = (event: MouseEvent): void => {
     const item =
       event.target instanceof Element ? event.target.closest<HTMLElement>(".slash-item") : null;
     if (item) insert(item.dataset.insert ?? "");
-  });
-  documentImpl.addEventListener("click", (event) => {
+  };
+  const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target;
     if (isOpen() && target instanceof Node && !popup.contains(target) && target !== textarea)
       close();
-  });
-  return { handleKeydown, open, close, isOpen, refresh };
+  };
+  textarea.addEventListener("input", refresh);
+  list.addEventListener("click", onListClick);
+  documentImpl.addEventListener("click", onDocumentClick);
+  return {
+    handleKeydown,
+    open,
+    close,
+    isOpen,
+    refresh,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      textarea.removeEventListener("input", refresh);
+      list.removeEventListener("click", onListClick);
+      documentImpl.removeEventListener("click", onDocumentClick);
+      close();
+    },
+  };
 }
