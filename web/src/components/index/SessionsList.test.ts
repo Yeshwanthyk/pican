@@ -60,15 +60,21 @@ describe("SessionsList compact home", () => {
     ).toEqual(["Pinned", "Now", "Projects"]);
   });
 
-  it("omits the Pinned group when there are 0 pins", () => {
+  it("keeps the Pinned, Now, Projects hierarchy legible in the empty state", () => {
     const { container } = render(SessionsList, {
       props: { sessions: [], projects: [], loading: false, view: "home" },
     });
 
     expect(
-      container.querySelector('.activity-group[data-bucket="pinned"]'),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pinned" })).not.toBeInTheDocument();
+      screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(["Pinned", "Now", "Projects"]);
+    expect(container.querySelector('[data-empty="pinned"]')).toHaveTextContent(
+      "No pinned sessions",
+    );
+    expect(container.querySelector('[data-empty="now"]')).toHaveTextContent(
+      "Nothing running or waiting",
+    );
+    expect(container.querySelector('[data-empty="tracked-projects"]')).toBeInTheDocument();
   });
 
   it.each([1, 8])("renders all %i preview pins in stable pin order", (pinCount) => {

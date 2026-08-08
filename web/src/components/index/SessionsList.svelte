@@ -92,22 +92,27 @@
     </div>
   {:else if isHome}
     <div class="home-feed activity-feed" data-home-feed>
-      {#if pinnedSessions.length > 0}
-        <ActivityGroup
-          id="pinned"
-          title={t('index.pinned')}
-          count={pinnedSessions.length <= PIN_PREVIEW_LIMIT
-            ? sessionsCountLabel(pinnedSessions.length)
-            : ''}
-          actionLabel={pinnedSessions.length > PIN_PREVIEW_LIMIT
-            ? allPinsVisible
-              ? t('index.showFewerPins')
-              : t('index.showAllPins', { count: pinnedSessions.length })
-            : ''}
-          actionExpanded={allPinsVisible}
-          onAction={() => (allPinsVisible = !allPinsVisible)}
-          bucket="pinned"
-        >
+      <ActivityGroup
+        id="pinned"
+        title={t('index.pinned')}
+        count={pinnedSessions.length <= PIN_PREVIEW_LIMIT
+          ? sessionsCountLabel(pinnedSessions.length)
+          : ''}
+        actionLabel={pinnedSessions.length > PIN_PREVIEW_LIMIT
+          ? allPinsVisible
+            ? t('index.showFewerPins')
+            : t('index.showAllPins', { count: pinnedSessions.length })
+          : ''}
+        actionExpanded={allPinsVisible}
+        onAction={() => (allPinsVisible = !allPinsVisible)}
+        bucket="pinned"
+      >
+        {#if pinnedSessions.length === 0}
+          <div class="activity-group-empty" data-empty="pinned">
+            <span>{t('index.noPinnedSessions')}</span>
+            <span class="activity-group-empty-hint">{t('index.noPinnedSessionsHint')}</span>
+          </div>
+        {:else}
           {#each visiblePinnedSessions as session (session.id)}
             <div class="home-feed-session" data-bucket="pinned">
               <SessionCard
@@ -118,17 +123,21 @@
               />
             </div>
           {/each}
-        </ActivityGroup>
-      {/if}
+        {/if}
+      </ActivityGroup>
 
-      {#if nowSessions.length > 0}
-        <ActivityGroup
-          id="now"
-          title={t('index.now')}
-          count={sessionsCountLabel(nowSessions.length)}
-          bucket="now"
-          spaced={pinnedSessions.length > 0}
-        >
+      <ActivityGroup
+        id="now"
+        title={t('index.now')}
+        count={sessionsCountLabel(nowSessions.length)}
+        bucket="now"
+        spaced={true}
+      >
+        {#if nowSessions.length === 0}
+          <div class="activity-group-empty" data-empty="now">
+            <span>{t('index.noActiveSessions')}</span>
+          </div>
+        {:else}
           {#each nowSessions as session (session.id)}
             <div class="home-feed-session" data-bucket="now">
               <SessionCard
@@ -139,16 +148,31 @@
               />
             </div>
           {/each}
-        </ActivityGroup>
-      {/if}
+        {/if}
+      </ActivityGroup>
 
-      {#if trackedProjects.length > 0}
-        <ActivityGroup
-          id="projects"
-          title={t('index.projects')}
-          variant="projects"
-          spaced={pinnedSessions.length > 0 || nowSessions.length > 0}
-        >
+      <ActivityGroup
+        id="projects"
+        title={t('index.projects')}
+        variant="projects"
+        spaced={true}
+      >
+        {#if trackedProjects.length === 0}
+          <div class="empty-state plain-state tracked-projects-empty" data-empty="tracked-projects">
+            <div class="plain-state-line">{t('index.noTrackedProjects')}</div>
+            <div class="plain-state-hint">
+              {t('index.noTrackedProjectsHint')}
+              <a
+                href={withBasePath('/?view=all')}
+                onclick={(event) => handleNavClick(event, '/?view=all')}
+                >{t('index.openAllSessions')}</a
+              >
+            </div>
+            <button class="btn-primary empty-add-project" type="button" onclick={onAddProject}
+              >{t('index.addProject')}</button
+            >
+          </div>
+        {:else}
           {#each projectGroups as group, groupIndex (group.project)}
             <ActivityGroup
               id={`project-${groupIndex}`}
@@ -179,24 +203,9 @@
               {/if}
             </ActivityGroup>
           {/each}
-        </ActivityGroup>
-      {/if}
+        {/if}
+      </ActivityGroup>
     </div>
-    {#if trackedProjects.length === 0}
-      <div class="empty-state plain-state tracked-projects-empty" data-empty="tracked-projects">
-        <div class="plain-state-line">{t('index.noTrackedProjects')}</div>
-        <div class="plain-state-hint">
-          {t('index.noTrackedProjectsHint')}
-          <a
-            href={withBasePath('/?view=all')}
-            onclick={(event) => handleNavClick(event, '/?view=all')}>{t('index.openAllSessions')}</a
-          >
-        </div>
-        <button class="btn-primary empty-add-project" type="button" onclick={onAddProject}
-          >{t('index.addProject')}</button
-        >
-      </div>
-    {/if}
   {:else if sessions.length === 0}
     <div class="empty-state plain-state" data-empty={project ? 'project' : view}>
       <div class="plain-state-line">

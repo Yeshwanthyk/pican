@@ -1611,6 +1611,27 @@ body.modal-sheet-open { overflow: hidden; }
     color: var(--muted);
     font-size: 11.5px;
 }
+.activity-group-empty {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--index-activity-divider);
+    color: var(--muted);
+    font-size: 11px;
+}
+.activity-group-empty > span:first-child {
+    flex: none;
+    white-space: nowrap;
+}
+.activity-group-empty-hint {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-dim);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .tracked-projects-empty { align-items: flex-start; text-align: left; }
 .tracked-projects-empty .plain-state-hint a { color: var(--accent); }
 .empty-add-project { margin-top: 16px; }
