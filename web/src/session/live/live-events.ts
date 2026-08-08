@@ -196,8 +196,7 @@ export async function handleSessionReload({
         }
         return Effect.tryPromise({
           try: () => readJson.call(response),
-          catch: () =>
-            new DecodeError({ url, issue: "session recovery response was not JSON" }),
+          catch: () => new DecodeError({ url, issue: "session recovery response was not JSON" }),
         });
       }),
     ),
@@ -382,9 +381,7 @@ export function wireSessionEvents({
         typeof payload.timestamp !== "string" ||
         !Number.isFinite(Date.parse(payload.timestamp))
       ) {
-        onError(
-          new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }),
-        );
+        onError(new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }));
         return;
       }
       onHeartbeat({ timestamp: payload.timestamp, freshness: "transport-only" });

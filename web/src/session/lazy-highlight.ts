@@ -27,8 +27,7 @@ export function highlightPendingCode(root: ParentNode, highlighter: Highlighter)
           element.removeAttribute("data-highlight-pending");
           element.removeAttribute("data-lang");
         },
-        catch: () =>
-          new DecodeError({ url: "highlight.js", issue: "highlight failed" }),
+        catch: () => new DecodeError({ url: "highlight.js", issue: "highlight failed" }),
       }).pipe(
         // Keep the pending marker so a later render pass can retry this node.
         Effect.catch(() => Effect.void),

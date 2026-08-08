@@ -78,10 +78,7 @@ export interface ToolResultLookupSource {
   readonly toolResultMap?: ReadonlyMap<string, ToolResultLookup>;
 }
 
-function indexToolResult(
-  results: Map<string, ToolResultLookup>,
-  entry: SessionEntry,
-): void {
+function indexToolResult(results: Map<string, ToolResultLookup>, entry: SessionEntry): void {
   if (entry.type !== "message" || entry.message?.role !== "toolResult") return;
   const message = entry.message;
   const toolCallId = message.toolCallId;

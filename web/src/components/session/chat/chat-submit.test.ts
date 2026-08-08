@@ -34,10 +34,12 @@ function createAttachments({
       currentFiles = [];
       currentTextAttachments = [];
     }),
-    restore: vi.fn((value: { readonly files: File[]; readonly textAttachments: TextAttachment[] }) => {
-      currentFiles = value.files.slice();
-      currentTextAttachments = value.textAttachments.slice();
-    }),
+    restore: vi.fn(
+      (value: { readonly files: File[]; readonly textAttachments: TextAttachment[] }) => {
+        currentFiles = value.files.slice();
+        currentTextAttachments = value.textAttachments.slice();
+      },
+    ),
   };
 }
 

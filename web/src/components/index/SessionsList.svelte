@@ -151,12 +151,7 @@
         {/if}
       </ActivityGroup>
 
-      <ActivityGroup
-        id="projects"
-        title={t('index.projects')}
-        variant="projects"
-        spaced={true}
-      >
+      <ActivityGroup id="projects" title={t('index.projects')} variant="projects" spaced={true}>
         {#if trackedProjects.length === 0}
           <div class="empty-state plain-state tracked-projects-empty" data-empty="tracked-projects">
             <div class="plain-state-line">{t('index.noTrackedProjects')}</div>

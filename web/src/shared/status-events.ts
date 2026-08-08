@@ -148,10 +148,7 @@ export function createStatusEvents({
       if (!shouldHandle()) return;
       const heartbeat = parseHeartbeat((event as MessageEvent<string>).data);
       if (heartbeat) onHeartbeat(heartbeat);
-      else
-        onError(
-          new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }),
-        );
+      else onError(new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }));
     });
     eventSource.addEventListener("status-snapshot", (event) => {
       if (!shouldHandle()) return;
