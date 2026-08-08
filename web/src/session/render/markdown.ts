@@ -1,6 +1,12 @@
 export const strictStrikethroughRegex =
   /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
 
+// marked.use() wraps existing tokenizer/renderer hooks rather than replacing
+// them. Reconfiguring the shared live instance on every SPA session switch
+// therefore retains each prior renderer closure and its unmounted session DOM.
+// Each Marked instance has one immutable session-markdown configuration.
+const configuredMarkedInstances = new WeakSet<object>();
+
 export function configureSessionMarkdown({
   marked,
   hljs,
@@ -10,6 +16,8 @@ export function configureSessionMarkdown({
   readonly hljs: HLJSApi | null;
   readonly escapeHtml: (text: unknown) => string;
 }): void {
+  if (configuredMarkedInstances.has(marked)) return;
+  configuredMarkedInstances.add(marked);
   marked.use({
     breaks: true,
     gfm: true,

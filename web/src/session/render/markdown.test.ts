@@ -33,4 +33,14 @@ describe("session markdown", () => {
       'class="hljs"',
     );
   });
+
+  it("configures each Marked instance only once", () => {
+    const instance = new Marked();
+    configureSessionMarkdown({ marked: instance, hljs: null, escapeHtml: String });
+    const configuredRenderer = instance.defaults.renderer;
+
+    configureSessionMarkdown({ marked: instance, hljs: null, escapeHtml: String });
+
+    expect(instance.defaults.renderer).toBe(configuredRenderer);
+  });
 });

@@ -17,7 +17,9 @@ export default defineConfig({
   use: {
     ...devices["Pixel 5"],
     headless: process.env.PICAN_PERF_HEADED !== "1",
-    trace: "retain-on-failure",
+    // Trace snapshots retain historical DOM trees and corrupt the post-GC
+    // DOM/heap slope this project measures. Opt in only for diagnosis.
+    trace: process.env.PICAN_PERF_TRACE === "1" ? "retain-on-failure" : "off",
     video: "off",
     screenshot: "only-on-failure",
   },

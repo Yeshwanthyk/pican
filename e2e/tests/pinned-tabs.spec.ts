@@ -111,7 +111,9 @@ test.describe("pinned session tabs", () => {
       page.on("request", trackTargetRequests);
       const documentIdentity = await page.evaluate(() => {
         const identity = crypto.randomUUID();
-        const markedWindow = window as Window & { __picanPinnedSwitchDocument?: string };
+        const markedWindow = window as Window & {
+          __picanPinnedSwitchDocument?: string;
+        };
         markedWindow.__picanPinnedSwitchDocument = identity;
         return {
           identity,
@@ -276,6 +278,154 @@ test.describe("pinned session tabs", () => {
       rmSync(alphaPath, { force: true });
       rmSync(betaPath, { force: true });
       rmSync(cwd, { force: true, recursive: true });
+    }
+  });
+
+  test("Pixel touch prefetch keeps ten pins on one document with bounded SSE", async ({
+    page,
+    sessionsDir,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "Mobile Chrome", "Pixel 5 acceptance proof");
+
+    await page.addInitScript(() => {
+      localStorage.setItem("pican:v1:session-tabs", "true");
+      localStorage.setItem("pican:v1:right-sidebar-collapsed", "true");
+    });
+    await page.route("**/api/settings", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ settings: { "pican:v1:session-tabs": "true" } }),
+      });
+    });
+
+    const projects = Array.from({ length: 5 }, () => realWorkingDir());
+    const sessionIds = Array.from({ length: 10 }, (_, index) => {
+      const id = uniqueSessionName(testInfo, `pixel-pin-${index}`);
+      const session = buildSession({ cwd: projects[index % projects.length] });
+      writeSession(sessionsDir, id, [
+        ...session.entries,
+        {
+          type: "session_info",
+          timestamp: new Date().toISOString(),
+          name: `Pixel Pin ${index + 1}`,
+        },
+      ]);
+      const path = join(sessionsDir, "--home-user-demo-project--", id);
+      const settledMtime = new Date(Date.now() - 5_000);
+      utimesSync(path, settledMtime, settledMtime);
+      return id;
+    });
+    const sessionPath = (id: string) => join(sessionsDir, "--home-user-demo-project--", id);
+    const curate = (sessionId: string, pinned: boolean) =>
+      page.request.post("/api/pins", { data: { sessionId, pinned } });
+    const isSessionRequest = (rawURL: string, id: string) => {
+      const url = new URL(rawURL);
+      return (
+        url.pathname === "/api/session" &&
+        url.searchParams.get("id") === id &&
+        url.searchParams.get("paginate") === "1"
+      );
+    };
+    type RawMetrics = {
+      process: {
+        sse_clients: number;
+        sse_global_streams: number;
+        sse_session_streams: number;
+      };
+    };
+    const readSse = async () => {
+      const response = await page.request.get("/api/metrics");
+      expect(response.ok()).toBeTruthy();
+      return ((await response.json()) as RawMetrics).process;
+    };
+
+    try {
+      for (const sessionId of sessionIds) {
+        const sessionResponse = await page.request.get(
+          `/api/session?id=${encodeURIComponent(sessionId)}&paginate=1`,
+        );
+        expect(sessionResponse.ok(), await sessionResponse.text()).toBeTruthy();
+        const response = await curate(sessionId, true);
+        expect(response.ok(), await response.text()).toBeTruthy();
+      }
+
+      await page.goto(`/session?id=${encodeURIComponent(sessionIds[0])}`);
+      await expect(page.locator('#messages [id^="entry-"]').first()).toBeAttached();
+      await expect(page.locator(".pinned-chips")).toBeVisible();
+      await expect
+        .poll(async () => {
+          const response = await page.request.get("/api/pins");
+          if (!response.ok()) return 0;
+          const catalog = (await response.json()) as { pins: string[] };
+          return catalog.pins.filter((id) => sessionIds.includes(id)).length;
+        })
+        .toBe(10);
+
+      const exactDraft = "  Pixel draft\nkeeps whitespace  ";
+      await page.locator("#pi-chat-message").evaluate((element, draft) => {
+        const textarea = element as HTMLTextAreaElement;
+        textarea.value = draft;
+        textarea.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+      }, exactDraft);
+      const documentIdentity = await page.evaluate(() => {
+        const identity = crypto.randomUUID();
+        const markedWindow = window as Window & {
+          __pixelPinnedDocument?: string;
+        };
+        markedWindow.__pixelPinnedDocument = identity;
+        return {
+          identity,
+          navigationCount: performance.getEntriesByType("navigation").length,
+        };
+      });
+      const currentDocumentIdentity = () =>
+        page.evaluate(() => {
+          const markedWindow = window as Window & {
+            __pixelPinnedDocument?: string;
+          };
+          return {
+            identity: markedWindow.__pixelPinnedDocument,
+            navigationCount: performance.getEntriesByType("navigation").length,
+          };
+        });
+
+      for (const targetId of [sessionIds[1], sessionIds[0]]) {
+        const requests: string[] = [];
+        const trackRequest = (request: import("@playwright/test").Request) => {
+          if (isSessionRequest(request.url(), targetId)) requests.push(request.url());
+        };
+        page.on("request", trackRequest);
+        const target = page.locator(`.pinned-chip[data-session-id="${targetId}"] > a`);
+        await expect(target).toBeVisible();
+        const prefetched = page.waitForResponse((response) =>
+          isSessionRequest(response.url(), targetId),
+        );
+        await target.dispatchEvent("touchstart");
+        await prefetched;
+        await target.click();
+        await expect(page).toHaveURL(new RegExp(`id=${encodeURIComponent(targetId)}`));
+        await expect(page.locator('#messages [id^="entry-"]').first()).toBeAttached();
+        expect(requests).toHaveLength(1);
+        page.off("request", trackRequest);
+        await expect.poll(async () => (await readSse()).sse_session_streams).toBe(1);
+        const ownership = await readSse();
+        expect(ownership.sse_clients).toBe(
+          ownership.sse_global_streams + ownership.sse_session_streams,
+        );
+        expect(await currentDocumentIdentity()).toEqual(documentIdentity);
+      }
+      await expect(page.locator("#pi-chat-message")).toHaveValue(exactDraft);
+    } finally {
+      for (const sessionId of sessionIds) {
+        await curate(sessionId, false).catch(() => {});
+        rmSync(sessionPath(sessionId), { force: true });
+      }
+      for (const project of projects) rmSync(project, { recursive: true, force: true });
     }
   });
 });
