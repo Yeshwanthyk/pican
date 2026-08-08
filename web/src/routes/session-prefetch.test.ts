@@ -68,7 +68,10 @@ describe("session-prefetch", () => {
     prefetchSession("navigating.jsonl", { fetchImpl });
     const navigation = consumeSessionPrefetch("navigating.jsonl");
     expect(navigation).not.toBe(null);
-    void navigation?.catch(() => undefined);
+    void navigation?.then(
+      () => undefined,
+      () => undefined,
+    );
     for (let index = 0; index < 16; index += 1) {
       prefetchSession(`hover-${index}.jsonl`, { fetchImpl });
     }

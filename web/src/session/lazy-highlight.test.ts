@@ -41,9 +41,7 @@ describe("highlightPendingCode", () => {
     `;
     const highlightAuto = vi
       .fn()
-      .mockImplementationOnce(() => {
-        throw new Error("failed");
-      })
+      .mockReturnValueOnce(null as never)
       .mockReturnValueOnce({ value: "<span>good</span>" });
 
     highlightPendingCode(document.getElementById("scope")!, {

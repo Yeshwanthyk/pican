@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { DecodeError, NetworkError } from "../../lib/errors.js";
 import { runPromise, runSync } from "../../lib/runtime.js";
 import { withBasePath } from "../../shared/base-path.js";
 import {
@@ -172,32 +173,63 @@ export async function handleSessionReload({
   }
   const dataValue = await runPromise(
     Effect.tryPromise({
-      try: async () => {
-        const response = await fetchImpl(withBasePath(url));
-        if (
-          !isUnknownRecord(response) ||
-          response.ok !== true ||
-          typeof response.json !== "function"
-        ) {
-          throw new Error("Session recovery returned an unsuccessful response");
+      try: () => fetchImpl(withBasePath(url)),
+      catch: (cause) => new NetworkError({ cause }),
+    }).pipe(
+      Effect.flatMap((response) => {
+        if (!isUnknownRecord(response) || response.ok !== true) {
+          return Effect.fail(
+            new DecodeError({
+              url,
+              issue: "session recovery returned an unsuccessful response",
+            }),
+          );
         }
-        return response.json();
-      },
-      catch: (cause) => cause,
-    }),
+        const readJson = response.json;
+        if (typeof readJson !== "function") {
+          return Effect.fail(
+            new DecodeError({
+              url,
+              issue: "session recovery returned an unsuccessful response",
+            }),
+          );
+        }
+        return Effect.tryPromise({
+          try: () => readJson.call(response),
+          catch: () =>
+            new DecodeError({ url, issue: "session recovery response was not JSON" }),
+        });
+      }),
+    ),
   );
   if (!shouldApply()) {
     return { entries: [], newCount: 0, stale: true };
   }
   if (!isUnknownRecord(dataValue) || !Array.isArray(dataValue.entries)) {
-    throw new Error("Session recovery response is missing canonical entries");
+    return runPromise(
+      Effect.fail(
+        new DecodeError({
+          url,
+          issue: "session recovery response is missing canonical entries",
+        }),
+      ),
+    );
   }
   const data = dataValue;
   const rawEntries: unknown[] = dataValue.entries;
   const entries: SessionEntry[] = [];
   for (const candidate of rawEntries) {
     const entry = sessionEntryFromUnknown(candidate);
-    if (!entry) throw new Error("Session recovery response contains an invalid entry");
+    if (!entry) {
+      return runPromise(
+        Effect.fail(
+          new DecodeError({
+            url,
+            issue: "session recovery response contains an invalid entry",
+          }),
+        ),
+      );
+    }
     entries.push(entry);
   }
   const isDelta = hasValidAfterCount && data.deltaOk === true;
@@ -350,7 +382,9 @@ export function wireSessionEvents({
         typeof payload.timestamp !== "string" ||
         !Number.isFinite(Date.parse(payload.timestamp))
       ) {
-        onError(new Error("Invalid heartbeat payload"));
+        onError(
+          new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }),
+        );
         return;
       }
       onHeartbeat({ timestamp: payload.timestamp, freshness: "transport-only" });

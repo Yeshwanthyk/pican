@@ -1,4 +1,5 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
+import { DecodeError } from "../lib/errors";
 import { runSync } from "../lib/runtime";
 import { parseStatusEvent } from "../lib/sse";
 import { withBasePath } from "./base-path";
@@ -33,10 +34,11 @@ interface Delta {
   readonly modelProvider: string;
 }
 
-export interface StatusHeartbeat {
-  readonly timestamp: string;
-  readonly freshness: "transport-only";
-}
+const StatusHeartbeatSchema = Schema.Struct({
+  timestamp: Schema.String,
+  freshness: Schema.Literal("transport-only"),
+});
+export type StatusHeartbeat = typeof StatusHeartbeatSchema.Type;
 
 export interface StatusEventsOptions {
   readonly topic?: string;
@@ -57,25 +59,13 @@ export interface StatusEventsOptions {
 
 const parse = (type: string, data: string) => runSync(Effect.option(parseStatusEvent(type, data)));
 
+const decodeStatusHeartbeat = Schema.decodeUnknownOption(
+  Schema.fromJsonString(StatusHeartbeatSchema),
+);
+
 const parseHeartbeat = (data: string): StatusHeartbeat | null => {
-  try {
-    const value: unknown = JSON.parse(data);
-    if (
-      typeof value !== "object" ||
-      value === null ||
-      (value as { freshness?: unknown }).freshness !== "transport-only" ||
-      typeof (value as { timestamp?: unknown }).timestamp !== "string" ||
-      !Number.isFinite(Date.parse((value as { timestamp: string }).timestamp))
-    ) {
-      return null;
-    }
-    return {
-      timestamp: (value as { timestamp: string }).timestamp,
-      freshness: "transport-only",
-    };
-  } catch {
-    return null;
-  }
+  const value = Option.getOrNull(decodeStatusHeartbeat(data));
+  return value && Number.isFinite(Date.parse(value.timestamp)) ? value : null;
 };
 
 export function createStatusEvents({
@@ -158,7 +148,10 @@ export function createStatusEvents({
       if (!shouldHandle()) return;
       const heartbeat = parseHeartbeat((event as MessageEvent<string>).data);
       if (heartbeat) onHeartbeat(heartbeat);
-      else onError(new Error("Invalid heartbeat payload"));
+      else
+        onError(
+          new DecodeError({ url: "/events", issue: "invalid heartbeat payload" }),
+        );
     });
     eventSource.addEventListener("status-snapshot", (event) => {
       if (!shouldHandle()) return;

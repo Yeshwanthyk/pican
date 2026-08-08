@@ -347,20 +347,29 @@ describe("live events", () => {
             new Response(JSON.stringify({ entries: [{ id: "new" }] }), { status: 503 }),
           ),
       }),
-    ).rejects.toThrow("unsuccessful response");
+    ).rejects.toMatchObject({
+      _tag: "DecodeError",
+      issue: "session recovery returned an unsuccessful response",
+    });
     await expect(
       handleSessionReload({
         ...base,
         fetchImpl: () =>
           Promise.resolve(new Response(JSON.stringify({ entries: [{ message: "missing id" }] }))),
       }),
-    ).rejects.toThrow("invalid entry");
+    ).rejects.toMatchObject({
+      _tag: "DecodeError",
+      issue: "session recovery response contains an invalid entry",
+    });
     await expect(
       handleSessionReload({
         ...base,
         fetchImpl: () => Promise.resolve(new Response(JSON.stringify({ name: "missing entries" }))),
       }),
-    ).rejects.toThrow("missing canonical entries");
+    ).rejects.toMatchObject({
+      _tag: "DecodeError",
+      issue: "session recovery response is missing canonical entries",
+    });
 
     expect(onReloaded).not.toHaveBeenCalled();
     expect(clearChatPreview).not.toHaveBeenCalled();
