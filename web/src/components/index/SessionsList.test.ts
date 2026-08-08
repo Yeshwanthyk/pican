@@ -22,7 +22,7 @@ describe("SessionsList compact home", () => {
     expect(container.querySelector(".load-more-btn")).not.toBeInTheDocument();
   });
 
-  it("orders the core Home hierarchy as Pinned, Now, then Projects", () => {
+  it("orders the core Home hierarchy as Pinned then Projects", () => {
     const project = "/Users/example/tracked";
     render(SessionsList, {
       props: {
@@ -34,8 +34,8 @@ describe("SessionsList compact home", () => {
             lastActivity: "2026-07-25T12:00:00Z",
           }),
           normalizeSession({
-            id: "now-session",
-            name: "Now session",
+            id: "untracked-session",
+            name: "Untracked session",
             project: "/Users/example/untracked",
             lastActivity: "2026-07-25T12:01:00Z",
           }),
@@ -49,7 +49,7 @@ describe("SessionsList compact home", () => {
           }),
         ],
         projects: [trackedProject(project)],
-        runningSessionIds: new Set(["now-session"]),
+        runningSessionIds: new Set(["untracked-session"]),
         loading: false,
         view: "home",
       },
@@ -57,22 +57,20 @@ describe("SessionsList compact home", () => {
 
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(["Pinned", "Now", "Projects"]);
+    ).toEqual(["Pinned", "Projects"]);
+    expect(screen.queryByRole("link", { name: "Untracked session" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Pinned, Now, Projects hierarchy legible in the empty state", () => {
+  it("keeps the Pinned and Projects hierarchy legible in the empty state", () => {
     const { container } = render(SessionsList, {
       props: { sessions: [], projects: [], loading: false, view: "home" },
     });
 
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(["Pinned", "Now", "Projects"]);
+    ).toEqual(["Pinned", "Projects"]);
     expect(container.querySelector('[data-empty="pinned"]')).toHaveTextContent(
       "No pinned sessions",
-    );
-    expect(container.querySelector('[data-empty="now"]')).toHaveTextContent(
-      "Nothing running or waiting",
     );
     expect(container.querySelector('[data-empty="tracked-projects"]')).toBeInTheDocument();
   });
@@ -218,7 +216,6 @@ describe("SessionsList compact home", () => {
     const stableRow = container.querySelector<HTMLElement>(
       `[data-project="${project}"] .session-ticker-row`,
     );
-    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBeNull();
     expect(stableRow).toBe(row);
     expect(
       within(stableRow as HTMLElement).getByRole("button", {
@@ -254,7 +251,6 @@ describe("SessionsList compact home", () => {
       ],
     });
 
-    expect(container.querySelector('[data-bucket="now"] .session-ticker-row')).toBeNull();
     expect(container.querySelector(`[data-project="${project}"] .session-ticker-row`)).toBe(row);
   });
 });

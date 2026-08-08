@@ -183,10 +183,9 @@
   }
 
   // Damps the reload storm: a global "reload:<id>" broadcast fires on every
-  // append to any streaming session, indefinitely. A brand-new (unknown) id
-  // still refreshes right away so it appears promptly; a known id only
-  // refreshes at most once per KNOWN_ID_REFRESH_THROTTLE_MS, since all a
-  // known session's reload updates activity/waiting summaries at a bounded rate.
+  // append to any streaming session, indefinitely. Ignore ids outside the
+  // bounded home response; new members arrive through new-session/curation
+  // events. Refresh known rows at a bounded rate for activity/waiting summaries.
   const KNOWN_ID_REFRESH_THROTTLE_MS = 5000;
   let lastKnownIdRefreshAt = 0;
   function handleReload({ id }: { readonly id: string }): void {

@@ -9,6 +9,11 @@ project scope and `tasks-<sessionId>.json` has session scope. Named global
 stores live under `~/.pi/tasks/`. The list endpoint skips malformed JSON files
 so an interrupted or unrelated write cannot break the board.
 
+Task executions may create Pi child sessions named `pi-tasks: <subject>`. The
+shared `/api/sessions` and `/api/projects` catalog boundary excludes these
+extension-managed children, matching subagent-child filtering so implementation
+sessions do not appear as top-level work.
+
 ## HTTP endpoints
 
 | Method | Path | Purpose |

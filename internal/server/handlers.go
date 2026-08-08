@@ -320,7 +320,7 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 // /api/projects. Curation scopes are always applied after these exclusions.
 func (s *Server) mainListSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
 	summaries = s.filterBtwSummaries(summaries)
-	return filterSubagentSummaries(summaries)
+	return filterExtensionChildSummaries(summaries)
 }
 
 func filterArchivedSummaries(summaries []sessions.SessionSummary, archived bool) []sessions.SessionSummary {
@@ -343,29 +343,10 @@ func filterProjectSummaries(summaries []sessions.SessionSummary, project string,
 	return out
 }
 
-func (s *Server) runningIDSnapshot() map[string]bool {
-	s.lastKnownMu.Lock()
-	defer s.lastKnownMu.Unlock()
-	ids := make(map[string]bool, len(s.lastKnown))
-	for id := range s.lastKnown {
-		ids[id] = true
-	}
-	return ids
-}
-
 func (s *Server) homeSummaries(all []sessions.SessionSummary, orderedPins []string) []sessions.SessionSummary {
-	running := s.runningIDSnapshot()
 	tracked, _ := s.trackedProjectSet()
 	added := make(map[string]bool)
 	out := make([]sessions.SessionSummary, 0)
-
-	// Activity sorting is already applied by the caller.
-	for _, summary := range all {
-		if running[summary.ID] || summary.WaitingQuestion != "" {
-			out = append(out, summary)
-			added[summary.ID] = true
-		}
-	}
 
 	byID := make(map[string]sessions.SessionSummary, len(all))
 	for _, summary := range all {
@@ -392,14 +373,22 @@ func (s *Server) homeSummaries(all []sessions.SessionSummary, orderedPins []stri
 	return out
 }
 
-// filterSubagentSummaries drops subagent child sessions (session_info name
-// prefixed "subagent: ") from the main sessions list. They are spawned by
-// other sessions and reviewed in the dedicated /subagents panel, so they only
-// clutter the timeline/project views here.
-func filterSubagentSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
+const taskChildNamePrefix = "pi-tasks: "
+
+func isExtensionChildSession(name string) bool {
+	if _, child := subagentTitleFromSessionName(name); child {
+		return true
+	}
+	return strings.HasPrefix(name, taskChildNamePrefix)
+}
+
+// filterExtensionChildSummaries drops extension-managed child sessions from
+// the main sessions list. They are spawned as implementation details of a
+// parent session, so showing them again clutters timeline and project views.
+func filterExtensionChildSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
 	out := make([]sessions.SessionSummary, 0, len(summaries))
 	for _, sum := range summaries {
-		if strings.HasPrefix(sum.Name, subagentNamePrefix) {
+		if isExtensionChildSession(sum.Name) {
 			continue
 		}
 		out = append(out, sum)

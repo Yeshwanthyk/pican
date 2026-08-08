@@ -146,7 +146,7 @@ func TestReapOrphanedArchives(t *testing.T) {
 	}
 }
 
-func TestHomeIncludesNowPinsAndSixPerTrackedProject(t *testing.T) {
+func TestHomeIncludesPinsAndSixPerTrackedProjectOnly(t *testing.T) {
 	s := newTestServer(t)
 	tracked := t.TempDir()
 	untracked := t.TempDir()
@@ -175,14 +175,16 @@ func TestHomeIncludesNowPinsAndSixPerTrackedProject(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if len(payload.Sessions) != 8 || payload.Total != 8 {
-		t.Fatalf("home size = %d/%d, want 8/8", len(payload.Sessions), payload.Total)
+	if len(payload.Sessions) != 7 || payload.Total != 7 {
+		t.Fatalf("home size = %d/%d, want 7/7", len(payload.Sessions), payload.Total)
 	}
-	if payload.Sessions[0].ID != "running.jsonl" {
-		t.Fatalf("home first = %q, want running Now session", payload.Sessions[0].ID)
+	if payload.Sessions[0].ID != "pinned.jsonl" || !payload.Sessions[0].Pinned {
+		t.Fatalf("home first = %+v, want pinned session", payload.Sessions[0])
 	}
-	if payload.Sessions[1].ID != "pinned.jsonl" || !payload.Sessions[1].Pinned {
-		t.Fatalf("home second = %+v, want pinned session", payload.Sessions[1])
+	for _, summary := range payload.Sessions {
+		if summary.ID == "running.jsonl" {
+			t.Fatal("untracked running session included in home response")
+		}
 	}
 	trackedCount := 0
 	for _, summary := range payload.Sessions {

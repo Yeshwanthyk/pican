@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"pican/internal/sessions"
@@ -127,6 +128,37 @@ func getSessions(t *testing.T, s *Server, url string) (count int, total int) {
 	list, _ := body["sessions"].([]any)
 	totalF, _ := body["total"].(float64)
 	return len(list), int(totalF)
+}
+
+func TestHandleApiSessions_HidesExtensionChildSessions(t *testing.T) {
+	s := newSessionsServer(t)
+	project := "/home/user/project"
+	writeSessionWithCWD(t, filepath.Join(s.sessionsDir, "visible"), "visible.jsonl", project)
+
+	for index, name := range []string{
+		"subagents: current child",
+		"subagent: legacy child",
+		"pi-tasks: Verify cron specialist integration",
+	} {
+		path := writeSessionWithCWD(
+			t,
+			filepath.Join(s.sessionsDir, "child-"+strconv.Itoa(index)),
+			"child.jsonl",
+			project,
+		)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data = []byte(strings.Replace(string(data), `"cwd":`, `"name":`+jsonString(name)+`,"cwd":`, 1))
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if count, total := getSessions(t, s, "/api/sessions?view=all"); count != 1 || total != 1 {
+		t.Fatalf("extension children visible: count=%d total=%d, want 1/1", count, total)
+	}
 }
 
 func TestHandleApiSessions_Pagination(t *testing.T) {

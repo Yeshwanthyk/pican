@@ -15,12 +15,20 @@ import (
 )
 
 const (
-	subagentNamePrefix      = "subagent: "
-	subagentParentWindow    = 7 * 24 * time.Hour
-	subagentMatchWindow     = 5 * time.Minute
-	subagentParentFileLimit = 100
-	subagentResultLimit     = 200
+	subagentNamePrefix       = "subagents: "
+	legacySubagentNamePrefix = "subagent: "
+	subagentParentWindow     = 7 * 24 * time.Hour
+	subagentMatchWindow      = 5 * time.Minute
+	subagentParentFileLimit  = 100
+	subagentResultLimit      = 200
 )
+
+func subagentTitleFromSessionName(name string) (string, bool) {
+	if title, ok := strings.CutPrefix(name, subagentNamePrefix); ok {
+		return title, true
+	}
+	return strings.CutPrefix(name, legacySubagentNamePrefix)
+}
 
 type subagentSummary struct {
 	ID            string `json:"id"`
@@ -373,7 +381,8 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 
 	children := make([]subagentSummary, 0)
 	for _, summary := range summaries {
-		if !strings.HasPrefix(summary.Name, subagentNamePrefix) {
+		title, child := subagentTitleFromSessionName(summary.Name)
+		if !child {
 			continue
 		}
 		path, ok := s.cache.FindPath(summary.Filename)
@@ -387,7 +396,7 @@ func (s *Server) handleApiSubagents(w http.ResponseWriter, r *http.Request) {
 			status = "running"
 		}
 		children = append(children, subagentSummary{
-			Title:        strings.TrimPrefix(summary.Name, subagentNamePrefix),
+			Title:        title,
 			Status:       status,
 			ChildSession: summary.Filename,
 			ChildProject: summary.Project,

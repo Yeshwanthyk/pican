@@ -327,7 +327,7 @@ func TestHandleApiProjects_TrackedAndCountsUseMainUnarchivedSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(childPath, []byte(strings.Replace(string(data), `"cwd":`, `"name":"subagent: child","cwd":`, 1)), 0644); err != nil {
+	if err := os.WriteFile(childPath, []byte(strings.Replace(string(data), `"cwd":`, `"name":"subagents: child","cwd":`, 1)), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.trackProject(project); err != nil {

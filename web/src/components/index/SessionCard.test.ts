@@ -150,12 +150,14 @@ describe("SessionCard compatibility wrapper", () => {
 
     await fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger.closest(".activity-row")).toHaveClass("activity-row--menu-open");
     const menu = screen.getByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: "Pin session" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Archive session" })).toBeInTheDocument();
 
     await fireEvent.click(document.body);
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger.closest(".activity-row")).not.toHaveClass("activity-row--menu-open");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 

@@ -14,7 +14,6 @@ import {
   sessionSearchText,
   stabilizeHomeSessionOrder,
   splitPinnedSessions,
-  splitHomeSessions,
   shouldRefetchOnReload,
   sessionsURL,
 } from "./sessions.js";
@@ -281,76 +280,6 @@ describe("index sessions helpers", () => {
     expect(splitPinnedSessions()).toEqual({ pinned: [], rest: [] });
   });
 
-  it("splits live and waiting into Now and excludes them from pinned and lower groups", () => {
-    const split = splitHomeSessions(
-      [
-        { id: "idle", pinned: false, lastActivity: "2024-01-01T00:00:00Z" },
-        { id: "live", pinned: false, lastActivity: "2024-01-04T00:00:00Z" },
-        {
-          id: "waiting",
-          pinned: false,
-          waitingQuestion: "Ship?",
-          lastActivity: "2024-01-03T00:00:00Z",
-        },
-        { id: "pinned", pinned: true, lastActivity: "2024-01-02T00:00:00Z" },
-      ],
-      new Set(["live", "waiting"]),
-    );
-    expect(split.live.map((session) => session.id)).toEqual(["live"]);
-    expect(split.waiting.map((session) => session.id)).toEqual(["waiting"]);
-    expect(split.pinned.map((session) => session.id)).toEqual(["pinned"]);
-    expect(split.rest.map((session) => session.id)).toEqual(["idle"]);
-  });
-
-  it("keeps pinned sessions in Pinned while they are running or waiting", () => {
-    const split = splitHomeSessions(
-      [
-        {
-          id: "running-pin",
-          pinned: true,
-          pinOrder: 1,
-          lastActivity: "2024-01-04T00:00:00Z",
-        },
-        {
-          id: "waiting-pin",
-          pinned: true,
-          pinOrder: 2,
-          waitingQuestion: "Ship?",
-          lastActivity: "2024-01-03T00:00:00Z",
-        },
-      ],
-      new Set(["running-pin"]),
-    );
-
-    expect(split.live).toEqual([]);
-    expect(split.waiting).toEqual([]);
-    expect(split.pinned.map((session) => session.id)).toEqual(["running-pin", "waiting-pin"]);
-  });
-
-  it("keeps running and waiting sessions inside tracked projects", () => {
-    const split = splitHomeSessions(
-      [
-        {
-          id: "running-tracked",
-          project: "/tracked",
-          lastActivity: "2024-01-04T00:00:00Z",
-        },
-        {
-          id: "waiting-tracked",
-          project: "/tracked",
-          waitingQuestion: "Ship?",
-          lastActivity: "2024-01-03T00:00:00Z",
-        },
-      ],
-      new Set(["running-tracked"]),
-      new Set(["/tracked"]),
-    );
-
-    expect(split.live).toEqual([]);
-    expect(split.waiting).toEqual([]);
-    expect(split.rest.map((session) => session.id)).toEqual(["running-tracked", "waiting-tracked"]);
-  });
-
   it("preserves known home rows across refreshes and prepends genuinely new sessions", () => {
     const previous = [
       { id: "a", lastActivity: "2024-01-01T00:00:00Z" },
@@ -369,12 +298,12 @@ describe("index sessions helpers", () => {
     ]);
   });
 
-  it("damps reload refetches for known sessions but not new ones", () => {
+  it("damps known-session reloads and ignores sessions outside the bounded home", () => {
     const knownIds = new Set(["a", "b"]);
     const base = { knownIds, lastRefreshAt: 1000, throttleMs: 5000 };
-    // Unknown or missing id → always refetch (new session must appear promptly).
-    expect(shouldRefetchOnReload({ ...base, id: "zz", now: 1001 })).toBe(true);
-    expect(shouldRefetchOnReload({ ...base, id: "", now: 1001 })).toBe(true);
+    // Unknown or missing ids do not belong to this bounded home response.
+    expect(shouldRefetchOnReload({ ...base, id: "zz", now: 1001 })).toBe(false);
+    expect(shouldRefetchOnReload({ ...base, id: "", now: 1001 })).toBe(false);
     // Known id inside the throttle window → skip.
     expect(shouldRefetchOnReload({ ...base, id: "a", now: 5999 })).toBe(false);
     // Known id once the window elapses → refetch.

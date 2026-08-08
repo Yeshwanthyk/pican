@@ -14,8 +14,8 @@ standard or first-party documentation that owns them.
 
 Pican should make the phone home screen a compact project switcher with one always-visible pinned
 group, then treat glass as restrained chrome rather than a material applied to every row. The data
-path does not need to be reinvented first: the default home response is already bounded to Now,
-every pin, and at most six other sessions per tracked project, while other views paginate in pages
+path does not need to be reinvented first: the default home response is already bounded to every
+pin and at most six sessions per tracked project, while other views paginate in pages
 of 100 ([frontend architecture](../architecture/frontend.md#sessions-index-),
 [`SessionsPage.svelte`](../../web/src/routes/SessionsPage.svelte#L45-L45),
 [`SessionsPage.svelte`](../../web/src/routes/SessionsPage.svelte#L134-L161)). The first work should
@@ -41,9 +41,10 @@ desktop ([Web Vitals](https://web.dev/articles/vitals)).
 
 - `/` is a Svelte 5 page with Projects as the default scope, plus All Sessions, Archived, and exact
   project views ([frontend architecture](../architecture/frontend.md#sessions-index-)).
-- `view=home` returns every Now/pinned session and at most six remaining sessions for each
-  explicitly tracked project. Pinned order is stable SQLite `pinOrder`, including when a session is
-  running or waiting ([frontend architecture](../architecture/frontend.md#sessions-index-)).
+- `view=home` returns every unarchived pinned session and at most six sessions for each explicitly
+  tracked project. Pinned order is stable SQLite `pinOrder`, including when a session is running or
+  waiting. Unpinned sessions from untracked projects remain available in All Sessions
+  ([frontend architecture](../architecture/frontend.md#sessions-index-)).
 - The page requests 100 sessions for All/Archived/project scopes, adds subsequent pages, and does
   not paginate the already-bounded home response
   ([`SessionsPage.svelte`](../../web/src/routes/SessionsPage.svelte#L45-L45),
@@ -57,10 +58,9 @@ desktop ([Web Vitals](https://web.dev/articles/vitals)).
 This supports a compact home hierarchy without adding another catalog endpoint:
 
 1. **Pinned**: a compact top group, ordered exactly as the server returns it.
-2. **Now**: only active or waiting work not already represented in a tracked-project group.
-3. **Projects**: dense project rows showing project name, active/waiting counts, and a small recent
+2. **Projects**: dense project rows showing project name, active/waiting counts, and a small recent
    session preview; expand one project at a time on phone.
-4. **Search / all sessions**: an explicit secondary path, not the initial phone payload.
+3. **Search / all sessions**: an explicit secondary path, not the initial phone payload.
 
 ### Long transcripts are windowed, but DOM work can still grow
 
@@ -157,9 +157,6 @@ Pican                         Search  +
 Pinned
         task title                    status
         current action · project
-
-Now     2 running · 1 waiting
-        task title                    status
 
 Projects
         project-a                  2 active
@@ -371,7 +368,7 @@ effects. The harness supplies exact event timestamps; observation supplies the w
 2. **Connection proof.** Add offline/background/burst tests, connection-age instrumentation, and a
    bounded server heartbeat experiment. Prove final authoritative equality, not merely that an
    `open` event fired.
-3. **Compact phone home.** Recompose the existing bounded response into Pinned, Now, and Projects;
+3. **Compact phone home.** Recompose the existing bounded response into Pinned and Projects;
    preserve current pin order, project curation, search, and pagination APIs. Compare human tasks
    and lab metrics to baseline.
 4. **Restrained glass.** Apply glass only to chrome, add solid/reduced-transparency fallbacks, and

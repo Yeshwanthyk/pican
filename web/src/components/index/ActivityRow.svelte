@@ -121,6 +121,7 @@
   class="activity-row session-ticker-row"
   class:activity-row--running={running && !waiting}
   class:activity-row--waiting={waiting}
+  class:activity-row--menu-open={mobileMenuOpen}
   class:session-ticker-row--running={running && !waiting}
   class:session-ticker-row--waiting={waiting}
   data-id={session.id}

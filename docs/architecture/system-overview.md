@@ -196,16 +196,16 @@ compatibility, but they do not select projects for the focused home.
 
 `GET /api/sessions` exposes explicit live-app scopes:
 
-- `view=home` returns Now, ordered pins, and at most six recent unarchived
+- `view=home` returns ordered unarchived pins and at most six recent unarchived
   sessions per tracked project;
 - `view=all` returns the paginated unarchived native catalog;
 - `view=archived` returns the paginated locally archived catalog;
 - `project=<path>` returns the complete paginated view for one exact persisted
   project path.
 
-Now includes running and waiting sessions even when their project is untracked.
-Pins also bypass project tracking. Typed command-palette search uses
-`view=all`, so untracked terminal-created sessions remain discoverable.
+Pins bypass project tracking. Running and waiting state changes row styling but
+not home membership. Typed command-palette search uses `view=all`, so untracked
+terminal-created sessions remain discoverable.
 
 Session pins and archive state are pican-owned SQLite curation metadata.
 Archiving never invokes a runtime-native archive API and never deletes or

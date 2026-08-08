@@ -109,13 +109,6 @@ export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession 
   };
 }
 
-export interface HomeSessionSplit<T> {
-  readonly live: T[];
-  readonly waiting: T[];
-  readonly pinned: T[];
-  readonly rest: T[];
-}
-
 export function stabilizeHomeSessionOrder<T extends { readonly id: string }>(
   previous: ReadonlyArray<T>,
   incoming: ReadonlyArray<T>,
@@ -130,32 +123,6 @@ export function stabilizeHomeSessionOrder<T extends { readonly id: string }>(
     return replacement ? [replacement] : [];
   });
   return [...fresh, ...retained];
-}
-
-export function splitHomeSessions<
-  T extends SessionActivity & {
-    readonly id: string;
-    readonly project?: string;
-    readonly pinned?: boolean;
-    readonly waitingQuestion?: string;
-  },
->(
-  sessions: ReadonlyArray<T>,
-  runningIds: ReadonlySet<string>,
-  trackedProjects: ReadonlySet<string> = new Set(),
-): HomeSessionSplit<T> {
-  const live: T[] = [];
-  const waiting: T[] = [];
-  const lower: T[] = [];
-  for (const session of sessions) {
-    if (session.pinned) lower.push(session);
-    else if (trackedProjects.has(session.project || "")) lower.push(session);
-    else if (session.waitingQuestion) waiting.push(session);
-    else if (runningIds.has(session.id)) live.push(session);
-    else lower.push(session);
-  }
-  const { pinned, rest } = splitPinnedSessions(lower);
-  return { live, waiting, pinned, rest };
 }
 
 // splitPinnedSessions separates pinned sessions from the rest, sorting the
@@ -178,11 +145,9 @@ export function splitPinnedSessions<
 
 // shouldRefetchOnReload damps the reload storm: the server broadcasts a
 // global "reload:<id>" for every append to ANY streaming session, but the
-// sessions list only needs to reflect a known session's activity time
-// occasionally, not on every single append. Refetch unconditionally when id
-// is unknown/empty (a brand-new session should appear promptly); otherwise
-// only after throttleMs has elapsed since the last known-id-triggered
-// refetch.
+// bounded home list only needs occasional summary refreshes for sessions it
+// already contains. New home members arrive through new-session/curation
+// events, so reloads for untracked sessions can be ignored.
 export function shouldRefetchOnReload({
   id,
   knownIds,
@@ -196,7 +161,7 @@ export function shouldRefetchOnReload({
   readonly now: number;
   readonly throttleMs: number;
 }): boolean {
-  if (!id || !knownIds.has(id)) return true;
+  if (!id || !knownIds.has(id)) return false;
   return now - lastRefreshAt >= throttleMs;
 }
 

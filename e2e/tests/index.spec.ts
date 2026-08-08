@@ -114,7 +114,7 @@ test.describe("sessions index", () => {
         .getByRole("heading", { level: 2 })
         .evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim()));
       expect(headings).toEqual(
-        ["Pinned", "Now", "Projects"].filter((heading) =>
+        ["Pinned", "Projects"].filter((heading) =>
           headings.includes(heading),
         ),
       );

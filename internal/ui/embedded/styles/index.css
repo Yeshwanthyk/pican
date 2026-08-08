@@ -1849,9 +1849,10 @@ body.modal-sheet-open { overflow: hidden; }
     text-transform: uppercase;
 }
 .rail-heading-button { border: 0; background: transparent; cursor: pointer; }
+.rail-waiting-list { display: grid; gap: 16px; margin-top: 14px; }
+.rail-waiting-item + .rail-waiting-item { padding-top: 16px; border-top: 1px solid var(--dim); }
 .rail-session-title {
     display: block;
-    margin-top: 14px;
     overflow: hidden;
     color: var(--text);
     font-size: 12px;
@@ -1860,7 +1861,7 @@ body.modal-sheet-open { overflow: hidden; }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.rail-question { margin-top: 7px; color: var(--attention); font-size: 12px; line-height: 1.5; }
+.rail-question { margin: 7px 0 0; color: var(--attention); font-size: 12px; line-height: 1.5; }
 .rail-answer-options { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .rail-answer-options button,
 .rail-open-session {
@@ -1939,6 +1940,8 @@ body.modal-sheet-open { overflow: hidden; }
     .activity-row-link { min-height: 60px; padding: 8px 52px 8px 2px; }
     .activity-row-title { font-size: 13.5px; }
     .session-ticker-action--desktop { display: none; }
+    /* Keep the overflow menu above later rows while :active transforms this row into a stacking context. */
+    .activity-row--menu-open { z-index: 14; }
     .session-ticker-mobile-actions {
         position: absolute;
         top: 50%;

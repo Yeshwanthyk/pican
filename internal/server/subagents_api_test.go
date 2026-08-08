@@ -44,6 +44,22 @@ func fetchSubagentsURL(t *testing.T, s *Server, url string) []subagentSummary {
 	return response.Subagents
 }
 
+func TestSubagentTitleFromSessionNameSupportsCurrentAndLegacyPrefixes(t *testing.T) {
+	tests := map[string]string{
+		"subagents: current": "current",
+		"subagent: legacy":   "legacy",
+	}
+	for name, want := range tests {
+		got, ok := subagentTitleFromSessionName(name)
+		if !ok || got != want {
+			t.Fatalf("subagentTitleFromSessionName(%q) = %q, %v; want %q, true", name, got, ok, want)
+		}
+	}
+	if title, ok := subagentTitleFromSessionName("top-level session"); ok {
+		t.Fatalf("top-level session classified as child: %q", title)
+	}
+}
+
 func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
 	s := newTestServer(t, func() time.Time { return time.Date(2026, 7, 17, 13, 0, 0, 0, time.UTC) })
 	parentProject := filepath.Join(t.TempDir(), "parent")
@@ -57,7 +73,7 @@ func TestHandleApiSubagentsMergesParentAndChild(t *testing.T) {
 	)
 	child := fmt.Sprintf(
 		"{\"type\":\"session\",\"id\":\"child-id\",\"timestamp\":\"2026-07-17T12:02:00Z\",\"cwd\":%q}\n"+
-			"{\"type\":\"session_info\",\"timestamp\":\"2026-07-17T12:02:01Z\",\"name\":\"subagent: Review API\"}\n"+
+			"{\"type\":\"session_info\",\"timestamp\":\"2026-07-17T12:02:01Z\",\"name\":\"subagents: Review API\"}\n"+
 			"{\"type\":\"message\",\"timestamp\":\"2026-07-17T12:03:00Z\",\"message\":{\"role\":\"assistant\",\"content\":\"Done\"}}\n",
 		childProject,
 	)

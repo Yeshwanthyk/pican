@@ -8,7 +8,7 @@
     groupTrackedProjectSessions,
     projectDisplayName,
     sessionsCountLabel,
-    splitHomeSessions,
+    splitPinnedSessions,
     type NormalizedSession,
     type RunningStatus,
     type SessionView,
@@ -60,9 +60,7 @@
 
   const isHome = $derived(!project && view === 'home');
   const trackedProjects = $derived(projects.filter((candidate) => candidate.tracked));
-  const trackedProjectPaths = $derived(new Set(trackedProjects.map((candidate) => candidate.path)));
-  const split = $derived(splitHomeSessions(sessions, runningSessionIds, trackedProjectPaths));
-  const nowSessions = $derived([...split.live, ...split.waiting]);
+  const split = $derived(splitPinnedSessions(sessions));
   const pinnedSessions = $derived(split.pinned);
   const visiblePinnedSessions = $derived(
     allPinsVisible ? pinnedSessions : pinnedSessions.slice(0, PIN_PREVIEW_LIMIT),
@@ -115,31 +113,6 @@
         {:else}
           {#each visiblePinnedSessions as session (session.id)}
             <div class="home-feed-session" data-bucket="pinned">
-              <SessionCard
-                {session}
-                running={runningSessionIds.has(session.id)}
-                runningStatus={runningStatuses.get(session.id)}
-                {now}
-              />
-            </div>
-          {/each}
-        {/if}
-      </ActivityGroup>
-
-      <ActivityGroup
-        id="now"
-        title={t('index.now')}
-        count={sessionsCountLabel(nowSessions.length)}
-        bucket="now"
-        spaced={true}
-      >
-        {#if nowSessions.length === 0}
-          <div class="activity-group-empty" data-empty="now">
-            <span>{t('index.noActiveSessions')}</span>
-          </div>
-        {:else}
-          {#each nowSessions as session (session.id)}
-            <div class="home-feed-session" data-bucket="now">
               <SessionCard
                 {session}
                 running={runningSessionIds.has(session.id)}
