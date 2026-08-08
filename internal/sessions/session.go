@@ -385,7 +385,7 @@ func (fs *summaryFoldState) foldToolActivity(timestamp string, msg *summaryMsg) 
 			continue
 		}
 		tool := summaryPendingTool{name: block.Name, startedAt: timestamp}
-		if block.Name == "ask_user_question" || block.Name == "pican_ask_user_question" {
+		if block.Name == "ask_user" || block.Name == "ask_user_question" || block.Name == "pican_ask_user_question" {
 			var args struct {
 				Questions []struct {
 					Question string `json:"question"`

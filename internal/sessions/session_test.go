@@ -375,6 +375,26 @@ func TestLabelSessionEntryAppendsLabelAndClearEntries(t *testing.T) {
 	}
 }
 
+func TestParseSummaryTracksGenericAskUserQuestion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "generic-ask-user.jsonl")
+	content := `{"type":"session","version":3,"id":"sid","timestamp":"2026-05-08T10:00:00Z"}` + "\n" +
+		`{"type":"message","id":"assistant","timestamp":"2026-05-08T10:01:00Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"q1","name":"ask_user","arguments":{"questions":[{"id":"release","question":"Ship this release?","options":[{"label":"Ship"},{"label":"Hold"}]}]}}]}}` + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ParseSummary(path, "--proj--", "generic-ask-user.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CurrentActivity != "ask_user" {
+		t.Fatalf("activity = %q, want ask_user", summary.CurrentActivity)
+	}
+	if summary.WaitingQuestion != "Ship this release?" || strings.Join(summary.WaitingOptions, ",") != "Ship,Hold" {
+		t.Fatalf("waiting summary = %q %#v", summary.WaitingQuestion, summary.WaitingOptions)
+	}
+}
+
 func TestParseSummaryTracksPendingToolAndWaitingQuestion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")
 	content := `{"type":"session","version":3,"id":"sid","timestamp":"2026-05-08T10:00:00Z"}` + "\n" +

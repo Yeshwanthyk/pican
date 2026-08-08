@@ -18,6 +18,7 @@ func readAskQuestionSrc(t *testing.T) string {
 func TestAskUserQuestionToolHasDedicatedRenderer(t *testing.T) {
 	src := readAskQuestionSrc(t)
 	jsChecks := []string{
+		"'ask_user'",
 		"'ask_user_question'",
 		"'pican_ask_user_question'",
 		"<AskQuestion",

@@ -201,6 +201,26 @@ describe("ToolCall", () => {
     expect(opts[0] instanceof HTMLElement ? opts[0].dataset.answer : undefined).toBe("A");
   });
 
+  it("renders the generic ask_user tool as a question card", () => {
+    const call = {
+      id: "generic-question",
+      name: "ask_user",
+      arguments: {
+        questions: [
+          {
+            id: "release",
+            question: "Ship this release?",
+            options: [{ label: "Ship" }, { label: "Hold" }],
+          },
+        ],
+      },
+    };
+    const { container } = render(ToolCall, { props: { call, model: model() } });
+    expect(container.querySelector(".ask-question-card")).not.toBeNull();
+    expect(container.querySelectorAll(".ask-question-option-action")).toHaveLength(2);
+    expect(container.querySelector<HTMLDetailsElement>(".tool-fold")?.open).toBe(true);
+  });
+
   it("marks multi-select questions as needing submit", () => {
     const call = {
       id: "q",

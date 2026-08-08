@@ -108,6 +108,15 @@
   const offset = $derived(typeof args.offset === 'number' ? args.offset : 1);
   const limit = $derived(typeof args.limit === 'number' ? args.limit : null);
   const toolResult = $derived(resultDetails ? { details: resultDetails } : null);
+  const isQuestionTool = $derived(
+    toolName === 'ask_user' ||
+      toolName === 'ask_user_question' ||
+      toolName === 'pican_ask_user_question',
+  );
+  const questionNeedsAttention = $derived(
+    isQuestionTool &&
+      (!result || result?.isError === true || resultDetails?.awaitingChatReply === true),
+  );
 
   // read/write/edit/ls share a file-path arg; compute it once.
   const filePath = $derived(str(args.file_path ?? args.path));
@@ -152,7 +161,7 @@
   class:activity-tool={activity}
   id={resultEntry ? `entry-${resultEntry.id}` : undefined}
 >
-  <details class="tool-fold" open={result?.isError || undefined}>
+  <details class="tool-fold" open={questionNeedsAttention || result?.isError || undefined}>
     <summary class="tool-fold-summary">
       <span class="tool-fold-status {statusClass}" aria-hidden="true"></span>
       <span class="tool-fold-name">{toolName}</span>
@@ -274,7 +283,7 @@
           >
         </div>
         {#if result && resultText.trim()}<ToolOutput text={resultText.trim()} maxLines={20} />{/if}
-      {:else if toolName === 'ask_user_question' || toolName === 'pican_ask_user_question'}
+      {:else if isQuestionTool}
         <AskQuestion {args} {result} />
       {:else if taskTools.has(toolName)}
         <TaskToolCard name={toolName} {args} {resultText} />
