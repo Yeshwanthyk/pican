@@ -76,7 +76,9 @@ function mount(
 describe("SessionContent", () => {
   it("renders the active root→leaf path in order (not off-path branches)", () => {
     const { container } = mount();
-    const ids = [...container.querySelectorAll("#messages-list > div")].map((d) => d.id);
+    const ids = [...container.querySelectorAll("#messages-list > .transcript-render-item")].map(
+      (item) => item.firstElementChild?.id,
+    );
     expect(ids).toEqual(["entry-root", "entry-mid", "entry-leaf"]);
     // 'other' is on a different branch → not rendered
     expect(container.querySelector("#entry-other")).not.toBeInTheDocument();
@@ -86,7 +88,9 @@ describe("SessionContent", () => {
     const { container, model } = mount();
     model.navigateTo("other");
     await Promise.resolve();
-    const ids = [...container.querySelectorAll("#messages-list > div")].map((d) => d.id);
+    const ids = [...container.querySelectorAll("#messages-list > .transcript-render-item")].map(
+      (item) => item.firstElementChild?.id,
+    );
     expect(ids).toEqual(["entry-root", "entry-other"]);
   });
 

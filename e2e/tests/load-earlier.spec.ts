@@ -18,7 +18,13 @@ function buildLargeSession(): unknown[] {
   const ts = (i: number) => new Date(base + i * 1000).toISOString();
 
   const entries: unknown[] = [
-    { type: "session", version: 3, id: "019e0000-0000-7000-8000-000000000000", timestamp: ts(0), cwd },
+    {
+      type: "session",
+      version: 3,
+      id: "019e0000-0000-7000-8000-000000000000",
+      timestamp: ts(0),
+      cwd,
+    },
   ];
 
   let parentId: string | null = null;
@@ -71,7 +77,36 @@ test.describe("load-earlier banner (large session pagination)", () => {
     // The early message is outside the embedded tail, so it is not rendered yet.
     await expect(page.locator("#messages")).not.toContainText(EARLY_MARKER);
 
-    // Click through preceding windows until everything is loaded. The banner
+    // The first retained entry is the scroll anchor. Loading an earlier window
+    // must preserve its viewport position instead of centering it or jumping to
+    // the top; content-visibility estimates are allowed at most 2px drift.
+    await banner.scrollIntoViewIfNeeded();
+    const initialAnchor = page.locator('#messages [id^="entry-"]').first();
+    const anchorId = await initialAnchor.getAttribute("id");
+    expect(anchorId).toBeTruthy();
+    const anchor = page.locator(`#${anchorId}`);
+    const anchorTop = await anchor.evaluate((element) => element.getBoundingClientRect().top);
+    await banner.getByRole("button").click();
+    await page.waitForFunction(
+      () => {
+        const current = document.querySelector("#load-earlier-banner");
+        const button = current?.querySelector("button");
+        return !current || (button != null && !(button as HTMLButtonElement).disabled);
+      },
+      { timeout: WINDOW_TIMEOUT },
+    );
+    await expect
+      .poll(
+        () =>
+          anchor.evaluate(
+            (element, previousTop) => Math.abs(element.getBoundingClientRect().top - previousTop),
+            anchorTop,
+          ),
+        { timeout: WINDOW_TIMEOUT },
+      )
+      .toBeLessThanOrEqual(2);
+
+    // Click through the remaining windows until everything is loaded. The banner
     // re-enables its button between windows and removes itself once `from`
     // reaches 0 (LoadEarlier.svelte). Playwright's click() auto-waits for the
     // enabled state, so we don't assert it separately. We deliberately avoid a
@@ -81,7 +116,7 @@ test.describe("load-earlier banner (large session pagination)", () => {
     // below is best-effort; only the final state (banner gone + earliest message
     // rendered) is asserted, via auto-retrying locator assertions that absorb
     // that jam.
-    for (let i = 0; i < 6 && (await banner.count()) > 0; i += 1) {
+    for (let i = 0; i < 5 && (await banner.count()) > 0; i += 1) {
       await banner.getByRole("button").click();
       // Wait for this window to settle (button re-enabled or banner detached)
       // so the next iteration targets a ready control. Non-fatal — the final

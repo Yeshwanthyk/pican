@@ -69,31 +69,33 @@
   });
 </script>
 
-<div id="messages-list" class="messages-list" bind:this={containerEl}>
+<div id="messages-list" class="messages-list" data-session-id={sessionId} bind:this={containerEl}>
   {#each renderItems as item, itemIndex (renderItemKey(item, itemIndex))}
-    {#if item.kind === 'group'}
-      <ActivityFold
-        entries={item.entries}
-        {model}
-        toolCount={item.toolCount}
-        durationSeconds={item.durationSeconds}
-        hasEdits={item.hasEdits}
-        status={item.status}
-        startedAt={item.startedAt}
-        {live}
-        {sessionId}
-      />
-    {:else}
-      <SessionEntry
-        entry={item.entry}
-        {model}
-        {live}
-        {modelLabel}
-        {sessionId}
-        {canFork}
-        {copyText}
-      />
-    {/if}
+    <div class="transcript-render-item" data-render-kind={item.kind}>
+      {#if item.kind === 'group'}
+        <ActivityFold
+          entries={item.entries}
+          {model}
+          toolCount={item.toolCount}
+          durationSeconds={item.durationSeconds}
+          hasEdits={item.hasEdits}
+          status={item.status}
+          startedAt={item.startedAt}
+          {live}
+          {sessionId}
+        />
+      {:else}
+        <SessionEntry
+          entry={item.entry}
+          {model}
+          {live}
+          {modelLabel}
+          {sessionId}
+          {canFork}
+          {copyText}
+        />
+      {/if}
+    </div>
   {/each}
   {#if model.workerStatus?.state === 'error'}
     <div class="plain-state plain-state--worker-down" role="status" aria-live="polite">
