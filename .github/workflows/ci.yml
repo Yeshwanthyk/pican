@@ -130,6 +130,21 @@ jobs:
         working-directory: e2e
         run: npx playwright test
 
+      - name: Record performance samples
+        env:
+          PICAN_PERF_REPETITIONS: '5'
+          PICAN_PERF_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: make e2e-perf-record
+
+      - name: Upload performance samples
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: e2e/perf-results
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Playwright report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7

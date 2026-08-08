@@ -204,6 +204,12 @@ bounded-home, long-transcript/Load Earlier plus a 100-entry retained-state appen
 offline-to-online exact-once catch-up check. That last check is not a general recovery, crash,
 replay, or data-loss scenario suite; no additional recovery scenario is claimed here.
 
+The Linux E2E CI job records five cold samples after the cross-browser suite and uploads
+`e2e/perf-results` as `performance-results-<run>-<attempt>` for 14 days, even when another step
+fails. The artifact is raw checked input for a later compatible comparison; CI does not declare it
+an accepted baseline. Download baseline and candidate artifacts into separate directories before
+using `make e2e-perf-compare`.
+
 The record target starts a fresh Playwright process, global setup, server, and temporary session
 directory for every repetition. This prevents tracked projects, pins, generated sessions, and
 other server state from leaking into the next sample. Do **not** replace that loop with
