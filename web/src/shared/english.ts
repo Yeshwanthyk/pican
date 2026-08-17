@@ -382,6 +382,7 @@ export default {
   "session.dockOpenAll": "open all →",
   "session.dockActive": "{count} active",
   "session.dockReady": "{count} done",
+  "session.dockMoreAgents": "+{count} more",
 
   "session.done": "done",
   "session.failed": "failed",

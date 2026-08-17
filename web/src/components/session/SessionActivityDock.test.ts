@@ -149,7 +149,7 @@ it("skips the tasks fetch when no project path is known", async () => {
   expect(dock).not.toHaveTextContent("Tasks");
 });
 
-it("counts each status chip exactly once", async () => {
+it("shows only running subagents in the live dock", async () => {
   const doneSubagent = {
     ...runningSubagent,
     id: "sa-002",
@@ -171,15 +171,30 @@ it("counts each status chip exactly once", async () => {
   const dock = container.querySelector("[data-session-activity-dock]");
   await waitFor(() => expect(dock).not.toHaveAttribute("hidden"));
 
-  // Exactly one chip per status — guards against duplicate chips slipping in.
+  // Settled agents belong to /subagents history, not the live activity dock.
   expect(container.querySelectorAll('[data-count="running"]').length).toBe(1);
-  expect(container.querySelectorAll('[data-count="done"]').length).toBe(1);
-  expect(container.querySelectorAll('[data-count="failed"]').length).toBe(1);
-  expect(container.querySelectorAll(".session-dock-count--done").length).toBe(1);
-
-  // Each status appears exactly once in the ribbon text; "1 done" is not doubled.
   expect(dock).toHaveTextContent("1 running");
-  expect(dock).toHaveTextContent("1 failed");
-  expect(dock?.textContent?.match(/1 done/g)?.length).toBe(1);
-  expect(dock).not.toHaveTextContent("2 done");
+  expect(dock).not.toHaveTextContent("Green build");
+  expect(dock).not.toHaveTextContent("Broken deploy");
+  expect(dock).not.toHaveTextContent("done");
+  expect(dock).not.toHaveTextContent("failed");
+});
+
+it("bounds the live agent list and exposes overflow", async () => {
+  const subagents = Array.from({ length: 5 }, (_, index) => ({
+    ...runningSubagent,
+    id: `sa-${index}`,
+    title: `Running agent ${index}`,
+  }));
+  stubFetch(subagents, []);
+  const { container } = render(SessionActivityDock, {
+    props: { sessionId: "parent.jsonl", projectPath: "/repo" },
+  });
+
+  const dock = container.querySelector("[data-session-activity-dock]");
+  await waitFor(() => expect(dock).not.toHaveAttribute("hidden"));
+
+  expect(container.querySelectorAll(".session-dock-agent")).toHaveLength(4);
+  expect(dock).toHaveTextContent("5 running");
+  expect(dock).toHaveTextContent("+1 more");
 });

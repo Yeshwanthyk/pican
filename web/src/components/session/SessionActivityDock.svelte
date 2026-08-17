@@ -36,7 +36,11 @@
   // already recency-ordered by the server, but sorting here keeps the dock
   // deterministic regardless of store order) and capped at five rows.
   const MAX_TASKS = 5;
+  const MAX_VISIBLE_AGENTS = 4;
   const agents = $derived(orderSubagents(subagents));
+  const runningAgents = $derived(agents.filter((agent) => agent.status === 'running'));
+  const visibleAgents = $derived(runningAgents.slice(0, MAX_VISIBLE_AGENTS));
+  const hiddenAgentCount = $derived(Math.max(0, runningAgents.length - visibleAgents.length));
   const dockTasks = $derived.by(() =>
     [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, MAX_TASKS),
   );
@@ -46,9 +50,7 @@
     dockTasks.find((task) => task.status === 'in_progress' || task.status === 'pending') ?? null,
   );
 
-  const runningCount = $derived(agents.filter((agent) => agent.status === 'running').length);
-  const doneCount = $derived(agents.filter((agent) => agent.status === 'done').length);
-  const failedCount = $derived(agents.filter((agent) => agent.status === 'error').length);
+  const runningCount = $derived(runningAgents.length);
   // Counts over the FULL task list — the rendered rows are capped at MAX_TASKS,
   // so deriving the ribbon numbers from dockTasks would undercount beyond it.
   const activeTaskCount = $derived(
@@ -56,7 +58,7 @@
   );
   const doneTaskCount = $derived(tasks.filter((task) => task.status === 'completed').length);
 
-  const hasAgents = $derived(agents.length > 0);
+  const hasAgents = $derived(runningAgents.length > 0);
   const hasTasks = $derived(dockTasks.length > 0);
   // View-only sessions get no live activity dock; empty state collapses to 0.
   const visible = $derived(chatAvailable && (hasAgents || hasTasks));
@@ -165,16 +167,9 @@
               {t('subagents.summary.running', { count: runningCount })}</span
             >
           {/if}
-          {#if doneCount > 0}
-            <span class="session-dock-count session-dock-count--done" data-count="done"
-              ><span class="session-dock-count-mark" aria-hidden="true">✓</span>
-              {t('subagents.summary.done', { count: doneCount })}</span
-            >
-          {/if}
-          {#if failedCount > 0}
-            <span class="session-dock-count session-dock-count--failed" data-count="failed"
-              ><span class="session-dock-count-mark" aria-hidden="true">✕</span>
-              {t('subagents.summary.failed', { count: failedCount })}</span
+          {#if hiddenAgentCount > 0}
+            <span class="session-dock-count session-dock-count--more"
+              >{t('session.dockMoreAgents', { count: hiddenAgentCount })}</span
             >
           {/if}
         </span>
@@ -185,15 +180,9 @@
         >
       </header>
       <div class="session-dock-agent-list" role="list">
-        {#each agents as subagent (`${subagent.parentSession}:${subagent.id}:${subagent.childSession}`)}
+        {#each visibleAgents as subagent (`${subagent.parentSession}:${subagent.id}:${subagent.childSession}`)}
           {@const href = subagentHref(subagent)}
-          <div
-            class="session-dock-agent"
-            role="listitem"
-            data-status={subagent.status}
-            class:session-dock-agent--settled={subagent.status === 'done' ||
-              subagent.status === 'error'}
-          >
+          <div class="session-dock-agent" role="listitem" data-status={subagent.status}>
             {#if href}
               <a
                 class="session-dock-agent-link"

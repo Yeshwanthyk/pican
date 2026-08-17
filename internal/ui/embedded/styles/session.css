@@ -7550,6 +7550,10 @@ html body .mobile-command-backdrop,
   color: var(--danger, var(--red));
 }
 
+.session-dock-count--more {
+  color: var(--muted);
+}
+
 .session-dock-count--active {
   color: var(--accent);
 }
@@ -7598,10 +7602,6 @@ a.session-dock-agent-link:hover {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
-.session-dock-agent--settled {
-  opacity: 0.72;
-}
-
 .session-dock-agent-dot {
   flex: 0 0 auto;
   width: 7px;
@@ -7613,18 +7613,6 @@ a.session-dock-agent-link:hover {
 .session-dock-agent-dot[data-status='running'] {
   background: var(--accent);
   animation: dock-pulse 1.6s ease-in-out infinite;
-}
-
-.session-dock-agent-dot[data-status='done'] {
-  background: var(--success);
-}
-
-.session-dock-agent-dot[data-status='error'] {
-  background: var(--danger, var(--red));
-}
-
-.session-dock-agent-dot[data-status='unknown'] {
-  background: var(--muted);
 }
 
 .session-dock-agent-title {
@@ -7807,7 +7795,22 @@ a.session-dock-agent-link:hover {
   }
 
   .session-dock-agents-panel .session-dock-panel-head {
-    display: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 3px 9px;
+    border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 62%, var(--body-bg));
+  }
+
+  .session-dock-agents-panel .session-dock-panel-title {
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  .session-dock-agents-panel .session-dock-open-all {
+    color: var(--accent);
   }
 
   .session-dock-agent-list {
@@ -7829,9 +7832,13 @@ a.session-dock-agent-link:hover {
 
   .session-dock-agent-id,
   .session-dock-agent-project,
-  .session-dock-agent-elapsed,
   .session-dock-agent-open {
     display: none;
+  }
+
+  .session-dock-agent-elapsed {
+    display: inline;
+    color: var(--muted);
   }
 
   .session-dock-tasks-panel {
