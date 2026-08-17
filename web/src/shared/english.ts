@@ -290,6 +290,10 @@ export default {
   "subagents.untitled": "Untitled subagent",
   "subagents.spawned": "Spawned {time}",
   "subagents.active": "Active {time}",
+  "subagents.summary.running": "{count} running",
+  "subagents.summary.done": "{count} done",
+  "subagents.summary.failed": "{count} failed",
+  "subagents.summary.unknown": "{count} unknown",
   "subagents.transcript": "Transcript",
   "subagents.parent": "Parent",
   "subagents.status.running": "Running",
@@ -371,6 +375,14 @@ export default {
   "session.inProgress": "in progress",
   "session.running": "running",
   "session.completed": "completed",
+
+  // ── Session activity dock ──
+  "session.dockAgents": "Agents",
+  "session.dockTasks": "Tasks",
+  "session.dockOpenAll": "open all →",
+  "session.dockActive": "{count} active",
+  "session.dockReady": "{count} done",
+
   "session.done": "done",
   "session.failed": "failed",
   "session.error": "error",

@@ -1219,6 +1219,35 @@ body.right-sidebar-expanded .right-sidebar {
   gap: 8px;
   flex-shrink: 0;
 }
+.session-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.session-header-parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--dim));
+  border-radius: 999px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.session-header-parent:hover,
+.session-header-parent:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  text-decoration: none;
+}
+
+.session-header-parent-label {
+  white-space: nowrap;
+}
 
 .session-header-back {
   display: inline-flex;
@@ -1262,6 +1291,20 @@ button.session-header-back {
   font-weight: 560;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.session-header-title--route {
+  gap: 8px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--dim) 56%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 38%, transparent);
+}
+
+.session-header-route-mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--accent);
 }
 
 button.session-header-title {
@@ -3597,6 +3640,11 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     gap: 0;
   }
 
+  .session-header-bar--child-session .session-header-left {
+    width: 80px;
+    gap: 2px;
+  }
+
   .session-header-back,
   .session-header-actions {
     width: 44px;
@@ -3606,6 +3654,18 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 
   .session-header-back-label,
   .session-header-tree-toggle {
+    display: none;
+  }
+
+  .session-header-bar--child-session .session-header-parent {
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+    padding: 0;
+    border-radius: 7px;
+  }
+
+  .session-header-bar--child-session .session-header-parent-label {
     display: none;
   }
 
@@ -3637,9 +3697,32 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     padding: 3px 2px;
   }
 
+  .session-header-title--route {
+    padding: 3px 2px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .session-header-bar--child-session .session-header-title {
+    padding: 3px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .session-header-bar--child-session .session-header-title:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 5px;
+  }
+
   .session-header-runtime {
     width: 20px;
     height: 20px;
+    border: 1px solid color-mix(in srgb, var(--dim) 75%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--surface-2) 65%, transparent);
   }
 
   .session-header-runtime-mark {
@@ -4428,7 +4511,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     align-items: center;
     overflow: hidden;
     color: var(--muted);
-    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    background: color-mix(in srgb, var(--surface) 52%, transparent);
     border: 1px solid color-mix(in srgb, var(--dim) 80%, transparent);
     border-radius: 9px;
     box-sizing: border-box;
@@ -4442,8 +4525,9 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     min-width: 136px;
     flex: 1 1 136px;
     color: var(--text);
-    background: var(--surface-2);
-    border-color: var(--dim);
+    background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--dim));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--body-bg) 24%, transparent);
   }
 
   .pinned-chip--guest {
@@ -4585,7 +4669,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     padding: 0;
     color: var(--muted);
     background: transparent;
-    border: 1px solid transparent;
+    border: 1px solid color-mix(in srgb, var(--dim) 55%, transparent);
     border-radius: 9px;
     cursor: pointer;
   }
@@ -7360,5 +7444,428 @@ html body .mobile-command-backdrop,
   :where(button, a[href], input, textarea, select, summary, [role="button"], [role="menuitem"], [role="treeitem"], [tabindex]):focus-visible {
     outline-color: Highlight !important;
     forced-color-adjust: auto;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Session activity dock — Agents + Tasks strip pinned above the composer.
+   Two compact panels (desktop) collapsing to one horizontally scrollable
+   pill strip (≤900px). Owned by SessionActivityDock.svelte. The dock sits
+   between #content and the composer and shares the reading column width —
+   the 14px side padding cancels the composer's own so the panel cards align
+   with .pi-chat-shell. */
+.session-activity-dock {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: calc(760px + 28px);
+  margin: 0 auto;
+  padding: 8px 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-activity-dock[hidden] {
+  display: none;
+}
+
+.session-dock-panel {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 62%, var(--body-bg));
+  padding: 6px 8px 8px;
+}
+
+.session-dock-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1px 2px 5px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session-dock-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.session-dock-panel-title > span {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.session-dock-counts {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.session-dock-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.session-dock-count-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dock-pulse 1.6s ease-in-out infinite;
+}
+
+.session-dock-count-mark {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.session-dock-count--running {
+  color: var(--accent);
+}
+
+.session-dock-count--done {
+  color: var(--success);
+}
+
+.session-dock-count--failed {
+  color: var(--danger, var(--red));
+}
+
+.session-dock-count--active {
+  color: var(--accent);
+}
+
+.session-dock-open-all {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.session-dock-open-all:hover,
+.session-dock-open-all:focus-visible {
+  color: var(--accent);
+}
+
+/* Agents rows — compact Cursor-style lines with a live status dot. */
+.session-dock-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-dock-agent-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 3px 5px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 11px;
+  line-height: 1.4;
+  transition: background 0.15s ease;
+}
+
+a.session-dock-agent-link:hover {
+  background: var(--surface-2);
+}
+
+.session-dock-agent-link:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);
+}
+
+.session-dock-agent--settled {
+  opacity: 0.72;
+}
+
+.session-dock-agent-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.session-dock-agent-dot[data-status='running'] {
+  background: var(--accent);
+  animation: dock-pulse 1.6s ease-in-out infinite;
+}
+
+.session-dock-agent-dot[data-status='done'] {
+  background: var(--success);
+}
+
+.session-dock-agent-dot[data-status='error'] {
+  background: var(--danger, var(--red));
+}
+
+.session-dock-agent-dot[data-status='unknown'] {
+  background: var(--muted);
+}
+
+.session-dock-agent-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-dock-agent-id,
+.session-dock-agent-project {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-family: var(--font-code);
+}
+
+.session-dock-agent-project {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-dock-agent-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.session-dock-agent-elapsed {
+  color: var(--text-soft);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.session-dock-agent-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 5px;
+  color: var(--accent);
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.session-dock-agent:hover .session-dock-agent-open,
+.session-dock-agent:focus-within .session-dock-agent-open {
+  opacity: 1;
+}
+
+.session-dock-agent-static {
+  cursor: default;
+}
+
+/* Tasks rows — tiny #id rows with status chips. */
+.session-dock-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-dock-task {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.session-dock-task-id {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-family: var(--font-code);
+}
+
+.session-dock-task-chip {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--dim) 80%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.session-dock-task[data-status='in_progress'] .session-dock-task-chip {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  color: var(--accent);
+}
+
+.session-dock-task[data-status='pending'] .session-dock-task-chip {
+  border-color: color-mix(in srgb, var(--dim) 80%, transparent);
+  color: var(--text-soft);
+}
+
+.session-dock-task[data-status='failed'] .session-dock-task-chip {
+  border-color: color-mix(in srgb, var(--danger, var(--red)) 70%, transparent);
+  color: var(--danger, var(--red));
+}
+
+.session-dock-task-subject {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-dock-task--done {
+  opacity: 0.72;
+}
+
+.session-dock-task--done .session-dock-task-subject {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* Mobile-only single pill carrying the freshest active task. */
+.session-dock-task-pill {
+  display: none;
+}
+
+@keyframes dock-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-dock-agent-dot[data-status='running'],
+  .session-dock-count-dot {
+    animation: none !important;
+  }
+}
+
+/* ≤900px (pican's mobile breakpoint): collapse to one horizontally
+   scrollable strip. Agent rows become pills; tasks collapse to a single
+   pill for the first active task. No extra top/bottom margin on mobile. */
+@media (max-width: 900px) {
+  .session-activity-dock {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0 12px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .session-dock-panel {
+    max-width: none;
+    margin: 0;
+  }
+
+  .session-dock-agents-panel {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .session-dock-agents-panel .session-dock-panel-head {
+    display: none;
+  }
+
+  .session-dock-agent-list {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .session-dock-agent {
+    flex: 0 0 auto;
+  }
+
+  .session-dock-agent-link {
+    padding: 3px 10px 3px 7px;
+    border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 62%, var(--body-bg));
+    font-size: 11px;
+  }
+
+  .session-dock-agent-id,
+  .session-dock-agent-project,
+  .session-dock-agent-elapsed,
+  .session-dock-agent-open {
+    display: none;
+  }
+
+  .session-dock-tasks-panel {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .session-dock-tasks-panel .session-dock-panel-head,
+  .session-dock-task-list {
+    display: none;
+  }
+
+  .session-dock-task-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 220px;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 62%, var(--body-bg));
+    color: var(--text);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-dock-task-pill-id {
+    flex: 0 0 auto;
+    color: var(--accent);
+    font-family: var(--font-code);
+    font-size: 10px;
   }
 }

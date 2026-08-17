@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pican subagents — Cursor-style redesign mock</title>
+<style>
+  /* pican design tokens (dark "Obsidian/Carbon" default) */
+  :root {
+    --body-bg: #111116; --surface: #15151b; --surface-2: #191920;
+    --text: #e6e7eb; --text-soft: #b7bbc4; --muted: #858a96; --dim: #292a33;
+    --accent: #9cc7c0; --attention: #d8b45a; --success: #b5bd68;
+    --danger: #ef767a;
+    --font: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
+            'DejaVu Sans Mono', monospace;
+    --header-h: 52px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--body-bg); }
+  body {
+    font-family: var(--font); font-size: 12px; line-height: 1.5;
+    color: var(--text-soft); background: var(--body-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- app shell ---- */
+  .header {
+    position: fixed; inset: 0 0 auto 0; height: var(--header-h); z-index: 20;
+    display: flex; align-items: center; gap: 12px; padding: 0 18px;
+    background: color-mix(in srgb, var(--body-bg) 88%, #000);
+    border-bottom: 1px solid var(--dim);
+  }
+  .header .back {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; border: 0; color: var(--text-soft);
+    font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .header .back:hover, .header .back:focus-visible { color: var(--text); }
+  .header h1 {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-size: 12px; font-weight: 650; color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .header .mode {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--muted);
+  }
+  .mode label {
+    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+    padding: 3px 8px; border: 1px solid var(--dim); border-radius: 999px;
+  }
+  .mode input { accent-color: var(--accent); }
+  .mode label.cur { border-color: color-mix(in srgb, var(--accent) 60%, var(--dim)); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+  .page {
+    max-width: 1080px; margin: 0 auto;
+    padding: calc(var(--header-h) + 24px) 20px 80px;
+  }
+
+  /* ---- summary ribbon (new) ---- */
+  .summary {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 0 2px 18px; padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--dim) 82%, transparent);
+    border-radius: 9px; background: color-mix(in srgb, var(--surface) 62%, transparent);
+    font-size: 11px; color: var(--muted);
+  }
+  .summary .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .summary .running { color: var(--accent); }
+  .summary .running .dot { background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+  .summary .done { color: var(--success); }
+  .summary .done .dot { background: var(--success); }
+  .summary .failed { color: var(--danger); }
+  .summary .failed .dot { background: var(--danger); }
+  .summary b { color: var(--text-soft); font-weight: 600; }
+
+  /* ---- cards (new) ---- */
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    display: flex; align-items: center; gap: 14px; min-width: 0;
+    padding: 13px 16px; border-radius: 10px; text-decoration: none; color: inherit;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--dim) 82%, transparent);
+    transition: background .2s cubic-bezier(.4,0,.2,1), border-color .2s,
+                transform .2s cubic-bezier(.4,0,.2,1), box-shadow .2s;
+  }
+  .card:hover, .card:focus-visible {
+    outline: none; background: var(--surface-2);
+    border-color: color-mix(in srgb, var(--muted) 55%, var(--dim));
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,.35);
+  }
+  .card .marker { flex: 0 0 auto; width: 20px; text-align: center; font-size: 12px; color: var(--muted); }
+  .card.running { border-color: color-mix(in srgb, var(--accent) 45%, var(--dim)); }
+  .card.running .marker { color: var(--accent); }
+  .card.running .marker .dot {
+    width: 8px; height: 8px; margin: 0 auto; border-radius: 50%;
+    background: var(--accent); animation: pulse 1.5s ease-in-out infinite;
+  }
+  .card.done .marker { color: var(--success); }
+  .card.error .marker { color: var(--danger); }
+  .card.error { border-color: color-mix(in srgb, var(--danger) 40%, var(--dim)); }
+  .card.unknown .marker { color: var(--muted); }
+  .card.done, .card.unknown { opacity: .82; }
+  .card.done:hover, .card.unknown:hover { opacity: 1; }
+
+  .card-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .card-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .chip {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 7px; border: 1px solid var(--dim); border-radius: 999px;
+    color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4;
+  }
+  .chip.running { border-color: color-mix(in srgb, var(--accent) 70%, transparent); color: var(--accent); }
+  .chip.running .pdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 1.5s ease-in-out infinite; }
+  .chip.done { border-color: color-mix(in srgb, var(--success) 70%, transparent); color: var(--success); }
+  .chip.error { border-color: color-mix(in srgb, var(--danger) 70%, transparent); color: var(--danger); }
+  .card .title {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text); font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .card .id { flex: 0 0 auto; color: var(--muted); font-size: 11px; }
+  .card .meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .card .project {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--muted); font-size: 11px;
+  }
+  .harness {
+    flex: 0 0 auto; padding: 1px 6px; border: 1px solid var(--dim);
+    border-radius: 999px; color: var(--muted); font-size: 10px;
+  }
+  .card .times { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .card .times .active { color: var(--text-soft); }
+  .card .open {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 6px; color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    opacity: 0; transition: opacity .15s, background .15s;
+  }
+  .card:hover .open, .card:focus-visible .open { opacity: 1; }
+  .card .open:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+  /* ---- child session header (return-to-parent) ---- */
+  .child-header {
+    border: 1px solid var(--dim); border-radius: 9px; background: var(--surface);
+    padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    font-size: 11.5px;
+  }
+  .child-header .crumbs { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .child-header .crumb a { color: var(--accent); text-decoration: none; }
+  .child-header .crumb a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .parent-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--dim));
+    border-radius: 999px; color: var(--accent); text-decoration: none; font-size: 11px;
+  }
+  .parent-chip:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .child-header .sep { width: 1px; height: 14px; background: var(--dim); }
+  .child-header .now { color: var(--text-soft); }
+  .bubble {
+    border: 1px solid var(--dim); border-radius: 9px; background: color-mix(in srgb, var(--surface) 70%, transparent);
+    padding: 12px 14px; margin-top: 9px; font-size: 12px; color: var(--text-soft);
+  }
+  .bubble .tag { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+
+  /* ---- current (rows) ---- */
+  .rows { display: flex; flex-direction: column; border-top: 1px solid color-mix(in srgb, var(--dim) 72%, transparent); }
+  .rows .row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 4px; border-bottom: 1px solid color-mix(in srgb, var(--dim) 72%, transparent); }
+  .rows .prim { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rows .tr { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .rows strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 14px; }
+  .rows .proj, .rows .times2 { color: var(--muted); font-size: 11px; }
+  .rows .times2 { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .rows a { color: var(--accent); font-size: 11px; }
+
+  .empty {
+    padding: 64px 20px; border: 1px dashed color-mix(in srgb, var(--dim) 70%, transparent);
+    border-radius: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    color: var(--muted); text-align: center;
+  }
+  .empty .ic { color: var(--accent); font-size: 26px; line-height: 1; }
+  .empty h2 { color: var(--text); font-size: 15px; font-weight: 600; }
+
+  .loop { margin-top: 22px; padding: 12px 14px; border: 1px dashed color-mix(in srgb, var(--dim) 78%, transparent); border-radius: 9px; color: var(--muted); font-size: 11.5px; }
+  .loop b { color: var(--text-soft); }
+
+  .foot { margin-top: 22px; font-size: 10.5px; color: var(--muted); opacity: .8; text-align: center; }
+
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  /* toggle wiring: old layout vs new layout */
+  .view-new { display: block; }
+  .view-old { display: none; }
+  body:has(#m-old:checked) .view-new { display: none; }
+  body:has(#m-old:checked) .view-old { display: block; }
+
+  @media (max-width: 640px) {
+    .card { flex-wrap: wrap; gap: 10px; }
+    .card .times { align-items: flex-start; flex-direction: row; }
+    .card .open { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .summary .dot, .card.running .marker .dot, .chip.running .pdot { animation: none; }
+    .card { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="back" type="button">‹ Sessions</button>
+  <h1>Subagents</h1>
+  <div class="mode">
+    <label>◐ current</label>
+    <input type="radio" name="mode" id="m-old">
+    <label class="cur">● redesign</label>
+    <input type="radio" name="mode" id="m-new" checked>
+  </div>
+</div>
+
+<main class="page">
+
+  <!-- ================= REDESIGN ================= -->
+  <section class="view-new">
+    <div class="summary">
+      <span class="running"><span class="dot"></span> <b>2</b> running</span>
+      <span class="done"><span class="dot"></span> <b>1</b> done</span>
+      <span class="failed"><span class="dot"></span> <b>1</b> failed</span>
+    </div>
+
+    <div class="cards">
+      <a class="card running" href="#child-sessions/cli-2">
+        <span class="marker"><span class="dot"></span></span>
+        <div class="card-main">
+          <div class="card-title-row">
+            <span class="chip running"><span class="pdot"></span>Running</span>
+            <span class="title">CLI-2 packaging sync</span>
+            <span class="id">sa-11</span>
+          </div>
+          <div class="meta">
+            <span class="harness">pi</span>
+            <span class="project">~/code/personal/scotty</span>
+          </div>
+        </div>
+        <div class="times">
+          <span class="active">Active just now</span>
+          <span>Spawned 4m ago</span>
+        </div>
+        <span class="open" aria-hidden="true">→</span>
+      </a>
+
+      <a class="card running" href="#child-sessions/w-4">
+        <span class="marker"><span class="dot"></span></span>
+        <div class="card-main">
+          <div class="card-title-row">
+            <span class="chip running"><span class="pdot"></span>Running</span>
+            <span class="title">W-4 Worker Alchemy host</span>
+            <span class="id">sa-9</span>
+          </div>
+          <div class="meta">
+            <span class="harness">codex</span>
+            <span class="project">~/code/personal/scotty</span>
+          </div>
+        </div>
+        <div class="times">
+          <span class="active">Active 12s ago</span>
+          <span>Spawned 7m ago</span>
+        </div>
+        <span class="open" aria-hidden="true">→</span>
+      </a>
+
+      <a class="card done" href="#child-sessions/auth-object">
+        <span class="marker">✓</span>
+        <div class="card-main">
+          <div class="card-title-row">
+            <span class="chip done">Done</span>
+            <span class="title">Explored auth-object</span>
+            <span class="id">sa-8</span>
+          </div>
+          <div class="meta">
+            <span class="harness">pi</span>
+            <span class="project">~/code/personal/scotty</span>
+          </div>
+        </div>
+        <div class="times">
+          <span class="active">Active 3m ago</span>
+          <span>Spawned 13m ago</span>
+        </div>
+        <span class="open" aria-hidden="true">→</span>
+      </a>
+
+      <a class="card error" href="#child-sessions/wrangler">
+        <span class="marker">✕</span>
+        <div class="card-main">
+          <div class="card-title-row">
+            <span class="chip error">Error</span>
+            <span class="title">Wrangler binding gate script</span>
+            <span class="id">sa-7</span>
+          </div>
+          <div class="meta">
+            <span class="harness">pi</span>
+            <span class="project">~/code/personal/scotty</span>
+          </div>
+        </div>
+        <div class="times">
+          <span class="active">Active 41m ago</span>
+          <span>Spawned 1h ago</span>
+        </div>
+        <span class="open" aria-hidden="true">→</span>
+      </a>
+    </div>
+
+    <!-- Selected subagent → child session view with return-to-parent -->
+    <div class="child-header">
+      <span class="crumbs">
+        <span class="crumb"><a href="#parent">Parent · scotty session</a></span>
+        <span class="sep"></span>
+        <span class="now">sa-11 · CLI-2 packaging sync · Running</span>
+      </span>
+      <a class="parent-chip" href="#parent">↑ Parent</a>
+    </div>
+    <div class="bubble">
+      <span class="tag">composer — steer this subagent</span><br>
+      Continue this session. ↔ stop button aborts the run (cancel)
+    </div>
+  </section>
+
+  <!-- ================= CURRENT ================= -->
+  <section class="view-old">
+    <div class="rows">
+      <div class="row">
+        <div class="prim">
+          <div class="tr">
+            <span class="chip running"><span class="pdot"></span>Running</span>
+            <strong>CLI-2 packaging sync</strong>
+            <span class="proj">sa-11</span>
+            <span class="harness">pi</span>
+          </div>
+          <span class="proj">~/code/personal/scotty</span>
+        </div>
+        <div class="times2">
+          <span>Spawned 4m ago</span>
+          <span>Active just now</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="prim">
+          <div class="tr">
+            <span class="chip running"><span class="pdot"></span>Running</span>
+            <strong>W-4 Worker Alchemy host</strong>
+            <span class="proj">sa-9</span>
+            <span class="harness">codex</span>
+          </div>
+          <span class="proj">~/code/personal/scotty</span>
+        </div>
+        <div class="times2">
+          <span>Spawned 7m ago</span>
+          <span>Active 12s ago</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="loop"><b>The loop:</b> Parent session → <b>Subagents</b> (all subagents, live) → click a card → <b>child transcript</b> (steer via composer, stop = cancel) → <b>↑ Parent</b> chip → back to the overall parent session.</div>
+
+  <div class="foot">pican · static mockup of the /subagents redesign + return-to-parent loop · source: routes/SubagentsPage.svelte + components/session/SessionHeader.svelte + embedded/styles/{subagents,session}.css</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pican session — Agents + Tasks dock (design mock)</title>
+<style>
+  :root {
+    --body-bg: #111116; --surface: #15151b; --surface-2: #191920; --surface-3: #1e1e26;
+    --text: #e6e7eb; --text-soft: #b7bbc4; --muted: #858a96; --faint: #5d626e;
+    --dim: #292a33; --accent: #9cc7c0; --attention: #d8b45a; --success: #b5bd68;
+    --danger: #ef767a;
+    --font: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
+            'DejaVu Sans Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--body-bg); }
+  body {
+    font-family: var(--font); font-size: 12px; line-height: 1.5;
+    color: var(--text-soft); background: var(--body-bg);
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
+  }
+
+  /* ── chrome ── */
+  .header {
+    display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 12px;
+    background: color-mix(in srgb, var(--body-bg) 88%, #000); border-bottom: 1px solid var(--dim);
+  }
+  .header .back { display: inline-flex; align-items: center; gap: 5px; background: none; border: 0; color: var(--text-soft); font: inherit; cursor: pointer; }
+  .parent-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--dim));
+    border-radius: 999px; color: var(--accent); text-decoration: none; font-size: 10.5px;
+  }
+  .header .title { font-size: 12px; font-weight: 650; color: var(--text); letter-spacing: -0.01em; display: inline-flex; align-items: center; gap: 7px; }
+  .header .title .id { color: var(--faint); font-weight: 400; font-size: 10px; }
+  .header .right { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--muted); }
+  .sw label { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border: 1px solid var(--dim); border-radius: 999px; cursor: pointer; }
+  .sw input { accent-color: var(--accent); }
+  .sw label:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 60%, var(--dim)); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--dim); border-radius: 6px; background: transparent; color: var(--text-soft); cursor: pointer; position: relative; }
+  .menu-pop {
+    position: absolute; right: 0; top: calc(100% + 5px); width: 200px;
+    border: 1px solid var(--dim); border-radius: 9px; background: var(--surface-2);
+    box-shadow: 0 8px 24px rgba(0,0,0,.4); padding: 6px; z-index: 40;
+  }
+  .menu-pop a { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--text-soft); text-decoration: none; font-size: 11px; }
+  .menu-pop a:hover { background: var(--surface-3); color: var(--text); }
+  .menu-pop a.cur { color: var(--accent); }
+  .menu-pop .sep { height: 1px; background: var(--dim); margin: 4px 6px; }
+
+  /* ── desktop: pinned tabs strip under the header ── */
+  .tabs {
+    display: none; align-items: flex-end; gap: 2px; height: 30px; padding: 0 10px;
+    background: var(--chrome-tabs, color-mix(in srgb, var(--body-bg) 94%, #000));
+    border-bottom: 1px solid var(--dim); overflow: hidden;
+  }
+  .tab {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 190px;
+    padding: 4px 10px 3px; border: 1px solid var(--dim); border-bottom: 0;
+    border-radius: 7px 7px 0 0; color: var(--muted); font-size: 10.5px; white-space: nowrap;
+    text-decoration: none; background: transparent;
+  }
+  .tab .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+  .tab.cur { background: var(--surface); color: var(--text); border-color: color-mix(in srgb, var(--dim) 90%, transparent); }
+  .tab.cur .dot { background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+  .tab .x { opacity: 0; }
+  .tab:hover .x { opacity: .7; }
+
+  /* ── layout ── */
+  .layout { display: flex; gap: 14px; max-width: 1060px; margin: 0 auto; padding: 14px 18px; align-items: flex-start; }
+  .chat { flex: 1 1 auto; min-width: 0; }
+
+  /* ── messages ── */
+  .msg { display: flex; gap: 9px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--dim) 55%, transparent); }
+  .msg .who { flex: 0 0 auto; width: 9ch; font-weight: 700; font-size: 10.5px; }
+  .msg.user .who { color: var(--attention); } .msg.asst .who { color: var(--accent); }
+  .msg .body { min-width: 0; flex: 1 1 auto; font-size: 11.5px; }
+  .msg .meta { color: var(--faint); font-size: 10px; margin-top: 2px; }
+  .thinking { color: var(--muted); font-style: italic; font-size: 10.5px; }
+  .tooldone { color: var(--muted); font-size: 10.5px; } .tooldone b { color: var(--text-soft); font-weight: 600; } .tooldone .ok { color: var(--success); }
+
+  .toolcard { margin: 7px 0; border: 1px solid var(--dim); border-radius: 8px; background: color-mix(in srgb, var(--surface) 70%, transparent); font-size: 11px; }
+  .toolcard .tc-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; color: var(--text); font-weight: 700; }
+  .toolcard .tc-head .ic { color: var(--accent); } .toolcard .tc-head .tc-name { color: var(--muted); font-weight: 400; font-size: 10.5px; }
+  .toolcard .tc-rows { display: grid; gap: 4px; padding: 0 10px 8px; }
+  .toolcard .row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .toolcard .row .id { color: var(--muted); } .toolcard .row .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pchip { flex: 0 0 auto; padding: 1px 6px; border: 1px solid var(--dim); border-radius: 999px; color: var(--muted); font-size: 9.5px; }
+  .pchip.running, .pchip.in_progress { color: var(--accent); border-color: var(--accent); }
+  .pchip.done, .pchip.completed { color: var(--success); border-color: var(--success); }
+  .pchip.failed { color: var(--danger); border-color: var(--danger); }
+
+  /* ── dock (shared) ── */
+  .dock { border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--surface) 78%, transparent); }
+  .dock-head { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid color-mix(in srgb, var(--dim) 80%, transparent); }
+  .dock-head .label { font-weight: 700; font-size: 10px; letter-spacing: .06em; color: var(--text-soft); text-transform: uppercase; }
+  .dock-head .counts { display: inline-flex; gap: 8px; font-size: 10px; color: var(--muted); }
+  .dock-head .counts .running { color: var(--accent); } .dock-head .counts .done { color: var(--success); } .dock-head .counts .failed { color: var(--danger); }
+  .dock-head .open-all { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 10px; }
+  .agent-row { display: flex; align-items: center; gap: 9px; padding: 5px 12px; border-bottom: 1px solid color-mix(in srgb, var(--dim) 50%, transparent); text-decoration: none; color: inherit; cursor: pointer; min-width: 0; }
+  .agent-row:last-of-type { border-bottom: 0; }
+  .agent-row:hover, .agent-row:focus-visible { background: var(--surface-2); outline: none; }
+  .agent-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+  .agent-row.quiet .agent-dot { background: var(--muted); animation: none; }
+  .agent-row.done .agent-dot { background: var(--success); animation: none; }
+  .agent-row .aname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; font-size: 11.5px; }
+  .agent-row .aid { flex: 0 0 auto; color: var(--faint); font-size: 10px; }
+  .agent-row .awhat { flex: 0 1 auto; min-width: 5ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
+  .agent-row.quiet .awhat { color: var(--faint); }
+  .agent-row .ael { flex: 0 0 auto; margin-left: auto; color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .agent-row .ajump { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 5px; color: var(--accent); font-size: 10.5px; opacity: 0; transition: opacity .12s; }
+  .agent-row:hover .ajump, .agent-row:focus-visible .ajump { opacity: 1; }
+  .task-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px; color: var(--text-soft); font-size: 11px; min-width: 0; }
+  .task-row .tid { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+  .task-row .tsub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row.done .tsub { color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+
+  /* composer */
+  .composer-v { margin-top: 9px; border: 1px solid var(--dim); border-radius: 10px; background: var(--surface); padding: 9px 12px; display: flex; align-items: center; gap: 10px; }
+  .composer-v input { flex: 1 1 auto; background: none; border: 0; color: var(--text); font: inherit; font-size: 12px; outline: none; }
+  .composer-v .statusline { flex: 0 0 auto; color: var(--faint); font-size: 10px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .composer-v .statusline .live { color: var(--attention); }
+  .composer-v .send { flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--dim)); border-radius: 7px; background: transparent; color: var(--accent); padding: 3px 12px; font: inherit; font-size: 10.5px; cursor: pointer; }
+
+  .annot { margin: 8px 2px 0; color: var(--faint); font-size: 10px; line-height: 1.6; }
+  .annot b { color: var(--muted); }
+
+  /* ── mobile: compact dock ── */
+  .mob-dock { display: none; }
+  .mob-strip {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 8px;
+    border: 1px solid color-mix(in srgb, var(--dim) 88%, transparent); border-radius: 9px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+  }
+  .mob-strip::-webkit-scrollbar { display: none; }
+  .mob-strip .lead { flex: 0 0 auto; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-right: 4px; }
+  .mob-agent { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--dim); border-radius: 999px; color: var(--text-soft); text-decoration: none; font-size: 10.5px; }
+  .mob-agent .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+  .mob-agent.quiet .dot { background: var(--muted); animation: none; }
+  .mob-agent .ael { color: var(--faint); font-variant-numeric: tabular-nums; }
+  .mob-task { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px dashed color-mix(in srgb, var(--dim) 90%, transparent); border-radius: 999px; color: var(--muted); text-decoration: none; font-size: 10.5px; }
+  .mob-task .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--attention); }
+
+  /* ── view wiring: desktop / mobile, dock / rail ── */
+  .view-desk { display: block; }
+  .view-desk .tabs { display: flex; }
+  .view-mob { display: none; }
+  body:has(#d-mob:checked) .view-desk { display: none; }
+  body:has(#d-mob:checked) .view-mob { display: block; }
+  .rail-dock { display: none; }
+  .view-desk:has(#l-rail:checked) .rail-dock { display: flex; }
+  .view-desk:has(#l-rail:checked) .dock-v { display: none; }
+  body:has(#l-rail:checked) .view-desk { flex-direction: row; }
+
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .agent-dot, .mob-agent .dot, .tab.cur .dot { animation: none; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ DESKTOP (header + tabs) ═══════════ -->
+<div class="view-desk">
+  <div class="header">
+    <button class="back" type="button">‹</button>
+    <a class="parent-chip" href="#parent">↑ Parent</a>
+    <span class="title">scotty · main<span class="id">sa-11 · CLI-2 packaging sync</span></span>
+    <div class="right">
+      <span class="sw"><label><input type="radio" name="layout" id="l-dock" checked> dock</label><label><input type="radio" name="layout" id="l-rail"> rail</label></span>
+      <span class="sw"><label><input type="radio" name="display" id="d-desk" checked> desktop</label><label><input type="radio" name="display" id="d-mob"> mobile</label></span>
+      <button class="menu-btn" type="button" aria-label="Menu">⋯
+        <div class="menu-pop" hidden>
+          <a href="#sessions">▤ Sessions</a>
+          <a href="#tasks">☑ Tasks</a>
+          <a href="#workflows">⛭ Workflows</a>
+          <a href="#subagents" class="cur">▤ Subagents <span style="margin-left:auto;color:var(--faint)">→</span></a>
+          <div class="sep"></div>
+          <a href="#settings">⚙ Settings</a>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- desktop-only pinned tabs strip -->
+  <div class="tabs">
+    <a class="tab cur" href="#parent"><span class="dot"></span>scotty · main<span style="margin-left:auto" class="x">✕</span></a>
+    <a class="tab" href="#other"><span class="dot"></span>pican · session 2<span style="margin-left:auto" class="x">✕</span></a>
+    <a class="tab" href="#new">＋</a>
+  </div>
+
+  <div class="layout">
+    <div class="chat">
+      <div class="msg user"><span class="who">You</span><div class="body"><p>Can you update the auth middleware so the redirect bug is gone?</p><div class="meta">10:31:18</div></div></div>
+      <div class="msg asst"><span class="who">pi</span><div class="body">
+        <div class="thinking">» 271s thinking · 5 tool runs</div>
+        <p>Looking at <b>auth/middleware.ts</b> — the clamp lives in <b>format.ts</b>…</p>
+        <div class="tooldone"><b>read</b> <span class="ok">✓</span> auth/middleware.ts</div>
+      </div></div>
+      <div class="toolcard">
+        <div class="tc-head"><span class="ic">▤</span> Subagents <span class="tc-name">subagent_wait · sa-11</span></div>
+        <div class="tc-rows">
+          <div class="row"><span class="id">sa-11</span> <span class="title">CLI-2 packaging sync</span> <span class="pchip">pi</span> <span class="pchip running">running</span></div>
+          <div class="row"><span class="id">sa-9</span> <span class="title">W-4 Worker Alchemy host</span> <span class="pchip">codex</span> <span class="pchip running">running</span></div>
+        </div>
+      </div>
+
+      <!-- desktop dock: between messages and composer, always visible -->
+      <div class="dock-v">
+        <div class="dock">
+          <div class="dock-head"><span class="label">Agents</span>
+            <span class="counts"><span class="running">● 2 running</span><span class="done">✓ 1 done</span></span>
+            <a class="open-all" href="#subagents">open all →</a>
+          </div>
+          <a class="agent-row" href="#child/cli-2"><span class="agent-dot"></span><span class="aname">CLI-2 packaging sync</span><span class="aid">sa-11</span><span class="awhat">→ bash npm test</span><span class="ael">12s</span><span class="ajump">→</span></a>
+          <a class="agent-row quiet" href="#child/w-4"><span class="agent-dot"></span><span class="aname">W-4 Worker Alchemy host</span><span class="aid">sa-9</span><span class="awhat">quiet · no recent events</span><span class="ael">1m02s</span><span class="ajump">→</span></a>
+          <a class="agent-row done" href="#child/lint"><span class="agent-dot"></span><span class="aname">Lint pass</span><span class="aid">sa-7</span><span class="awhat">✓ 24 ops · 3m10s</span><span class="ael">3m10s</span><span class="ajump">→</span></a>
+        </div>
+        <div class="dock" style="margin-top:8px">
+          <div class="dock-head"><span class="label">Tasks</span>
+            <span class="counts"><span class="running">1 active</span><span class="done">2 done</span></span>
+            <a class="open-all" href="#tasks">open all →</a>
+          </div>
+          <div class="task-row"><span class="tid">#12</span><span class="pchip in_progress">in progress</span><span class="tsub">Fix login redirect</span></div>
+          <div class="task-row done"><span class="tid">#11</span><span class="pchip completed">done</span><span class="tsub">Add rate-limit middleware</span></div>
+          <div class="task-row done"><span class="tid">#9</span><span class="pchip completed">done</span><span class="tsub">Bump the 2 MB cap</span></div>
+        </div>
+      </div>
+
+      <div class="composer-v">
+        <input value="Continue this session." aria-label="Composer">
+        <span class="statusline"><span class="live">● idle</span> medium · GPT-5.6 Sol · openai-codex</span>
+        <button class="send" type="button">Send</button>
+      </div>
+      <div class="annot">
+        <b>Desktop:</b> dock is pinned between the transcript and composer (transcript scrolls behind it) — tabs strip stays under the header, untouched.
+        Hover an agent → <b>→</b> → click jumps into the child transcript (↑ Parent returns). <b>⋯ → Subagents</b> and dock <b>open all →</b> both open <b>/subagents</b>.
+      </div>
+    </div>
+
+    <div class="rail-dock">
+      <div class="dock">
+        <div class="dock-head"><span class="label">Agents</span><span class="counts"><span class="running">2</span><span class="done">1</span></span><a class="open-all" href="#subagents">all →</a></div>
+        <a class="agent-row" href="#child/cli-2"><span class="agent-dot"></span><span class="aname">CLI-2 packaging sync</span><span class="aid">sa-11</span><span class="awhat">→ bash npm test</span><span class="ael">12s</span><span class="ajump">→</span></a>
+        <a class="agent-row quiet" href="#child/w-4"><span class="agent-dot"></span><span class="aname">W-4 Worker Alchemy host</span><span class="aid">sa-9</span><span class="awhat">quiet · no recent events</span><span class="ael">1m02s</span><span class="ajump">→</span></a>
+        <a class="agent-row done" href="#child/lint"><span class="agent-dot"></span><span class="aname">Lint pass</span><span class="aid">sa-7</span><span class="awhat">✓ 24 ops · 3m10s</span><span class="ael">3m10s</span><span class="ajump">→</span></a>
+      </div>
+      <div class="dock">
+        <div class="dock-head"><span class="label">Tasks</span><span class="counts"><span class="running">1</span><span class="done">2</span></span><a class="open-all" href="#tasks">all →</a></div>
+        <div class="task-row"><span class="tid">#12</span><span class="pchip in_progress">in progress</span><span class="tsub">Fix login redirect</span></div>
+        <div class="task-row done"><span class="tid">#11</span><span class="pchip completed">done</span><span class="tsub">Add rate-limit middleware</span></div>
+        <div class="task-row done"><span class="tid">#9</span><span class="pchip completed">done</span><span class="tsub">Bump the 2 MB cap</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MOBILE (header only, compact dock) ═══════════ -->
+<div class="view-mob">
+  <div class="header">
+    <button class="back" type="button">‹</button>
+    <a class="parent-chip" href="#parent">↑ Parent</a>
+    <span class="title">scotty · main<span class="id">sa-11</span></span>
+    <div class="right">
+      <span class="sw"><label><input type="radio" name="layout2" id="l2-dock" checked> dock</label></span>
+      <span class="sw"><label><input type="radio" name="display2" id="d2-desk"> desktop</label><label><input type="radio" name="display2" id="d2-mob" checked> mobile</label></span>
+      <button class="menu-btn" type="button" aria-label="Menu">⋯
+        <div class="menu-pop" hidden>
+          <a href="#tasks">☑ Tasks</a>
+          <a href="#subagents" class="cur">▤ Subagents <span style="margin-left:auto;color:var(--faint)">→</span></a>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <div class="layout" style="max-width:520px">
+    <div class="chat">
+      <div class="msg user"><span class="who">You</span><div class="body"><p>Can you update the auth middleware so the redirect bug is gone?</p><div class="meta">10:31:18</div></div></div>
+      <div class="msg asst"><span class="who">pi</span><div class="body">
+        <div class="thinking">» 271s thinking · 5 tool runs</div>
+        <p>Looking at <b>auth/middleware.ts</b>…</p>
+      </div></div>
+
+      <!-- mobile compact dock: one scrollable strip, tap to jump -->
+      <div class="mob-strip">
+        <span class="lead">Agents</span>
+        <a class="mob-agent" href="#child/cli-2"><span class="dot"></span>CLI-2 packaging sync <span class="ael">12s</span></a>
+        <a class="mob-agent quiet" href="#child/w-4"><span class="dot"></span>W-4 Worker Alchemy host <span class="ael">1m</span></a>
+        <a class="mob-agent" href="#child/lint"><span class="dot"></span>Lint pass <span class="ael">3m</span></a>
+        <a class="mob-task" href="#tasks"><span class="dot"></span>#12 in progress · Fix login redirect</a>
+      </div>
+
+      <div class="composer-v">
+        <input value="Continue this session." aria-label="Composer">
+        <button class="send" type="button">↩</button>
+      </div>
+      <div class="annot">
+        <b>Mobile:</b> header only (no tabs). Dock compresses to a single horizontally scrollable row of agent chips + the active task —
+        tap any chip to jump into that agent's transcript (↑ Parent returns). Zero vertical space stolen from the chat.
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

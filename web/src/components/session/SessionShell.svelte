@@ -8,6 +8,7 @@
   import SessionHeader from './SessionHeader.svelte';
   import SessionInfoHeader from './SessionInfoHeader.svelte';
   import SessionContent from './SessionContent.svelte';
+  import SessionActivityDock from './SessionActivityDock.svelte';
   import ImageModal from './ImageModal.svelte';
   import ShortcutsModal from './ShortcutsModal.svelte';
   import ModelUsageModal from './ModelUsageModal.svelte';
@@ -58,6 +59,7 @@
     archived = false,
     waiting = false,
     sessionTabsEnabled = false,
+    parentSession = '',
     initialUiState = undefined as SessionSwitchUiState | undefined,
     onUiStateCapture = (() => {}) as (patch: SessionSwitchUiStatePatch) => void,
     onArchiveChange = null,
@@ -147,6 +149,7 @@
   {nativeId}
   {chatAvailable}
   {workerStatus}
+  {parentSession}
   pinnedNavigationEnabled={sessionTabsEnabled}
 />
 {#if !sessionTabsEnabled}
@@ -209,6 +212,7 @@
         />
       </div>
     </main>
+    <SessionActivityDock {sessionId} projectPath={cwd} {chatAvailable} />
     <ChatComposer
       {sessionId}
       {chatAvailable}

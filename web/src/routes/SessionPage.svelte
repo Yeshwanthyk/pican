@@ -23,6 +23,7 @@
   import { SESSION_TABS_SETTING_KEY } from '../shared/settings-store';
   import { errorMessage, settle } from '../components/shared/ui-effect';
   import { withBasePath } from '../shared/base-path';
+  import { parentSessionParam } from '../subagents/subagents';
   import type {
     SessionSwitchUiState,
     SessionSwitchUiStatePatch,
@@ -96,6 +97,11 @@
   let waiting = $state(false);
   let sessionTabsEnabled = $state(false);
   let dataEl = $state<HTMLScriptElement | null>(null);
+  // Set when a subagent card hands off into the child transcript with a
+  // `parent` param — lets the header offer a one-click way back to the parent.
+  let parentSession = $state(
+    parentSessionParam(typeof window === 'undefined' ? '' : window.location.search),
+  );
 
   onMount(() => {
     const previousTitle = document.title;
@@ -244,6 +250,7 @@
     {archived}
     {waiting}
     {sessionTabsEnabled}
+    {parentSession}
     {initialUiState}
     {onUiStateCapture}
     onArchiveChange={(next: boolean) => (archived = next)}

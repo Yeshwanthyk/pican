@@ -7,6 +7,7 @@
   import {
     icon,
     ArrowLeft,
+    ArrowUp,
     PanelLeft,
     Plus,
     SquarePen,
@@ -37,6 +38,7 @@
     chatAvailable = true,
     workerStatus = { state: 'idle' },
     pinnedNavigationEnabled = false,
+    parentSession = '',
   }: {
     title?: string;
     cwd?: string;
@@ -49,6 +51,7 @@
     chatAvailable?: boolean;
     workerStatus?: { readonly state: string; readonly exitCode?: number };
     pinnedNavigationEnabled?: boolean;
+    parentSession?: string;
   } = $props();
 
   const safeResumeCommand = $derived(capabilities.resume ? resumeCommand : '');
@@ -156,6 +159,7 @@
 <div
   class="session-header-bar"
   class:session-header-bar--pinned-navigation={pinnedNavigationEnabled}
+  class:session-header-bar--child-session={Boolean(parentSession)}
 >
   <div class="session-header-left">
     <a
@@ -165,6 +169,19 @@
       ><span aria-hidden="true">{@html icon(ArrowLeft, { size: 14 })}</span>
       <span class="session-header-back-label">{t('session.back')}</span></a
     >
+    {#if parentSession}
+      <a
+        href={withBasePath('/session?id=' + encodeURIComponent(parentSession))}
+        class="session-header-parent"
+        data-parent-session
+        aria-label={t('subagents.parent')}
+        title={t('subagents.sessionScope')}
+        onclick={(event) =>
+          handleNavClick(event, withBasePath('/session?id=' + encodeURIComponent(parentSession)))}
+        ><span aria-hidden="true">{@html icon(ArrowUp, { size: 12 })}</span>
+        <span class="session-header-parent-label">{t('subagents.parent')}</span></a
+      >
+    {/if}
     <button
       id="tree-toggle"
       class="session-header-actions session-header-tree-toggle"

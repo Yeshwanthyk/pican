@@ -184,3 +184,23 @@ describe("SessionHeader runtime commands", () => {
     );
   });
 });
+
+it("shows a parent-session chip only when a parent is provided", () => {
+  const { container, rerender } = render(SessionHeader, {
+    props: { title: "Child", parentSession: "parent.jsonl" },
+  });
+  const chip = container.querySelector("[data-parent-session]");
+  expect(chip).toBeTruthy();
+  expect(chip).toHaveAttribute("href", "/session?id=parent.jsonl");
+  expect(chip).toHaveAccessibleName("Parent");
+  expect(chip).toHaveTextContent("Parent");
+  expect(container.querySelector(".session-header-bar")).toHaveClass(
+    "session-header-bar--child-session",
+  );
+
+  rerender({ title: "Child", parentSession: "" });
+  expect(container.querySelector("[data-parent-session]")).toBeNull();
+  expect(container.querySelector(".session-header-bar")).not.toHaveClass(
+    "session-header-bar--child-session",
+  );
+});

@@ -1,5 +1,6 @@
-/* Read-only subagent review list. Kept route-scoped and aligned with the
-   Workflows and Tasks dashboard vocabulary. */
+/* Read-only subagent review list — Cursor-style cards.
+   Kept route-scoped and aligned with the Workflows and Tasks dashboard
+   vocabulary, reusing the session-card hover/lift recipe from index.css. */
 
 .subagents-page {
   width: min(1080px, 100%);
@@ -57,72 +58,193 @@
   font-size: 15px;
 }
 
-.subagents-list {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid color-mix(in srgb, var(--dim) 72%, transparent);
-}
-
-.subagent-list-row {
+/* Agenda-style summary ribbon: live counts, Cursor-agent-panel feel. */
+.subagents-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  min-width: 0;
-  padding: 16px 4px;
-  border-bottom: 1px solid color-mix(in srgb, var(--dim) 72%, transparent);
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 2px 2px 18px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--dim) 82%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  color: var(--muted);
+  font-size: 11px;
 }
 
-.subagent-list-primary,
-.subagent-list-secondary {
-  display: flex;
-  min-width: 0;
-}
-
-.subagent-list-primary {
-  flex: 1 1 auto;
-  flex-direction: column;
+.subagents-summary-item {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 
-.subagent-list-secondary {
-  flex: 0 0 auto;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 9px;
+.subagents-summary-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
-.subagent-list-title-row,
-.subagent-list-times,
-.subagent-list-actions {
+.subagents-summary-item[data-summary='running'] {
+  color: var(--accent);
+}
+
+.subagents-summary-item[data-summary='running'] .subagents-summary-dot {
+  animation: subagent-list-pulse 1.5s ease-in-out infinite;
+}
+
+.subagents-summary-item[data-summary='done'] {
+  color: var(--success);
+}
+
+.subagents-summary-item[data-summary='failed'] {
+  color: var(--danger, var(--red));
+}
+
+.subagents-summary-item[data-summary='unknown'] {
+  color: var(--muted);
+}
+
+/* Cursor-style cards. */
+.subagents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subagent-card {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--dim) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subagent-card[data-status='running'] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--dim));
+}
+
+.subagent-card[data-status='error'] {
+  border-color: color-mix(in srgb, var(--danger, var(--red)) 40%, var(--dim));
+}
+
+.subagent-card[data-status='done'],
+.subagent-card[data-status='unknown'] {
+  opacity: 0.82;
+}
+
+.subagent-card[data-status='done']:hover,
+.subagent-card[data-status='done']:focus-within,
+.subagent-card[data-status='unknown']:hover,
+.subagent-card[data-status='unknown']:focus-within {
+  opacity: 1;
+}
+
+.subagent-card-link {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 10px;
+}
+
+.subagent-card:has(.subagent-card-link:focus-visible),
+.subagent-card-link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.subagent-card:hover,
+.subagent-card:focus-within {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--muted) 55%, var(--dim));
+  transform: translateY(-1px);
+}
+
+.subagent-card-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 13px 16px;
+}
+
+.subagent-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  color: var(--muted);
+}
+
+.subagent-card[data-status='running'] .subagent-marker {
+  color: var(--accent);
+}
+
+.subagent-card[data-status='done'] .subagent-marker {
+  color: var(--success);
+}
+
+.subagent-card[data-status='error'] .subagent-marker {
+  color: var(--danger, var(--red));
+}
+
+.subagent-marker-unknown {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.subagent-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.subagent-card-title-row,
+.subagent-card-meta,
+.subagent-card-times {
   display: flex;
   align-items: center;
 }
 
-.subagent-list-title-row {
+.subagent-card-title-row {
   gap: 8px;
   min-width: 0;
 }
 
-.subagent-list-title-row strong {
+.subagent-card-title-row strong {
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.subagent-card-meta {
+  gap: 8px;
+  min-width: 0;
+}
+
 .subagent-list-id,
 .subagent-list-project,
-.subagent-list-times {
+.subagent-card-times {
   color: var(--muted);
   font-size: 11px;
 }
 
 .subagent-list-id {
   flex: 0 0 auto;
-  font-family: var(--font-code, var(--mono));
+  font-family: var(--font-code);
 }
 
 .subagent-list-project {
@@ -131,10 +253,36 @@
   white-space: nowrap;
 }
 
-.subagent-list-times {
-  justify-content: flex-end;
-  gap: 12px;
+.subagent-card-times {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
   white-space: nowrap;
+}
+
+.subagent-active-time {
+  color: var(--text-soft);
+}
+
+.subagent-card-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.subagent-card:hover .subagent-card-open,
+.subagent-card:focus-within .subagent-card-open {
+  opacity: 1;
 }
 
 .subagent-status-chip,
@@ -175,24 +323,9 @@
   animation: subagent-list-pulse 1.5s ease-in-out infinite;
 }
 
-.subagent-list-actions {
-  gap: 12px;
-}
-
-.subagent-list-actions a {
-  color: var(--accent);
-  font-size: 11px;
-  text-decoration: none;
-}
-
-.subagent-list-actions a:hover,
-.subagent-list-actions a:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.subagent-list-actions-mobile {
-  display: none;
+.subagent-marker .subagent-status-pulse {
+  width: 8px;
+  height: 8px;
 }
 
 @keyframes subagent-list-pulse {
@@ -208,45 +341,40 @@
     overflow-x: hidden;
   }
 
-  .subagent-list-row {
-    align-items: flex-start;
+  .subagent-card-body {
+    flex-wrap: wrap;
     gap: 10px;
-    padding: 14px 2px;
+    padding: 12px 14px;
   }
 
-  .subagent-list-title-row {
-    align-items: flex-start;
+  .subagent-card-title-row {
     flex-wrap: wrap;
   }
 
-  .subagent-list-title-row strong {
-    flex-basis: calc(100% - 90px);
+  .subagent-card-title-row strong {
+    flex-basis: calc(100% - 76px);
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
-  .subagent-list-secondary {
-    align-items: flex-end;
+  .subagent-card-times {
+    flex-direction: row;
+    align-items: flex-start;
+    margin-left: 34px;
   }
 
-  .subagent-list-times {
-    align-items: flex-end;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .subagent-list-secondary .subagent-list-actions {
-    display: none;
-  }
-
-  .subagent-list-actions-mobile {
-    display: flex;
-    margin-top: 3px;
+  .subagent-card-open {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .subagent-status-pulse {
+  .subagent-status-pulse,
+  .subagents-summary-item[data-summary='running'] .subagents-summary-dot {
     animation: none;
+  }
+
+  .subagent-card {
+    transition: none;
   }
 }

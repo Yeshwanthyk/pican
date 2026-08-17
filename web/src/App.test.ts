@@ -87,6 +87,101 @@ describe("App", () => {
     mounted = mountApp({ props: { path: "/subagents" } });
 
     expect(document.querySelector(".session-header-title")?.textContent).toBe("Subagents");
+    expect(document.querySelector(".session-header-bar--subagents")).not.toBeNull();
+    expect(document.querySelector(".session-header-route-mark")).not.toBeNull();
+    expect(document.querySelector("[data-subagents-page]")).toBeTruthy();
+  });
+
+  it("renders the subagents list with summary, markers, hrefs, and running-first order", async () => {
+    const now = Date.now();
+    const ago = (ms: number) => new Date(now - ms).toISOString();
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/subagents")) {
+        return Promise.resolve(
+          Response.json({
+            subagents: [
+              {
+                id: "sa-1",
+                title: "CLI-2 packaging sync",
+                harness: "pi",
+                status: "running",
+                spawnedAt: ago(30_000),
+                parentSession: "parent.jsonl",
+                parentProject: "/repo",
+                childSession: "child.jsonl",
+                childProject: "/repo",
+                lastActivity: new Date(now).toISOString(),
+              },
+              {
+                id: "sa-2",
+                title: "Docs audit",
+                harness: "pi",
+                status: "done",
+                spawnedAt: ago(120_000),
+                parentSession: "parent.jsonl",
+                parentProject: "/repo",
+                childSession: "done-child.jsonl",
+                childProject: "/repo",
+                lastActivity: ago(60_000),
+              },
+              {
+                id: "sa-3",
+                title: "Broken attempt",
+                harness: "claude",
+                status: "error",
+                spawnedAt: ago(240_000),
+                parentSession: "parent.jsonl",
+                parentProject: "/repo",
+                childSession: "failed-child.jsonl",
+                childProject: "/repo",
+                lastActivity: ago(180_000),
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(Response.json({}));
+    });
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+
+    mounted = mountApp({ props: { path: "/subagents" } });
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(document.querySelector(".subagent-card")).not.toBeNull();
+    });
+
+    const summary = document.querySelector(".subagents-summary");
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).toContain("1 running");
+    expect(summary?.textContent).toContain("1 done");
+    expect(summary?.textContent).toContain("1 failed");
+    // Zero-count groups are hidden: no unknown subagents were stubbed.
+    expect(summary?.querySelector('[data-summary="unknown"]')).toBeNull();
+
+    const runningCard = document.querySelector<HTMLElement>(
+      '.subagent-card[data-status="running"]',
+    );
+    expect(runningCard).not.toBeNull();
+    const runningLink = runningCard?.querySelector(".subagent-card-link");
+    expect(runningLink?.getAttribute("href")).toContain("child.jsonl");
+    expect(runningLink?.getAttribute("href")).toContain("parent=parent.jsonl");
+    expect(runningLink?.getAttribute("aria-label")).toContain("CLI-2 packaging sync");
+
+    const doneCard = document.querySelector('.subagent-card[data-status="done"]');
+    expect(doneCard?.querySelector(".subagent-marker svg")).not.toBeNull();
+
+    // Running-first DOM order, then failures, then settled (recency within group).
+    const cards = document.querySelectorAll(".subagent-card");
+    expect(cards.length).toBe(3);
+    expect(cards[0]?.getAttribute("data-status")).toBe("running");
+    expect(cards[1]?.getAttribute("data-status")).toBe("error");
+    expect(cards[2]?.getAttribute("data-status")).toBe("done");
+
+    // list/listitem semantics and the page marker survive the data render.
+    expect(document.querySelector(".subagents-list")?.getAttribute("role")).toBe("list");
     expect(document.querySelector("[data-subagents-page]")).toBeTruthy();
   });
 
