@@ -57,7 +57,7 @@ The in-app updater (the pican version row in the menu → "Check for updates")
 installs newer releases the same way, straight from GitHub Releases, then
 restarts pican to apply them.
 
-Session auto-titling is built into pican (not the extension) and configured on the `/settings` page. It's on by default: pican names sessions automatically using a free built-in word heuristic (no AI), re-titling on every new message. You can switch to titling once per session, and/or pick a model to write smarter titles instead of the heuristic.
+Session auto-titling is built into pican (not the extension) and configured on the `/settings` page. It's on by default: pican names each session from its first user message using a free built-in word heuristic (no AI), and the title stays stable — "Regenerate title" in the session menu refreshes it on demand when the subject shifts. You can switch to re-titling on every user turn, and/or pick a model to write smarter titles instead of the heuristic.
 
 On Linux, auto-start is configured as a user systemd service at `~/.config/systemd/user/pican.service`. The installer rewrites its `ExecStart` to the actual installed binary path. If Tailscale is available at runtime, pican publishes the localhost server with Tailscale Serve HTTPS. If user systemd is unavailable, run it manually with `~/.pi/agent/bin/pican -o`.
 

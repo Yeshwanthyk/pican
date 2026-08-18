@@ -781,6 +781,25 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request) {
 	s.broadcast(resolved.Session.ID, "reload")
 	writeJSON(w, 0, map[string]any{"ok": true, "name": name})
 }
+func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	id := r.URL.Query().Get("id")
+	resolved, err := s.resolveSession(id)
+	if resolveOrWriteError(w, err) {
+		return
+	}
+	if !s.requireRuntimeCapability(w, r, resolved.Session.Runtime, runtimes.CapabilityRename) {
+		return
+	}
+	// Fire-and-forget: the title model call can take up to autoTitleTimeout.
+	// The existing completion path broadcasts the reload SSE that applies the
+	// new title in the UI.
+	go s.regenerateTitle(resolved.Session.ID)
+	writeJSON(w, 0, map[string]any{"ok": true})
+}
 
 func (s *Server) handleLabelSessionEntry(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

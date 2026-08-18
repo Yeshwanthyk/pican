@@ -13,6 +13,7 @@
     icon,
     Search,
     Pencil,
+    RefreshCw,
     GitFork,
     Copy,
     Terminal,
@@ -42,6 +43,7 @@
     cloneSession,
     forkSession,
     loadForkEntries,
+    regenerateTitle,
     renameSession,
   } from '../../session/session-menu-actions.js';
   import {
@@ -105,6 +107,7 @@
     'tree',
     'model-usage',
     'rename',
+    'regenerate-title',
     'fork',
     'clone',
     'version',
@@ -127,6 +130,7 @@
   const primaryItems: readonly PrimaryItem[] = [
     { action: 'list-sessions', icon: Search, label: 'menu.searchSessions', kbd: '⌘K' },
     { action: 'rename', icon: Pencil, label: 'menu.rename' },
+    { action: 'regenerate-title', icon: RefreshCw, label: 'menu.regenerateTitle' },
     { action: 'fork', icon: GitFork, label: 'menu.fork' },
     { action: 'clone', icon: Copy, label: 'menu.clone' },
     { action: 'terminal', icon: Terminal, label: 'menu.resumeTerminal' },
@@ -149,7 +153,7 @@
   let archiveBusy = $state(false);
   const visiblePrimaryItems = $derived([
     ...primaryItems.filter((item) => {
-      if (item.action === 'rename') return capabilities.rename;
+      if (item.action === 'rename' || item.action === 'regenerate-title') return capabilities.rename;
       if (item.action === 'fork') return capabilities.fork;
       if (item.action === 'clone') return capabilities.clone;
       if (item.action === 'terminal') return capabilities.resume && !!resumeCommand;
@@ -267,6 +271,16 @@
               toast(t('menu.renamed'));
             },
             () => toast(t('git.renameFailed')),
+          );
+        }),
+        Match.when('regenerate-title', () => {
+          closeMenu();
+          toast(t('menu.titleRegenerating'));
+          void regenerateTitle(sessionId).then(
+            // The new title arrives via the session reload SSE; nothing to do
+            // here beyond the toast.
+            () => {},
+            () => toast(t('menu.titleRegenerateFailed')),
           );
         }),
         Match.when('fork', () => {

@@ -93,7 +93,7 @@ pican/
 │   │   ├── diff.go             # /api/git/diff handler
 │   │   ├── files.go            # /api/files handler + per-cwd file-walk cache
 │   │   ├── settings.go         # Server-backed user settings (/api/settings) + SPA shell helpers
-│   │   ├── auto_title.go       # Auto-title sessions via OneShotPrompt; guards against clobbering user names
+│   │   ├── auto_title.go       # Auto-title sessions via OneShotPrompt; title-once default, on-demand regenerate, guards against clobbering user names
 │   │   ├── auto_title_heuristic.go # Heuristic fallback title from first user message
 │   │   ├── metrics.go          # /metrics + /api/metrics + pprof registration (gopsutil sampler)
 │   │   ├── projects.go         # Project visibility prefs: list/toggle/register + index filtering (SQLite)
@@ -396,6 +396,7 @@ type piRPCWorker struct {
 | `/api/fork-session` | POST | `handleApiForkSession` | Fork a session into a new file |
 | `/api/clone-session` | POST | `handleApiCloneSession` | Clone a session into a new file |
 | `/api/rename-session` | POST | `handleRenameSession` | Append `session_info` rename metadata |
+| `/api/regenerate-title` | POST | `handleRegenerateTitle` | Force an on-demand auto-title regenerate (menu action); statement fires the model off the HTTP path |
 | `/api/label-session` | POST | `handleLabelSessionEntry` | Append a label to a session entry |
 | `/api/recent-locations` | GET | `handleRecentLocations` | List known project paths |
 | `/api/files` | GET | `handleApiFiles` | Bounded file listing for @mention autocomplete |

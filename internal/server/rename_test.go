@@ -143,3 +143,44 @@ func TestHandleRenameSessionRejectsMissingSession(t *testing.T) {
 		t.Fatalf("status = %d, want 404", w.Code)
 	}
 }
+
+func TestHandleRegenerateTitle(t *testing.T) {
+	root := t.TempDir()
+	writeSessionFile(t, root, "test-project", "session.jsonl")
+	s := &Server{
+		sessionsDir: root,
+		cache:       sessions.NewCache(),
+		now:         func() time.Time { return time.Date(2026, 5, 8, 10, 1, 2, 0, time.UTC) },
+		autoTitle: autoTitleState{
+			inFlight:  make(map[string]bool),
+			name:      make(map[string]string),
+			count:     make(map[string]int),
+			userOwned: make(map[string]bool),
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/regenerate-title?id=session.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleRegenerateTitle(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestHandleRegenerateTitleRejectsMissingSession(t *testing.T) {
+	s := &Server{sessionsDir: t.TempDir(), cache: sessions.NewCache()}
+	req := httptest.NewRequest(http.MethodPost, "/api/regenerate-title?id=missing.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleRegenerateTitle(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", w.Code)
+	}
+}

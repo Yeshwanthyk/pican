@@ -49,6 +49,13 @@ func TestAutoTitlePromptUsesDurableConversationContext(t *testing.T) {
 		"The stale list appears",
 		"Fix the synchronization lifecycle",
 		"durable goal",
+		// Ported t3code editorial rules must stay in the prompt.
+		"Do not copy or truncate a message verbatim",
+		"Avoid project names already visible in the UI",
+		"Name the product change, not the mock, plan, report, branch, or PR",
+		"For reviews, name what is being reviewed and the relevant concern",
+		"For research, name the question domain rather than the research process",
+		"tools, output formats, and monitoring instructions do not belong in the title",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q: %s", want, prompt)
@@ -352,5 +359,129 @@ func TestMaybeAutoTitleNoUserMessage(t *testing.T) {
 	s.maybeAutoTitle(id) // must not panic or rename
 	if got := sessionNameNow(t, s, id); got != id {
 		t.Fatalf("expected fallback to filename when no user text, got %q", got)
+	}
+}
+
+func TestRegenerateTitleOverridesExistingAutoTitle(t *testing.T) {
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
+	id := writeAutoTitleSession(t, s.sessionsDir, "investigate reconnect behavior", "")
+
+	calls := 0
+	restore := autoTitleGenerate
+	autoTitleGenerate = func(ctx context.Context, opts rpc.PromptOpts) (string, error) {
+		calls++
+		if calls == 1 {
+			return "Reconnect Bug", nil
+		}
+		return "Reconnect Sync Fix", nil
+	}
+	t.Cleanup(func() { autoTitleGenerate = restore })
+
+	// Automatic pass titles once (default mode is title-once).
+	s.maybeAutoTitle(id)
+	if got := sessionNameNow(t, s, id); got != "Reconnect Bug" {
+		t.Fatalf("expected initial auto title, got %q", got)
+	}
+	// Another automatic pass is a no-op — already titled.
+	s.maybeAutoTitle(id)
+	if calls != 1 {
+		t.Fatalf("default title-once re-titled on a later pass, model calls = %d", calls)
+	}
+	// Explicit regenerate forces a fresh model round even though titled.
+	s.regenerateTitle(id)
+	if got := sessionNameNow(t, s, id); got != "Reconnect Sync Fix" {
+		t.Fatalf("expected regenerated title, got %q", got)
+	}
+	if calls != 2 {
+		t.Fatalf("regenerate should run one model call, got %d", calls)
+	}
+}
+
+func TestRegenerateTitleOverridesManualRename(t *testing.T) {
+	s := newAutoTitleServer(t, nil) // default mode (once), heuristic fallback
+	id := writeAutoTitleSession(t, s.sessionsDir, "investigate reconnect behavior", "")
+
+	resolved, err := s.resolveSession(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sessions.RenameSession(resolved.Path, "My Manual Name", s.now); err != nil {
+		t.Fatal(err)
+	}
+	// Automatic titling backs off for good on a user-owned session…
+	s.maybeAutoTitle(id)
+	if got := sessionNameNow(t, s, id); got != "My Manual Name" {
+		t.Fatalf("auto-title clobbered manual name: %q", got)
+	}
+	// …but an explicit regenerate wins and clears the user-owned mark.
+	s.regenerateTitle(id)
+	if got := sessionNameNow(t, s, id); got != "Investigate Reconnect Behavior" {
+		t.Fatalf("expected regenerated heuristic title, got %q", got)
+	}
+	// The clear user-owned mark lets a later automatic pass (each-turn mode)
+	// treat the session as pican-owned again.
+	if s.autoTitle.userOwned[id] {
+		t.Fatal("regenerate left userOwned set after writing its own title")
+	}
+}
+
+func TestRegenerateTitleRequiresUserMessage(t *testing.T) {
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
+	id := writeAutoTitleSession(t, s.sessionsDir, "", "Manually Named")
+
+	calls := 0
+	restore := autoTitleGenerate
+	autoTitleGenerate = func(ctx context.Context, opts rpc.PromptOpts) (string, error) {
+		calls++
+		return "Should Not Run", nil
+	}
+	t.Cleanup(func() { autoTitleGenerate = restore })
+
+	s.regenerateTitle(id)
+	if calls != 0 {
+		t.Fatalf("regenerate ran the model without a user message, calls = %d", calls)
+	}
+	if got := sessionNameNow(t, s, id); got != "Manually Named" {
+		t.Fatalf("regenerate overwrote a session with no user message: %q", got)
+	}
+}
+
+func TestRegenerateTitleBacksOffOnRacingManualRename(t *testing.T) {
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "anthropic/sonnet"})
+	id := writeAutoTitleSession(t, s.sessionsDir, "investigate reconnect behavior", "")
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	restore := autoTitleGenerate
+	autoTitleGenerate = func(ctx context.Context, opts rpc.PromptOpts) (string, error) {
+		close(started)
+		select {
+		case <-release:
+			return "Stale Regenerated Title", nil
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	t.Cleanup(func() { autoTitleGenerate = restore })
+
+	done := make(chan struct{})
+	go func() {
+		s.regenerateTitle(id)
+		close(done)
+	}()
+	<-started
+
+	resolved, err := s.resolveSession(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sessions.RenameSession(resolved.Path, "Faster Manual Name", s.now); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	<-done
+
+	if got := sessionNameNow(t, s, id); got != "Faster Manual Name" {
+		t.Fatalf("regenerate overwrote a manual rename made while it ran: %q", got)
 	}
 }

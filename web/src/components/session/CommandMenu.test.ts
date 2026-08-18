@@ -61,6 +61,25 @@ describe("CommandMenu", () => {
     );
   });
 
+  it("regenerates the title via the API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))),
+    );
+    render(CommandMenu, { props: { sessionId: "session.jsonl" } });
+    await tick();
+
+    await fireEvent.click(
+      document.querySelector('[data-action="regenerate-title"]') ?? document.body,
+    );
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/regenerate-title?id=session.jsonl",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
   it("keeps the old title when the rename API fails", async () => {
     vi.stubGlobal(
       "fetch",
