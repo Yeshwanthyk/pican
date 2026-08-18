@@ -163,8 +163,8 @@ The `e2e` job in `.github/workflows/ci.yml`: `npm ci` →
 1. Put the spec in `e2e/tests/*.spec.ts` and import `{ test, expect }` from
    `../lib/test` (not `@playwright/test` directly) so `baseURL`/`sessionsDir` are wired.
 2. For layout-specific assertions, gate on `isMobileLayout(page)` after navigating.
-3. On narrow viewports the scratchpad overlays the header/composer — call
-   `collapseScratchpad(page)` before `goto` (see chat/mobile specs).
+3. On narrow viewports the right sidebar overlays the header/composer — call
+   `collapseRightSidebar(page)` before `goto` (see chat/mobile specs).
 4. For anything that writes to a session, create a per-test file via
    `e2e/lib/sessions.ts`; never mutate the committed fixtures.
 

@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { test as baseTest, expect, collapseScratchpad, waitForSessionReady } from "../lib/test";
+import { test as baseTest, expect, collapseRightSidebar, waitForSessionReady } from "../lib/test";
 import {
   appendEntry,
   assistantTextEntry,
@@ -450,7 +450,7 @@ test.describe("connection resilience", () => {
     const sessionId = writeSession(isolatedServer.sessionsDir, name, entries);
 
     await enableGlobalAndSessionStreams(page);
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     const sessionURL = `${isolatedServer.baseURL}/session?id=${encodeURIComponent(sessionId)}`;
     await page.goto(sessionURL);
     await waitForSessionReady(page);
@@ -505,7 +505,7 @@ test.describe("connection resilience", () => {
 
       await enableGlobalAndSessionStreams(page);
       await installFailedSendControl(page);
-      await collapseScratchpad(page);
+      await collapseRightSidebar(page);
 
       await page.goto(`${isolatedServer.baseURL}/session?id=${encodeURIComponent(sessionId)}`);
       await waitForSessionReady(page);

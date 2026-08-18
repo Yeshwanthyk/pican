@@ -1,4 +1,4 @@
-import { test, expect, isMobileLayout, collapseScratchpad } from "../lib/test";
+import { test, expect, isMobileLayout, collapseRightSidebar } from "../lib/test";
 import type { Page } from "@playwright/test";
 
 // Layout is driven by the 900px breakpoint, not by device type: iPad portrait
@@ -11,9 +11,9 @@ import type { Page } from "@playwright/test";
 // sidebar — see SessionTree.svelte / session-modals.svelte.js.
 
 async function openDemoSession(page: Page) {
-  // Keep the scratchpad collapsed so it doesn't overlay the header on narrow
+  // Keep the right sidebar collapsed so it doesn't overlay the header on narrow
   // viewports; we're exercising the tree overlay.
-  await collapseScratchpad(page);
+  await collapseRightSidebar(page);
   await page.goto("/");
   await page
     .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })
@@ -69,7 +69,7 @@ test.describe("session tree overlay", () => {
   });
 
   test("?tree=open restores the overlay on load", async ({ page }) => {
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto("/");
     await page
       .locator(".session-ticker-row", { hasText: "add deepseek-v4-pro" })

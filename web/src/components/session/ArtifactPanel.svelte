@@ -259,15 +259,11 @@
     pickedId = id;
   }
 
-  // Hide the Artifacts tab entirely when the feature is disabled; if it was the
-  // active tab, fall back to Scratchpad so the user isn't left on a blank pane.
+  // Hide the Artifacts tab entirely when the feature is disabled.
   function applyArtifactsEnabled(enabled: boolean): void {
     const tab = document.getElementById('right-tab-artifacts');
     if (!tab) return;
     tab.hidden = !enabled;
-    if (!enabled && tab.classList.contains('active')) {
-      document.getElementById('right-tab-scratchpad')?.click();
-    }
   }
 
   // Whenever the resolved selection changes (user pick or a list change that

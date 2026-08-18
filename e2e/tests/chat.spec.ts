@@ -1,4 +1,4 @@
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import {
   buildSession,
   realWorkingDir,
@@ -22,7 +22,7 @@ test.describe("chat (stubbed pi)", () => {
     const name = uniqueSessionName(testInfo, "chat");
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
     // Composer should be enabled (cwd exists -> chat available).

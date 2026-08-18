@@ -1,4 +1,4 @@
-import { test, expect, collapseScratchpad, openTree } from "../lib/test";
+import { test, expect, collapseRightSidebar, openTree } from "../lib/test";
 import { uniqueSessionName, writeSession } from "../lib/sessions";
 
 // Reproduces a user-reported bug: after refreshing a *forked* chat, the
@@ -67,7 +67,7 @@ test.describe("forked chat refresh", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
 
     const name = uniqueSessionName(testInfo, "fork");
     const id = writeSession(sessionsDir, name, buildForkedSession());

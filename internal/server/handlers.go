@@ -65,8 +65,8 @@ func isSPABrowserPath(r *http.Request) bool {
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 	// Embed the session payload so the SPA paints without round-trips to
-	// /api/session and /api/scratchpad. Empty when the id is missing/unresolved;
-	// the client then falls back to fetching (and shows a proper error).
+	// /api/session. Empty when the id is missing/unresolved; the client then
+	// falls back to fetching (and shows a proper error).
 	bootstrap := ""
 	if id := r.URL.Query().Get("id"); id != "" {
 		bootstrap = s.sessionBootstrap(id)
@@ -549,9 +549,9 @@ func (s *Server) sessionResponseMap(session sessions.Session, entries []map[stri
 }
 
 // sessionBootstrap builds the base64 payload embedded in the session page shell
-// so the SPA can render its first paint without round-trips to /api/session and
-// /api/scratchpad. Returns "" when the id can't be resolved — the client then
-// falls back to fetching, which surfaces a proper 404/error state.
+// so the SPA can render its first paint without round-trips to /api/session.
+// Returns "" when the id can't be resolved — the client then falls back to
+// fetching, which surfaces a proper 404/error state.
 func (s *Server) sessionBootstrap(id string) string {
 	if s.cache == nil {
 		return ""
@@ -563,14 +563,7 @@ func (s *Server) sessionBootstrap(id string) string {
 	entries, total, from := paginatedEntries(resolved.Session.Entries)
 	data := s.sessionResponseMap(resolved.Session, entries, total, from)
 
-	scratchpad := ""
-	if cwd, _ := resolved.Session.Header["cwd"].(string); cwd != "" {
-		if content, err := s.lookupScratchpad(cwd); err == nil {
-			scratchpad = content
-		}
-	}
-
-	raw, err := json.Marshal(map[string]any{"id": id, "data": data, "scratchpad": scratchpad})
+	raw, err := json.Marshal(map[string]any{"id": id, "data": data})
 	if err != nil {
 		return ""
 	}

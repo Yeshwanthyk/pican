@@ -75,7 +75,6 @@ export type SessionPageData = typeof SessionPageDataSchema.Type;
 const BootstrapSchema = Schema.Struct({
   id: Schema.String,
   data: SessionPageDataSchema,
-  scratchpad: Schema.optionalKey(Schema.String),
 });
 export type SessionBootstrap = typeof BootstrapSchema.Type;
 const decodeBootstrap = Schema.decodeUnknownEffect(BootstrapSchema);
@@ -97,7 +96,6 @@ export interface SessionPageState {
   readonly sessionUUID: string;
   readonly entries: ReadonlyArray<SessionEntry>;
   readonly cwd: string;
-  readonly scratchpad: string;
   readonly chatAvailable: boolean;
   readonly chatDisabledReason: string;
   readonly modelLabel: string;
@@ -115,7 +113,6 @@ interface LooseSessionEntry extends UnknownRecord {
 interface BuildStateOptions extends CodecOptions {
   readonly sessionId: string;
   readonly data: SessionPageData;
-  readonly scratchpad?: string;
 }
 
 interface LoadStateOptions extends CodecOptions, BootstrapOptions {
@@ -182,23 +179,6 @@ export function firstMessageStub(entries: ReadonlyArray<LooseSessionEntry> = [])
   return `<div class="user-message" aria-hidden="true"><div class="markdown-content"><p>${text}</p></div></div>`;
 }
 
-const ScratchpadSchema = Schema.Struct({ content: Schema.optionalKey(Schema.String) });
-
-export function loadScratchpad(
-  projectPath: string,
-  { fetchImpl = globalThis.fetch }: { readonly fetchImpl?: FetchLike } = {},
-): Promise<string> {
-  if (!projectPath) return Promise.resolve("");
-  return runPromise(
-    Http.get(`/api/scratchpad?project=${encodeURIComponent(projectPath)}`, ScratchpadSchema, {
-      fetchImpl,
-    }).pipe(
-      Effect.map(({ content }) => content ?? ""),
-      Effect.catch(() => Effect.succeed("")),
-    ),
-  );
-}
-
 export function normalizeSessionRuntime(
   data: Partial<SessionPageData> = {},
   header: UnknownRecord = data.header ?? {},
@@ -216,7 +196,6 @@ export function normalizeSessionRuntime(
 export function buildSessionPageState({
   sessionId,
   data,
-  scratchpad = "",
   btoaImpl,
   TextEncoderImpl,
 }: BuildStateOptions): SessionPageState {
@@ -253,7 +232,6 @@ export function buildSessionPageState({
     sessionUUID,
     entries,
     cwd,
-    scratchpad,
     chatAvailable,
     chatDisabledReason,
     modelLabel: model && provider ? `${model} @ ${provider}` : model,
@@ -300,7 +278,6 @@ export function loadSessionPageState({
       buildSessionPageState({
         sessionId,
         data: boot.data,
-        scratchpad: boot.scratchpad || "",
         btoaImpl,
         TextEncoderImpl,
       }),
@@ -335,7 +312,6 @@ export function loadSessionPageState({
       buildSessionPageState({
         sessionId,
         data,
-        scratchpad: "",
         btoaImpl,
         TextEncoderImpl,
       }),

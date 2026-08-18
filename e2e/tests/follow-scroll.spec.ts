@@ -1,4 +1,4 @@
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import {
   assistantTextEntry,
   buildSession,
@@ -32,7 +32,7 @@ test.describe("follow scroll", () => {
     const name = uniqueSessionName(testInfo, "follow");
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
     await expect(page.locator("#messages")).toContainText("Filler line 0.");
 

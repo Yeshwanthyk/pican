@@ -6,18 +6,14 @@
   import { t } from '../../shared/strings.js';
   import ArtifactPanel from './ArtifactPanel.svelte';
   import { sessionRuntime } from '../../session/session-runtime.js';
-  import { createScratchpadController } from './right-sidebar-scratchpad.js';
-
-  let { scratchpad = '', projectPath = '' }: { scratchpad?: string; projectPath?: string } =
-    $props();
 
   const RIGHT_SIDEBAR_COLLAPSED_KEY = 'pican:v1:right-sidebar-collapsed';
   const RIGHT_SIDEBAR_WIDTH_KEY = 'pican:v1:right-sidebar-width';
   const RIGHT_SIDEBAR_TAB_KEY = 'pican:v1:right-sidebar-tab';
   const MIN_CONTENT_WIDTH = 320;
   const DEFAULT_WIDTH_PX = 320; // double-click reset width
-  type SidebarTab = 'scratchpad' | 'artifacts';
-  const TAB_PANES: readonly SidebarTab[] = ['scratchpad', 'artifacts'];
+  type SidebarTab = 'artifacts';
+  const TAB_PANES: readonly SidebarTab[] = ['artifacts'];
 
   function readStorage(key: string): string | null {
     return runSync(
@@ -37,10 +33,11 @@
     );
   }
 
+  // The sidebar has a single pane (Artifacts). Any stored tab value other than
+  // 'artifacts' falls back to the artifacts pane.
   function readInitialTab(): SidebarTab {
     const stored = readStorage(RIGHT_SIDEBAR_TAB_KEY);
-    if (stored === 'scratchpad' || stored === 'artifacts') return stored;
-    return 'scratchpad';
+    return stored === 'artifacts' ? 'artifacts' : 'artifacts';
   }
 
   // The active tab is component-local state bound straight into the markup. The
@@ -49,13 +46,10 @@
   let activeTab = $state(readInitialTab());
 
   function activateTab(pane: SidebarTab): void {
+    if (pane !== 'artifacts') return;
     activeTab = pane;
     writeStorage(RIGHT_SIDEBAR_TAB_KEY, pane);
   }
-
-  // Assigned in onMount once the scratchpad controller exists; the visibility
-  // helpers below call it when un-collapsing the sidebar.
-  let loadScratchpad: () => void = () => undefined;
 
   function isCollapsed(): boolean {
     return document.body.classList.contains('right-sidebar-collapsed');
@@ -70,17 +64,13 @@
   function toggleSidebar(): void {
     if (isCollapsed()) {
       setCollapsed(false);
-      loadScratchpad();
     } else {
       setCollapsed(true);
       setExpanded(false);
     }
   }
   function openSidebar(): void {
-    if (isCollapsed()) {
-      setCollapsed(false);
-      loadScratchpad();
-    }
+    if (isCollapsed()) setCollapsed(false);
   }
   function collapseSidebar(): void {
     setExpanded(false);
@@ -92,7 +82,6 @@
     } else {
       if (isCollapsed()) setCollapsed(false);
       setExpanded(true);
-      loadScratchpad();
     }
   }
 
@@ -101,8 +90,6 @@
     const windowImpl = window;
     const sidebar = documentImpl.getElementById('right-sidebar');
     const resizer = documentImpl.getElementById('right-sidebar-resizer');
-    const textarea = documentImpl.querySelector<HTMLTextAreaElement>('#scratchpad-textarea');
-    const statusEl = documentImpl.getElementById('scratchpad-status');
     const toggleBtn = documentImpl.getElementById('toggle-right-sidebar-btn');
     const backdrop = documentImpl.getElementById('right-sidebar-backdrop');
     const cleanups: Array<() => void> = [];
@@ -132,16 +119,6 @@
         sessionRuntime.rightSidebar = null;
       };
     }
-
-    // ── Scratchpad load/save ─────────────────────────────────────────────────
-    const scratchpadController = createScratchpadController({
-      projectPath,
-      textarea,
-      statusEl,
-      fetchImpl: fetch,
-    });
-    loadScratchpad = () => void scratchpadController.load();
-    if (textarea) cleanups.push(scratchpadController.bind());
 
     function getRightSidebarBounds(): { minWidth: number; maxWidth: number } {
       const rootStyles = windowImpl.getComputedStyle(documentImpl.documentElement);
@@ -226,17 +203,8 @@
       cleanups.push(() => windowImpl.removeEventListener('resize', onWindowResize));
     }
 
-    // Bootstrap path: scratchpad arrives in the prop and is server-rendered into
-    // the textarea, so adopt it as the baseline. SPA-nav path: the prop is empty
-    // (loadSessionPageState skips the scratchpad fetch to keep it off the
-    // critical path), so fetch it here instead.
     const savedWidth = loadWidth();
     if (savedWidth !== null) applyWidth(savedWidth);
-    if (textarea && !textarea.value && projectPath) {
-      void scratchpadController.load();
-    } else {
-      scratchpadController.adoptCurrentValue();
-    }
 
     // ── Artifacts help (?) modal ─────────────────────────────────────────────
     // Shown only on the Artifacts tab via CSS; toggled by the help button.
@@ -280,21 +248,11 @@
   class="right-sidebar-resizer"
   role="separator"
   aria-orientation="vertical"
-  aria-label={t('sidebar.resizeScratchpad')}
+  aria-label={t('sidebar.resize')}
 ></div>
 <aside id="right-sidebar" class="right-sidebar" data-active-tab={activeTab}>
   <div class="right-sidebar-header">
     <div class="right-sidebar-tabs" role="tablist">
-      <button
-        type="button"
-        id="right-tab-scratchpad"
-        class="right-sidebar-tab"
-        class:active={activeTab === 'scratchpad'}
-        role="tab"
-        data-pane="scratchpad"
-        aria-selected={activeTab === 'scratchpad'}
-        onclick={() => activateTab('scratchpad')}>{t('sidebar.scratchpad')}</button
-      >
       <button
         type="button"
         id="right-tab-artifacts"
@@ -328,20 +286,6 @@
   </div>
   <div class="right-sidebar-content">
     <div
-      id="right-pane-scratchpad"
-      class="right-sidebar-pane"
-      class:active={activeTab === 'scratchpad'}
-      role="tabpanel"
-      aria-labelledby="right-tab-scratchpad"
-      hidden={activeTab !== 'scratchpad'}
-    >
-      <textarea
-        id="scratchpad-textarea"
-        class="scratchpad-textarea"
-        placeholder={t('sidebar.scratchpadPlaceholder')}>{scratchpad}</textarea
-      >
-    </div>
-    <div
       id="right-pane-artifacts"
       class="right-sidebar-pane"
       class:active={activeTab === 'artifacts'}
@@ -357,9 +301,6 @@
       >
       <ArtifactPanel />
     </div>
-  </div>
-  <div class="right-sidebar-footer">
-    <span id="scratchpad-status" class="scratchpad-status">{t('common.saved')}</span>
   </div>
 </aside>
 <div id="right-sidebar-backdrop" class="right-sidebar-backdrop"></div>

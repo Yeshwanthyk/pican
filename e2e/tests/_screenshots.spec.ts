@@ -5,7 +5,7 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import {
   buildSession,
   realWorkingDir,
@@ -25,7 +25,7 @@ test.describe("@screenshots queue + steer panel @screenshots", () => {
     const name = uniqueSessionName(testInfo, "shots");
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
     await expect(page.locator("#pi-chat-composer")).toHaveAttribute("data-chat-available", "true");
 

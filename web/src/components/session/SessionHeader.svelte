@@ -261,8 +261,8 @@
     <button
       id="toggle-right-sidebar-btn"
       class="session-header-actions"
-      title={`${t('session.toggleScratchpad')} (⌘⇧N)`}
-      aria-label={t('session.toggleScratchpad')}>{@html icon(SquarePen, { size: 14 })}</button
+      title={`${t('session.toggleSidebar')} (⌘⇧N)`}
+      aria-label={t('session.toggleSidebar')}>{@html icon(SquarePen, { size: 14 })}</button
     >
     <button
       id="command-menu-btn"

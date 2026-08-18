@@ -95,10 +95,9 @@ so an artifact's source-view anchor (`artifact-<id>`) survives in-place changes.
      │ user clicks "Preview" (preview-kind) ───────▶│── Source ⇄ Preview toggle
 ```
 
-The list and source view live in the **Artifacts** tab of the right sidebar
-(Scratchpad / Artifacts switcher in `web/src/session/ui/`). A count badge
-reflects the number of artifacts; the help (?) button appears only on the
-Artifacts tab.
+The list and source view live in the **Artifacts** tab of the right sidebar.
+A count badge reflects the number of artifacts; the help (?) button appears
+only on the Artifacts tab.
 
 ## Preview (Source ⇄ Preview), and its security model
 
@@ -128,7 +127,7 @@ defaults in `internal/server/settings.go`) control what the panel shows:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `pican:v1:artifacts:enabled` | `true` | When `false`, the whole **Artifacts tab is hidden** (and if it was active, the sidebar falls back to Scratchpad). |
+| `pican:v1:artifacts:enabled` | `true` | When `false`, the whole **Artifacts tab is hidden**. |
 | `pican:v1:artifacts:include` | `*.md, *.html` | Comma/space-separated glob list. Empty = show everything. |
 
 `filterArtifacts(artifacts, { enabled, include })` (pure) applies them:

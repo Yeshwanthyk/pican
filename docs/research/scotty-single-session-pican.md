@@ -122,8 +122,8 @@ scheduler, and starts the autonomous chat queue drainer
 ([`internal/server/server.go#L231-L353`](../../internal/server/server.go#L231-L353),
 [`internal/server/server.go#L356-L419`](../../internal/server/server.go#L356-L419)). `Register`
 then installs the home, settings, catalog, session creation/fork/clone/rename/archive/delete,
-peers, scratchpad, schedules, workflows, tasks, subagents, metrics, pprof, sounds, and
-update surfaces alongside the session APIs
+peers, schedules, workflows, tasks, subagents, metrics, pprof, sounds, and update surfaces
+alongside the session APIs
 ([`internal/server/server.go#L437-L509`](../../internal/server/server.go#L437-L509)).
 
 The frontend is also one general bundle. Vite has one `app` entry at `src/main.ts`
@@ -271,7 +271,6 @@ Do not register:
 - `/`, `/api/sessions`, `/api/new-session`, fork, clone, rename, label, Codex archive/unarchive/
   delete, Pican archives, pins, recent locations, projects, peers, settings page, or
   filesystem browsing.
-- scratchpad unless the bound-session product explicitly retains it.
 - schedules, schedule runs, workflows, tasks, subagents index APIs, metrics dashboard, pprof,
   sounds, push subscription, version/update/restart, and PWA service-worker routes.
 
@@ -283,7 +282,7 @@ Do not initialize:
 - global status sweeper;
 - broad catalog reconciliation after the bound pair is validated;
 - session index cache population;
-- project/peer/pin/archive/scratchpad tables;
+- project/peer/pin/archive tables;
 - update checker, sounds seeding, Tailscale publication, browser opening, or PWA registration;
 - global queue draining. If persistent queued chat remains a requirement, run a drainer scoped to
   the bound ID only.
@@ -318,7 +317,7 @@ retain those imports and can leave mutation code reachable.
 The lean default should include the transcript, composer, stop/cancel, worker state, model and
 effort controls, slash commands, file mentions, approval/question UI, a compact static title/cwd,
 and Git branch/Create PR status if Scotty requires it. It should not import the home router,
-pinned-session models, Back/New controls, session tree, Scratchpad/Artifacts sidebar, BTW,
+pinned-session models, Back/New controls, session tree, Artifacts sidebar, BTW,
 fork/label/model-usage/image/diff modals, version controller, or PWA code.
 
 Use separate build products rather than a runtime boolean:

@@ -1,4 +1,4 @@
-import { test, expect, isMobileLayout, collapseScratchpad } from "../lib/test";
+import { test, expect, isMobileLayout, collapseRightSidebar } from "../lib/test";
 import { buildSession, realWorkingDir, uniqueSessionName, writeSession } from "../lib/sessions";
 
 // Regression guard for the iOS "can't see the chat input box" bug: when the
@@ -25,7 +25,7 @@ test.describe("composer stays above the keyboard (mobile)", () => {
     const name = uniqueSessionName(testInfo, "kbd");
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
     test.skip(!(await isMobileLayout(page)), "mobile-only behavior");

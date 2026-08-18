@@ -374,11 +374,6 @@ func initDB(agentDir string) (*sql.DB, error) {
 		name string
 		stmt string
 	}{
-		{"scratchpads table", `CREATE TABLE IF NOT EXISTS scratchpads (
-			project_path TEXT PRIMARY KEY,
-			content TEXT,
-			updated_at DATETIME
-		)`},
 		{"settings table", `CREATE TABLE IF NOT EXISTS settings (
 			key        TEXT PRIMARY KEY,
 			value      TEXT,
@@ -461,7 +456,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	// correctly before the user authenticates. Contents are non-secret color
 	// variables only.
 	mux.HandleFunc("/custom-themes.css", s.handleCustomThemes)
-	mux.HandleFunc("/api/scratchpad", s.getPostHandler(s.handleGetScratchpad, s.handleSaveScratchpad))
 	mux.HandleFunc("/api/chat/queue", s.auth.Wrap(s.handleChatQueue))
 	mux.HandleFunc("/api/settings", s.getPostHandler(s.handleGetSettings, s.handleSaveSettings))
 	mux.HandleFunc("/api/workflows", s.auth.Wrap(s.handleApiWorkflows))

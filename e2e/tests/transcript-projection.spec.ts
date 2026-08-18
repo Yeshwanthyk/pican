@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { generateTranscriptFixture } from "../perf/fixtures";
-import { collapseScratchpad, expect, test } from "../lib/test";
+import { collapseRightSidebar, expect, test } from "../lib/test";
 
 async function waitForEarlierWindow(page: Page): Promise<void> {
   await page.waitForFunction(
@@ -59,7 +59,7 @@ test("5k transcript preserves browser transcript contracts", async ({
 
   try {
     await page.waitForTimeout(100);
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     const eventStream = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return url.pathname === "/events" && url.searchParams.get("id") === fixture.sessionId;

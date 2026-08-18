@@ -58,7 +58,6 @@ describe("session-page-data", () => {
   it("builds state and encoded payload from API data", () => {
     const state = buildSessionPageState({
       sessionId: "s.jsonl",
-      scratchpad: "notes",
       btoaImpl,
       data: {
         name: "Title",
@@ -79,7 +78,6 @@ describe("session-page-data", () => {
 
     expect(state.title).toBe("Title");
     expect(state.cwd).toBe("/tmp/project");
-    expect(state.scratchpad).toBe("notes");
     expect(state.chatAvailable).toBe(false);
     expect(state.chatDisabledReason).toContain("chat is disabled");
     expect(state.modelLabel).toBe("sonnet @ anthropic");
@@ -148,7 +146,7 @@ describe("session-page-data", () => {
     });
   });
 
-  it("only fetches the session on the network path; the scratchpad is the sidebar’s job", async () => {
+  it("only fetches the session on the network path", async () => {
     const seen: string[] = [];
     const fetchImpl = async (url: RequestInfo | URL) => {
       seen.push(String(url));
@@ -167,7 +165,6 @@ describe("session-page-data", () => {
     });
 
     expect(state.title).toBe("Loaded");
-    expect(state.scratchpad).toBe("");
     expect(seen).toEqual(["/api/session?id=s.jsonl&paginate=1"]);
   });
 
@@ -184,7 +181,6 @@ describe("session-page-data", () => {
           modelProvider: "anthropic",
           chatAvailable: true,
         },
-        scratchpad: "notes",
       }),
     );
     const documentImpl = {
@@ -206,7 +202,6 @@ describe("session-page-data", () => {
 
     expect(fetched).toBe(false);
     expect(state.title).toBe("Embedded");
-    expect(state.scratchpad).toBe("notes");
     expect(state.modelLabel).toBe("haiku @ anthropic");
   });
 

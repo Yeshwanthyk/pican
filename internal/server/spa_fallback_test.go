@@ -36,3 +36,22 @@ func TestSPAFallbackServesBrowserRoutesButNotAPIsOrAssets(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleSessionUsesSPAShell(t *testing.T) {
+	s := &Server{
+		renderAppShell: func(w io.Writer, bootstrap string) error {
+			_, err := io.WriteString(w, "spa shell")
+			return err
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/session?id=with-pad.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleSession(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	if got := w.Body.String(); got != "spa shell" {
+		t.Fatalf("expected SPA shell, got %q", got)
+	}
+}

@@ -101,7 +101,7 @@ export function setupSessionGlobals({
     { capture: true },
   );
 
-  // Cmd+Shift+N — toggle scratchpad (right sidebar)
+  // Cmd+Shift+N — toggle the right sidebar
   on(target, "keydown", (e) => {
     if (!(e instanceof KeyboardEvent)) return;
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {

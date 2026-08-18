@@ -1,4 +1,4 @@
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import {
   buildSession,
   realWorkingDir,
@@ -32,7 +32,7 @@ test.describe("steer / queue (stubbed pi)", () => {
     const name = uniqueSessionName(testInfo, prefix);
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
     const composer = page.locator("#pi-chat-composer");
@@ -602,7 +602,7 @@ test.describe("steer / queue (stubbed pi)", () => {
   }, testInfo) => {
     const context1 = await browser.newContext();
     const page1 = await context1.newPage();
-    await collapseScratchpad(page1);
+    await collapseRightSidebar(page1);
 
     const cwd = realWorkingDir();
     const { entries } = buildSession({ cwd });
@@ -652,7 +652,7 @@ test.describe("steer / queue (stubbed pi)", () => {
     // Brand-new browser context: cookies, localStorage, IndexedDB all gone.
     const context2 = await browser.newContext();
     const page2 = await context2.newPage();
-    await collapseScratchpad(page2);
+    await collapseRightSidebar(page2);
     await page2.goto(`/session?id=${encodeURIComponent(id)}`);
     await expect(page2.locator("#pi-chat-composer")).toHaveAttribute(
       "data-chat-available",

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import { buildSession, uniqueSessionName, writeSession } from "../lib/sessions";
 
 // The @mention autocomplete opens when "@" is typed in the composer and lists
@@ -27,7 +27,7 @@ test.describe("@mention path autocomplete (real cwd)", () => {
     const name = uniqueSessionName(testInfo, "mention");
     const id = writeSession(sessionsDir, name, entries);
 
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
     await page.goto(`/session?id=${encodeURIComponent(id)}`);
 
     const composer = page.locator("#pi-chat-composer");

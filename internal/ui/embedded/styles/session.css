@@ -143,8 +143,8 @@ html {
   --right-sidebar-width: 320px;
   --right-sidebar-min-width: 240px;
   --right-sidebar-max-width: 640px;
-  /* Shared height of the three bottom bars (left tree status, middle git
-         action bar, right scratchpad footer) so their top divider lines align. */
+  /* Shared height of the two bottom bars (left tree status, middle git action
+         bar) so their top divider lines align. */
   --session-footer-h: 34px;
 }
 
@@ -232,7 +232,7 @@ body.pi-sheet-open {
   border-color: var(--borderMuted);
 }
 
-/* ── Right Sidebar (Scratchpad) ── */
+/* ── Right Sidebar ── */
 .right-sidebar {
   width: var(--right-sidebar-width);
   min-width: var(--right-sidebar-width);
@@ -511,50 +511,6 @@ body.right-sidebar-resizing {
   flex-direction: column;
   overflow: hidden;
   padding: 8px;
-}
-
-.scratchpad-textarea {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  background: transparent;
-  color: var(--text);
-  border: none;
-  outline: none;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: var(--line-height);
-  resize: none;
-  caret-color: var(--accent);
-}
-
-.scratchpad-textarea::placeholder {
-  color: var(--muted);
-}
-
-.right-sidebar-footer {
-  min-height: var(--session-footer-h);
-  box-sizing: border-box;
-  padding: 0 12px;
-  border-top: 1px solid var(--dim);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.scratchpad-status {
-  font-size: 10px;
-  color: var(--muted);
-  transition: color 0.3s;
-}
-
-.scratchpad-status.saving {
-  color: var(--accent);
-}
-
-.scratchpad-status.saved {
-  color: var(--muted);
 }
 
 /* ── Artifacts panel (right sidebar "Artifacts" tab) ── */
@@ -3782,7 +3738,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
     display: none;
   }
 
-  /* Premium slide-in mobile notes drawer (scratchpad) */
+  /* Premium slide-in mobile right-sidebar drawer */
   .right-sidebar {
     display: flex !important;
     position: fixed !important;

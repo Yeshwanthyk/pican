@@ -43,7 +43,6 @@
     contentRuntime,
     sessionId = '',
     title = 'Session',
-    scratchpad = '',
     cwd = '',
     chatAvailable = true,
     chatDisabledReason = '',
@@ -229,7 +228,7 @@
       {onArchiveChange}
     />
   </div>
-  <RightSidebar {scratchpad} projectPath={cwd} />
+  <RightSidebar />
   <ImageModal />
 </div>
 

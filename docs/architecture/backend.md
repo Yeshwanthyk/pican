@@ -96,7 +96,6 @@ pican/
 │   │   ├── auto_title.go       # Auto-title sessions via OneShotPrompt; guards against clobbering user names
 │   │   ├── auto_title_heuristic.go # Heuristic fallback title from first user message
 │   │   ├── metrics.go          # /metrics + /api/metrics + pprof registration (gopsutil sampler)
-│   │   ├── scratchpad.go       # Per-project scratchpad get/save (SQLite)
 │   │   ├── projects.go         # Project visibility prefs: list/toggle/register + index filtering (SQLite)
 │   │   ├── archives.go         # Runtime-neutral local session archive metadata and API
 │   │   ├── push.go             # PushManager: VAPID, subscribe/unsubscribe, NotifyDone
@@ -184,9 +183,9 @@ source compatibility. When
 `RunInstall`/`RunRestart` are nil the corresponding endpoints respond `503`.
 
 On `New`, the server opens (and migrates) a SQLite database at
-`~/.pi/agent/pican.sqlite` with tables for scratchpads, settings, project
-preferences, session pins, local session archive, peer hosts, and chat
-queues. An enabled `project_prefs` row whose source is
+`~/.pi/agent/pican.sqlite` with tables for settings, project preferences,
+session pins, local session archive, peer hosts, and chat queues. An enabled
+`project_prefs` row whose source is
 `registered` is the tracked-project contract. `session_archives` is strictly
 pican-local presentation state and never mutates runtime-native state. See
 `projects.go`, `pins.go`, `archives.go`, and `settings.go`. The pool is capped to a single
@@ -403,7 +402,6 @@ type piRPCWorker struct {
 | `/api/git/info` | GET | `handleGitInfo` | Branch / dirty / PR-URL info for a project |
 | `/api/git/rename-branch` | POST | `handleGitRenameBranch` | Rename the current git branch |
 | `/api/git/diff` | GET | `handleGitDiff` | Uncommitted working-tree diff (tracked + untracked) for the session cwd |
-| `/api/scratchpad` | GET/POST | `handleGetScratchpad` / `handleSaveScratchpad` | Per-project scratchpad (SQLite) |
 | `/api/settings` | GET/POST | `handleGetSettings` / `handleSaveSettings` | Server-backed user settings (SQLite) |
 | `/api/projects` | GET/POST | `handleApiProjects` / `handleUpdateProject` | List discovered/tracked projects and track/untrack exact persisted paths; legacy visibility actions remain compatible |
 | `/api/pins` | GET/POST | `handleListPins` / `handleSetPin` | Ordered session pins (SQLite); pinning also restores a locally archived session |

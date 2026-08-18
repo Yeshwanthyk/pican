@@ -82,7 +82,6 @@
   let sessionId = $state('');
   let title = $state('Session');
   let payloadBase64 = $state('');
-  let scratchpad = $state('');
   let cwd = $state('');
   let chatAvailable = $state(true);
   let chatDisabledReason = $state('');
@@ -155,7 +154,6 @@
           else delete document.body.dataset.nativeId;
         }
         cwd = state.cwd;
-        scratchpad = state.scratchpad;
         payloadBase64 = state.payloadBase64;
         chatAvailable = state.chatAvailable;
         chatDisabledReason = state.chatDisabledReason;
@@ -236,7 +234,6 @@
     {contentRuntime}
     {sessionId}
     {title}
-    {scratchpad}
     {cwd}
     {chatAvailable}
     {chatDisabledReason}

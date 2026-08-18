@@ -1,4 +1,4 @@
-import { test, expect, collapseScratchpad } from "../lib/test";
+import { test, expect, collapseRightSidebar } from "../lib/test";
 import { uniqueSessionName, writeSession } from "../lib/sessions";
 
 // Build a session large enough to cross the server-side truncation threshold.
@@ -61,9 +61,9 @@ test.describe("load-earlier banner (large session pagination)", () => {
     page,
     sessionsDir,
   }, testInfo) => {
-    // On narrow viewports the scratchpad overlays content and can intercept
+    // On narrow viewports the right sidebar overlays content and can intercept
     // clicks; collapse it before navigating so the banner button is clickable.
-    await collapseScratchpad(page);
+    await collapseRightSidebar(page);
 
     const name = uniqueSessionName(testInfo, "le");
     const id = writeSession(sessionsDir, name, buildLargeSession());

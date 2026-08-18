@@ -360,27 +360,3 @@ Browser POST /api/clone-session?id=<sourceId>
 ```
 
 For Codex, clone is `thread/fork` without `lastTurnId`, so it clones the current native thread rather than copying projected JSONL entries. For OpenCode, clone calls the native fork endpoint without a message boundary. Neither path copies projected JSONL as authority.
-
-## Data Flow: Scratchpad (Notes)
-
-```
-Browser GET /api/scratchpad?project=<cwd>
-           │
-           ▼
-    server.handleGetScratchpad
-           │
-           ├──▶ Query SQLite: SELECT content FROM scratchpads WHERE project_path = ?
-           │
-           └──▶ Return {"content": "..."}  (empty string if no notes exist)
-
-Browser POST /api/scratchpad
-           │
-           ▼
-    server.handleSaveScratchpad
-           │
-           ├──▶ Decode JSON body → {"project": "...", "content": "..."}
-           ├──▶ UPSERT into SQLite scratchpads table (INSERT ... ON CONFLICT DO UPDATE)
-           │
-           └──▶ Return {"ok": true}
-```
-```

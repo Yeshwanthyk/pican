@@ -8,7 +8,7 @@ import {
   writeSession,
 } from "../lib/sessions";
 import {
-  collapseScratchpad,
+  collapseRightSidebar,
   expect,
   test,
   waitForSessionReady,
@@ -118,7 +118,7 @@ test.describe("mobile accessibility checkpoint", () => {
     skipUnlessMobile(page);
     const fixture = await seedMobileSession(page, sessionsDir, testInfo);
     try {
-      await collapseScratchpad(page);
+      await collapseRightSidebar(page);
       await waitForHome(page);
 
       const row = page.locator(".session-ticker-row", {
@@ -168,7 +168,7 @@ test.describe("mobile accessibility checkpoint", () => {
     skipUnlessMobile(page);
     const fixture = await seedMobileSession(page, sessionsDir, testInfo);
     try {
-      await collapseScratchpad(page);
+      await collapseRightSidebar(page);
       await waitForHome(page);
 
       const search = page.locator(".mobile-thumb-search");

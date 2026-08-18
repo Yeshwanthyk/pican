@@ -406,10 +406,7 @@ test.describe("artifacts panel", () => {
     await expect(empty.locator('a[href="/settings"]')).toBeVisible();
   });
 
-  test("disabling artifacts hides the tab and falls back to Scratchpad", async ({
-    page,
-    sessionsDir,
-  }, testInfo) => {
+  test("disabling artifacts hides the tab", async ({ page, sessionsDir }, testInfo) => {
     const name = uniqueSessionName(testInfo, "art");
     const id = writeSession(sessionsDir, name, sessionWithArtifacts());
 
@@ -423,12 +420,9 @@ test.describe("artifacts panel", () => {
     if (collapsed) await page.locator("#toggle-right-sidebar-btn").click();
 
     // The Artifacts tab is actually not rendered (visibility, not just the
-    // `hidden` property) while its siblings remain visible — guards against the
-    // CSS `display` rule overriding the `[hidden]` attribute.
-    await expect(page.locator("#right-tab-scratchpad")).toBeVisible();
+    // `hidden` property) — guards against the CSS `display` rule overriding
+    // the `[hidden]` attribute.
     await expect(page.locator("#right-tab-artifacts")).toBeHidden();
-    // Scratchpad remains the active tab.
-    await expect(page.locator("#right-tab-scratchpad")).toHaveClass(/active/);
   });
 
   test("reflects a setting change from another tab live (no reload)", async ({

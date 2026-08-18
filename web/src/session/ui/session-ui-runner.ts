@@ -150,9 +150,9 @@ export function setupSessionUi({
     closeSidebar,
     attachHeaderHandlers,
     toggleController,
-    // The right-sidebar chrome (scratchpad/resize/tabs) lives in <RightSidebar>,
-    // which registers its controls in sessionRuntime.rightSidebar. Read lazily so
-    // the calls resolve against the mounted component.
+    // The right-sidebar chrome (resize/tabs) lives in <RightSidebar>, which
+    // registers its controls in sessionRuntime.rightSidebar. Read lazily so the
+    // calls resolve against the mounted component.
     toggleRightSidebar: () => sessionRuntime.rightSidebar?.toggle?.(),
     openRightSidebar: () => sessionRuntime.rightSidebar?.open?.(),
     collapseRightSidebar: () => sessionRuntime.rightSidebar?.collapse?.(),

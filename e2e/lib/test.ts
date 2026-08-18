@@ -47,11 +47,11 @@ export async function isMobileLayout(
 }
 
 /**
- * Start with the scratchpad (right sidebar) collapsed. On narrow viewports it
- * otherwise overlays the header/composer and intercepts clicks. Must be called
- * before navigating (it installs an init script read by the page's bootstrap).
+ * Start with the right sidebar collapsed. On narrow viewports it otherwise
+ * overlays the header/composer and intercepts clicks. Must be called before
+ * navigating (it installs an init script read by the page's bootstrap).
  */
-export async function collapseScratchpad(
+export async function collapseRightSidebar(
   page: import("@playwright/test").Page,
 ): Promise<void> {
   await page.addInitScript(() => {

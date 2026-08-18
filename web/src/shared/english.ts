@@ -246,7 +246,7 @@ export default {
   "session.new": "New",
   "session.newSession": "Start a new session",
   "session.shortcuts": "Show keyboard shortcuts",
-  "session.toggleScratchpad": "Toggle scratchpad",
+  "session.toggleSidebar": "Toggle sidebar",
   "session.actions": "Session actions",
   "session.pinnedSessions": "Pinned sessions",
   "session.openPinnedSessions": "Switch pinned session",
@@ -371,13 +371,11 @@ export default {
   "session.copyPatch": "copy patch",
 
   // ── Right sidebar ──
-  "sidebar.scratchpad": "Scratchpad",
   "sidebar.artifacts": "Artifacts",
   "sidebar.howArtifactsWork": "How artifacts work",
   "sidebar.expandPanel": "Expand panel",
   "sidebar.hidePanel": "Hide panel",
-  "sidebar.scratchpadPlaceholder": "Write project-level notes, scratchpad, tasks...",
-  "sidebar.resizeScratchpad": "Resize scratchpad sidebar",
+  "sidebar.resize": "Resize sidebar",
 
   // ── Chat composer ──
   "composer.placeholder": "Continue this session…",
