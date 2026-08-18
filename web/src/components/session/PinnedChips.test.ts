@@ -58,6 +58,10 @@ describe("PinnedChips", () => {
       expect(container.querySelectorAll(".pinned-chip")).toHaveLength(expected);
     });
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("Session s10");
+    expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("repo");
+    expect(container.querySelector('[aria-current="page"]')).toHaveAccessibleName(
+      /\/repo/,
+    );
     expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("working");
     expect(container.querySelector('[title="OpenCode"]')).toHaveTextContent("O");
     expect(container.querySelector('[aria-label="Unpin session"]')).not.toBeNull();

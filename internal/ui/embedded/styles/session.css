@@ -4522,6 +4522,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   }
 
   .pinned-chip--active {
+    height: 48px;
     min-width: 136px;
     flex: 1 1 136px;
     color: var(--text);
@@ -4603,6 +4604,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   }
 
   .pinned-chip-title,
+  .pinned-chip-project,
   .pinned-chip-caption {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4612,6 +4614,12 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   .pinned-chip-title {
     color: var(--text);
     font-size: 10.5px;
+  }
+
+  .pinned-chip-project {
+    color: var(--text-soft);
+    font-family: var(--font-code);
+    font-size: 9.5px;
   }
 
   .pinned-chip-caption {
@@ -4629,7 +4637,7 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 
   .pinned-chip-pin {
     width: 36px;
-    height: 40px;
+    height: 48px;
     display: inline-flex;
     flex: none;
     align-items: center;

@@ -8,6 +8,7 @@
   import { showToast } from '../../shared/toast';
   import { prefetchSession } from '../../routes/session-prefetch';
   import { withBasePath } from '../../shared/base-path';
+  import { shortenPath } from '../../session/render/session-format';
   import {
     selectVisiblePinnedSessions,
     type PinnedTabsModel,
@@ -78,6 +79,20 @@
     return age ? t('session.tabsIdleAge', { age }) : t('session.tabsIdle');
   }
 
+  function projectPathFor(session: NormalizedSession): string {
+    return shortenPath(session.project);
+  }
+
+  function projectLabelFor(session: NormalizedSession): string {
+    const path = projectPathFor(session).replace(/\/+$/, '');
+    return path.slice(path.lastIndexOf('/') + 1) || path;
+  }
+
+  function accessibleLabelFor(session: NormalizedSession): string {
+    const project = projectPathFor(session);
+    return `${session.name}${project ? ` · ${project}` : ''} · ${captionFor(session)}`;
+  }
+
   async function setCurrentPinned(pinned: boolean): Promise<void> {
     if (await model.setPinned(currentSession, pinned)) {
       if (pinned && currentSession.archived) onArchiveChange?.(false);
@@ -115,7 +130,7 @@
       <a
         {href}
         aria-current={active ? 'page' : undefined}
-        aria-label={`${session.name} · ${captionFor(session)}`}
+        aria-label={accessibleLabelFor(session)}
         onclick={(event) => handleNavClick(event, href)}
         onpointerenter={() => startPrefetch(session.id)}
         onmousedown={() => startPrefetch(session.id)}
@@ -132,6 +147,11 @@
         {#if active}
           <span class="pinned-chip-copy">
             <span class="pinned-chip-title">{session.name}</span>
+            {#if projectLabelFor(session)}
+              <span class="pinned-chip-project" title={session.project}
+                >{projectLabelFor(session)}</span
+              >
+            {/if}
             <span class="pinned-chip-caption">{captionFor(session)}</span>
           </span>
         {/if}
@@ -160,7 +180,7 @@
       <a
         href={hrefFor(currentSession.id)}
         aria-current="page"
-        aria-label={`${currentSession.name} · ${captionFor(currentSession)}`}
+        aria-label={accessibleLabelFor(currentSession)}
       >
         {#if mark.icon}
           <img class="pinned-chip-runtime" src={mark.icon} alt="" aria-hidden="true" />
@@ -172,6 +192,11 @@
         <span class="pinned-chip-status" aria-hidden="true"></span>
         <span class="pinned-chip-copy">
           <span class="pinned-chip-title">{currentSession.name}</span>
+          {#if projectLabelFor(currentSession)}
+            <span class="pinned-chip-project" title={currentSession.project}
+              >{projectLabelFor(currentSession)}</span
+            >
+          {/if}
           <span class="pinned-chip-caption">{captionFor(currentSession)}</span>
         </span>
       </a>
