@@ -60,6 +60,12 @@
   }: Props = $props();
 
   const PIN_PREVIEW_LIMIT = 8;
+  const GHOST_ROW_COUNT = 5;
+  // Deterministic width cycle so the skeleton reads identically on every
+  // render (no random jitter). Indexed pair-wise: GHOST_TITLE_WIDTHS[i] /
+  // GHOST_META_WIDTHS[i] shape ghost row i.
+  const GHOST_TITLE_WIDTHS = ['58%', '74%', '42%', '66%', '52%'] as const;
+  const GHOST_META_WIDTHS = ['34%', '28%', '40%', '30%', '36%'] as const;
   let now = $state(Date.now());
   let allPinsVisible = $state(false);
 
@@ -89,9 +95,20 @@
   data-scope={project ? 'project' : view}
 >
   {#if loading && sessions.length === 0}
-    <div class="empty-state plain-state">
-      <div class="plain-state-line">{t('index.loadingSessions')}</div>
-      <div class="plain-state-hint">{t('index.loadingSessionsHint')}</div>
+    <div class="ghost-list" data-skeleton-rows role="status">
+      <span class="sr-only">{t('index.loadingSessions')}</span>
+      {#each Array.from({ length: GHOST_ROW_COUNT }, (_, i) => i) as i (i)}
+        <div class="ghost-row" aria-hidden="true">
+          <span class="ghost-row-icon"></span>
+          <span class="ghost-row-copy">
+            <span class="ghost-row-title" style:width={GHOST_TITLE_WIDTHS[i]}></span>
+            <span class="ghost-row-meta">
+              <span class="ghost-row-meta-bar" style:width={GHOST_META_WIDTHS[i]}></span>
+              <span class="ghost-row-time"></span>
+            </span>
+          </span>
+        </div>
+      {/each}
     </div>
   {:else if isHome}
     <div class="home-feed activity-feed" data-home-feed>

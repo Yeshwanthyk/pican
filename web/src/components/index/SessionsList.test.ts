@@ -287,3 +287,37 @@ describe("SessionsList compact home", () => {
     expect(container.querySelector(`[data-project="${project}"] .session-ticker-row`)).toBe(row);
   });
 });
+
+describe("SessionsList loading skeleton", () => {
+  it("renders ghost rows shaped like activity rows while loading", () => {
+    const { container } = render(SessionsList, {
+      props: { sessions: [], projects: [], loading: true, view: "home" },
+    });
+    const list = container.querySelector("[data-skeleton-rows]");
+    expect(list).not.toBeNull();
+    expect(list).toHaveAttribute("role", "status");
+    const ghosts = container.querySelectorAll(".ghost-row");
+    expect(ghosts).toHaveLength(5);
+    for (const ghost of ghosts) {
+      expect(ghost.querySelector(".ghost-row-icon")).not.toBeNull();
+      expect(ghost.querySelector(".ghost-row-title")).not.toBeNull();
+      expect(ghost.querySelector(".ghost-row-meta-bar")).not.toBeNull();
+      expect(ghost.querySelector(".ghost-row-time")).not.toBeNull();
+      expect(ghost).toHaveAttribute("aria-hidden", "true");
+    }
+    // The old text-only loading state is gone.
+    expect(container.querySelector(".plain-state")).not.toBeInTheDocument();
+  });
+
+  it("replaces the skeleton with content once loading finishes", async () => {
+    const { container, rerender } = render(SessionsList, {
+      props: { sessions: [], projects: [], loading: true, view: "home" },
+    });
+    expect(container.querySelector(".ghost-list")).not.toBeNull();
+
+    await rerender({ sessions: [], projects: [], loading: false, view: "home" });
+
+    expect(container.querySelector(".ghost-list")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-empty="pinned"]')).toBeInTheDocument();
+  });
+});

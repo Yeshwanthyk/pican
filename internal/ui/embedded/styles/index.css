@@ -1771,6 +1771,67 @@ body.modal-sheet-open { overflow: hidden; }
 .activity-row-meta > span:nth-last-child(-n + 2) { flex: none; }
 .activity-row-status--running { color: color-mix(in srgb, var(--accent) 82%, var(--text-soft)); }
 .activity-row-status--waiting { color: color-mix(in srgb, var(--attention) 88%, var(--text-soft)); }
+/* Ghost-row loading skeleton: bars in the activity-row geometry (24px icon
+   circle, title bar, meta bar, right-aligned time bar) with a deterministic
+   width cycle and one container-level opacity pulse instead of per-bar
+   shimmer — one composited animation, cheap on mobile. */
+.ghost-list {
+    min-width: 0;
+    animation: ghost-pulse 1.5s ease-in-out infinite;
+}
+.ghost-row {
+    min-height: 60px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--index-activity-divider);
+}
+.ghost-row-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.ghost-row-copy {
+    display: block;
+    min-width: 0;
+}
+.ghost-row-title,
+.ghost-row-meta-bar,
+.ghost-row-time {
+    display: block;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.ghost-row-title {
+    height: 13.5px;
+    max-width: 86%;
+}
+.ghost-row-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 7px;
+}
+.ghost-row-meta-bar {
+    height: 10.5px;
+    max-width: 55%;
+}
+.ghost-row-time {
+    flex: none;
+    width: 56px;
+    height: 10.5px;
+}
+@keyframes ghost-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ghost-list { animation: none; }
+}
 .session-ticker-pin {
     position: absolute;
     top: 50%;
