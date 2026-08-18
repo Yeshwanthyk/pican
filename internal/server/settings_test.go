@@ -82,9 +82,6 @@ func TestHandleSaveSettingsRoundTrip(t *testing.T) {
 
 	// Other keys keep their defaults.
 	all := s.getSettings()
-	if all["pican:v1:done-sound"] != "cat.mp3" {
-		t.Errorf("expected default done-sound, got %q", all["pican:v1:done-sound"])
-	}
 	if all["pican:spinner-style"] != "braille" {
 		t.Errorf("expected stored spinner 'braille', got %q", all["pican:spinner-style"])
 	}

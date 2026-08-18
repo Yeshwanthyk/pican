@@ -28,7 +28,7 @@ func TestSPAFallbackServesBrowserRoutesButNotAPIsOrAssets(t *testing.T) {
 		}
 	}
 
-	for _, path := range []string{"/api/unknown", "/static/assets/missing.js", "/missing.js", "/sounds/missing.mp3"} {
+	for _, path := range []string{"/api/unknown", "/static/assets/missing.js", "/missing.js"} {
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusNotFound {

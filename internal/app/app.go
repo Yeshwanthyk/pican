@@ -96,9 +96,6 @@ func Run(ctx context.Context, config Config) error {
 	}
 
 	agentDir := config.StateRoot
-	if err := seedSoundsDir(agentDir); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to seed sounds directory: %v\n", err)
-	}
 	sessionsDir := filepath.Join(agentDir, "sessions")
 
 	var srv *server.Server

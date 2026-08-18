@@ -33,7 +33,6 @@ function makeWindow({ badgeApi = true } = {}) {
   return {
     windowImpl: {
       navigator: nav,
-      Audio: null,
       Notification: null,
       addEventListener: (_type: string, _listener: EventListener) => undefined,
       removeEventListener: (_type: string, _listener: EventListener) => undefined,

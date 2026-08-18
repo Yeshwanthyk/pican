@@ -540,9 +540,7 @@ export default {
 
   "settings.notifications": "Notifications",
   "settings.notifyReady": "Notify when a response is ready",
-  "settings.notifyReadyHint": "Plays a sound and shows a notification when chat completes.",
-  "settings.doneSound": "Done sound",
-  "settings.doneSoundHint": "Sound played when a response is ready.",
+  "settings.notifyReadyHint": "Shows a notification when chat completes.",
 
   "settings.machines": "Machines",
   "settings.machinesHint":

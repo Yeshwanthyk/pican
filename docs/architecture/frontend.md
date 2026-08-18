@@ -36,7 +36,7 @@ Browser routes served by the SPA shell:
 - `/subagents` → `web/src/routes/SubagentsPage.svelte`
 - `/login` → `web/src/routes/LoginPage.svelte`
 
-API, SSE, PWA, sound, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
+API, SSE, PWA, and static asset routes remain server-handled and are not intercepted by the SPA fallback.
 
 The route list above is relative to one shared live base path. At `/s/abc123`, for example, the browser sees `/s/abc123/session`, `/s/abc123/api/session`, `/s/abc123/events`, mounted hashed assets, and mounted PWA URLs. The Go shell emits the normalized value in `meta[name=pican-base-path]`; `web/src/shared/base-path.ts` is the only frontend prefix/strip abstraction used by navigation, route parsing, API helpers, SSE, icons, and service-worker registration. A static contract test rejects new root-relative live runtime URL sinks outside that helper. Static export is intentionally unchanged and self-contained.
 
@@ -78,7 +78,7 @@ The old runners/renderers have been replaced by Svelte components plus focused h
 - `data/` — payload decoding + the reactive `SessionDataModel` (`session-data.svelte.ts`, the single source of truth: entries/lookups/tree/active-path/view-state, `reconcile()`)
 - `tree/`, `render/`, `navigation/` — **pure** tree/format/markdown/navigation helpers consumed by the Svelte components (and the export). The message renderer is now `<SessionEntry>`/`<ToolCall>`; `render/` keeps `session-format`, `markdown`, `entry-format`, `session-entry-actions` (download/share/copy)
 - `session-globals.ts`, `session-content-runtime.ts`, `lazy-highlight.ts` — the relocated live glue (see above)
-- `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/sound/push util, also used by the settings page). Model discovery is session-scoped (`/api/models?id=<sessionId>`) so providers from different runtimes cannot mix. Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
+- `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/push util, also used by the settings page). Model discovery is session-scoped (`/api/models?id=<sessionId>`) so providers from different runtimes cannot mix. Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
 - `live/` — live-only helpers used by `<LiveReload>`: `live-connection.ts` (SSE connection/reconnect lifecycle), `live-events.ts` (SSE/reload primitives), `live-scroll.ts` (low-level scroll primitives), `live-follow.ts` (`createFollowScrollController` — follow-mode decision state + follow button), `live-stats.ts` (header stats), and `chat-preview.ts` (streaming-preview helper, also used by `<BtwPopup>`)
 - `ui/` — search/toggle/session-ui-runner helpers used by `setupSessionUi` and `RightSidebar`, plus `sidebar.ts`'s mobile-breakpoint helpers (`isMobileLayout`) and the docked-sidebar drawer toggle (`setSidebarOpen`) still used by the static export (see below)
 - `artifacts/` — pure registries/filters + the fetch API wrappers; the panel itself is `ArtifactPanel.svelte`
@@ -177,7 +177,6 @@ The subagents route also uses the `__all__` connection. It refetches `/api/subag
 | Service worker          | `internal/ui/embedded/assets/sw.js`                                                           | `/sw.js`                                                                                                                               |
 | Icons                   | `internal/ui/embedded/assets/icon.svg` etc.                                                   | `/icon.svg`, `/icon-maskable.svg`, `/pi-logo.svg`                                                                                      |
 | Sound assets            | `internal/ui/embedded/assets/cat.webm`                                                        | `/cat.webm`                                                                                                                            |
-| User sound assets       | `~/.pi/agent/pican/assets/*.mp3`                                                              | `/sounds/*.mp3`                                                                                                                        |
 | SPA bundled stylesheets | `internal/ui/app_styles.go` (index/session/menu/palette/workflows/tasks/subagents CSS joined) | `/styles/app.css?v=<hash>`, content-hash cache-busted, `Cache-Control: public, max-age=31536000, immutable`, served gzip when accepted |
 
 ## Theme System

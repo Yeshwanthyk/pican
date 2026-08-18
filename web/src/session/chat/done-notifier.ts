@@ -6,15 +6,6 @@ import { writeSetting } from "../../shared/settings-store.js";
 import type { SettingsStorage } from "../../shared/settings-store.js";
 import { withBasePath } from "../../shared/base-path.js";
 
-interface AudioLike {
-  volume: number;
-  play(): Promise<void> | void;
-}
-
-interface AudioConstructor {
-  new (src?: string): AudioLike;
-}
-
 interface NotificationLike {
   onclick: ((event: Event) => unknown) | null;
   close(): void;
@@ -33,7 +24,6 @@ interface BadgeNavigator {
 }
 
 interface DoneWindow {
-  readonly Audio?: AudioConstructor | null;
   readonly Notification?: NotificationConstructor | null;
   readonly navigator: BadgeNavigator;
   readonly PushManager?: unknown;
@@ -74,10 +64,6 @@ const ignorePromise = (operation: () => Promise<unknown>): void => {
 };
 
 const VapidResponseSchema = Schema.Struct({ publicKey: Schema.String });
-const SoundsResponseSchema = Schema.Struct({
-  sounds: Schema.Array(Schema.String),
-  default: Schema.String,
-});
 const encodeJson = Schema.encodeUnknownEffect(Schema.UnknownFromJsonString);
 const isNetworkError = Schema.is(NetworkError);
 
@@ -101,9 +87,8 @@ const decodeResponse = <A, R>(
   );
 
 export const DONE_NOTIFY_STORAGE_KEY = "pican:v1:notify-on-done";
-export const DONE_SOUND_STORAGE_KEY = "pican:v1:done-sound";
-
 export function isDoneNotifyEnabled({
+
   storage = globalThis.localStorage,
 }: StorageOptions = {}): boolean {
   return bestEffort(() => storage?.getItem(DONE_NOTIFY_STORAGE_KEY) === "true", false);
@@ -114,35 +99,6 @@ export function setDoneNotifyEnabled(
   { storage = globalThis.localStorage }: StorageOptions = {},
 ): void {
   writeSetting(DONE_NOTIFY_STORAGE_KEY, String(!!enabled), { storage });
-}
-
-export function getSelectedSound({
-  storage = globalThis.localStorage,
-}: StorageOptions = {}): string {
-  return bestEffort(() => storage?.getItem(DONE_SOUND_STORAGE_KEY) || "cat.mp3", "cat.mp3");
-}
-
-export function setSelectedSound(
-  name: string,
-  { storage = globalThis.localStorage }: StorageOptions = {},
-): void {
-  writeSetting(DONE_SOUND_STORAGE_KEY, name || "cat.mp3", { storage });
-}
-
-export function playDoneSound({
-  windowImpl = globalThis.window,
-  audioSrc,
-  storage = globalThis.localStorage,
-}: WindowOptions & StorageOptions & { readonly audioSrc?: string } = {}): void {
-  bestEffort(() => {
-    const AudioCtor = windowImpl.Audio;
-    if (!AudioCtor) return;
-    const src = audioSrc || withBasePath(`/sounds/${getSelectedSound({ storage })}`);
-    const audio = new AudioCtor(src);
-    audio.volume = 0.7;
-    const p = audio.play();
-    if (p instanceof Promise) ignorePromise(() => p);
-  }, undefined);
 }
 
 export function showDoneNotification({
@@ -388,7 +344,6 @@ export function notifyDone({
   storage = globalThis.localStorage,
 }: WindowOptions & StorageOptions & { readonly documentImpl?: VisibilityDocument } = {}): void {
   if (!isDoneNotifyEnabled({ storage })) return;
-  playDoneSound({ windowImpl, storage });
   showDoneNotification({ windowImpl, documentImpl });
   // Badge only when the user isn't watching this session — covers background
   // tabs, minimized windows, and other apps in front. Cleared on
@@ -428,82 +383,3 @@ export function setupAppBadgeClearing({
   };
 }
 
-export async function fetchAvailableSounds({
-  fetchImpl = globalThis.fetch,
-}: { readonly fetchImpl?: FetchLike } = {}): Promise<{
-  sounds: ReadonlyArray<string>;
-  default: string;
-}> {
-  const fallback = { sounds: ["cat.mp3", "done.mp3"], default: "cat.mp3" };
-  const operation = Effect.tryPromise({
-    try: () => fetchImpl(withBasePath("/api/sounds")),
-    catch: (cause) => new NetworkError({ cause }),
-  }).pipe(
-    Effect.flatMap((response) =>
-      response.ok ? decodeResponse(response, SoundsResponseSchema) : Effect.succeed(fallback),
-    ),
-    Effect.catch(() => Effect.succeed(fallback)),
-  );
-  return runPromise(operation);
-}
-
-export async function setupSoundSelector({
-  documentImpl = globalThis.document,
-  windowImpl = globalThis.window,
-  storage = globalThis.localStorage,
-  fetchImpl = typeof globalThis.fetch !== "undefined" ? globalThis.fetch : null,
-}: {
-  readonly documentImpl?: Document;
-  readonly windowImpl?: DoneWindow;
-  readonly storage?: SettingsStorage;
-  readonly fetchImpl?: FetchLike | null;
-} = {}): Promise<void> {
-  const selectors = Array.from(documentImpl.querySelectorAll<HTMLSelectElement>(".sound-selector"));
-  if (selectors.length === 0) return;
-
-  // Prevent event propagation inside the selector from triggering the parent button's click toggle
-  selectors.forEach((sel) => {
-    sel.addEventListener("click", (e) => e.stopPropagation());
-    sel.addEventListener("mousedown", (e) => e.stopPropagation());
-  });
-
-  if (!fetchImpl) return;
-
-  // Fetch the available sounds
-  const data = await fetchAvailableSounds({ fetchImpl });
-  const sounds = data.sounds || ["cat.mp3", "done.mp3"];
-  const activeSound = getSelectedSound({ storage });
-
-  selectors.forEach((sel) => {
-    // Clear existing options
-    sel.replaceChildren();
-
-    // Add options
-    sounds.forEach((soundName) => {
-      const opt = documentImpl.createElement("option");
-      opt.value = soundName;
-      opt.textContent = soundName;
-      if (soundName === activeSound) {
-        opt.selected = true;
-      }
-      sel.appendChild(opt);
-    });
-
-    // When value changes, update localStorage, play preview, and sync other sound selector elements!
-    sel.addEventListener("change", (e) => {
-      if (!(e.currentTarget instanceof HTMLSelectElement)) return;
-      const newSound = e.currentTarget.value;
-      setSelectedSound(newSound, { storage });
-
-      // Sync all other selectors on the page to the new value
-      selectors.forEach((otherSel) => {
-        if (otherSel !== sel) {
-          otherSel.value = newSound;
-        }
-      });
-
-      // Preview the sound
-      playDoneSound({ windowImpl, storage });
-    });
-  });
-}

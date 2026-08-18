@@ -50,7 +50,6 @@ func isSPABrowserPath(r *http.Request) bool {
 		"/api/",
 		"/api",
 		"/static/",
-		"/sounds/",
 		"/debug/",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix) {

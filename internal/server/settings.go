@@ -61,7 +61,6 @@ var settingDefaults = map[string]string{
 	"pican:v1:font-content-size":   "13",
 	"pican:spinner-style":          "runcat",
 	"pican:v1:notify-on-done":      "false",
-	"pican:v1:done-sound":          "cat.mp3",
 	"pican:view-layout":            "timeline",
 	"pican:v1:show-btw-in-index":   "false",
 	settingAutoTitleEnabled:        "true",

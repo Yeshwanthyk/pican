@@ -72,7 +72,6 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   GET  /api/workflows{,/run} → external workflow run snapshots            │
 │   GET  /api/tasks{,/output} → external task stores and output              │
 │   GET  /api/subagents → merged child sessions and parent records           │
-│   GET  /api/sounds  /  GET /sounds/…   (notification sounds)             │
 │   POST /share         →  handleShare         (GitHub Gist)               │
 │   GET  /events        →  handleEvents        (SSE)                       │
 │   GET  /api/recent-locations → handleRecentLocations                     │

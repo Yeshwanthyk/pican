@@ -21,7 +21,6 @@ pican/
 │   │   ├── models_cache.go     # Process-wide coalesced cache for Pi model list
 │   │   ├── runtime.go          # Runtime mode, Codex service/catalog sync, model aggregation
 │   │   ├── browser.go          # Open the default browser at startup
-│   │   ├── sounds.go           # Seed default notification sounds into the agent dir
 │   │   ├── update.go           # runInstall / runRestart for self-update
 │   │   └── state_file_*.go     # pican-state.json + flock helpers
 │   ├── frontend/
@@ -101,7 +100,6 @@ pican/
 │   │   ├── scratchpad.go       # Per-project scratchpad get/save (SQLite)
 │   │   ├── projects.go         # Project visibility prefs: list/toggle/register + index filtering (SQLite)
 │   │   ├── archives.go         # Runtime-neutral local session archive metadata and API
-│   │   ├── sound.go            # /api/sounds + /sounds/ asset serving
 │   │   ├── push.go             # PushManager: VAPID, subscribe/unsubscribe, NotifyDone
 │   │   ├── workflows_api.go    # Read-only workflow list/detail handlers
 │   │   ├── subagents_api.go    # Merge child sessions with parent spawn/result records
@@ -420,8 +418,6 @@ type piRPCWorker struct {
 | `/api/archives` | POST | `handleSetArchive` | Runtime-neutral local archive/restore; archive unpins and rejects running/waiting sessions |
 | `/api/peers` | GET/POST | `handleApiPeers` / `handleUpdatePeer` | Registered peer hosts (SQLite); GET never returns tokens, POST upserts (`action:"remove"` deletes) |
 | `/api/peers/sessions` | GET | `handlePeersSessions` | Fan out to every peer's `/api/sessions` over Tailscale (3s/peer timeout); see `docs/sequence-flows/peers.md` |
-| `/api/sounds` | GET | `handleApiSounds` | List available notification sounds |
-| `/sounds/` | GET | `handleSounds` | Serve a sound asset (no auth) |
 | `/custom-themes.css` | GET | `handleCustomThemes` | User custom theme CSS |
 | `/api/push/vapid` | GET | `handleVapid` | VAPID public key (when push enabled) |
 | `/api/push/subscribe` | POST | `handleSubscribe` | Register a web-push subscription |

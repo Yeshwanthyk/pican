@@ -33,12 +33,6 @@ var appIconPNG []byte
 //go:embed embedded/assets/pi-logo.svg
 var piLogoSVG string
 
-//go:embed embedded/assets/cat.mp3
-var CatMP3 []byte
-
-//go:embed embedded/assets/done.mp3
-var DoneMP3 []byte
-
 //go:embed embedded/assets/cat.webm
 var catWebm []byte
 

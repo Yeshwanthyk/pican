@@ -183,7 +183,7 @@
     {:else if activeSection === 'artifacts'}
       <ArtifactSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'notifications'}
-      <NotificationSettings {settings} onSave={saveSetting} onSaved={flashSaved} />
+      <NotificationSettings {settings} onSave={saveSetting} />
     {:else if activeSection === 'machines'}
       <MachinesSettings />
     {/if}

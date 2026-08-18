@@ -14,7 +14,6 @@ export const SERVER_SETTING_KEYS = [
   "pican:v1:font-content-size",
   "pican:spinner-style",
   "pican:v1:notify-on-done",
-  "pican:v1:done-sound",
   "pican:view-layout",
   "pican:v1:auto-title:enabled",
   "pican:v1:auto-title:mode",
