@@ -12,6 +12,21 @@ with the four platform binaries and `sha256sums.txt`.
 
 ## [Unreleased]
 
+### Added
+
+- Waiting sessions ("Waiting on you") with answer buttons now surface in the
+  home feed on mobile, where the rail was previously hidden; peer machines
+  show an online-count entry in the home menu on phones.
+- Queue button on the composer toolbar now stays visible while idle when the
+  queue is non-empty or paused, with a queued-count badge and paused state.
+- Queue rows now label the head item "next up" and later items "queued #n",
+  and each queued row has a mouse-accessible "Send now" button.
+- Skeleton loading rows replace the bare "Loading sessions…" text on the home
+  feed.
+- The home rail collapses to a single centered column when it has nothing to
+  show (no waiting sessions, no peer machines).
+- Follow button shows the pending new-message count while streaming.
+
 ### Removed
 
 - None yet.
