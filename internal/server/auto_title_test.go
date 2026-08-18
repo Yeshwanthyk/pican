@@ -169,7 +169,7 @@ func TestMaybeAutoTitleUsesModel(t *testing.T) {
 	restore := autoTitleGenerate
 	autoTitleGenerate = func(ctx context.Context, opts rpc.PromptOpts) (string, error) {
 		calls++
-		if opts.Model != "anthropic/sonnet" {
+		if opts.Model != "anthropic/sonnet:off" {
 			t.Errorf("expected model passed through, got %q", opts.Model)
 		}
 		return "Model Title", nil

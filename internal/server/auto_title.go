@@ -177,6 +177,9 @@ func (s *Server) generateTitle(firstUserText string) string {
 
 func (s *Server) generateTitleInputs(inputs sessions.TitleInputs, fallbackText string) string {
 	model := s.autoTitleModel()
+	if model != "" && !strings.HasSuffix(model, ":off") {
+		model += ":off"
+	}
 	// Hosted mode only permits subprocesses through the configured Codex
 	// worker environment. The legacy title generator launches pi directly
 	// with the ambient process environment, so use the deterministic local

@@ -578,14 +578,14 @@ export default {
 
   "settings.sessionTitles": "Session Titles",
   "settings.autoTitle": "Auto-generate titles",
-  "settings.autoTitleHint": "Let pican name sessions automatically from the first message.",
+  "settings.autoTitleHint": "Generate one clean title from the first user message.",
   "settings.whenToTitle": "When to title",
-  "settings.whenToTitleHint": "Title a session once, or refresh it as the focus shifts.",
+  "settings.whenToTitleHint": "Title once, or refresh after each user turn.",
   "settings.titleOnce": "Once per session",
-  "settings.titleEachTurn": "Every new message",
+  "settings.titleEachTurn": "Every user turn",
   "settings.titleModel": "Title model",
   "settings.titleModelHint":
-    "Built-in is a free, instant word heuristic (no AI). Pick a model for smarter titles — a small, fast one is ideal.",
+    "The built-in option is instant and free. Choose a model for cleaner titles; reasoning is disabled for this short task.",
   "settings.titleBuiltin": "Built-in heuristic (no AI)",
 
   "settings.sessionDisplay": "Session Display",

@@ -12,9 +12,11 @@
   const enabledKey = 'pican:v1:auto-title:enabled';
   const modeKey = 'pican:v1:auto-title:mode';
   const modelKey = 'pican:v1:auto-title:model';
+  const displayModel = (value: string): string =>
+    value.endsWith(':off') ? value.slice(0, -':off'.length) : value;
   let enabled = $derived(boolFor(settings, enabledKey, false));
   let mode = $derived(valueFor(settings, modeKey, 'once'));
-  let model = $derived(valueFor(settings, modelKey, ''));
+  let model = $derived(displayModel(valueFor(settings, modelKey, '')));
   let modelGroups = $state<ReadonlyArray<ModelGroup>>([]);
 
   onMount(() => {
