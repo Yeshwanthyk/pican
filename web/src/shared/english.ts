@@ -388,6 +388,8 @@ export default {
   "composer.queueNext": "Queue next",
   "composer.queueHint": "Queue this message for after the current response",
   "composer.queuedNext": "queued next",
+  "composer.queueBadgeCount": "{count} pending messages in queue",
+  "composer.queuePausedBadge": "Queue is paused",
   "composer.submitted": "submitted",
   "composer.removeQueued": "Remove queued message",
   "composer.queueActive": "Queue",

@@ -329,7 +329,13 @@
         showCommands={capabilities.slashCommands}
         showFiles={capabilities.files}
       />
-      <ChatToolbar chatAvailable={composerAvailable} {toolbar} {modelLabel} {capabilities} />
+      <ChatToolbar
+        chatAvailable={composerAvailable}
+        {toolbar}
+        {modelLabel}
+        {capabilities}
+        {queueStore}
+      />
       <ContextUsage popover={true} />
     </div>
     {#if pinnedTabs && currentSession}

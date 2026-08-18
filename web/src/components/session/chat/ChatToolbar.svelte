@@ -7,17 +7,20 @@
     defaultRuntimeCapabilities,
     type CompleteRuntimeCapabilities,
   } from '../../../lib/runtime-capabilities.js';
+  import type { QueueStore } from './queue-store.svelte.js';
 
   let {
     chatAvailable = true,
     toolbar = new ChatToolbarState(),
     modelLabel = '',
     capabilities = defaultRuntimeCapabilities('pi'),
+    queueStore = null,
   }: {
     chatAvailable?: boolean;
     toolbar?: ChatToolbarState;
     modelLabel?: string;
     capabilities?: CompleteRuntimeCapabilities;
+    queueStore?: QueueStore | null;
   } = $props();
 
   const statusText = $derived(
@@ -88,10 +91,24 @@
           type="button"
           id="pi-chat-queue"
           class="pi-chat-queue"
-          style:display={toolbar.isRunning ? '' : 'none'}
-          title={t('composer.queueHint')}
-          disabled>{t('composer.queueNext')}</button
-        >{/if}
+          class:pi-chat-queue--paused={queueStore?.paused}
+          style:display={toolbar.isRunning || (queueStore?.count ?? 0) > 0 || queueStore?.paused
+            ? ''
+            : 'none'}
+          title={queueStore?.paused ? t('composer.queuePausedBadge') : t('composer.queueHint')}
+          disabled
+          >{t('composer.queueNext')}
+          {#if queueStore?.paused}<span
+              class="pi-chat-queue-paused"
+              role="img"
+              aria-label={t('composer.queuePausedBadge')}
+            ></span>{/if}
+          {#if (queueStore?.queuedCount ?? 0) > 0}<span
+              class="pi-chat-queue-badge"
+              aria-label={t('composer.queueBadgeCount', { count: queueStore?.queuedCount })}
+              >{queueStore?.queuedCount}</span
+            >{/if}
+        </button>{/if}
     </div>
   </div>
 </div>

@@ -4650,6 +4650,45 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
 /* Floating card above the composer. .pi-chat-composer is a wide flex column
        (it spans the full reading area to anchor the cwd bar / footer), so the
        panel needs to mirror .pi-chat-shell's own centering + max-width or it
+/* Count pill + paused glyph on the Queue button. */
+.pi-chat-queue-badge,
+.pi-chat-queue-paused {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  border-radius: 9px;
+}
+
+.pi-chat-queue-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  font-size: 9px;
+  line-height: 14px;
+  color: var(--body-bg);
+  background: var(--accent);
+}
+
+/* A pair of pause bars, shown while the queue is paused. */
+.pi-chat-queue-paused {
+  width: 10px;
+  height: 10px;
+  margin-left: 5px;
+  background:
+    linear-gradient(var(--warning), var(--warning)) 0 0 / 3px 10px no-repeat,
+    linear-gradient(var(--warning), var(--warning)) 6px 0 / 3px 10px no-repeat;
+}
+
+.pi-chat-queue--paused {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
        sprawls when the sidebars are collapsed and the column is wider. */
 .pi-queue-panel {
   display: flex;

@@ -2,6 +2,7 @@ import { afterEach, assert, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/svelte";
 import ChatToolbar from "./ChatToolbar.svelte";
 import { ChatToolbarState } from "./chat-toolbar-state.svelte.js";
+import { QueueStore } from "./queue-store.svelte.js";
 import { defaultRuntimeCapabilities } from "../../../lib/runtime-capabilities";
 
 function byId(elementId: string): HTMLElement {
@@ -37,7 +38,7 @@ describe("ChatToolbar", () => {
     expect(byId("pi-chat-cancel").style.display).toBe("");
     expect(byId("pi-chat-cancel").textContent).toBe("Stop");
     expect(byId("pi-chat-queue").style.display).toBe("");
-    expect(byId("pi-chat-queue").textContent).toBe("Queue next");
+    expect(byId("pi-chat-queue")).toHaveTextContent("Queue next");
     expect(byId("pi-chat-send").textContent).toBe("Steer now");
     expect(byId("pi-chat-send").getAttribute("title")).toBe(
       "Add this message to the response in progress",
@@ -66,6 +67,37 @@ describe("ChatToolbar", () => {
     expect(byId("pi-chat-cancel").style.display).toBe("none");
     expect(byId("pi-chat-queue").style.display).toBe("none");
     expect(byId("pi-chat-send").textContent).toBe("Send");
+  });
+
+  it("keeps the queue button visible while idle when the queue is non-empty", () => {
+    const toolbar = new ChatToolbarState();
+    const queueStore = new QueueStore();
+    queueStore.items = [
+      {
+        id: "q-1",
+        kind: "queued",
+        position: 1,
+        text: "first",
+        displayText: "first",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+    ];
+    render(ChatToolbar, { props: { chatAvailable: true, toolbar, queueStore } });
+
+    expect(byId("pi-chat-queue").style.display).toBe("");
+    expect(byId("pi-chat-queue").querySelector(".pi-chat-queue-badge")?.textContent).toBe("1");
+    expect(byId("pi-chat-queue").querySelector(".pi-chat-queue-paused")).toBeNull();
+  });
+
+  it("keeps the queue button visible while idle when the queue is paused", () => {
+    const toolbar = new ChatToolbarState();
+    const queueStore = new QueueStore();
+    queueStore.setPaused(true);
+    render(ChatToolbar, { props: { chatAvailable: true, toolbar, queueStore } });
+
+    expect(byId("pi-chat-queue").style.display).toBe("");
+    expect(byId("pi-chat-queue").className).toContain("pi-chat-queue--paused");
+    expect(byId("pi-chat-queue").querySelector(".pi-chat-queue-paused")).not.toBeNull();
   });
 
   it("keeps Stop disabled while an accepted interrupt is settling", () => {
