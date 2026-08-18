@@ -97,3 +97,7 @@ Architecture documentation lives in [`docs/architecture`](docs/architecture/READ
 
 pican is a fork of [pi-web](https://github.com/ygncode/pi-web) by
 [Set Kyar Wa Lar (YGNCode)](https://github.com/setkyar), MIT licensed.
+
+Releases are cut locally (no CI); see [`RELEASING.md`](RELEASING.md) for the
+bump → build → publish flow, and [`CHANGELOG.md`](CHANGELOG.md) for the
+per-release history.
