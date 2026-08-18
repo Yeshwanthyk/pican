@@ -19,7 +19,11 @@ func TestSanitizeTitle(t *testing.T) {
 		{"  Fix Flaky Login Test  ", "Fix Flaky Login Test"},
 		{"\"Quoted Title\"", "Quoted Title"},
 		{"Title\nwith a second line", "Title"},
-		{"one two three four five six seven", "one two three four five six seven"},
+		// Sanitize enforces the hard title word cap: longer model output is
+		// truncated so titles cannot balloon past the limit.
+		{"one two three four five six seven", "one two three four"},
+		{"one two three four five", "one two three four"},
+		{"one two three four", "one two three four"},
 		{"", ""},
 		{"   ", ""},
 		{"`backticked`", "backticked"},

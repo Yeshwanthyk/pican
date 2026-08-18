@@ -8,7 +8,7 @@ import (
 )
 
 // titleWordLimit caps how many words a generated/heuristic title may contain.
-const titleWordLimit = 8
+const titleWordLimit = 4
 
 // titleStopWords are dropped from heuristic titles. Ported from the former
 // pican pi extension so behavior is preserved now that titling is built in.
@@ -33,7 +33,8 @@ var (
 	reUnderSlash = regexp.MustCompile(`[_/]+`)
 	// Keep letters, numbers, and combining marks (\p{M}) so complex scripts
 	// (e.g. Burmese vowel signs/medials) are not split apart.
-	reNonWord = regexp.MustCompile(`[^\p{L}\p{N}\p{M}-]+`)
+	reNonWord  = regexp.MustCompile(`[^\p{L}\p{N}\p{M}-]+`)
+	reSentenceEnd = regexp.MustCompile(`[.!?]+\s`)
 )
 
 func titleCaseWord(word string) string {
@@ -68,6 +69,11 @@ func deriveTitleFromInput(text string) string {
 	normalized := reFencedCode.ReplaceAllString(text, " ")
 	normalized = reInlineCode.ReplaceAllString(normalized, " $1 ")
 	normalized = reURL.ReplaceAllString(normalized, " ")
+	// Intent lives in the first sentence: cut later sentences (which are often
+	// tangential findings or mid-task words) so they cannot pollute the title.
+	if i := reSentenceEnd.FindStringIndex(normalized); i != nil {
+		normalized = normalized[:i[0]]
+	}
 	normalized = reUnderSlash.ReplaceAllString(normalized, " ")
 	normalized = reNonWord.ReplaceAllString(normalized, " ")
 	normalized = strings.TrimSpace(normalized)
