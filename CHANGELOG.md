@@ -12,6 +12,25 @@ with the four platform binaries and `sha256sums.txt`.
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-08-18
+
+### Changed
+
+- Auto-titles are now written once per session by default, anchored on the
+  durable subject of the first user message, instead of being rewritten on
+  every user turn. Use the new "Regenerate title" session-menu action (or the
+  per-turn setting) when the subject genuinely shifts.
+- Title prompts now follow t3code's editorial rules: never copy or truncate a
+  message verbatim, avoid project names already visible in the UI, and name
+  the product change rather than the mock, plan, branch, or PR used to produce
+  it.
+
+### Added
+
+- "Regenerate title" action in the session menu re-titles a session on demand
+  (new `/api/regenerate-title` endpoint); an explicit regenerate overrides an
+  existing auto or manual title but still loses to a rename made while it runs.
+
 ### Fixed
 
 - In-app update now restarts bare/manual-run instances by re-executing the
