@@ -95,3 +95,8 @@ Always use `make build`; it embeds the current frontend assets into the Go binar
 `make check` includes Oxlint, Oxfmt/Svelte formatting checks, TypeScript and `svelte-check`, unit tests, the production build, installer tests, and `go vet`. Playwright remains a separate `make e2e` gate.
 
 Architecture documentation lives in [`docs/architecture`](docs/architecture/README.md).
+
+## Credits
+
+pican is a fork of [pi-web](https://github.com/ygncode/pi-web) by
+[Set Kyar Wa Lar (YGNCode)](https://github.com/setkyar), MIT licensed.
