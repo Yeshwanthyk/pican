@@ -34,8 +34,17 @@
     return raw || t('composer.attachmentText');
   }
 
+  // The head of the server queue is "next up" — it runs as soon as the
+  // worker is free. Every later queued row shows its 1-based position in the
+  // queue ("queued #2", "queued #3", …). Steer rows are in-flight prompts, so
+  // they keep the "submitted" tag.
   function itemState(item: QueueDisplayItem): string {
-    return item.kind === 'queued' ? t('composer.queuedNext') : t('composer.submitted');
+    if (item.kind === 'steer') return t('composer.submitted');
+    const queuedIndex = store.items.findIndex(
+      (candidate) => candidate.kind === 'queued' && candidate.id === item.id,
+    );
+    if (queuedIndex <= 0) return t('composer.queuedNext');
+    return t('composer.queuePosition', { n: queuedIndex + 1 });
   }
 
   function itemTime(item: QueueDisplayItem): string {
@@ -246,6 +255,20 @@
               <time datetime={item.createdAt} title={item.createdAt}>{itemTime(item)}</time>
             {/if}
           </span>
+          {#if item.kind === 'queued'}
+            <button
+              type="button"
+              class="pi-queue-item-send"
+              aria-label={t('composer.sendNowHint')}
+              title={t('composer.sendNowHint')}
+              onclick={(event) => {
+                event.stopPropagation();
+                store.actions.sendNow?.(item.id);
+              }}
+            >
+              {@html icon(Play, { size: 12 })}
+            </button>
+          {/if}
           <button
             type="button"
             class="pi-queue-item-remove"

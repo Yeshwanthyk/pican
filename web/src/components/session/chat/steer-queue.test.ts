@@ -229,6 +229,13 @@ describe("setupSteerQueue (server-backed)", () => {
     // here would double-send the same message.
     expect(sendChatMessage).not.toHaveBeenCalled();
   });
+  it("exposes sendNow as store.actions.sendNow so the panel's mouse button uses the same path as Enter", () => {
+    const { queueButton, textarea } = makeDom();
+    const store = new QueueStore();
+    const handle = setupSteerQueue({ store, queueButton, textarea });
+
+    expect(store.actions.sendNow).toBe(handle.sendNow);
+  });
 
   it("edit DELETEs the row server-side and pops the text back into the textarea", async () => {
     const { queueButton, textarea } = makeDom();

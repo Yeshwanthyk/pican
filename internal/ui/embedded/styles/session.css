@@ -4968,6 +4968,26 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   background: color-mix(in srgb, var(--text) 10%, transparent);
   color: var(--text);
 }
+.pi-queue-item-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--accent) 85%, var(--text));
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.pi-queue-item-send:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  opacity: 1;
+}
 
 .pi-queue-shortcuts {
   display: flex;
@@ -5027,12 +5047,14 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   .pi-chat-cancel,
   .pi-chat-queue,
   .pi-queue-toggle,
-  .pi-queue-item-remove {
+  .pi-queue-item-remove,
+  .pi-queue-item-send {
     min-height: 44px;
   }
 
   .pi-chat-icon-button,
-  .pi-queue-item-remove {
+  .pi-queue-item-remove,
+  .pi-queue-item-send {
     min-width: 44px;
   }
 
