@@ -12,6 +12,10 @@ with the four platform binaries and `sha256sums.txt`.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [0.0.6] - 2026-08-18
+
 ### Added
 
 - Waiting sessions ("Waiting on you") with answer buttons now surface in the
@@ -26,14 +30,6 @@ with the four platform binaries and `sha256sums.txt`.
 - The home rail collapses to a single centered column when it has nothing to
   show (no waiting sessions, no peer machines).
 - Follow button shows the pending new-message count while streaming.
-
-### Removed
-
-- None yet.
-
-### Fixed
-
-- None yet.
 
 ## [0.0.5] - 2026-08-18
 
