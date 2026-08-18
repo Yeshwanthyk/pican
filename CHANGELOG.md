@@ -12,7 +12,11 @@ with the four platform binaries and `sha256sums.txt`.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Fixed
+
+- In-app update now restarts bare/manual-run instances by re-executing the
+  binary when no service manager (launchd plist or systemd unit) is present,
+  instead of shutting down after the failed service restart.
 
 ## [0.0.6] - 2026-08-18
 

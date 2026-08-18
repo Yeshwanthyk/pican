@@ -4,17 +4,238 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"pican/internal/updater"
 )
+
+// fakeServiceRunner scripts the service-manager restart command: success
+// (tookOver), failure (bare-binary run), or a hard error.
+type fakeServiceRunner struct {
+	tookOver bool
+	err      error
+	calls    int
+}
+
+func (f *fakeServiceRunner) restartService() (tookOver bool, err error) {
+	f.calls++
+	return f.tookOver, f.err
+}
+
+// setRestartHooks swaps the restart seams (re-exec spawn, process exit, exit
+// timer) for the duration of the test so the fallback decision can be
+// observed without spawning processes or killing the test binary.
+func setRestartHooks(t *testing.T, spawn func(*exec.Cmd) error, exit func(int), timer func(time.Duration) *time.Timer) {
+	t.Helper()
+	origSpawn, origExit, origTimer := spawnReexec, exitProcess, exitAfter
+	spawnReexec, exitProcess, exitAfter = spawn, exit, timer
+	t.Cleanup(func() {
+		spawnReexec, exitProcess, exitAfter = origSpawn, origExit, origTimer
+	})
+}
+
+func TestRunRestartServiceManagerSuccessArmsExitTimer(t *testing.T) {
+	runner := &fakeServiceRunner{tookOver: true}
+	var spawned []*exec.Cmd
+	exited := false
+	timerArmed := false
+	setRestartHooks(t,
+		func(cmd *exec.Cmd) error { spawned = append(spawned, cmd); return nil },
+		func(code int) { exited = true },
+		func(d time.Duration) *time.Timer { timerArmed = true; return time.NewTimer(time.Hour) },
+	)
+
+	if err := unixRestart(runner); err != nil {
+		t.Fatalf("unixRestart err: %v", err)
+	}
+	if runner.calls != 1 {
+		t.Errorf("service runner invoked %d times, want 1", runner.calls)
+	}
+	if len(spawned) != 0 {
+		t.Errorf("re-exec child spawned %d times, want 0", len(spawned))
+	}
+	if !timerArmed {
+		t.Errorf("exit timer was not armed after service-manager success")
+	}
+	if exited {
+		t.Errorf("process exited despite service-manager success")
+	}
+}
+
+func TestRunRestartServiceManagerFailureReexecs(t *testing.T) {
+	runner := &fakeServiceRunner{tookOver: false}
+	var spawned *exec.Cmd
+	exited := false
+	timerArmed := false
+	setRestartHooks(t,
+		func(cmd *exec.Cmd) error { spawned = cmd; return nil },
+		func(code int) { exited = true },
+		func(d time.Duration) *time.Timer { timerArmed = true; return time.NewTimer(time.Hour) },
+	)
+
+	if err := unixRestart(runner); err != nil {
+		t.Fatalf("unixRestart err: %v", err)
+	}
+	if runner.calls != 1 {
+		t.Errorf("service runner invoked %d times, want 1", runner.calls)
+	}
+	if spawned == nil {
+		t.Fatal("re-exec child was not spawned")
+	}
+	if timerArmed {
+		t.Errorf("exit timer armed in re-exec fallback path")
+	}
+	if !exited {
+		t.Errorf("old process did not exit after spawning re-exec child")
+	}
+
+	// The child must preserve the runtime: same executable and argv
+	// (shell-quoted inside the detached sh -c script), same cwd and env, in a
+	// detached session, with a sleep so the old process releases the port
+	// before the child binds.
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spawned.Args) != 3 || spawned.Args[0] != "sh" || spawned.Args[1] != "-c" {
+		t.Fatalf("re-exec command = %q, want sh -c <script>", spawned.Args)
+	}
+	quoted := make([]string, 0, len(os.Args))
+	for _, a := range os.Args[1:] {
+		quoted = append(quoted, shQuote(a))
+	}
+	wantScript := fmt.Sprintf("sleep 1; exec %s %s", shQuote(exe), strings.Join(quoted, " "))
+	if spawned.Args[2] != wantScript {
+		t.Errorf("re-exec script = %q, want %q", spawned.Args[2], wantScript)
+	}
+	if cwd, _ := os.Getwd(); spawned.Dir != cwd {
+		t.Errorf("re-exec cwd = %q, want %q", spawned.Dir, cwd)
+	}
+	if !slices.Equal(spawned.Env, os.Environ()) {
+		t.Errorf("re-exec env does not match the parent env")
+	}
+	if spawned.SysProcAttr == nil {
+		t.Errorf("re-exec child is not detached (no SysProcAttr)")
+	}
+	if spawned.Stdin == nil || spawned.Stdout == nil {
+		t.Errorf("re-exec stdio is not detached")
+	}
+}
+
+func TestRunRestartServiceRunnerErrorPropagates(t *testing.T) {
+	runner := &fakeServiceRunner{err: errors.New("restart command could not start")}
+	var spawned *exec.Cmd
+	exited := false
+	timerArmed := false
+	setRestartHooks(t,
+		func(cmd *exec.Cmd) error { spawned = cmd; return nil },
+		func(code int) { exited = true },
+		func(d time.Duration) *time.Timer { timerArmed = true; return time.NewTimer(time.Hour) },
+	)
+
+	err := unixRestart(runner)
+	if err == nil {
+		t.Fatal("expected runner error to propagate")
+	}
+	if spawned != nil || exited || timerArmed {
+		t.Errorf("no child/timer/exit expected on runner error: spawned=%v exited=%v timerArmed=%v",
+			spawned != nil, exited, timerArmed)
+	}
+}
+
+func TestRunRestartReexecSpawnFailurePropagates(t *testing.T) {
+	runner := &fakeServiceRunner{tookOver: false}
+	exited := false
+	setRestartHooks(t,
+		func(cmd *exec.Cmd) error { return errors.New("spawn boom") },
+		func(code int) { exited = true },
+		func(d time.Duration) *time.Timer { return time.NewTimer(time.Hour) },
+	)
+
+	err := unixRestart(runner)
+	if err == nil || !strings.Contains(err.Error(), "spawn boom") {
+		t.Fatalf("expected spawn error to propagate, got: %v", err)
+	}
+	if exited {
+		t.Errorf("process exited despite spawn failure")
+	}
+}
+
+func TestUnixServiceRunnerMapsExitStatus(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix service runner is not used on windows")
+	}
+	// Exit 0 means the service manager took over.
+	ok := &unixServiceRunner{cmd: exec.Command("true")}
+	tookOver, err := ok.restartService()
+	if err != nil {
+		t.Fatalf("restartService err: %v", err)
+	}
+	if !tookOver {
+		t.Errorf("exit 0 reported as not taken over")
+	}
+	// Non-zero exit (e.g. launchd script exits 127 without a plist) means a
+	// bare binary run: fall back to re-exec.
+	fail := &unixServiceRunner{cmd: exec.Command("false")}
+	tookOver, err = fail.restartService()
+	if err != nil {
+		t.Fatalf("restartService err: %v", err)
+	}
+	if tookOver {
+		t.Errorf("non-zero exit reported as taken over")
+	}
+}
+
+func TestUnixServiceRunnerTimeoutTreatsAsTakenOver(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix service runner is not used on windows")
+	}
+	runner := &unixServiceRunner{cmd: exec.Command("sleep", "30")}
+	start := time.Now()
+	tookOver, err := runner.restartService()
+	if err != nil {
+		t.Fatalf("restartService err: %v", err)
+	}
+	if !tookOver {
+		t.Errorf("slow service command reported as not taken over")
+	}
+	if elapsed := time.Since(start); elapsed > serviceRestartTimeout+2*time.Second {
+		t.Errorf("restartService took %s, want ~%s", elapsed, serviceRestartTimeout)
+	}
+}
+
+func TestWindowsRestartScriptKeepsBareBinaryFallback(t *testing.T) {
+	// Best-effort guard on the Windows path: the helper must still wait for
+	// this process to exit and relaunch through the launcher, falling back to
+	// the bare executable.
+	script := windowsRestartScript()
+	if !strings.Contains(script, "Wait-Process") {
+		t.Errorf("script must wait for this process to exit: %q", script)
+	}
+	if !strings.Contains(script, "wscript.exe") {
+		t.Errorf("script must relaunch via the startup launcher: %q", script)
+	}
+	if !strings.Contains(script, "} else { Start-Process") {
+		t.Errorf("script must fall back to the bare executable: %q", script)
+	}
+}
+
+func TestNewServiceRunnerRejectsUnsupportedOS(t *testing.T) {
+	if _, err := newServiceRunner("plan9"); err == nil {
+		t.Fatal("expected error for unsupported OS")
+	}
+}
 
 // fakeResolver stubs the subset of updater.Checker the install path uses, so
 // tests can script the GitHub Releases API without a live checker.
