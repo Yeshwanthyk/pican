@@ -247,6 +247,69 @@ describe("App", () => {
     });
   });
 
+  it("collapses the home rail when there is nothing to show", async () => {
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/sessions")) {
+        return Promise.resolve(Response.json({ sessions: [], total: 0 }));
+      }
+      if (url === "/api/projects") return Promise.resolve(Response.json({ projects: [] }));
+      if (url === "/api/recent-locations") {
+        return Promise.resolve(Response.json({ locations: [] }));
+      }
+      if (url === "/api/peers") return Promise.resolve(Response.json({ peers: [] }));
+      return Promise.resolve(Response.json({}));
+    });
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+    mounted = mountApp({ props: { path: "/" } });
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(document.querySelector(".home-layout--no-rail")).toBeTruthy();
+    });
+    expect(document.querySelector(".home-rail")).toBeNull();
+  });
+
+  it("keeps the home rail when a session is waiting", async () => {
+    const now = new Date().toISOString();
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/sessions")) {
+        return Promise.resolve(
+          Response.json({
+            sessions: [
+              {
+                id: "waiting.jsonl",
+                name: "Release",
+                project: "/repo",
+                waitingQuestion: "Ship it?",
+                waitingOptions: ["Ship", "Hold"],
+                lastActivity: now,
+              },
+            ],
+            total: 1,
+          }),
+        );
+      }
+      if (url === "/api/projects") return Promise.resolve(Response.json({ projects: [] }));
+      if (url === "/api/recent-locations") {
+        return Promise.resolve(Response.json({ locations: [] }));
+      }
+      if (url === "/api/peers") return Promise.resolve(Response.json({ peers: [] }));
+      return Promise.resolve(Response.json({}));
+    });
+    vi.spyOn(window, "fetch").mockImplementation(fetchSpy);
+    document.body.innerHTML = '<div id="app"></div>';
+    mounted = mountApp({ props: { path: "/" } });
+    flushSync();
+
+    await vi.waitFor(() => {
+      expect(document.querySelector(".home-rail")).toBeTruthy();
+    });
+    expect(document.querySelector(".home-layout--no-rail")).toBeNull();
+  });
+
   it("swaps views on browser back/forward (popstate)", async () => {
     document.body.innerHTML = '<div id="app"></div>';
     window.history.pushState({}, "", "/");

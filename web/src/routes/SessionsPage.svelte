@@ -92,6 +92,8 @@
   const waitingSessions = $derived(sessions.filter((session) => session.waitingQuestion));
   const waitingIds = $derived(new Set(waitingSessions.map((session) => session.id)));
   const waitingCount = $derived(waitingSessions.length);
+  // The rail only earns its ~300px column when it has something to say.
+  const hasRailContent = $derived(waitingSessions.length > 0 || peerHosts.length > 0);
   const runningCount = $derived(
     [...runningSessionIds].filter((sessionId) => !waitingIds.has(sessionId)).length,
   );
@@ -445,7 +447,7 @@
   navigate={(url: string) => navigate(url)}
 />
 
-<main class="home-layout">
+<main class="home-layout" class:home-layout--no-rail={!hasRailContent}>
   <SessionsList
     {sessions}
     {projects}
@@ -461,7 +463,9 @@
     {waitingSessions}
     onAnswerWaiting={answerWaitingQuestion}
   />
-  <HomeRail {waitingSessions} {peerHosts} onAnswer={answerWaitingQuestion} />
+  {#if hasRailContent}
+    <HomeRail {waitingSessions} {peerHosts} onAnswer={answerWaitingQuestion} />
+  {/if}
 </main>
 
 <nav class="mobile-thumb-bar" aria-label={t('index.mobileActions')}>

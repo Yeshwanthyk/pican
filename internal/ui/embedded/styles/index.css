@@ -1545,6 +1545,10 @@ body.modal-sheet-open { overflow: hidden; }
     gap: clamp(36px, 6vw, 76px);
     align-items: start;
 }
+.home-layout--no-rail {
+    grid-template-columns: minmax(0, 760px);
+    justify-content: center;
+}
 .home-layout > .content {
     width: 100%;
     max-width: 760px;
