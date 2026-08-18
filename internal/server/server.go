@@ -135,7 +135,6 @@ type Server struct {
 	chatSender          ChatSender
 	cache               *sessions.Cache
 	auth                *auth.Middleware
-	shareRunner         shareCmdRunner
 	now                 func() time.Time
 	renderExportSession func(s sessions.Session, theme string) string
 	renderAppShell      func(w io.Writer, bootstrap string) error
@@ -441,7 +440,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/commands", s.auth.Wrap(s.handleCommands))
 	mux.HandleFunc("/api/extension-ui/pending", s.auth.Wrap(s.handlePendingExtensionUI))
 	mux.HandleFunc("/api/extension-ui/respond", s.auth.Wrap(s.handleRespondExtensionUI))
-	mux.HandleFunc("/share", s.auth.Wrap(s.handleShare))
 	mux.HandleFunc("/events", s.auth.Wrap(s.handleEvents))
 	mux.HandleFunc("/api/new-session", s.auth.Wrap(s.handleNewSession))
 	mux.HandleFunc("/api/fork-session", s.auth.Wrap(s.handleApiForkSession))

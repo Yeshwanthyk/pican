@@ -8,7 +8,7 @@ This document explains how the live Svelte SPA, Go-embedded shell, shared styles
 |---|---|
 | `web/` | TypeScript client runtime source — Svelte + Vite modules compiled into `web/dist/` and served as `/static/assets/...` |
 | `internal/ui/embedded/app.html` | One Go-embedded live SPA shell for browser routes |
-| `internal/ui/embedded/share-session.html` | Static export/share shell only; rendered with `IsLive: false` by `internal/ui/export.go` |
+| `internal/ui/embedded/share-session.html` | Static export shell only; rendered with `IsLive: false` by `internal/ui/export.go` |
 | `internal/ui/embedded/styles/` | Shared CSS tokens and page styles used by the SPA shell, PWA CSS routes, and export |
 
 ---
@@ -38,7 +38,7 @@ The Go shell intentionally preserves the current PWA-first boot path:
 - service worker registration
 - Vite hashed SPA asset from `web/dist/.vite/manifest.json`
 
-API, SSE, PWA, static asset, sound, and share routes remain server-handled.
+API, SSE, PWA, static asset, and sound routes remain server-handled.
 
 ---
 
@@ -59,7 +59,7 @@ Some CSS is also exposed as PWA/static routes by `internal/ui/pwa.go` (`/theme.c
 
 ## Static / Share Export
 
-Export/share snapshots are still fully self-contained and must not depend on the live Go backend.
+Static export snapshots are still fully self-contained and must not depend on the live Go backend.
 
 | | Live App | Static Export |
 |---|---|---|

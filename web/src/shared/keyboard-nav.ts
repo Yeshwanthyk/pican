@@ -119,7 +119,7 @@ export function setupKeyboardNav({
       // Don't steal Escape from popups / modals / overlays.
       if (
         active.closest?.(
-          '.pi-chat-model-popup, .pi-chat-thinking-popup, [role="menu"], [role="dialog"], .command-menu-popover, .mobile-command-panel, .share-overlay-backdrop, .mobile-command-backdrop, #commandPalette, #sessionPalette, .model-selector-dropdown, .modal-overlay, .modal',
+          '.pi-chat-model-popup, .pi-chat-thinking-popup, [role="menu"], [role="dialog"], .command-menu-popover, .mobile-command-panel, .mobile-command-backdrop, #commandPalette, #sessionPalette, .model-selector-dropdown, .modal-overlay, .modal',
         )
       )
         return;

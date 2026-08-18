@@ -66,9 +66,6 @@ func TestHostedDirectSessionSurfacesRejectOutsideWorkspace(t *testing.T) {
 		workspace:     resolver,
 		workspaceRoot: resolver.Root(),
 		hosted:        true,
-		renderExportSession: func(sessions.Session, string) string {
-			return "<html></html>"
-		},
 	}
 
 	api := httptest.NewRecorder()
@@ -78,11 +75,6 @@ func TestHostedDirectSessionSurfacesRejectOutsideWorkspace(t *testing.T) {
 	}
 	if bootstrap := s.sessionBootstrap(id); bootstrap != "" {
 		t.Fatalf("outside bootstrap = %q, want empty", bootstrap)
-	}
-	preview := httptest.NewRecorder()
-	s.handleShare(preview, httptest.NewRequest(http.MethodGet, "/share?preview=1&id="+id, nil))
-	if preview.Code == http.StatusOK {
-		t.Fatal("share preview exposed an outside session")
 	}
 }
 

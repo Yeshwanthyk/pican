@@ -153,7 +153,6 @@
       : t('session.resumeUnavailable')}>Terminal</button
   >
   <button id="new-btn" title="New Session" disabled={!capabilities.create}>Session</button>
-  <button id="share-btn" title="Share session as GitHub Gist">Share</button>
 </div>
 
 <div

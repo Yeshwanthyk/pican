@@ -89,11 +89,11 @@ func TestSessionViteSourceShowsAnimatedWorkingPreviewLabel(t *testing.T) {
 	}
 }
 
-func TestGenerateExportHtmlOmitsChatComposerForShare(t *testing.T) {
+func TestGenerateExportHtmlOmitsChatComposer(t *testing.T) {
 	session := sessions.Session{SessionSummary: sessions.SessionSummary{ID: "s.jsonl", Filename: "s.jsonl"}, Entries: []map[string]any{{"id": "aaaaaaaa"}}}
 	html := RenderExportSessionPage(session, "dark")
 	if strings.Contains(html, `id="pi-chat-composer"`) {
-		t.Fatalf("chat composer should not be included in share export")
+		t.Fatalf("chat composer should not be included in the static export")
 	}
 }
 
@@ -138,25 +138,6 @@ func TestClipboardHelperGuardsAndFallsBack(t *testing.T) {
 	}
 }
 
-func TestShareResultCopyButtonsUseClipboardFallbackAndToast(t *testing.T) {
-	// Share UI now lives in the <ShareDialog> Svelte component (absorbed from the
-	// former live/share-overlay.js in migration Phase 3).
-	source, err := os.ReadFile(repoPath("web/src/components/session/ShareDialog.svelte"))
-	if err != nil {
-		t.Fatalf("read web/src/components/session/ShareDialog.svelte: %v", err)
-	}
-	for _, want := range []string{
-		"function copyShareUrl(",
-		"copyToClipboard(text)",
-		"share-copy-notice",
-		"t('share.copiedSuffix', { label })",
-	} {
-		if !strings.Contains(string(source), want) {
-			t.Fatalf("share copy source missing %q", want)
-		}
-	}
-}
-
 func TestResumeButtonClipboardGuardAndFallback(t *testing.T) {
 	// Resume behavior now lives in the <SessionHeader> Svelte component
 	// (absorbed from the former live/resume-button.js in migration Phase 3).
@@ -189,11 +170,11 @@ func TestResumeButtonShowsToastWithoutChangingButtonText(t *testing.T) {
 	}
 }
 
-func TestGenerateExportHtmlOmitsResumeButtonForShare(t *testing.T) {
+func TestGenerateExportHtmlOmitsResumeButton(t *testing.T) {
 	session := sessions.Session{SessionSummary: sessions.SessionSummary{ID: "s.jsonl", Filename: "s.jsonl"}, Entries: []map[string]any{{"id": "aaaaaaaa"}}}
 	html := RenderExportSessionPage(session, "dark")
 	if strings.Contains(html, `id="resume-btn"`) {
-		t.Fatalf("resume button should not be included in share export")
+		t.Fatalf("resume button should not be included in the static export")
 	}
 }
 

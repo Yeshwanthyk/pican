@@ -2,7 +2,7 @@
   // Session actions menu — Svelte port of live/command-menu.js. Renders the
   // desktop popover + mobile panel (+ the session-list <CommandPalette>) and, in
   // onMount, wires open/close + the action dispatch. Several actions delegate to
-  // shared live runtime helpers or click hidden relay buttons (share/new/terminal).
+  // shared live runtime helpers or click hidden relay buttons (new/terminal).
   import { onMount } from 'svelte';
   import { Match, Schema } from 'effect';
   import type { IconNode } from 'lucide';
@@ -13,7 +13,6 @@
     icon,
     Search,
     Pencil,
-    Share2,
     GitFork,
     Copy,
     Terminal,
@@ -100,7 +99,6 @@
       });
 
   const MenuActionSchema = Schema.Literals([
-    'share',
     'list-sessions',
     'new-session',
     'terminal',
@@ -129,7 +127,6 @@
   const primaryItems: readonly PrimaryItem[] = [
     { action: 'list-sessions', icon: Search, label: 'menu.searchSessions', kbd: '⌘K' },
     { action: 'rename', icon: Pencil, label: 'menu.rename' },
-    { action: 'share', icon: Share2, label: 'menu.share' },
     { action: 'fork', icon: GitFork, label: 'menu.fork' },
     { action: 'clone', icon: Copy, label: 'menu.clone' },
     { action: 'terminal', icon: Terminal, label: 'menu.resumeTerminal' },
@@ -238,10 +235,6 @@
 
     function handleAction(action: MenuAction): void {
       Match.value(action).pipe(
-        Match.when('share', () => {
-          clickHidden('share-btn');
-          closeMenu();
-        }),
         Match.when('list-sessions', () => {
           closeMenu();
           openSessionPalette();

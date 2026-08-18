@@ -1,6 +1,6 @@
 // Static export snapshot entry point.
 //
-// Renders a self-contained session snapshot (GitHub Gist) using the SAME
+// Renders a self-contained session snapshot using the SAME
 // rendering modules as the live app (web/src/session/*). It deliberately omits
 // every live-only concern: no SSE/live-reload, no chat composer, no
 // artifacts, no fetch-backed features. Those DOM hosts are not emitted by the

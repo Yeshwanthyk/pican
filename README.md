@@ -13,7 +13,7 @@ One server can select any registered runtime combination. It keeps native state 
 - Capability-driven steering, queues, cancellation, lifecycle actions, and labels
 - Session search, project grouping, pins, tasks, workflows, subagents, and scratchpads
 - Markdown, syntax highlighting, images, diffs, artifacts, and collapsible tool output
-- Static HTML/JSONL export and GitHub Gist sharing
+- Static HTML/JSONL export
 - Responsive desktop/mobile UI, themes, fonts, keyboard navigation, and PWA installation
 - Localhost-first serving with optional Tailscale HTTPS and token authentication
 

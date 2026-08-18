@@ -26,7 +26,7 @@ OpenCode's own storage is authoritative. pican reads native sessions and message
 
 These files are replaceable presentation caches. `internal/projections.Store` supplies canonical cwd validation, identity locking, safe paths, local metadata preservation, duplicate migration, and atomic replacement. Deleting or rebuilding a projection does not delete the native session.
 
-A complete successful list may prune validated OpenCode projections absent from native membership. A partial list, per-session read failure, or cwd mismatch never authorizes pruning; healthy native sessions and new work remain available while the bad records are reported. A failed authoritative list or unavailable child marks OpenCode unavailable. Cached projections remain viewable, downloadable, exportable, and shareable in either case.
+A complete successful list may prune validated OpenCode projections absent from native membership. A partial list, per-session read failure, or cwd mismatch never authorizes pruning; healthy native sessions and new work remain available while the bad records are reported. A failed authoritative list or unavailable child marks OpenCode unavailable. Cached projections remain viewable, downloadable, and exportable in either case.
 
 ## Shared events and live workers
 
@@ -62,4 +62,4 @@ Shutdown closes the event stream, aborts active work where possible, and termina
 
 ## Rendering and export
 
-OpenCode projections use the common list, search, viewer, pagination, labels, download, static export, and share paths. The live app uses API calls, worker state, and pican SSE. Static export/share renders only the persisted projection snapshot and contains no OpenCode credential, child URL, HTTP request, SSE connection, chat composer, or SPA behavior.
+OpenCode projections use the common list, search, viewer, pagination, labels, download, and static export paths. The live app uses API calls, worker state, and pican SSE. Static export renders only the persisted projection snapshot and contains no OpenCode credential, child URL, HTTP request, SSE connection, chat composer, or SPA behavior.

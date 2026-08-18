@@ -327,7 +327,6 @@ export default {
   // ── Session command menu ──
   "menu.searchSessions": "Search Sessions",
   "menu.rename": "Rename",
-  "menu.share": "Share",
   "menu.fork": "Fork",
   "menu.clone": "Clone",
   "menu.resumeTerminal": "Resume via Terminal",
@@ -443,19 +442,6 @@ export default {
   "extensionUi.timeout": "{seconds}s remaining",
   "extensionUi.failed": "Couldn’t send the response. Try again.",
   "extensionUi.notification": "Extension notification",
-
-  // ── Share / export ──
-  "share.copiedSuffix": "{label} copied",
-  "share.defaultTitle": "Share session",
-  "share.failedTitle": "Share Failed",
-  "share.successTitle": "Session Shared",
-  "share.gistUrlLabel": "Gist URL",
-  "share.previewUrlLabel": "Preview URL",
-  "share.copyGist": "Copy Gist",
-  "share.copyPreview": "Copy Preview",
-  "share.gistLabel": "Gist",
-  "share.previewLabel": "Preview",
-  "share.networkError": "Network error",
 
   // ── Settings ──
   "settings.title": "Settings",

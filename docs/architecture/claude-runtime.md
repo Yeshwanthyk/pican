@@ -86,4 +86,4 @@ Enabled capabilities are create, resume, chat, cancel, image input, cwd-local fi
 
 ## Rendering and export
 
-Claude projections use the normal session cache, viewer, search, pagination, labels, SSE projection-file watcher, download, static export, and share paths. Live reconciliation uses `replaceable-projection`, so it always requests a full canonical snapshot and replaces same-ID entries. Static export remains snapshot-only: no Claude process, filesystem watcher, API, SPA, chat, or SSE behavior enters export/share output.
+Claude projections use the normal session cache, viewer, search, pagination, labels, SSE projection-file watcher, download, and static export paths. Live reconciliation uses `replaceable-projection`, so it always requests a full canonical snapshot and replaces same-ID entries. Static export remains snapshot-only: no Claude process, filesystem watcher, API, SPA, chat, or SSE behavior enters export output.

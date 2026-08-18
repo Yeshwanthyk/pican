@@ -106,7 +106,6 @@ pican/
 │   │   ├── update.go           # /api/version, check-update, update, restart handlers
 │   │   ├── events.go           # SSE endpoint (/events)
 │   │   ├── sse_format.go       # SSE event framing helper
-│   │   ├── share.go            # Share handler adapter
 │   │   ├── watcher.go          # fsnotify + polling file watcher
 │   │   ├── status.go           # Running-status computation logic
 │   │   ├── status_sweeper.go   # Periodic status revalidation
@@ -120,8 +119,6 @@ pican/
 │   │   └── store.go            # Durable hosted create/idempotency state machine
 │   ├── workspace/
 │   │   └── containment.go      # Canonical symlink-aware hosted containment resolver
-│   ├── share/
-│   │   └── share.go            # GitHub Gist creation logic
 │   └── workers/
 │       └── manager.go          # ChatWorker lifecycle: create, cache, reap
 ```
@@ -146,7 +143,6 @@ type Server struct {
     chatSender    ChatSender      // workers.Manager
     cache         *sessions.Cache // modtime-aware parse cache
     auth          *auth.Middleware
-    shareRunner   shareCmdRunner  // overridable in tests
     now           func() time.Time
     renderExportSession func(s sessions.Session, theme string) string
     renderAppShell      func(w io.Writer, bootstrap string) error
@@ -276,7 +272,7 @@ type CatalogResult struct {
 | Codex item translation and sparse captured tool-turn retention | Codex adapter |
 | Codex archive/delete/unarchive and native rename/fork semantics | separate `CodexService`, not the common registry |
 | Live session/API/SSE behavior | `server.Server` |
-| Static export/share rendering | `internal/ui` export path; no runtime registry or worker dependency |
+| Static export rendering | `internal/ui` export path; no runtime registry or worker dependency |
 
 Production dispatch is:
 
@@ -396,7 +392,6 @@ type piRPCWorker struct {
 | `/metrics` | GET | `handleMetricsPage` | Worker metrics dashboard (self-contained HTML) |
 | `/api/metrics` | GET | `handleMetrics` | JSON snapshot: process, SSE stream/heartbeat/error observability, and per-worker CPU/RSS (gopsutil); see `docs/dev/metrics-dashboard.md` |
 | `/api/debug/pprof/` | GET | `pprof.Index` (+ cmdline/profile/symbol/trace) | Go runtime profiler, auth-gated (`/api`-stripped before Index) |
-| `/share` | POST | `handleShare` | Create private GitHub Gist |
 | `/events` | GET | `handleEvents` | SSE stream |
 | `/api/new-session` | POST | `handleNewSession` | Create new session file |
 | `/api/fork-session` | POST | `handleApiForkSession` | Fork a session into a new file |

@@ -76,7 +76,7 @@ Assistant edit tools use the shared, side-effect-free `words-diff.ts` parser and
 The old runners/renderers have been replaced by Svelte components plus focused helpers: `web/src/session/` holds the reactive model, pure helpers, live-only helpers, and a few shared utilities:
 
 - `data/` — payload decoding + the reactive `SessionDataModel` (`session-data.svelte.ts`, the single source of truth: entries/lookups/tree/active-path/view-state, `reconcile()`)
-- `tree/`, `render/`, `navigation/` — **pure** tree/format/markdown/navigation helpers consumed by the Svelte components (and the export). The message renderer is now `<SessionEntry>`/`<ToolCall>`; `render/` keeps `session-format`, `markdown`, `entry-format`, `session-entry-actions` (download/share/copy)
+- `tree/`, `render/`, `navigation/` — **pure** tree/format/markdown/navigation helpers consumed by the Svelte components (and the export). The message renderer is now `<SessionEntry>`/`<ToolCall>`; `render/` keeps `session-format`, `markdown`, `entry-format`, `session-entry-actions` (download/copy-link/copy)
 - `session-globals.ts`, `session-content-runtime.ts`, `lazy-highlight.ts` — the relocated live glue (see above)
 - `chat/` — **pure/shared helpers**: `chat-api` + `git-api` (fetch wrappers), `chat-selectors` (pure model/thinking helpers), `done-notifier` (shared notification/push util, also used by the settings page). Model discovery is session-scoped (`/api/models?id=<sessionId>`) so providers from different runtimes cannot mix. Live composer DOM helpers live under `web/src/components/session/chat/`, wired together by `chat-composer-runtime.js` (`runChatComposer`, mounted by `<ChatComposer>`).
 - `live/` — live-only helpers used by `<LiveReload>`: `live-connection.ts` (SSE connection/reconnect lifecycle), `live-events.ts` (SSE/reload primitives), `live-scroll.ts` (low-level scroll primitives), `live-follow.ts` (`createFollowScrollController` — follow-mode decision state + follow button), `live-stats.ts` (header stats), and `chat-preview.ts` (streaming-preview helper)
@@ -104,7 +104,7 @@ remains the broader session-search path.
 
 ## Static / Share Export
 
-Export/share remains separate and self-contained. `web/src/export/export-entry.ts` builds `internal/ui/embedded/export/export.js`, which is inlined by `internal/ui/export.go` with vendored `marked` and `highlight.js` assets. Export-only static adapters keep the bundle off live SSE/chat/network modules and the application Effect runtime bridge.
+Static export remains separate and self-contained. `web/src/export/export-entry.ts` builds `internal/ui/embedded/export/export.js`, which is inlined by `internal/ui/export.go` with vendored `marked` and `highlight.js` assets. Export-only static adapters keep the bundle off live SSE/chat/network modules and the application Effect runtime bridge.
 
 Export rules:
 

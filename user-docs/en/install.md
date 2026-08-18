@@ -237,15 +237,15 @@ Startup behavior:
 - A Codex executable override is one path via `-codex-command` (preferred) or `PICAN_CODEX_COMMAND`. pican appends `app-server --stdio` itself.
 - Generated auto-start entries invoke pican without `-runtime`, so they discover the installed set at every launch. Add `-runtime=…` to launchd `ProgramArguments`, systemd `ExecStart`, or the Windows starter's binary command only when you want a fixed subset.
 
-Codex remains authoritative under `~/.codex`. pican creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, export, and share paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
+Codex remains authoritative under `~/.codex`. pican creates rebuildable `codex-<thread-id>.jsonl` projections under `~/.pi/agent/sessions` so both runtimes use the same browse, render, SSE, download, and export paths. Projection refresh is atomic and preserves local names/labels/model/effort metadata. These are not append-only Pi transcripts and can be rebuilt from Codex.
 
-Existing projections remain viewable, downloadable, exportable, and shareable while Codex is unavailable. Chat, create, rename, fork/clone, and model/effort operations require the runtime. This is cached local viewing, not browser-offline support: pican intentionally does not service-worker-cache session data.
+Existing projections remain viewable, downloadable, and exportable while Codex is unavailable. Chat, create, rename, fork/clone, and model/effort operations require the runtime. This is cached local viewing, not browser-offline support: pican intentionally does not service-worker-cache session data.
 
 Codex sessions support text/images, steering an active turn, persistent queues, cancel, model and reasoning effort, `/review`, `/compact`, rename, labels, fork/clone, status/SSE, and `codex resume <thread-id>` copying from the session header. YOLO mode bypasses command/file approvals. Unexpected approval requests are declined defensively; permission and user-input requests receive empty responses, and MCP elicitation is declined.
 
 ## Claude runtime
 
-The configured Claude home defaults to `~/.claude`. pican reads `projects/*/*.jsonl` as the authoritative transcript catalog and never rewrites those files. It creates rebuildable `claude-<session-id>.jsonl` projections under the Pi sessions directory for search, viewing, labels, download, export, share, and live external-session discovery.
+The configured Claude home defaults to `~/.claude`. pican reads `projects/*/*.jsonl` as the authoritative transcript catalog and never rewrites those files. It creates rebuildable `claude-<session-id>.jsonl` projections under the Pi sessions directory for search, viewing, labels, download, export, and live external-session discovery.
 
 Command precedence is `-claude-command`, `PICAN_CLAUDE_COMMAND`, then `claude`. Home precedence is `-claude-home`, `PICAN_CLAUDE_HOME`, `CLAUDE_CONFIG_DIR`, then `~/.claude`. For the default home, pican leaves `CLAUDE_CONFIG_DIR` unset so Claude Code uses the native subscription/OAuth profile; non-default homes remain explicitly isolated. pican probes the installed CLI with `--version` and `auth status --json`; missing CLI/auth disables Claude operations without hiding cached projections. Native changes are debounced, with a ten-minute `(mtime,size)`-gated recovery reconcile. Malformed lines or incomplete appends never authorize projection deletion.
 
@@ -259,7 +259,7 @@ pican runs OpenCode through the supported headless HTTP/SSE API. Command precede
 
 One child safely serves sessions from multiple projects. pican includes and validates the canonical directory on every scoped native request, then demultiplexes one global SSE stream by directory and native session ID. This prevents updates from one project or session reaching another.
 
-OpenCode owns the native session history. pican creates atomically replaceable `opencode-<session-id>.jsonl` projections under the Pi sessions directory for the shared list, search, renderer, labels, download, export, and share surfaces. A failed or partial native catalog never prunes projections, and cached projections stay readable while OpenCode restarts.
+OpenCode owns the native session history. pican creates atomically replaceable `opencode-<session-id>.jsonl` projections under the Pi sessions directory for the shared list, search, renderer, labels, download, and export surfaces. A failed or partial native catalog never prunes projections, and cached projections stay readable while OpenCode restarts.
 
 Supported controls are create/resume, rename, fork/clone, delete, text chat, cancel, and model listing/switching. The session header copies `<configured-opencode-command> --session <native-session-id>` for terminal resume. Native archive/unarchive, steering a running response, persistent queues, images/files, effort/reasoning controls, slash commands, subagent UI, approvals, and user questions aren't supported; pican hides those runtime controls and rejects direct requests with a precise capability error. The runtime-neutral local Archive action remains available and never changes OpenCode's native session.
 

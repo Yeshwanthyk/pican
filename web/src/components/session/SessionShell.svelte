@@ -16,7 +16,6 @@
   import DiffModal from './DiffModal.svelte';
   import LoadEarlier from './LoadEarlier.svelte';
   import SessionTree from './SessionTree.svelte';
-  import ShareDialog from './ShareDialog.svelte';
   import PinnedSessionSwitcher from './PinnedSessionSwitcher.svelte';
   import PinnedTabsStrip from './PinnedTabsStrip.svelte';
   import { normalizeSession } from '../../index/sessions.js';
@@ -243,8 +242,6 @@
 />
 <DiffModal bind:open={sessionModals.diff.open} sessionId={sessionModals.diff.sessionId} />
 <SessionTree bind:open={sessionModals.tree.open} />
-
-<ShareDialog {sessionId} />
 <svelte:element
   this={"script"}
   id="session-data"

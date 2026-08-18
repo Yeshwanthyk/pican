@@ -53,7 +53,7 @@ Want more than coding? Turn it into a dedicated [personal assistant](personal-as
 | 🌿 **Git integration** | See the current branch and open a GitHub PR right from the session viewer. |
 | 📝 **Scratchpad** | Jot down notes, todos, or quick thoughts alongside your sessions without switching apps. |
 | 🎨 **Themes & customization** | Switch between dark and light mode, tweak the UI to your liking — make pican feel like *yours*. |
-| 📤 **Share & export** | Download JSONL projections/transcripts, export static snapshots, or share as private GitHub Gists. |
+| 📤 **Export & download** | Export static snapshots and download JSONL projections/transcripts. |
 | 🔔 **Notification sounds** | Customizable notification chimes for session events — stay in the loop even when pican is in another tab. |
 | ⌨️ **Keyboard shortcuts** | Vim-style navigation, quick actions — [full reference →](keyboard-shortcuts.md) |
 | 🤖 **Personal assistant** | Turn pican into your own AI assistant that lives on your computer — like OpenClaw or Hermes. [Set it up →](personal-assistant.md) |

@@ -69,7 +69,7 @@ implementation.
 ### What Scotty should not copy
 
 Scotty should not copy Amp's entire orb workspace product into embedded Pican. In particular, do
-not add Amp-style project/activity feeds, collaboration, sharing, generic terminal multiplexing,
+not add Amp-style project/activity feeds, collaboration, generic terminal multiplexing,
 portal orchestration, or Desktop merely to resemble the screenshot. Scotty already owns the
 workspace lifecycle and outer navigation. Pican should remain the lean bound conversation surface;
 Scotty may place its existing Changes, Files, terminal, preview, or desktop capabilities beside it
@@ -122,7 +122,7 @@ scheduler, and starts the autonomous chat queue drainer
 ([`internal/server/server.go#L231-L353`](../../internal/server/server.go#L231-L353),
 [`internal/server/server.go#L356-L419`](../../internal/server/server.go#L356-L419)). `Register`
 then installs the home, settings, catalog, session creation/fork/clone/rename/archive/delete,
-sharing, peers, scratchpad, schedules, workflows, tasks, subagents, metrics, pprof, sounds, and
+peers, scratchpad, schedules, workflows, tasks, subagents, metrics, pprof, sounds, and
 update surfaces alongside the session APIs
 ([`internal/server/server.go#L437-L509`](../../internal/server/server.go#L437-L509)).
 
@@ -269,7 +269,7 @@ still requires the new bound check; the current route list alone does not impose
 Do not register:
 
 - `/`, `/api/sessions`, `/api/new-session`, fork, clone, rename, label, Codex archive/unarchive/
-  delete, Pican archives, pins, recent locations, projects, peers, sharing, settings page, or
+  delete, Pican archives, pins, recent locations, projects, peers, settings page, or
   filesystem browsing.
 - scratchpad unless the bound-session product explicitly retains it.
 - schedules, schedule runs, workflows, tasks, subagents index APIs, metrics dashboard, pprof,
@@ -318,7 +318,7 @@ retain those imports and can leave mutation code reachable.
 The lean default should include the transcript, composer, stop/cancel, worker state, model and
 effort controls, slash commands, file mentions, approval/question UI, a compact static title/cwd,
 and Git branch/Create PR status if Scotty requires it. It should not import the home router,
-pinned-session models, Back/New controls, session tree, Scratchpad/Artifacts sidebar, BTW, share,
+pinned-session models, Back/New controls, session tree, Scratchpad/Artifacts sidebar, BTW,
 fork/label/model-usage/image/diff modals, version controller, or PWA code.
 
 Use separate build products rather than a runtime boolean:

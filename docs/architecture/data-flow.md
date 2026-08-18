@@ -210,29 +210,6 @@ Editor saves session file
                 └──▶ append/upsert canonical entries and clear preview
 ```
 
-## Data Flow: Share to Gist
-
-```
-Browser POST /share?id=<id>
-           │
-           ▼
-    server.handleShare
-           │
-           ├──▶ share.FindGh → locate `gh` CLI
-           │
-           ├──▶ gh auth status → verify login
-           │
-           ├──▶ deps.Resolve(id) → find matching session
-           │
-           ├──▶ renderExportSessionPage(session)  (no live chrome)
-           │
-           ├──▶ Write to temp file
-           │
-           ├──▶ gh gist create --public=false <tmpfile>
-           │
-           └──▶ Return {gistUrl, gistId, previewUrl}
-```
-
 ## Data Flow: Codex Catalog Sync
 
 ```text

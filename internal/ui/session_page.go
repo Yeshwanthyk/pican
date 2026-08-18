@@ -11,7 +11,7 @@ import (
 	"pican/internal/sessions"
 )
 
-// share-session.html renders the static export/share snapshot only; the live
+// share-session.html renders the static export snapshot only; the live
 // session page is the Svelte SPA served via the app.html shell.
 //
 //go:embed embedded/share-session.html
@@ -54,7 +54,7 @@ func envInt(name string, def int) int {
 }
 
 // prepareSessionPageData computes the payload (base64-encoded session data,
-// themed CSS, and body attributes) for the static export/share snapshot.
+// themed CSS, and body attributes) for the static export snapshot.
 //
 // For sessions with more than LargeSessionThreshold entries we embed only the
 // tail (LargeSessionTailEntries) and add { truncated, total, from } fields so

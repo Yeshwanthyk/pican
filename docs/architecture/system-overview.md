@@ -10,7 +10,7 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 |-------|------------|
 | Backend | Go 1.25+ |
 | Frontend (live app) | Svelte 5 SPA (`web/src/main.ts` → `App.svelte`), built by Vite; the session viewer is fully component-driven over a reactive `SessionDataModel`. Go serves a single embedded shell (`internal/ui/embedded/app.html`) + injects bootstrap data |
-| Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained Gist) |
+| Static export | Go `html/template` (`internal/ui/embedded/share-session.html`) + inlined `export.js`/CSS, built from the same `web/src/session/` modules (self-contained snapshot) |
 | Styling | Custom CSS (multi-theme: dark/light/nord/dracula/custom) |
 | Live Updates | Server-Sent Events (SSE) |
 | Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI; supervised authenticated HTTP/SSE via `opencode serve` |
@@ -71,7 +71,6 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   GET  /api/workflows{,/run} → external workflow run snapshots            │
 │   GET  /api/tasks{,/output} → external task stores and output              │
 │   GET  /api/subagents → merged child sessions and parent records           │
-│   POST /share         →  handleShare         (GitHub Gist)               │
 │   GET  /events        →  handleEvents        (SSE)                       │
 │   GET  /api/recent-locations → handleRecentLocations                     │
 │   GET  /custom-themes.css → handleCustomThemes                           │
@@ -106,7 +105,6 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
    │   claude stream-json          (per-active-Claude-session worker)   │
    │   claude --version/auth status (bounded availability probe)        │
    │   opencode serve              (one supervised loopback HTTP/SSE child)│
-   │   gh gist create             (share session as private gist)       │
    │                                                                   │
    └──────────────────────────────────────────────────────────────────┘
 ```
@@ -150,13 +148,13 @@ name, while pican itself continues listening only on localhost.
 
 Standalone defaults retain the local `~/.pi/agent` shape. Hosted mode is intentionally Codex-only and requires one canonical absolute `WorkspaceRoot`, one absolute `StateRoot` contained by that workspace, one normalized `BasePath` such as `/s/abc123`, proxy-only authentication, and an exact child environment supplied by the host.
 
-The server registers a root-based inner mux once, then the base-path handler strips the configured mount before dispatch. Requests outside the mount return `404`. Live HTML, hashed assets, styles, API requests, SSE, navigation, icons, manifest, and service-worker URLs all derive from the same base-path value. Static export/share remains a separate self-contained render and does not inherit live mount or network behavior.
+The server registers a root-based inner mux once, then the base-path handler strips the configured mount before dispatch. Requests outside the mount return `404`. Live HTML, hashed assets, styles, API requests, SSE, navigation, icons, manifest, and service-worker URLs all derive from the same base-path value. Static export remains a separate self-contained render and does not inherit live mount or network behavior.
 
 Proxy-only mode accepts exactly one instance of the configured header and compares its value in constant time. It accepts no query token, login form, Bearer token, `X-Pican-Token`, Pican cookie, or browser fallback. The proxy token is read from `PICAN_PROXY_TOKEN`; there is deliberately no CLI token flag. It is not copied into the Codex environment, state, projections, responses, or logs. Scotty must keep Pican off the public network, authenticate the browser, strip browser credentials, and inject the private header only on its internal hop.
 
-Every hosted create, browse, file, git, task, project, and child-working-directory boundary resolves through one canonical symlink-aware workspace resolver. The root and descendants are accepted; raw `..`, siblings, scoped filesystem symlinks, task store/output symlinks, and external Git gitdirs are rejected before reads or creation. Catalog reconciliation validates each authoritative Codex thread cwd before projection, and direct API/bootstrap/share reads repeat the same check. Native unarchive validates archived metadata before mutation. The Codex child and hosted Git helpers receive only the configured allowlisted environment, including opaque `CODEX_*`, `OPENAI_*`, `GH_*`, and `GITHUB_*` sentinels. Pican never resolves those sentinel values. Pican auth variables and unrelated host/provider secrets are stripped.
+Every hosted create, browse, file, git, task, project, and child-working-directory boundary resolves through one canonical symlink-aware workspace resolver. The root and descendants are accepted; raw `..`, siblings, scoped filesystem symlinks, task store/output symlinks, and external Git gitdirs are rejected before reads or creation. Catalog reconciliation validates each authoritative Codex thread cwd before projection, and direct API/bootstrap reads repeat the same check. Native unarchive validates archived metadata before mutation. The Codex child and hosted Git helpers receive only the configured allowlisted environment, including opaque `CODEX_*`, `OPENAI_*`, `GH_*`, and `GITHUB_*` sentinels. Pican never resolves those sentinel values. Pican auth variables and unrelated host/provider secrets are stripped.
 
-Hosted mode does not publish GitHub gists, run remote update checks, install or restart Pican, or invoke the ambient Pi auto-title model path. Share preview remains a local static render, and auto-title falls back to the local heuristic. Scotty owns external egress and runtime replacement.
+Hosted mode does not run remote update checks, install or restart Pican, or invoke the ambient Pi auto-title model path. Auto-title falls back to the local heuristic. Scotty owns external egress and runtime replacement.
 
 ## Session Directory Layout
 
