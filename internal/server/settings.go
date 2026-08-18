@@ -65,7 +65,7 @@ var settingDefaults = map[string]string{
 	"pican:view-layout":            "timeline",
 	"pican:v1:show-btw-in-index":   "false",
 	settingAutoTitleEnabled:        "true",
-	settingAutoTitleMode:           "each-turn",
+	settingAutoTitleMode:           "once",
 	settingAutoTitleModel:          "",
 	"pican:v1:artifacts:enabled":   "true",
 	"pican:v1:artifacts:include":   "*.md, *.html",

@@ -19,14 +19,35 @@ func TestSanitizeTitle(t *testing.T) {
 		{"  Fix Flaky Login Test  ", "Fix Flaky Login Test"},
 		{"\"Quoted Title\"", "Quoted Title"},
 		{"Title\nwith a second line", "Title"},
-		{"one two three four five six seven", "one two three four five"},
+		{"one two three four five six seven", "one two three four five six seven"},
 		{"", ""},
 		{"   ", ""},
 		{"`backticked`", "backticked"},
+		{`{"title":"Fix Reconnect State."}`, "Fix Reconnect State"},
+		{"```json\n{\"title\":\"Fix Reconnect State\"}\n```", "Fix Reconnect State"},
 	}
 	for _, c := range cases {
 		if got := sanitizeTitle(c.in); got != c.want {
 			t.Errorf("sanitizeTitle(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestAutoTitlePromptUsesDurableConversationContext(t *testing.T) {
+	prompt := autoTitlePrompt(sessions.TitleInputs{
+		CurrentName: "Reconnect Bug",
+		ConversationText: "USER:\nInvestigate reconnect behavior\n\nASSISTANT:\n" +
+			"The stale list appears after the stream reconnects.\n\nUSER:\nFix the synchronization lifecycle",
+	})
+	for _, want := range []string{
+		"Previous title: Reconnect Bug",
+		"Investigate reconnect behavior",
+		"The stale list appears",
+		"Fix the synchronization lifecycle",
+		"durable goal",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q: %s", want, prompt)
 		}
 	}
 }
@@ -197,6 +218,46 @@ func TestMaybeAutoTitleModelErrorFallsBack(t *testing.T) {
 	s.maybeAutoTitle(id)
 	if got := sessionNameNow(t, s, id); got != "Fix Flaky Login Test" {
 		t.Fatalf("expected heuristic fallback, got %q", got)
+	}
+}
+
+func TestMaybeAutoTitleDoesNotOverwriteManualRenameWhileModelRuns(t *testing.T) {
+	s := newAutoTitleServer(t, map[string]string{"pican:v1:auto-title:model": "opencode-go/deepseek-v4-flash:off"})
+	id := writeAutoTitleSession(t, s.sessionsDir, "investigate reconnect behavior", "")
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	restore := autoTitleGenerate
+	autoTitleGenerate = func(ctx context.Context, opts rpc.PromptOpts) (string, error) {
+		close(started)
+		select {
+		case <-release:
+			return `{"title":"Generated Reconnect Title"}`, nil
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	t.Cleanup(func() { autoTitleGenerate = restore })
+
+	done := make(chan struct{})
+	go func() {
+		s.maybeAutoTitle(id)
+		close(done)
+	}()
+	<-started
+
+	resolved, err := s.resolveSession(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sessions.RenameSession(resolved.Path, "Manual Rename", s.now); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	<-done
+
+	if got := sessionNameNow(t, s, id); got != "Manual Rename" {
+		t.Fatalf("manual rename was overwritten by stale completion: %q", got)
 	}
 }
 

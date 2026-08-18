@@ -97,8 +97,8 @@ func TestAutoTitleSettingsDefaultsAndRoundTrip(t *testing.T) {
 	if all["pican:v1:auto-title:enabled"] != "true" {
 		t.Errorf("expected auto-title enabled default 'true', got %q", all["pican:v1:auto-title:enabled"])
 	}
-	if all["pican:v1:auto-title:mode"] != "each-turn" {
-		t.Errorf("expected auto-title mode default 'each-turn', got %q", all["pican:v1:auto-title:mode"])
+	if all["pican:v1:auto-title:mode"] != "once" {
+		t.Errorf("expected auto-title mode default 'once', got %q", all["pican:v1:auto-title:mode"])
 	}
 	if all["pican:v1:auto-title:model"] != "" {
 		t.Errorf("expected auto-title model default '', got %q", all["pican:v1:auto-title:model"])

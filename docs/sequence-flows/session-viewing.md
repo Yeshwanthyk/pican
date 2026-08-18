@@ -108,6 +108,24 @@ The server:
 
 When a Pi transcript append or atomic replaceable projection update changes the file, the session-directory watcher calls `broadcast(sessID, "reload")`. The browser fetches `/api/session`, updates the visible session header and browser `<title>`, and reconciles canonical entries. Codex and OpenCode workers request reload after projection materialization; Claude native changes pass through its read-only watcher.
 
+### Automatic Title Flow
+
+The same title lifecycle is runtime-neutral even though persistence is delegated
+to the active runtime adapter:
+
+1. The watcher observes a new user message and starts `maybeAutoTitle` off the
+   watcher path. It does not start another request while one is in flight.
+2. `sessions.ReadTitleInputs` extracts a bounded, labeled user/assistant
+   transcript, the current title ownership marker, and the user-message count.
+3. The configured title model is invoked through Pi RPC with no session, tools,
+   extensions, or project context. The prompt treats transcript text as data,
+   anchors regeneration to the previous title, and requests one JSON `title`.
+4. Before persistence, pican rereads the session. A changed message count or a
+   manual rename invalidates the completion, so stale model output cannot win.
+5. A valid title is persisted as pican-owned metadata through the Pi, Codex, or
+   OpenCode rename path, then the normal session and global reload events are
+   broadcast.
+
 ## Rename Flow
 
 The command menu's **Rename** action calls:

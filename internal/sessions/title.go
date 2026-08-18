@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	titleContextLimit = 8 * 1024
+	titleMessageLimit = 4 * 1024
+)
+
 // TitleInputs is the subset of a session's state the auto-titler needs to
 // decide whether (and how) to generate a title.
 type TitleInputs struct {
@@ -30,6 +35,10 @@ type TitleInputs struct {
 	// UserMsgCount is the number of user messages seen, used to detect new turns
 	// for re-titling.
 	UserMsgCount int
+	// ConversationText is a bounded, labeled transcript for title generation.
+	// It includes user and assistant text so vague follow-ups can be grounded
+	// without sending the full session to the model.
+	ConversationText string
 }
 
 // ReadTitleInputs scans a session JSONL file for the auto-titler's inputs. It
@@ -45,6 +54,7 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 	var out TitleInputs
 	var headerName, sessionInfoName string
 	var headerAuto, sessionInfoAuto bool
+	var conversation []string
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 256*1024*1024)
@@ -70,10 +80,18 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 			}
 		case "message":
 			if raw.Message == nil || raw.Message.Role != "user" {
+				if raw.Message != nil && raw.Message.Role == "assistant" {
+					if text := strings.TrimSpace(extractRawText(raw.Message.Content)); text != "" {
+						conversation = append(conversation, "ASSISTANT:\n"+limitTitleText(text, titleMessageLimit))
+					}
+				}
 				continue
 			}
 			out.UserMsgCount++
 			text := extractRawText(raw.Message.Content)
+			if trimmed := strings.TrimSpace(text); trimmed != "" {
+				conversation = append(conversation, "USER:\n"+limitTitleText(trimmed, titleMessageLimit))
+			}
 			if out.FirstUserText == "" {
 				out.FirstUserText = text
 			}
@@ -96,5 +114,20 @@ func ReadTitleInputs(path string) (TitleInputs, error) {
 		out.HasExplicitName = true
 		out.AutoTitled = headerAuto
 	}
+	out.ConversationText = limitTitleText(strings.Join(conversation, "\n\n"), titleContextLimit)
 	return out, nil
+}
+
+func limitTitleText(text string, max int) string {
+	runes := []rune(text)
+	if len(runes) <= max {
+		return text
+	}
+	marker := []rune("\n\n[Earlier content truncated]\n\n")
+	if max <= len(marker) {
+		return string(runes[:max])
+	}
+	head := (max - len(marker)) / 2
+	tail := max - len(marker) - head
+	return string(runes[:head]) + string(marker) + string(runes[len(runes)-tail:])
 }

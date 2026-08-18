@@ -8,7 +8,7 @@ import (
 )
 
 // titleWordLimit caps how many words a generated/heuristic title may contain.
-const titleWordLimit = 5
+const titleWordLimit = 8
 
 // titleStopWords are dropped from heuristic titles. Ported from the former
 // pican pi extension so behavior is preserved now that titling is built in.
