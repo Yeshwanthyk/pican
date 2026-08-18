@@ -91,39 +91,6 @@ export const ProjectListSchema = Schema.Struct({
 });
 export type ProjectList = typeof ProjectListSchema.Type;
 
-export const ScheduleSchema = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  instructions: Schema.String,
-  modelProvider: Schema.String,
-  modelId: Schema.String,
-  thinkingLevel: Schema.String,
-  projectPath: Schema.String,
-  cronExpr: Schema.String,
-  timezone: Schema.String,
-  enabled: Schema.Boolean,
-  lastRunAt: optionalString,
-  nextRunAt: optionalString,
-  createdAt: Schema.String,
-  updatedAt: Schema.String,
-});
-export type Schedule = typeof ScheduleSchema.Type;
-export const ScheduleListSchema = Schema.Struct({ schedules: Schema.Array(ScheduleSchema) });
-export type ScheduleList = typeof ScheduleListSchema.Type;
-
-export const ScheduleRunSchema = Schema.Struct({
-  id: Schema.Number,
-  scheduleId: Schema.String,
-  sessionId: optionalString,
-  sessionFile: optionalString,
-  firedAt: Schema.String,
-  status: Schema.String,
-  error: optionalString,
-});
-export type ScheduleRun = typeof ScheduleRunSchema.Type;
-export const ScheduleRunListSchema = Schema.Struct({ runs: Schema.Array(ScheduleRunSchema) });
-export type ScheduleRunList = typeof ScheduleRunListSchema.Type;
-
 export const QueueItemSchema = Schema.Struct({
   sessionId: Schema.String,
   position: Schema.Number,
@@ -358,15 +325,6 @@ export const PeerMutationResponseSchema = Schema.Struct({
   ok: Schema.Literal(true),
   name: Schema.String,
 });
-export const ScheduleMutationResponseSchema = Schema.Struct({
-  ok: Schema.optionalKey(Schema.Boolean),
-  schedule: Schema.optionalKey(ScheduleSchema),
-  runId: optionalString,
-});
-export const ScheduleRunResponseSchema = Schema.Struct({
-  ok: Schema.Literal(true),
-  sessionId: Schema.String,
-});
 export const QueueMutationResponseSchema = Schema.Struct({
   ok: Schema.Boolean,
   removed: Schema.optionalKey(Schema.Boolean),
@@ -406,19 +364,6 @@ export const PeerUpsertRequestSchema = Schema.Struct({
 export const PeerRemoveRequestSchema = Schema.Struct({
   name: Schema.String,
   action: Schema.Literal("remove"),
-});
-export const ScheduleMutationRequestSchema = Schema.Struct({
-  name: Schema.String,
-  instructions: Schema.String,
-  modelProvider: Schema.String,
-  modelId: Schema.String,
-  thinkingLevel: Schema.String,
-  projectPath: Schema.String,
-  cronExpr: Schema.String,
-  timezone: Schema.String,
-  enabled: Schema.Boolean,
-  lastRunAt: optionalString,
-  nextRunAt: optionalString,
 });
 export const QueueAddRequestSchema = Schema.Struct({
   message: Schema.String,

@@ -21,7 +21,7 @@ describe("HomeRail", () => {
     expect(onAnswer).toHaveBeenCalledWith(waiting, "Ship");
   });
 
-  it("shows every waiting session alongside schedules", () => {
+  it("shows every waiting session", () => {
     render(HomeRail, {
       props: {
         waitingSessions: [
@@ -36,55 +36,10 @@ describe("HomeRail", () => {
             waitingQuestion: "Choose a region",
           }),
         ],
-        schedules: [
-          {
-            id: "daily",
-            name: "Daily digest",
-            instructions: "Summarize",
-            modelProvider: "",
-            modelId: "",
-            thinkingLevel: "",
-            projectPath: "/repo",
-            cronExpr: "0 9 * * *",
-            timezone: "America/Toronto",
-            enabled: true,
-            nextRunAt: "2026-07-20T13:00:00Z",
-            createdAt: "2026-07-19T00:00:00Z",
-            updatedAt: "2026-07-19T00:00:00Z",
-          },
-        ],
       },
     });
 
     expect(screen.getByRole("link", { name: "Release" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Deploy" })).toBeInTheDocument();
-    expect(screen.getByText("Schedules")).toBeInTheDocument();
-    expect(screen.getByText("1 active")).toBeInTheDocument();
-  });
-
-  it("shows the idle schedules summary", () => {
-    render(HomeRail, {
-      props: {
-        schedules: [
-          {
-            id: "daily",
-            name: "Daily digest",
-            instructions: "Summarize",
-            modelProvider: "",
-            modelId: "",
-            thinkingLevel: "",
-            projectPath: "/repo",
-            cronExpr: "0 9 * * *",
-            timezone: "America/Toronto",
-            enabled: true,
-            nextRunAt: "2026-07-20T13:00:00Z",
-            createdAt: "2026-07-19T00:00:00Z",
-            updatedAt: "2026-07-19T00:00:00Z",
-          },
-        ],
-      },
-    });
-    expect(screen.getByText("1 active")).toBeInTheDocument();
-    expect(screen.getByText(/Next: Daily digest/)).toBeInTheDocument();
   });
 });

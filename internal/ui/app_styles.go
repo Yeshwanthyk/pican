@@ -23,7 +23,6 @@ import (
 var appStylesBundle = strings.Join([]string{
 	indexCSS,
 	settingsCSS,
-	schedulesCSS,
 	workflowsCSS,
 	tasksCSS,
 	subagentsCSS,

@@ -180,8 +180,7 @@ On success, server creation starts:
 2. workflow and task watchers;
 3. Pi `session-status` watching;
 4. the one-second running-status sweeper;
-5. the schedule runner;
-6. the persistent chat-queue drainer.
+5. the persistent chat-queue drainer.
 
 ### 9. Route Registration and Mounting
 
@@ -196,7 +195,7 @@ mux.HandleFunc("/api/models", s.auth.Wrap(s.handleAvailableModels))
 // … etc
 ```
 
-`/api/models?runtime=<runtime>` scopes explicit discovery; `/api/models?id=<session-id>` resolves the session runtime. Global callers such as settings and schedules continue using the merged `/api/models` response.
+`/api/models?runtime=<runtime>` scopes explicit discovery; `/api/models?id=<session-id>` resolves the session runtime. Global callers such as settings continue using the merged `/api/models` response.
 
 Handlers remain registered against root-relative paths on one inner mux. A single base-path handler mounts that mux and strips the prefix before dispatch; requests outside the mount return `404`. The same normalized path is supplied to the live shell, frontend URL helpers, PWA metadata, and Vite asset loader.
 

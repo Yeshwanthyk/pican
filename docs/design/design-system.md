@@ -138,7 +138,7 @@ Every component (the index list cards, sidebar tree, chat bubbles, buttons, and 
 
 - Sessions render as flat ticker rows separated by hairlines. The title leads, current activity or waiting state follows when present, and the footer balances project/model against token, cost, and recency metrics.
 - Home membership is curation-based: pinned sessions stay in Pinned and tracked sessions stay under their project. Waiting uses `--attention`; live work uses `--accent` and a reduced-motion-safe status pulse without moving the row.
-- Desktop uses a compact top action bar and a right rail for waiting questions, schedules, and machines. Mobile uses a bottom thumb bar with search, a 46px new-session action, and the overflow menu.
+- Desktop uses a compact top action bar and a right rail for waiting questions and machines. Mobile uses a bottom thumb bar with search, a 46px new-session action, and the overflow menu.
 - Counts, costs, tokens, elapsed durations, and timestamps use tabular numerals. All fourteen named themes define `--attention` independently from danger and success.
 
 ### Plain States

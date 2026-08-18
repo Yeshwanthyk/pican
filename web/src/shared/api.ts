@@ -11,7 +11,6 @@ import {
   GitRenameResponseSchema,
   ModelListSchema,
   MutationResponseSchema,
-  OkResponseSchema,
   PeerListSchema,
   PeerMutationResponseSchema,
   PeerSessionListSchema,
@@ -25,10 +24,6 @@ import {
   QueueStateSchema,
   RecentLocationsSchema,
   RuntimesResponseSchema,
-  ScheduleListSchema,
-  ScheduleMutationResponseSchema,
-  ScheduleRunListSchema,
-  ScheduleRunResponseSchema,
   SessionListSchema,
   SettingsResponseSchema,
   SubagentListSchema,
@@ -143,16 +138,6 @@ export const effects = {
     updateArchive: (sessionId: string, archived: boolean) =>
       Http.post("/api/archives", { sessionId, archived }, MutationResponseSchema),
     pins: Http.get("/api/pins", PinListSchema),
-  },
-  schedules: {
-    list: Http.get("/api/schedules", ScheduleListSchema),
-    runs: (id: string) => Http.get(query("/api/schedule/runs", { id }), ScheduleRunListSchema),
-    create: (body: unknown) => Http.post("/api/schedules", body, ScheduleMutationResponseSchema),
-    update: (id: string, body: unknown) =>
-      Http.post(query("/api/schedule", { id }), body, ScheduleMutationResponseSchema),
-    run: (id: string) =>
-      Http.post(query("/api/schedule/run", { id }), {}, ScheduleRunResponseSchema),
-    delete: (id: string) => Http.del(query("/api/schedule", { id }), OkResponseSchema),
   },
   peers: {
     list: Http.get("/api/peers", PeerListSchema),

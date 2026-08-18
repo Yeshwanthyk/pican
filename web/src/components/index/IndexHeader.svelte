@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { icon, ArrowLeft, CalendarClock, MoreHorizontal } from '../../shared/icons.js';
+  import { icon, ArrowLeft, MoreHorizontal } from '../../shared/icons.js';
   import { handleNavClick } from '../../shared/navigation.js';
   import { t } from '../../shared/strings.js';
   import type { SessionView } from '../../index/sessions.js';
@@ -17,7 +17,6 @@
     onNewSession?: () => void;
     onAddProject?: () => void;
     onToggleMenu?: () => void;
-    onSchedules?: () => void;
   }
 
   let {
@@ -32,7 +31,6 @@
     onNewSession = () => {},
     onAddProject = () => {},
     onToggleMenu = () => {},
-    onSchedules = () => {},
   }: Props = $props();
 
   const scopes: ReadonlyArray<{
@@ -106,16 +104,6 @@
       >
       <button class="header-new-session" type="button" onclick={onNewSession}
         ><span aria-hidden="true">+</span>{t('index.newSessionShort')}</button
-      >
-      <button
-        type="button"
-        class="schedules-nav-btn"
-        data-schedules-btn
-        title={t('schedules.navTitle')}
-        onclick={onSchedules}
-        ><span aria-hidden="true">{@html icon(CalendarClock, { size: 15 })}</span><span
-          >{t('schedules.navTitle')}</span
-        ></button
       >
       <button
         class="nav-menu-btn"

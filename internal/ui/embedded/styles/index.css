@@ -214,32 +214,6 @@ a { color: inherit; }
     gap: 8px;
     flex-shrink: 0;
 }
-.schedules-nav-btn {
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    border: 1px solid color-mix(in srgb, var(--dim) 76%, transparent);
-    background: color-mix(in srgb, var(--surface) 54%, transparent);
-    color: var(--muted);
-    border-radius: 6px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 13px;
-    line-height: 1;
-    transition: color 0.12s, background 0.12s, border-color 0.12s;
-}
-.schedules-nav-btn:hover {
-    color: var(--text);
-    background: var(--surface-2);
-    border-color: var(--dim);
-}
-.schedules-nav-icon {
-    display: inline-flex;
-    align-items: center;
-    color: var(--accent);
-}
 .stat-running {
     display: none;
     align-items: center;
@@ -1205,20 +1179,6 @@ body.modal-sheet-open { overflow: hidden; }
         padding: 0 12px;
         font-size: 12px;
     }
-    .schedules-nav-btn {
-        flex: 1 1 calc(50% - 4px);
-        width: auto;
-        min-width: 0;
-        height: 44px;
-        padding: 0 10px;
-        justify-content: center;
-    }
-    .schedules-nav-btn > span:last-child {
-        display: inline;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
     .content {
         width: 100%;
         max-width: 100%;
@@ -1556,7 +1516,6 @@ body.modal-sheet-open { overflow: hidden; }
     white-space: nowrap;
 }
 .header-actions .nav-search-btn { height: 34px; min-width: 178px; }
-.header-actions .schedules-nav-btn,
 .header-actions .nav-menu-btn,
 .header-new-session {
     min-height: 34px;
@@ -1881,8 +1840,6 @@ body.modal-sheet-open { overflow: hidden; }
 .rail-open-session:active { transform: scale(0.96); }
 .rail-answer-options button:disabled { cursor: wait; opacity: 0.6; }
 .rail-open-session { display: inline-flex; align-items: center; margin-top: 12px; }
-.rail-schedule-count { margin-top: 12px; color: var(--text-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
-.rail-schedule-next { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .home-rail .timeline-section { margin: 0; }
 .home-rail .machine-toggle { border: 0; border-bottom: 1px solid var(--dim); border-radius: 0; background: transparent; }
 .home-rail .machine-status { font-size: 10px; }

@@ -46,27 +46,23 @@ self.addEventListener('push', (event) => {
       data = { title: 'pican session', body: 'Response ready' };
     }
 
-    // Scheduled runs fire in the background regardless of whether the app is
-    // open, so they're always shown. The "response ready" cue for a session the
-    // user is actively watching is suppressed when a foreground client exists —
-    // the page handles that cue itself (including done.mp3).
-    const isSchedule = data.type === 'schedule-done';
-    if (!isSchedule) {
-      const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const hasForegroundClient = clientsList.some((client) => {
-        // WindowClient.visibilityState is the ideal signal. Some browsers expose
-        // WindowClient.focused instead/also, so treat either as foreground.
-        return client.visibilityState === 'visible' || client.focused === true;
-      });
-      if (hasForegroundClient) return;
-    }
+    // The "response ready" cue for a session the user is actively watching is
+    // suppressed when a foreground client exists — the page handles that cue
+    // itself (including done.mp3).
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const hasForegroundClient = clientsList.some((client) => {
+      // WindowClient.visibilityState is the ideal signal. Some browsers expose
+      // WindowClient.focused instead/also, so treat either as foreground.
+      return client.visibilityState === 'visible' || client.focused === true;
+    });
+    if (hasForegroundClient) return;
 
     const title = data.title || 'pican session';
     const options = {
       body: data.body || 'Response ready',
       icon: picanURL('/app-icon.png'),
       badge: picanURL('/app-icon.png'),
-      tag: isSchedule ? `pican-schedule-${data.sessionId || ''}` : 'pican-session-done',
+      tag: 'pican-session-done',
       renotify: true,
       data: { sessionId: data.sessionId || '' },
       // Phones play their default notification sound when this fires.

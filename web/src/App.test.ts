@@ -218,7 +218,6 @@ describe("App", () => {
         return Promise.resolve(Response.json({ locations: [] }));
       }
       if (url === "/api/peers") return Promise.resolve(Response.json({ peers: [] }));
-      if (url === "/api/schedules") return Promise.resolve(Response.json({ schedules: [] }));
       return Promise.resolve(Response.json({}));
     });
     vi.spyOn(window, "fetch").mockImplementation(fetchSpy);

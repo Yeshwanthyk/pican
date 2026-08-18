@@ -3,7 +3,6 @@
   import SessionsPage from './routes/SessionsPage.svelte';
   import SessionPage from './routes/SessionPage.svelte';
   import SettingsPage from './routes/SettingsPage.svelte';
-  import SchedulesPage from './routes/SchedulesPage.svelte';
   import WorkflowsPage from './routes/WorkflowsPage.svelte';
   import TasksPage from './routes/TasksPage.svelte';
   import SubagentsPage from './routes/SubagentsPage.svelte';
@@ -113,8 +112,6 @@
   {/key}
 {:else if path === '/settings'}
   <SettingsPage />
-{:else if path === '/schedules'}
-  <SchedulesPage />
 {:else if path === '/workflows'}
   <WorkflowsPage runId={workflowRunId} session={workflowSession} />
 {:else if path === '/tasks'}

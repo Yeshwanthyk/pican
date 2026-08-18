@@ -51,9 +51,6 @@ var indexCSS string
 //go:embed embedded/styles/settings.css
 var settingsCSS string
 
-//go:embed embedded/styles/schedules.css
-var schedulesCSS string
-
 //go:embed embedded/styles/workflows.css
 var workflowsCSS string
 

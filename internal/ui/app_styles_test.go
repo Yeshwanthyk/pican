@@ -56,7 +56,6 @@ func TestAppStylesBundleContainsPerRouteStylesheets(t *testing.T) {
 	for name, css := range map[string]string{
 		"indexCSS":       indexCSS,
 		"settingsCSS":    settingsCSS,
-		"schedulesCSS":   schedulesCSS,
 		"workflowsCSS":   workflowsCSS,
 		"tasksCSS":       tasksCSS,
 		"subagentsCSS":   subagentsCSS,

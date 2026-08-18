@@ -11,7 +11,7 @@ One server can select any registered runtime combination. It keeps native state 
 - Continue sessions with text and image attachments
 - Runtime-scoped model and reasoning-effort controls where supported
 - Capability-driven steering, queues, cancellation, lifecycle actions, and labels
-- Session search, project grouping, pins, schedules, tasks, workflows, subagents, and scratchpads
+- Session search, project grouping, pins, tasks, workflows, subagents, and scratchpads
 - Markdown, syntax highlighting, images, diffs, artifacts, and collapsible tool output
 - Static HTML/JSONL export and GitHub Gist sharing
 - Responsive desktop/mobile UI, themes, fonts, keyboard navigation, and PWA installation

@@ -27,7 +27,6 @@ import (
 	"pican/internal/render"
 	"pican/internal/rpc"
 	"pican/internal/runtimes"
-	"pican/internal/schedules"
 	"pican/internal/sessioncreate"
 	"pican/internal/sessions"
 	"pican/internal/updater"
@@ -155,7 +154,6 @@ type Server struct {
 	stopOnce            sync.Once
 	wg                  sync.WaitGroup
 	db                  *sql.DB
-	schedules           *schedules.Store
 	chatQueue           *chatqueue.Store
 	sessionCreates      *sessioncreate.Store
 	queueDrainer        *queueDrainer
@@ -288,7 +286,6 @@ func New(deps Deps) (*Server, error) {
 		lastKnown:           make(map[string]struct{}),
 		stopCh:              make(chan struct{}),
 		db:                  db,
-		schedules:           schedules.NewStore(db),
 		chatQueue:           chatqueue.NewStore(db),
 		sessionCreates:      sessionCreates,
 		updater:             deps.Updater,
@@ -323,7 +320,6 @@ func New(deps Deps) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("default runtime %q is not registered: %w", s.defaultRuntime, err)
 	}
-	s.schedules.Now = now
 	s.chatQueue.Now = now
 	if pm, err := NewPushManager(agentDir); err != nil {
 		fmt.Fprintf(os.Stderr, "push notifications unavailable: %v\n", err)
@@ -340,11 +336,6 @@ func New(deps Deps) (*Server, error) {
 	go func() {
 		defer s.wg.Done()
 		s.runStatusSweeper(s.stopCh, time.Second)
-	}()
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.runScheduler(s.stopCh, scheduleTickInterval)
 	}()
 	// Autonomous queue drainer: drains chat_queue items into the worker even
 	// when nobody has the session open in a browser. Stop in Shutdown.
@@ -364,7 +355,7 @@ func initDB(agentDir string) (*sql.DB, error) {
 	}
 	// SQLite allows only one writer at a time; multiple pooled connections
 	// racing to write surface as "database is locked" errors (e.g. concurrent
-	// schedule or share writes). Serialize on a single connection so writes
+	// share writes). Serialize on a single connection so writes
 	// queue instead of failing.
 	db.SetMaxOpenConns(1)
 	// WAL mode lets readers and the (single) writer make progress concurrently,
@@ -400,10 +391,6 @@ func initDB(agentDir string) (*sql.DB, error) {
 		{"session_archives table", sessionArchivesSchema},
 		{"peer_hosts table", peerHostsSchema},
 		{"btw_sessions table", btwSessionsSchema},
-		{"schedules table", schedules.SchedulesTableDDL},
-		{"schedule_runs table", schedules.RunsTableDDL},
-		{"schedule_runs schedule index", schedules.RunsScheduleIndexDDL},
-		{"schedule_runs session index", schedules.RunsSessionIndexDDL},
 		{"chat_queue_items table", chatqueue.ItemsTableDDL},
 		{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
 		{"chat_queue_state table", chatqueue.StateTableDDL},
@@ -483,10 +470,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/settings", s.getPostHandler(s.handleGetSettings, s.handleSaveSettings))
 	mux.HandleFunc("/api/btw", s.auth.Wrap(s.handleGetBtw))
 	mux.HandleFunc("/api/btw/new", s.auth.Wrap(s.handleNewBtw))
-	mux.HandleFunc("/api/schedules", s.auth.Wrap(s.handleApiSchedules))
-	mux.HandleFunc("/api/schedule", s.auth.Wrap(s.handleApiSchedule))
-	mux.HandleFunc("/api/schedule/run", s.auth.Wrap(s.handleApiScheduleRun))
-	mux.HandleFunc("/api/schedule/runs", s.auth.Wrap(s.handleApiScheduleRuns))
 	mux.HandleFunc("/api/workflows", s.auth.Wrap(s.handleApiWorkflows))
 	mux.HandleFunc("/api/workflows/run", s.auth.Wrap(s.handleApiWorkflowRun))
 	mux.HandleFunc("/api/tasks", s.auth.Wrap(s.handleApiTasks))

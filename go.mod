@@ -6,7 +6,6 @@ require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/uuid v1.6.0
-	github.com/robfig/cron/v3 v3.0.1
 	github.com/shirou/gopsutil/v4 v4.26.5
 	golang.org/x/sys v0.42.0
 	modernc.org/sqlite v1.51.0

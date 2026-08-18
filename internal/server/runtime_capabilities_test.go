@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +14,6 @@ import (
 
 	"pican/internal/projections"
 	"pican/internal/runtimes"
-	"pican/internal/schedules"
 	"pican/internal/sessions"
 	"pican/internal/workers"
 )
@@ -206,15 +204,10 @@ func TestChatEnforcesImageAndSteerCapabilities(t *testing.T) {
 	})
 }
 
-func TestScheduleAndBtwCreationRequireDefaultRuntimeCapabilities(t *testing.T) {
+func TestBtwCreationRequiresDefaultRuntimeCapabilities(t *testing.T) {
 	s := &Server{
 		defaultRuntime:  "future",
 		runtimeRegistry: futureRegistry(t, runtimes.Capabilities{}, true, ""),
-	}
-	err := s.scheduleCapabilityError(context.Background(), schedules.Schedule{Instructions: "run"})
-	failure := new(runtimeOperationFailure)
-	if !errors.As(err, &failure) || failure.status != http.StatusConflict || !strings.Contains(failure.message, "does not support schedules") {
-		t.Fatalf("schedule error = %#v", err)
 	}
 	recorder := httptest.NewRecorder()
 	s.handleNewBtw(recorder, httptest.NewRequest(http.MethodPost, "/api/btw/new", strings.NewReader(`{"path":"`+t.TempDir()+`"}`)))
@@ -319,24 +312,6 @@ func TestReplaceableRuntimeLabelsUseIdentityValidatedProjectionStore(t *testing.
 	}
 	if !strings.Contains(string(data), `"type":"label"`) || !strings.Contains(string(data), `"label":"checkpoint"`) {
 		t.Fatalf("projection = %s", data)
-	}
-}
-
-func TestScheduleCapabilityRejectsClaudeBeforePersistence(t *testing.T) {
-	registry, err := runtimes.New(runtimes.Claude(runtimes.BuiltinOptions{
-		Command: "claude", AvailabilityProbe: func(context.Context) runtimes.Availability {
-			return runtimes.Availability{Available: true}
-		},
-		Catalog: compatibilityCatalog{}, WorkerFactory: compatibilityWorkerFactory,
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &Server{runtimeRegistry: registry, defaultRuntime: string(runtimes.ClaudeID)}
-	err = s.scheduleCapabilityError(context.Background(), schedules.Schedule{})
-	var failure *runtimeOperationFailure
-	if !errors.As(err, &failure) || failure.status != http.StatusConflict || failure.message != "Claude runtime does not support schedules" {
-		t.Fatalf("schedule capability error = %#v", err)
 	}
 }
 

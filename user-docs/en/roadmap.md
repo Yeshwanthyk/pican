@@ -32,7 +32,6 @@ Everything listed in [the features table](README.md#what-you-can-do-with-pican) 
 | # | Feature | What it does |
 |---|---|---|
 | [#47](https://github.com/Yeshwanthyk/pican/issues/47) | **File Explorer & Git Diff** | Browse the project file tree and see git changes directly in pican. Opt-in, so it stays out of your way. |
-| [#44](https://github.com/Yeshwanthyk/pican/issues/44) | **Scheduler** | Schedule prompts to run automatically — daily standups, morning summaries, recurring tasks. Admin-gated for safety. |
 | [#43](https://github.com/Yeshwanthyk/pican/issues/43) | **Customizable shortcuts** | Remap every keyboard shortcut to match your muscle memory. |
 
 ---

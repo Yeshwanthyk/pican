@@ -14,9 +14,8 @@
   import { navigate } from '../shared/navigation.js';
   import { t } from '../shared/strings.js';
   import { describeError } from '../lib/errors';
-  import type { Project, Schedule } from '../lib/schema';
+  import type { Project } from '../lib/schema';
   import { sendChat } from '../session/chat/chat-api.js';
-  import { defaultFetchSchedules } from '../index/schedules.js';
   import { showToast } from '../shared/toast.js';
   import { ignoreFailure, recoverSync, settle } from '../components/shared/ui-effect';
   import { SvelteSet, SvelteMap } from 'svelte/reactivity';
@@ -73,7 +72,6 @@
   let peersConfigured = false;
   let peerHosts = $state<NormalizedPeerHost[]>([]);
   let peersRefreshInflight = false;
-  let schedules = $state<Schedule[]>([]);
 
   const selectedProject = $derived(projects.find((candidate) => candidate.path === project));
   const projectName = $derived(projectDisplayName(project));
@@ -224,11 +222,6 @@
     const result = await settle(defaultFetchPeers);
     peersConfigured = result.ok && (result.value.peers || []).length > 0;
     if (peersConfigured) await refreshPeerHosts();
-  }
-
-  async function refreshSchedules() {
-    const result = await settle(defaultFetchSchedules);
-    if (result.ok) schedules = [...result.value.schedules];
   }
 
   async function answerWaitingQuestion(
@@ -412,7 +405,6 @@
       recentLocations = normalizeRecentLocations(recent).slice(0, 10);
     });
     initPeers();
-    refreshSchedules();
 
     return () => {
       document.title = previousTitle;
@@ -437,7 +429,6 @@
   onNewSession={openNewSessionModal}
   onAddProject={openProjectsModal}
   onToggleMenu={toggleMenu}
-  onSchedules={() => navigate('/schedules')}
 />
 
 <HomeMenu
@@ -445,7 +436,6 @@
   onClose={closeMenu}
   onNewSession={openNewSessionModal}
   onManageProjects={openProjectsModal}
-  onSchedules={() => navigate('/schedules')}
 />
 
 <CommandPalette
@@ -468,13 +458,7 @@
     onLoadMore={loadMore}
     onAddProject={openProjectsModal}
   />
-  <HomeRail
-    {waitingSessions}
-    {schedules}
-    {peerHosts}
-    onAnswer={answerWaitingQuestion}
-    onSchedules={() => navigate('/schedules')}
-  />
+  <HomeRail {waitingSessions} {peerHosts} onAnswer={answerWaitingQuestion} />
 </main>
 
 <nav class="mobile-thumb-bar" aria-label={t('index.mobileActions')}>

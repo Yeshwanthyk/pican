@@ -4,7 +4,6 @@
     icon,
     SquarePen,
     FolderGit2,
-    CalendarClock,
     Layers,
     ListTree,
     Snowflake,
@@ -20,7 +19,6 @@
     onClose?: () => void;
     onNewSession?: () => void;
     onManageProjects?: () => void;
-    onSchedules?: () => void;
   }
 
   let {
@@ -28,7 +26,6 @@
     onClose = () => {},
     onNewSession = () => {},
     onManageProjects = () => {},
-    onSchedules = () => {},
   }: Props = $props();
 
   const scopes = [
@@ -110,19 +107,6 @@
       }}
       ><span class="menu-item-label"
         >{@html icon(FolderGit2, { size: 15 })}{t('index.addRemoveProjects')}</span
-      ></button
-    >
-    <button
-      class="web-menu-item"
-      type="button"
-      data-schedules-menu-btn
-      role="menuitem"
-      onclick={() => {
-        onClose();
-        onSchedules();
-      }}
-      ><span class="menu-item-label"
-        >{@html icon(CalendarClock, { size: 15 })}{t('schedules.navTitle')}</span
       ></button
     >
   </div>

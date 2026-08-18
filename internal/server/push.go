@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -184,23 +183,6 @@ func (m *PushManager) NotifyDone(sessionID string) {
 		"sessionId": sessionID,
 		"title":     "pican session",
 		"body":      "Response ready",
-	})
-}
-
-// NotifyScheduleDone sends a schedule-specific push when a scheduled run
-// finishes. Unlike session-done, the service worker shows this even when the
-// app is foregrounded, since a schedule firing is a background event the user
-// may not be watching.
-func (m *PushManager) NotifyScheduleDone(scheduleName, sessionID string) {
-	title := scheduleName
-	if strings.TrimSpace(title) == "" {
-		title = "Scheduled run"
-	}
-	m.notify(map[string]string{
-		"type":      "schedule-done",
-		"sessionId": sessionID,
-		"title":     title,
-		"body":      "Scheduled run finished",
 	})
 }
 

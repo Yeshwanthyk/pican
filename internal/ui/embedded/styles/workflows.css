@@ -1,5 +1,5 @@
 /* Read-only workflow run dashboard. The live SPA shell inlines this file via
-   appStylesheets(), matching the route-scoped schedules stylesheet. */
+   appStylesheets(), matching the other route-scoped stylesheets. */
 
 .workflows-page {
   width: min(980px, 100%);
@@ -541,18 +541,6 @@
 
   .workflow-transcript-entries {
     padding-left: 0;
-  }
-}
-
-@media (max-width: 700px) {
-  .workspace-views .schedules-nav-btn > span:last-child {
-    display: none;
-  }
-
-  .workspace-views .schedules-nav-btn {
-    width: 30px;
-    padding: 0;
-    justify-content: center;
   }
 }
 
