@@ -181,7 +181,7 @@ func TestRecordModTimeGlobalBroadcastCarriesSessionID(t *testing.T) {
 	s.recordModTime("session.jsonl", time.Now())
 
 	// The session-scoped topic still gets the plain "reload" other consumers
-	// (live-events.js, btw-events.js) depend on — unchanged.
+	// (live-events.js) depend on — unchanged.
 	select {
 	case msg := <-sessionClient.ch:
 		if msg != "reload" {

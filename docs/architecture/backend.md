@@ -93,7 +93,6 @@ pican/
 │   │   ├── diff.go             # /api/git/diff handler
 │   │   ├── files.go            # /api/files handler + per-cwd file-walk cache
 │   │   ├── settings.go         # Server-backed user settings (/api/settings) + SPA shell helpers
-│   │   ├── btw.go              # btw scratch-chat registry: get/new + legacy migration (SQLite)
 │   │   ├── auto_title.go       # Auto-title sessions via OneShotPrompt; guards against clobbering user names
 │   │   ├── auto_title_heuristic.go # Heuristic fallback title from first user message
 │   │   ├── metrics.go          # /metrics + /api/metrics + pprof registration (gopsutil sampler)
@@ -190,11 +189,11 @@ source compatibility. When
 
 On `New`, the server opens (and migrates) a SQLite database at
 `~/.pi/agent/pican.sqlite` with tables for scratchpads, settings, project
-preferences, session pins, local session archive, peer hosts, btw sessions,
-and chat queues. An enabled `project_prefs` row whose source is
+preferences, session pins, local session archive, peer hosts, and chat
+queues. An enabled `project_prefs` row whose source is
 `registered` is the tracked-project contract. `session_archives` is strictly
 pican-local presentation state and never mutates runtime-native state. See
-`projects.go`, `pins.go`, `archives.go`, `settings.go`, and `btw.go`. The pool is capped to a single
+`projects.go`, `pins.go`, `archives.go`, and `settings.go`. The pool is capped to a single
 connection (`SetMaxOpenConns(1)`) so concurrent writers queue instead of failing
 with "database is locked". A `PushManager` (when configured) persists web-push
 subscriptions and VAPID keys under the agent dir.
@@ -309,7 +308,7 @@ Wave 1 preserves the public Pi/Codex surface while moving internals to the regis
 
 Runtime-dependent HTTP handlers authorize operations from the selected registry descriptor, never from request-body capability data or frontend state. A declared-but-unsupported operation returns `409` with the stable form `<label> runtime does not support <operation>`; a supported operation whose runtime probe is unavailable returns `503` with the current availability reason. Session-scoped endpoints resolve the persisted session first, so a caller cannot use a conflicting runtime query to select a different model or mutation path.
 
-Create, fork, clone, rename, delete, chat/steer, cancel, persistent queue operations, model listing/switching, effort/reasoning selection, slash commands, file/image attachments, btw creation, and auto-title all cross this boundary. OpenCode lifecycle dispatch uses its native create/update/fork/delete endpoints; unsupported native archive, steer, queue, attachment, effort, and interaction paths fail closed before dispatch. Labels and runtime-neutral local Archive are pican-owned metadata outside runtime dispatch.
+Create, fork, clone, rename, delete, chat/steer, cancel, persistent queue operations, model listing/switching, effort/reasoning selection, slash commands, file/image attachments, and auto-title all cross this boundary. OpenCode lifecycle dispatch uses its native create/update/fork/delete endpoints; unsupported native archive, steer, queue, attachment, effort, and interaction paths fail closed before dispatch. Labels and runtime-neutral local Archive are pican-owned metadata outside runtime dispatch.
 
 `/api/session` additively returns the trusted `runtimeLabel`, complete `capabilities`, `projectionMode`, and a server-built `resumeCommand`. Resume commands are emitted only for known runtime argument contracts, including `<opencode-command> --session <native-id>`, and every shell argument is quoted by the server. The live frontend uses these fields to remove or disable unsupported actions. Static export still renders only persisted data and does not receive or consult the registry.
 
@@ -411,8 +410,6 @@ type piRPCWorker struct {
 | `/api/git/diff` | GET | `handleGitDiff` | Uncommitted working-tree diff (tracked + untracked) for the session cwd |
 | `/api/scratchpad` | GET/POST | `handleGetScratchpad` / `handleSaveScratchpad` | Per-project scratchpad (SQLite) |
 | `/api/settings` | GET/POST | `handleGetSettings` / `handleSaveSettings` | Server-backed user settings (SQLite) |
-| `/api/btw` | GET | `handleGetBtw` | Resolve the btw scratch-chat session for a parent (SQLite) |
-| `/api/btw/new` | POST | `handleNewBtw` | Create a new btw scratch-chat session (SQLite) |
 | `/api/projects` | GET/POST | `handleApiProjects` / `handleUpdateProject` | List discovered/tracked projects and track/untrack exact persisted paths; legacy visibility actions remain compatible |
 | `/api/pins` | GET/POST | `handleListPins` / `handleSetPin` | Ordered session pins (SQLite); pinning also restores a locally archived session |
 | `/api/archives` | POST | `handleSetArchive` | Runtime-neutral local archive/restore; archive unpins and rejects running/waiting sessions |

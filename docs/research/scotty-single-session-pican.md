@@ -271,7 +271,7 @@ Do not register:
 - `/`, `/api/sessions`, `/api/new-session`, fork, clone, rename, label, Codex archive/unarchive/
   delete, Pican archives, pins, recent locations, projects, peers, sharing, settings page, or
   filesystem browsing.
-- scratchpad and btw unless the bound-session product explicitly retains them.
+- scratchpad unless the bound-session product explicitly retains it.
 - schedules, schedule runs, workflows, tasks, subagents index APIs, metrics dashboard, pprof,
   sounds, push subscription, version/update/restart, and PWA service-worker routes.
 
@@ -283,7 +283,7 @@ Do not initialize:
 - global status sweeper;
 - broad catalog reconciliation after the bound pair is validated;
 - session index cache population;
-- project/peer/pin/archive/scratchpad/btw tables;
+- project/peer/pin/archive/scratchpad tables;
 - update checker, sounds seeding, Tailscale publication, browser opening, or PWA registration;
 - global queue draining. If persistent queued chat remains a requirement, run a drainer scoped to
   the bound ID only.

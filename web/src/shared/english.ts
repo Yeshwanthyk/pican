@@ -501,10 +501,6 @@ export default {
   "settings.spinnerComet": "Comet",
   "settings.defaultLayout": "Default layout",
   "settings.defaultLayoutHint": "How the sessions list is grouped on load.",
-  "settings.showBtw": "Show btw chats in list",
-  "settings.showBtwHint":
-    "Include the throwaway btw scratch-chats in the sessions list. Hidden by default.",
-
   "settings.sessionTitles": "Session Titles",
   "settings.autoTitle": "Auto-generate titles",
   "settings.autoTitleHint": "Generate one clean title from the first user message.",
@@ -599,15 +595,6 @@ export default {
   "git.renameBranch": "Rename branch",
   "git.newBranchName": "New branch name",
   "git.moreActions": "More git actions",
-
-  // ── btw floating chat window ──
-  "btw.newChat": "New btw chat",
-  "btw.new": "new",
-  "btw.inputPlaceholder": "Type something...",
-  "btw.working": "Working…",
-  "btw.stop": "Stop",
-  "btw.emptyHasSession": "No messages yet — say hello.",
-  "btw.emptyNoSession": "Type a message to start a btw chat, or hit “new”.",
 
   // ── Artifacts panel actions ──
   "artifact.copy": "Copy",

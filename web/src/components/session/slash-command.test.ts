@@ -11,7 +11,7 @@ import {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const SAMPLE = [
-  { name: "btw", description: "side chat", source: "extension" },
+  { name: "ext:note", description: "take a note", source: "extension" },
   { name: "workon", description: "start a task", source: "prompt" },
   { name: "skill:memory", description: "project memory", source: "skill" },
 ];
@@ -61,7 +61,7 @@ describe("groupCommands", () => {
     const groups = groupCommands([
       { name: "skill:memory", source: "skill" },
       { name: "workon", source: "prompt" },
-      { name: "btw", source: "extension" },
+      { name: "ext:note", source: "extension" },
     ]);
     expect(groups.map((g) => g.label)).toEqual(["Prompts", "Skills", "Extensions"]);
   });
@@ -151,9 +151,9 @@ describe("setupSlashCommands controller", () => {
     expect(getCommands).toHaveBeenCalledWith("s", { load: true });
     const items = document.querySelectorAll(".slash-item");
     expect(items).toHaveLength(3);
-    expect([...items].some((el) => el instanceof HTMLElement && el.dataset.insert === "btw")).toBe(
-      true,
-    );
+    expect(
+      [...items].some((el) => el instanceof HTMLElement && el.dataset.insert === "ext:note"),
+    ).toBe(true);
     el.remove();
   });
 

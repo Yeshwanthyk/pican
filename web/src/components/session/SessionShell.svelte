@@ -13,7 +13,6 @@
   import ShortcutsModal from './ShortcutsModal.svelte';
   import ModelUsageModal from './ModelUsageModal.svelte';
   import ForkModal from './ForkModal.svelte';
-  import BtwPopup from './BtwPopup.svelte';
   import DiffModal from './DiffModal.svelte';
   import LoadEarlier from './LoadEarlier.svelte';
   import SessionTree from './SessionTree.svelte';
@@ -246,7 +245,6 @@
 <SessionTree bind:open={sessionModals.tree.open} />
 
 <ShareDialog {sessionId} />
-<BtwPopup {cwd} parentId={sessionId} />
 <svelte:element
   this={"script"}
   id="session-data"

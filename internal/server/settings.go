@@ -62,7 +62,6 @@ var settingDefaults = map[string]string{
 	"pican:spinner-style":          "runcat",
 	"pican:v1:notify-on-done":      "false",
 	"pican:view-layout":            "timeline",
-	"pican:v1:show-btw-in-index":   "false",
 	settingAutoTitleEnabled:        "true",
 	settingAutoTitleMode:           "once",
 	settingAutoTitleModel:          "",

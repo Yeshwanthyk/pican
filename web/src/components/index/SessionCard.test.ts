@@ -29,7 +29,6 @@ describe("SessionCard compatibility wrapper", () => {
           runtime: "codex",
           nativeId: "thread-1",
           pinned: true,
-          btw: true,
           tokenTotal: 1200,
           costTotal: 0.25,
         }),
@@ -43,7 +42,7 @@ describe("SessionCard compatibility wrapper", () => {
     expect(row).not.toBeNull();
     expect(row?.dataset.search).toContain("codex thread-1");
     expect(container.querySelector(".session-card")).not.toBeInTheDocument();
-    expect(container.querySelectorAll(".activity-row-marker")).toHaveLength(2);
+    expect(container.querySelectorAll(".activity-row-marker")).toHaveLength(1);
     expect(titleLine).toHaveTextContent("Session");
     expect(metadataLine).toHaveTextContent("idle");
     expect(metadataLine).toHaveTextContent("/repo");

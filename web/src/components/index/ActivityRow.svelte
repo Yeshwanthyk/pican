@@ -8,7 +8,6 @@
     Pin,
     PinOff,
     Terminal,
-    TextQuote,
   } from '../../shared/icons.js';
   import { runtimeDisplay } from '../../lib/runtime-display';
   import { withBasePath } from '../../shared/base-path';
@@ -154,11 +153,6 @@
         {#if session.pinned}
           <span class="activity-row-marker" title={t('index.pinned')} aria-hidden="true">
             {@html icon(Pin, { size: 12, strokeWidth: 1.5 })}
-          </span>
-        {/if}
-        {#if session.btw}
-          <span class="activity-row-marker" aria-hidden="true">
-            {@html icon(TextQuote, { size: 12, strokeWidth: 1.5 })}
           </span>
         {/if}
         {#if !session.chatAvailable}

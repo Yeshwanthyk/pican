@@ -27,7 +27,6 @@ export interface NormalizedSession {
   chatDisabledReason: string;
   pinned: boolean;
   pinOrder: number;
-  btw: boolean;
   currentActivity: string;
   activityStartedAt: string;
   waitingQuestion: string;
@@ -99,7 +98,6 @@ export function normalizeSession(raw: Partial<Session> = {}): NormalizedSession 
     chatDisabledReason: raw.chatDisabledReason || raw.ChatDisabledReason || "",
     pinned: raw.pinned ?? raw.Pinned ?? false,
     pinOrder: raw.pinOrder ?? raw.PinOrder ?? 0,
-    btw: raw.btw ?? raw.Btw ?? false,
     currentActivity: raw.currentActivity || raw.CurrentActivity || "",
     activityStartedAt: raw.activityStartedAt || raw.ActivityStartedAt || "",
     waitingQuestion: raw.waitingQuestion || raw.WaitingQuestion || "",

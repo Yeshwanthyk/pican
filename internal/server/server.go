@@ -390,7 +390,6 @@ func initDB(agentDir string) (*sql.DB, error) {
 		{"session_pins table", sessionPinsSchema},
 		{"session_archives table", sessionArchivesSchema},
 		{"peer_hosts table", peerHostsSchema},
-		{"btw_sessions table", btwSessionsSchema},
 		{"chat_queue_items table", chatqueue.ItemsTableDDL},
 		{"chat_queue_items index", chatqueue.ItemsSessionIndexDDL},
 		{"chat_queue_state table", chatqueue.StateTableDDL},
@@ -402,7 +401,6 @@ func initDB(agentDir string) (*sql.DB, error) {
 			return nil, fmt.Errorf("create %s: %w", s.name, err)
 		}
 	}
-	migrateLegacyBtwSession(db)
 	return db, nil
 }
 
@@ -468,8 +466,6 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/scratchpad", s.getPostHandler(s.handleGetScratchpad, s.handleSaveScratchpad))
 	mux.HandleFunc("/api/chat/queue", s.auth.Wrap(s.handleChatQueue))
 	mux.HandleFunc("/api/settings", s.getPostHandler(s.handleGetSettings, s.handleSaveSettings))
-	mux.HandleFunc("/api/btw", s.auth.Wrap(s.handleGetBtw))
-	mux.HandleFunc("/api/btw/new", s.auth.Wrap(s.handleNewBtw))
 	mux.HandleFunc("/api/workflows", s.auth.Wrap(s.handleApiWorkflows))
 	mux.HandleFunc("/api/workflows/run", s.auth.Wrap(s.handleApiWorkflowRun))
 	mux.HandleFunc("/api/tasks", s.auth.Wrap(s.handleApiTasks))

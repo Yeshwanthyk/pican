@@ -195,20 +195,3 @@ func TestOpenCodeUnavailableKeepsProjectionViewableAndFailsChatClosed(t *testing
 		t.Fatalf("chat = %d %s", chat.Code, chat.Body.String())
 	}
 }
-
-func TestOpenCodeBtwUsesNativeCreationAdapter(t *testing.T) {
-	s, fake, _, _ := newOpenCodeRouteServer(t)
-	s.db = newBtwDB(t)
-	fake.started = false
-	project := t.TempDir()
-
-	response := httptest.NewRecorder()
-	s.handleNewBtw(response, httptest.NewRequest(
-		http.MethodPost,
-		"/api/btw/new",
-		strings.NewReader(`{"path":"`+project+`","parent":"parent"}`),
-	))
-	if response.Code != http.StatusOK || !fake.started || fake.cwd != project {
-		t.Fatalf("btw = %d %s started=%v cwd=%q", response.Code, response.Body.String(), fake.started, fake.cwd)
-	}
-}

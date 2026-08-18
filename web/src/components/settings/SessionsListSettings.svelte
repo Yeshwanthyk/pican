@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../../shared/strings';
-  import { boolFor, valueFor } from '../../settings/settings-support';
+  import { valueFor } from '../../settings/settings-support';
   import type { Settings } from '../../settings/settings-support';
 
   let {
@@ -9,10 +9,8 @@
   }: { settings?: Settings; onSave?: (key: string, value: string) => void } = $props();
   const spinnerKey = 'pican:spinner-style';
   const layoutKey = 'pican:view-layout';
-  const btwKey = 'pican:v1:show-btw-in-index';
   let spinner = $derived(valueFor(settings, spinnerKey, 'runcat'));
   let layout = $derived(valueFor(settings, layoutKey, 'timeline'));
-  let showBtw = $derived(boolFor(settings, btwKey, false));
 </script>
 
 <section class="settings-section">
@@ -53,23 +51,6 @@
           >{t('index.layoutProjects')}</option
         >
       </select>
-    </div>
-  </div>
-  <div class="settings-row">
-    <div class="settings-row-label">
-      <span class="name">{t('settings.showBtw')}</span><span class="hint"
-        >{t('settings.showBtwHint')}</span
-      >
-    </div>
-    <div class="settings-control">
-      <label class="settings-toggle"
-        ><input
-          type="checkbox"
-          data-setting={btwKey}
-          checked={showBtw}
-          onchange={(e) => onSave(btwKey, e.currentTarget.checked ? 'true' : 'false')}
-        /><span class="slider"></span></label
-      >
     </div>
   </div>
 </section>

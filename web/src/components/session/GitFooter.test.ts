@@ -48,10 +48,10 @@ afterEach(() => {
 });
 
 describe("GitFooter", () => {
-  it("hides the git controls but keeps the bar visible (for btw) when the cwd is not a git repo", async () => {
+  it("hides the whole bar when the cwd is not a git repo", async () => {
     renderFooter({ getGitInfo: vi.fn().mockResolvedValue(gitInfo({ isRepo: false })) });
     await flush();
-    expect(id("pi-git-bar").hidden).toBe(false);
+    expect(id("pi-git-bar").hidden).toBe(true);
     expect(id("pi-git-branch").hidden).toBe(true);
     expect(id("pi-git-pr").hidden).toBe(true);
   });

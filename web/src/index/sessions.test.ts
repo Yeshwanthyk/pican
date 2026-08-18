@@ -32,7 +32,6 @@ describe("index sessions helpers", () => {
       chatAvailable: true,
       pinned: false,
       pinOrder: 0,
-      btw: false,
       currentActivity: "",
       waitingQuestion: "",
     });

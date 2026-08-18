@@ -318,7 +318,6 @@ func (s *Server) handleApiSessions(w http.ResponseWriter, r *http.Request) {
 // mainListSummaries is the shared catalog boundary for /api/sessions and
 // /api/projects. Curation scopes are always applied after these exclusions.
 func (s *Server) mainListSummaries(summaries []sessions.SessionSummary) []sessions.SessionSummary {
-	summaries = s.filterBtwSummaries(summaries)
 	return filterExtensionChildSummaries(summaries)
 }
 

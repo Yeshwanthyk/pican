@@ -87,16 +87,9 @@ func TestMobileSessionActionsDoNotCoverHeaderToggleButtons(t *testing.T) {
 	}
 }
 
-func TestMobileGitFooterKeepsBtwButHidesPullRequestActions(t *testing.T) {
-	mobileRule := "@media (max-width: 900px) {\n  /* Keep the compact branch context and btw affordance on phones; PR workflow\n         actions belong in the roomier desktop footer. */\n  .pi-git-pr {\n    display: none;\n  }\n}"
+func TestMobileGitFooterHidesPullRequestActions(t *testing.T) {
+	mobileRule := "@media (max-width: 900px) {\n  /* Keep the compact branch context on phones; PR workflow actions\n         belong in the roomier desktop footer. */\n  .pi-git-pr {\n    display: none;\n  }\n}"
 	if !strings.Contains(liveSessionCss, mobileRule) {
 		t.Fatal("mobile session footer must hide PR actions")
-	}
-	footerSource, err := os.ReadFile(repoPath("web/src/components/session/GitFooter.svelte"))
-	if err != nil {
-		t.Fatalf("read GitFooter.svelte: %v", err)
-	}
-	if !strings.Contains(string(footerSource), "pi-btw-button") {
-		t.Fatal("mobile session footer must retain the btw action")
 	}
 }

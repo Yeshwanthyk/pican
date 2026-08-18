@@ -47,8 +47,6 @@ export const SessionSchema = Schema.Struct({
   Pinned: optionalNullableBoolean,
   pinOrder: optionalNullableNumber,
   PinOrder: optionalNullableNumber,
-  btw: optionalNullableBoolean,
-  Btw: optionalNullableBoolean,
   currentActivity: optionalNullableString,
   CurrentActivity: optionalNullableString,
   activityStartedAt: optionalNullableString,

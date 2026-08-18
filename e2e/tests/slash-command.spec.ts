@@ -46,7 +46,7 @@ test.describe("slash-command palette (stubbed pi)", () => {
     await expect(
       page.locator('.slash-item[data-insert="skill:memory"]'),
     ).toBeVisible();
-    await expect(page.locator('.slash-item[data-insert="btw"]')).toBeVisible();
+    await expect(page.locator('.slash-item[data-insert="ext:note"]')).toBeVisible();
   });
 
   test("filters as the query narrows", async ({

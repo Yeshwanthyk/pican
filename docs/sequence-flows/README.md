@@ -10,7 +10,6 @@ This directory documents the key runtime sequences in pican.
 | [live-reload.md](./live-reload.md) | How file changes propagate to the browser |
 | [artifacts.md](./artifacts.md) | Detecting (path-keyed/edit-aware), rendering, and sandbox-previewing artifacts |
 | [mention-autocomplete.md](./mention-autocomplete.md) | `@`-triggered file/folder path autocomplete in the chat composer |
-| [btw.md](./btw.md) | Throwaway "btw" floating scratch-chats attached to a session page |
 | [share.md](./share.md) | Exporting a session to a private GitHub Gist |
 | [workflows.md](./workflows.md) | Read-only workflow run dashboard, filesystem watcher, and SSE refresh |
 | [tasks.md](./tasks.md) | Read-only task stores, output inspection, and SSE refresh |

@@ -204,18 +204,6 @@ func TestChatEnforcesImageAndSteerCapabilities(t *testing.T) {
 	})
 }
 
-func TestBtwCreationRequiresDefaultRuntimeCapabilities(t *testing.T) {
-	s := &Server{
-		defaultRuntime:  "future",
-		runtimeRegistry: futureRegistry(t, runtimes.Capabilities{}, true, ""),
-	}
-	recorder := httptest.NewRecorder()
-	s.handleNewBtw(recorder, httptest.NewRequest(http.MethodPost, "/api/btw/new", strings.NewReader(`{"path":"`+t.TempDir()+`"}`)))
-	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), "does not support create") {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-}
-
 func TestSupportedOperationOnUnavailableRuntimeReturns503(t *testing.T) {
 	root := t.TempDir()
 	path := writeFutureSession(t, root)

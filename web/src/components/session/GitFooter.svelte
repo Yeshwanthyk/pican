@@ -21,8 +21,7 @@
     'delete the branch after merging.';
 
   // The branch indicator + smart git action control beneath the chat composer.
-  // The bar stays visible (even outside a git repo) because it also hosts the
-  // always-available btw button. gitApi is injectable for tests.
+  // gitApi is injectable for tests.
   interface GitApi {
     readonly getGitInfo: (sessionId: string) => Promise<GitInfo>;
     readonly renameBranch: (sessionId: string, name: string) => Promise<unknown>;
@@ -135,11 +134,10 @@
 
     function applyInfo(info: GitInfo): void {
       if (!info || !info.isRepo || !info.branch) {
-        // Not a git repo: hide the git controls but keep the bar itself visible,
-        // since it also hosts the always-available btw button.
+        // Not a git repo: nothing to show, hide the whole bar.
         show(branchWrap, false);
         show(prWrap, false);
-        bar.hidden = false;
+        bar.hidden = true;
         return;
       }
       show(branchWrap, true);
@@ -310,9 +308,6 @@
     />
   </div>
   <div class="pi-git-right">
-    <button type="button" class="pi-git-pr-button pi-btw-button" id="pi-btw-button" title="btw"
-      >btw</button
-    >
     <div class="pi-git-pr" id="pi-git-pr" hidden>
       <button type="button" class="pi-git-pr-button pi-git-primary" id="pi-git-primary"
         ><span id="pi-git-primary-label">{t('git.createPr')}</span></button

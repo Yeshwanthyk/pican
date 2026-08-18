@@ -312,7 +312,7 @@ func TestGetCommandsParsesResponseAndCaches(t *testing.T) {
 	}()
 
 	waitForPending(t, w, "req-1")
-	w.handleRPCLine(`{"type":"response","id":"req-1","command":"get_commands","success":true,"data":{"commands":[{"name":"skill:memory","description":"mem","source":"skill"},{"name":"btw","description":"side chat","source":"extension"}]}}`)
+	w.handleRPCLine(`{"type":"response","id":"req-1","command":"get_commands","success":true,"data":{"commands":[{"name":"skill:memory","description":"mem","source":"skill"},{"name":"ext:note","description":"take a note","source":"extension"}]}}`)
 
 	got := <-resCh
 	if got.err != nil {

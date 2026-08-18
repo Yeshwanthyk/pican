@@ -15,7 +15,7 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 | Live Updates | Server-Sent Events (SSE) |
 | Agent runtime | Startup-owned ordered registry; JSONL RPC via `pi --mode rpc`; JSON-RPC via `codex app-server --stdio`; bidirectional stream-json via the installed `claude` CLI; supervised authenticated HTTP/SSE via `opencode serve` |
 | Session Storage | Registry-declared append-only Pi transcripts plus runtime-neutral replaceable projections under the configured state root; Codex, Claude, and OpenCode retain native authority |
-| Local DB | SQLite under the configured state root for per-project scratchpads, tracked-project metadata, session pins/local archive, server-backed user settings, btw scratch-chat registry, and hosted create idempotency |
+| Local DB | SQLite under the configured state root for per-project scratchpads, tracked-project metadata, session pins/local archive, server-backed user settings, and hosted create idempotency |
 | Auth | Standalone token cookie/query/header, or mutually exclusive hosted proxy-only header authentication |
 
 ## Component Diagram
@@ -35,7 +35,7 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   │  /workflows → WorkflowsPage (Svelte)  │  │  • workflows-updated    │  │
 │   │  /tasks → TasksPage (Svelte)           │  │                         │  │
 │   │  /subagents → SubagentsPage (Svelte)   │  │                         │  │
-│   │  /login → LoginPage                   │  │  • btw…                 │  │
+│   │  /login → LoginPage                   │  │                         │  │
 │   │  shared: CommandPalette, Version UI   │  │                         │  │
 │   └──────────────────────────────────────┘  └─────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -62,7 +62,6 @@ pican is a local HTTP server that lets you browse and continue Pi, Codex, Claude
 │   GET  /api/models    →  handleAvailableModels                           │
 │   GET  /api/commands  →  handleCommands       (slash-command palette)    │
 │   GET  /api/worker-status → handleWorkerStatus                           │
-│   GET  /api/btw / POST /api/btw/new → btw scratch-chats (SQLite, SSE)    │
 │   GET  /api/files     →  handleApiFiles       (@mention autocomplete)    │
 │   GET  /api/git/info  / POST /api/git/rename-branch                      │
 │   GET  /api/git/diff → working-tree diff for the diff modal              │
@@ -175,7 +174,7 @@ Hosted mode does not publish GitHub gists, run remote update checks, install or 
 ├── session-status/
 │   ├── 2026-01-15T10-30-00.000Z_a1b2c3d4.jsonl   ← terminal writes here
 │   └── …
-├── pican.sqlite           ← scratchpads + project visibility prefs + user settings + btw registry
+├── pican.sqlite           ← scratchpads + project visibility prefs + user settings
 └── pican/
     ├── pican-state.json   ← server state file
     ├── custom-themes.css   ← optional user custom theme
