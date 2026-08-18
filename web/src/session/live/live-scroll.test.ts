@@ -15,9 +15,15 @@ describe("live scroll helpers", () => {
       documentImpl: dom.window.document,
       requestAnimationFrameImpl: (cb) => cb(0),
     });
-    setFollowButtonText(btn, 2);
+    setFollowButtonText(btn, 0);
     expect(btn.querySelector("svg")).not.toBeNull();
     expect(btn.getAttribute("aria-label")).toBe("Scroll to bottom");
+    expect(btn.hasAttribute("data-count")).toBe(false);
+    setFollowButtonText(btn, 2);
+    expect(btn.querySelector("svg")).not.toBeNull();
+    expect(btn.querySelector(".follow-button-count")?.textContent).toBe("2");
+    expect(btn.getAttribute("aria-label")).toBe("Scroll to bottom, 2 new messages");
+    expect(btn.hasAttribute("data-count")).toBe(true);
     expect(dom.window.document.body.contains(btn)).toBe(true);
     removeFollowButton(btn, { windowImpl: { setTimeout: (cb) => cb() } });
     expect(dom.window.document.body.contains(btn)).toBe(false);

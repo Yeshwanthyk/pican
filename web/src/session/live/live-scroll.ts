@@ -115,8 +115,18 @@ export function createFollowButton({
   return button;
 }
 
-export function setFollowButtonText(button: HTMLButtonElement | null, _pendingCount: number): void {
-  if (button) button.innerHTML = icon(ArrowDown, { size: 18 });
+export function setFollowButtonText(button: HTMLButtonElement | null, pendingCount: number): void {
+  if (!button) return;
+  const arrow = icon(ArrowDown, { size: 18 });
+  if (pendingCount > 0) {
+    button.setAttribute("data-count", "");
+    button.setAttribute("aria-label", `Scroll to bottom, ${pendingCount} new messages`);
+    button.innerHTML = `${arrow}<span class="follow-button-count" aria-hidden="true">${pendingCount}</span>`;
+  } else {
+    button.removeAttribute("data-count");
+    button.setAttribute("aria-label", "Scroll to bottom");
+    button.innerHTML = arrow;
+  }
 }
 
 export function removeFollowButton(

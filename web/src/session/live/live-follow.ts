@@ -236,6 +236,10 @@ export function createFollowScrollController({
     },
     incrementPending: (count: number): void => {
       pendingCount += count;
+      // showFollowButton renders the button text only once, so keep the visible
+      // button's pending count current as more entries stream in while the user
+      // stays scrolled away from the bottom.
+      if (followBtn) setFollowButtonText(followBtn, pendingCount);
     },
     showFollowButton,
     forceFollowToBottom,

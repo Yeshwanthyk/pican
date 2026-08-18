@@ -5543,6 +5543,21 @@ body:has(#pinned-session-switcher:popover-open) .session-header-title-chevron {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
+/* With a pending count the circular arrow widens into a pill carrying the
+   count; the bare circle returns once the user re-pins to the bottom. */
+.follow-button[data-count] {
+  width: auto;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 999px;
+}
+
+.follow-button-count {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 
 /* New entry highlight */
 .new-entry-highlight {

@@ -157,6 +157,36 @@ describe("createFollowScrollController", () => {
     expect(controller.isFollowing()).toBe(true);
   });
 
+  it("renders a live pending count on the follow button and resets it on click", () => {
+    const { documentImpl, windowImpl, fire, controller } = setup();
+    fire("scroll"); // scrolled away from bottom → button appears
+    const btn = documentImpl.querySelector<HTMLButtonElement>(".follow-button");
+    expect(btn).not.toBeNull();
+    expect(btn?.getAttribute("aria-label")).toBe("Scroll to bottom");
+
+    controller.incrementPending(3);
+    expect(btn?.querySelector(".follow-button-count")?.textContent).toBe("3");
+    expect(btn?.getAttribute("aria-label")).toBe("Scroll to bottom, 3 new messages");
+
+    // More entries stream in while the button is already visible.
+    controller.incrementPending(2);
+    expect(btn?.querySelector(".follow-button-count")?.textContent).toBe("5");
+    expect(btn?.getAttribute("aria-label")).toBe("Scroll to bottom, 5 new messages");
+
+    // Re-pinning clears the count and hides the button.
+    btn?.click();
+    expect(documentImpl.querySelector(".follow-button")).toBeNull();
+    expect(controller.isFollowing()).toBe(true);
+
+    // Scrolling away again creates a fresh button without a count.
+    windowImpl.scrollY = 0;
+    fire("scroll");
+    const fresh = documentImpl.querySelector<HTMLButtonElement>(".follow-button");
+    expect(fresh).not.toBeNull();
+    expect(fresh?.querySelector(".follow-button-count")).toBeNull();
+    expect(fresh?.getAttribute("aria-label")).toBe("Scroll to bottom");
+  });
+
   it("extendPreviewFollow keeps shouldFollow true while not following", () => {
     const { fire, controller } = setup();
     fire("scroll"); // following becomes false
