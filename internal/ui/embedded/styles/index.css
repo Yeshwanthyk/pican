@@ -1845,6 +1845,9 @@ body.modal-sheet-open { overflow: hidden; }
 .home-rail .machine-status { font-size: 10px; }
 .home-rail .session-ticker-row,
 .home-rail .session-card { font-size: 11px; }
+    /* Mobile-only copy of the rail's waiting block, surfaced inside the home
+       feed at <=900px where .home-rail is hidden. Desktop never sees it. */
+    .mobile-waiting { display: none; }
 .mobile-thumb-bar { display: none; }
 
 .projects-modal-intro {
@@ -1891,6 +1894,20 @@ body.modal-sheet-open { overflow: hidden; }
     .home-layout { display: block; width: 100%; padding: 18px max(16px, env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
     .home-layout > .content { max-width: none; padding: 0; }
     .home-rail { display: none; }
+    .mobile-waiting { display: block; }
+    .mobile-waiting .rail-waiting-item { padding: 0 2px; }
+    .mobile-waiting .rail-answer-options button,
+    .mobile-waiting .rail-open-session {
+        min-height: 44px;
+        padding: 0 14px;
+        font-size: 12.5px;
+    }
+    .mobile-waiting .rail-session-title {
+        min-height: 44px;
+        line-height: 44px;
+        font-size: 14px;
+    }
+    .mobile-waiting .rail-question { font-size: 13px; }
     .timeline-section,
     .project-group { margin-bottom: 24px; }
     .activity-group--spaced { margin-top: 24px; }

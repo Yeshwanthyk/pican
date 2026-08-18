@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { normalizeSession } from "../../index/sessions";
 import SessionsList from "./SessionsList.svelte";
@@ -20,6 +20,39 @@ describe("SessionsList compact home", () => {
     expect(container.querySelector('[data-empty="tracked-projects"]')).toBeInTheDocument();
     expect(container.querySelector(".empty-add-project")).toBeInTheDocument();
     expect(container.querySelector(".load-more-btn")).not.toBeInTheDocument();
+  });
+
+  it("surfaces waiting sessions above Pinned and answers inline", async () => {
+    const onAnswerWaiting = vi.fn(async () => true);
+    const waiting = normalizeSession({
+      id: "waiting.jsonl",
+      name: "Release",
+      project: "/repo",
+      waitingQuestion: "Ship it?",
+      waitingOptions: ["Ship", "Hold"],
+    });
+    const { container } = render(SessionsList, {
+      props: {
+        sessions: [waiting],
+        projects: [],
+        loading: false,
+        view: "home",
+        waitingSessions: [waiting],
+        onAnswerWaiting,
+      },
+    });
+    const block = container.querySelector<HTMLElement>("[data-mobile-waiting]");
+    expect(block).not.toBeNull();
+    const pinnedGroup = container.querySelector<HTMLElement>(
+      '.activity-group[data-bucket="pinned"]',
+    );
+    expect(pinnedGroup).not.toBeNull();
+    expect(block!.compareDocumentPosition(pinnedGroup!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(block as HTMLElement).getByText("Waiting on you")).toBeInTheDocument();
+    await fireEvent.click(
+      within(block as HTMLElement).getByRole("button", { name: "Answer Ship for Ship it?" }),
+    );
+    expect(onAnswerWaiting).toHaveBeenCalledWith(waiting, "Ship");
   });
 
   it("orders the core Home hierarchy as Pinned then Projects", () => {

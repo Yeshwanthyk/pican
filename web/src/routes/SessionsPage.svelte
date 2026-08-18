@@ -433,6 +433,7 @@
 
 <HomeMenu
   open={menuOpen}
+  {peerHosts}
   onClose={closeMenu}
   onNewSession={openNewSessionModal}
   onManageProjects={openProjectsModal}
@@ -457,6 +458,8 @@
     {loadingMore}
     onLoadMore={loadMore}
     onAddProject={openProjectsModal}
+    {waitingSessions}
+    onAnswerWaiting={answerWaitingQuestion}
   />
   <HomeRail {waitingSessions} {peerHosts} onAnswer={answerWaitingQuestion} />
 </main>

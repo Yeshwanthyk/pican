@@ -346,6 +346,15 @@
     font-weight: 600;
 }
 
+/* Machines count on the menu row, mirroring the version-status right side. */
+.machines-menu-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--pi-menu-muted-color, var(--muted));
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 /* Small dot badge on the row label when an update is waiting. */
 [data-version-row].has-update > span:first-child::after {
     content: '';
@@ -359,7 +368,8 @@
 }
 
 @media (max-width: 900px) {
-    .version-status {
+    .version-status,
+    .machines-menu-count {
         font-size: 13px !important;
         color: var(--muted) !important;
     }

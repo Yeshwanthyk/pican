@@ -15,6 +15,7 @@
   } from '../../index/sessions.js';
   import type { Project } from '../../lib/schema';
   import ActivityGroup from './ActivityGroup.svelte';
+  import WaitingSection from './WaitingSection.svelte';
   import SessionCard from './SessionCard.svelte';
   import { withBasePath } from '../../shared/base-path.js';
 
@@ -38,6 +39,8 @@
     loadingMore?: boolean;
     onLoadMore?: () => void | Promise<void>;
     onAddProject?: () => void;
+    waitingSessions?: ReadonlyArray<NormalizedSession>;
+    onAnswerWaiting?: (session: NormalizedSession, answer: string) => Promise<boolean>;
   }
 
   let {
@@ -52,6 +55,8 @@
     loadingMore = false,
     onLoadMore = () => {},
     onAddProject = () => {},
+    waitingSessions = [],
+    onAnswerWaiting = async () => false,
   }: Props = $props();
 
   const PIN_PREVIEW_LIMIT = 8;
@@ -90,6 +95,11 @@
     </div>
   {:else if isHome}
     <div class="home-feed activity-feed" data-home-feed>
+      {#if waitingSessions.length > 0}
+        <div class="mobile-waiting" data-mobile-waiting>
+          <WaitingSection {waitingSessions} onAnswer={onAnswerWaiting} />
+        </div>
+      {/if}
       <ActivityGroup
         id="pinned"
         title={t('index.pinned')}

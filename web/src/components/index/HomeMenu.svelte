@@ -9,16 +9,19 @@
     Snowflake,
     Settings,
     Tag,
+    Server,
   } from '../../shared/icons.js';
   import { openVersionModal } from '../../shared/version.js';
   import { handleNavClick } from '../../shared/navigation.js';
   import { withBasePath } from '../../shared/base-path.js';
+  import type { NormalizedPeerHost } from '../../index/peers.js';
 
   interface Props {
     open?: boolean;
     onClose?: () => void;
     onNewSession?: () => void;
     onManageProjects?: () => void;
+    peerHosts?: ReadonlyArray<NormalizedPeerHost>;
   }
 
   let {
@@ -26,7 +29,10 @@
     onClose = () => {},
     onNewSession = () => {},
     onManageProjects = () => {},
+    peerHosts = [],
   }: Props = $props();
+
+  const onlineCount = $derived(peerHosts.filter((host) => host.online).length);
 
   const scopes = [
     { href: '/', label: 'index.scopeProjects', icon: Layers },
@@ -123,6 +129,21 @@
         >{@html icon(Settings, { size: 15 })}{t('common.settings')}</span
       ><kbd>⌘,</kbd></a
     >
+    {#if peerHosts.length > 0}
+      <a
+        class="web-menu-item"
+        href={withBasePath('/settings')}
+        role="menuitem"
+        onclick={(event) => {
+          onClose();
+          handleNavClick(event, '/settings');
+        }}
+        ><span class="menu-item-label">{@html icon(Server, { size: 15 })}{t('index.machines')}</span
+        ><span class="machines-menu-count" data-machines-count
+          >{t('index.machinesOnlineCount', { online: onlineCount, total: peerHosts.length })}</span
+        ></a
+      >
+    {/if}
     <button
       class="web-menu-item"
       type="button"
