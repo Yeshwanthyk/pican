@@ -65,8 +65,8 @@ export default defineConfig({
     nav: [
       { text: "Guide", link: "/guide" },
       {
-        text: "pi.dev",
-        link: "https://pi.dev/packages/@yeshwanthyk/pican?name=pican",
+        text: "Releases",
+        link: "https://github.com/Yeshwanthyk/pican/releases",
       },
     ],
     sidebar: [

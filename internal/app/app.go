@@ -370,7 +370,7 @@ func Run(ctx context.Context, config Config) error {
 	var runInstallHook func(context.Context) error
 	var runRestartHook func() error
 	if config.Mode == ModeStandalone {
-		runInstallHook = runInstall
+		runInstallHook = func(ctx context.Context) error { return runInstall(ctx, versionChecker) }
 		runRestartHook = runRestart
 	}
 	srv, srvErr = server.New(server.Deps{

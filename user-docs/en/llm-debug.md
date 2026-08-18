@@ -1,8 +1,9 @@
-User is installing pican via
+User is installing pican via the [install.sh](https://raw.githubusercontent.com/Yeshwanthyk/pican/refs/heads/main/install.sh)
+script, which downloads the pican binary from GitHub Releases and sets up auto-start.
 
-- pi install npm:@yeshwanthyk/pican@beta
-
-Which it automatically run [install.sh](https://raw.githubusercontent.com/Yeshwanthyk/pican/refs/heads/main/install.sh) and setup pi.
+```bash
+curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash
+```
 
 If user is having issue it might be the setup of install.sh is causing issue. You can review and check what's going on and provide user what exactly is causing problem. And ask if they want you to fix. Always confirm with user.
 

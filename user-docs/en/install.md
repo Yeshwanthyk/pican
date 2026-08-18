@@ -34,40 +34,7 @@
 
 ## Install
 
-### Pi package (recommended)
-
-```bash
-pi install npm:@yeshwanthyk/pican@beta
-```
-
-This single command:
-- Installs the npm pi package under pi's package directory
-- Runs the package `postinstall` script (`install.sh`, or `install.ps1` on Windows)
-- Downloads the matching pican binary for your package version and platform from GitHub Releases
-- Installs it to `~/.pi/agent/bin/pican` (`pican.exe` on Windows)
-- Sets up auto-start on login (launchd on macOS, systemd on Linux, a Run-key launcher on Windows)
-- Registers the `/web`, `/remote`, `/refresh`, `/pican token`, and `/pican set-token` pi commands
-
-Session auto-titling is built into pican (not the extension) and configured on the `/settings` page. It's on by default: pican names sessions automatically using a free built-in word heuristic (no AI), re-titling on every new message. You can switch to titling once per session, and/or pick a model to write smarter titles instead of the heuristic.
-
-On Linux, auto-start is configured as a user systemd service at `~/.config/systemd/user/pican.service`. The installer rewrites its `ExecStart` to the actual installed binary path. If Tailscale is available at runtime, pican publishes the localhost server with Tailscale Serve HTTPS. If user systemd is unavailable, run it manually with `~/.pi/agent/bin/pican -o`.
-
-To install only for a specific project (shared with your team via `.pi/settings.json`):
-
-```bash
-pi install -l npm:@yeshwanthyk/pican@beta
-```
-
-Then restart pi (or run `/reload`), and use `/web`, `/pican`, `/remote`, `/refresh`. Manage your access token with `/pican token` and `/pican set-token`.
-
-If npm aborts with `ENOTEMPTY` while renaming `@yeshwanthyk/pican`, remove npm's stale hidden backup directories and reinstall the beta channel:
-
-```bash
-rm -rf ~/.pi/agent/npm/node_modules/@yeshwanthyk/.pican-*
-pi install npm:@yeshwanthyk/pican@beta
-```
-
-### Quick install (no build tools needed)
+### Quick install (recommended)
 
 macOS / Linux:
 
@@ -81,7 +48,18 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.ps1 | iex
 ```
 
-This downloads the latest pican binary, installs it to `/usr/local/bin` (`~/.pi/agent/bin` on Windows), and sets up auto-start on login. No Go, Node, or pi required.
+The installer downloads the `pican-<os>-<arch>` binary matching your platform
+from [GitHub Releases](https://github.com/Yeshwanthyk/pican/releases), installs
+it to `/usr/local/bin` (`~/.pi/agent/bin` on Windows), records the installed
+version, and sets up auto-start on login. No Go, Node, or pi required.
+
+The in-app updater (the pican version row in the menu → "Check for updates")
+installs newer releases the same way, straight from GitHub Releases, then
+restarts pican to apply them.
+
+Session auto-titling is built into pican (not the extension) and configured on the `/settings` page. It's on by default: pican names sessions automatically using a free built-in word heuristic (no AI), re-titling on every new message. You can switch to titling once per session, and/or pick a model to write smarter titles instead of the heuristic.
+
+On Linux, auto-start is configured as a user systemd service at `~/.config/systemd/user/pican.service`. The installer rewrites its `ExecStart` to the actual installed binary path. If Tailscale is available at runtime, pican publishes the localhost server with Tailscale Serve HTTPS. If user systemd is unavailable, run it manually with `~/.pi/agent/bin/pican -o`.
 
 ### Download binary
 
@@ -140,13 +118,13 @@ by hand, run `npm --prefix web install && npm --prefix web run build` before
 ## Uninstall
 
 ```bash
-pi remove npm:@yeshwanthyk/pican@beta
+uninstall.sh        # macOS / Linux
+uninstall.ps1       # Windows
 ```
 
-This runs the package `preuninstall` script (`uninstall.sh`, or `uninstall.ps1`
-on Windows), which stops the running instance and removes:
+This stops the running instance and removes:
 
-- the pican binary (`~/.pi/agent/bin/pican`, or `/usr/local/bin/pican` for standalone installs)
+- the pican binary (`/usr/local/bin/pican`, or `~/.pi/agent/bin/pican`)
 - the version file (`~/.pi/agent/pican-version`)
 - the runtime state file (`~/.pi/agent/pican/pican-state.json`)
 - the auto-start config (launchd plist on macOS, systemd user service on Linux, Run-key entry + launcher scripts on Windows)

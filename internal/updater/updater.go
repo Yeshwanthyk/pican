@@ -1,8 +1,8 @@
 // Package updater checks whether a newer pican release is available. It
-// compares the build-time version against the npm registry's published
-// version (the install channel) and fetches the matching changelog from the
-// GitHub Releases API. Results are cached in memory and refreshed by a
-// background poll; callers can also force an immediate check.
+// compares the build-time version against the latest GitHub Release (the
+// install channel) and exposes that release's assets so the in-app updater
+// can download the matching platform binary. Results are cached in memory and
+// refreshed by a background poll; callers can also force an immediate check.
 package updater
 
 import (
@@ -20,10 +20,10 @@ import (
 )
 
 const (
-	defaultNPMURL    = "https://registry.npmjs.org/@yeshwanthyk/pican"
+	// defaultGitHubAPI is the GitHub REST API base for the pican repository.
+	// The in-app updater resolves releases and assets through it; binary and
+	// checksum downloads use the asset URLs it returns.
 	defaultGitHubAPI = "https://api.github.com/repos/Yeshwanthyk/pican"
-	// npmChannel is the dist-tag pican installs from (see pi install command).
-	npmChannel = "beta"
 	// PollInterval is how often the background goroutine refreshes the cache.
 	PollInterval = 6 * time.Hour
 	httpTimeout  = 10 * time.Second
@@ -40,6 +40,22 @@ type Info struct {
 	CheckedAt    string `json:"checkedAt"`
 }
 
+// Asset is a downloadable file attached to a GitHub release.
+type Asset struct {
+	Name        string
+	DownloadURL string
+}
+
+// Release is a published GitHub release as the updater consumes it: the tag
+// (semver, usually "v"-prefixed), the release page URL, the markdown body
+// used as the changelog, and the attached assets.
+type Release struct {
+	Tag     string
+	HTMLURL string
+	Body    string
+	Assets  []Asset
+}
+
 // devVersionRe matches `git describe` development builds: a tag followed by a
 // commits-ahead count and an abbreviated SHA (e.g. "-3-gd7e8bf2"), optionally
 // "-dirty". Clean release builds are exactly the tag and don't match.
@@ -49,11 +65,11 @@ var devVersionRe = regexp.MustCompile(`-\d+-g[0-9a-f]{7,}|-dirty$`)
 // check. It is safe for concurrent use.
 type Checker struct {
 	current   string
-	npmURL    string
 	githubAPI string
 	client    *http.Client
 
 	mu           sync.RWMutex
+	release      *Release // cached latest release (nil until first successful check)
 	latest       string
 	changelog    string
 	changelogURL string
@@ -68,7 +84,6 @@ func New(version string) *Checker {
 	}
 	return &Checker{
 		current:   version,
-		npmURL:    defaultNPMURL,
 		githubAPI: defaultGitHubAPI,
 		client:    &http.Client{Timeout: httpTimeout},
 	}
@@ -118,21 +133,17 @@ func (c *Checker) Check(ctx context.Context) (Info, error) {
 		return info, nil
 	}
 
-	latest, err := c.fetchLatestVersion(ctx)
+	rel, err := c.fetchLatestRelease(ctx)
 	if err != nil {
 		return c.Info(), err
 	}
 
-	var changelog, changelogURL string
-	if compareSemver(latest, c.current) > 0 {
-		changelog, changelogURL = c.fetchChangelog(ctx, latest)
-	}
-
 	c.mu.Lock()
-	c.latest = latest
-	if changelog != "" || changelogURL != "" {
-		c.changelog = changelog
-		c.changelogURL = changelogURL
+	c.latest = rel.Tag
+	c.release = &rel
+	if rel.Body != "" || rel.HTMLURL != "" {
+		c.changelog = rel.Body
+		c.changelogURL = rel.HTMLURL
 	}
 	c.checkedAt = time.Now()
 	info := c.snapshotLocked()
@@ -162,82 +173,130 @@ func (c *Checker) Start(ctx context.Context) {
 	}
 }
 
-// fetchLatestVersion reads the published version for the install channel from
-// the npm registry packument (dist-tags), falling back to "latest".
-func (c *Checker) fetchLatestVersion(ctx context.Context) (string, error) {
-	body, err := c.get(ctx, c.npmURL, "")
+// LatestAsset resolves the download for the given platform from the latest
+// release. platform is "os-arch", e.g. "darwin-arm64" or "windows-amd64";
+// asset names match the installers: pican-<os>-<arch> (with an .exe suffix on
+// Windows). It uses the cached release when one was already fetched (the same
+// tag the UI advertised) so an install never races a mid-publish release;
+// otherwise it fetches from the API.
+func (c *Checker) LatestAsset(ctx context.Context, platform string) (tag, assetName, downloadURL string, err error) {
+	rel, err := c.latestRelease(ctx)
+	if err != nil {
+		return "", "", "", err
+	}
+	name := assetNameForPlatform(platform)
+	for _, a := range rel.Assets {
+		if a.Name == name {
+			return rel.Tag, a.Name, a.DownloadURL, nil
+		}
+	}
+	return "", "", "", fmt.Errorf("release %s has no asset for platform %q (expected %q)", rel.Tag, platform, name)
+}
+
+// LatestChecksumsURL returns the download URL of the release's sha256sums.txt
+// asset, or "" when the release does not include one. The install hook skips
+// checksum verification when no checksum asset is present (parity with
+// install.sh, which never verifies).
+func (c *Checker) LatestChecksumsURL(ctx context.Context) (string, error) {
+	rel, err := c.latestRelease(ctx)
 	if err != nil {
 		return "", err
 	}
-	var doc struct {
-		DistTags map[string]string `json:"dist-tags"`
+	for _, a := range rel.Assets {
+		if a.Name == "sha256sums.txt" {
+			return a.DownloadURL, nil
+		}
 	}
-	if err := json.Unmarshal(body, &doc); err != nil {
-		return "", fmt.Errorf("parse npm packument: %w", err)
-	}
-	if v := doc.DistTags[npmChannel]; v != "" {
-		return v, nil
-	}
-	if v := doc.DistTags["latest"]; v != "" {
-		return v, nil
-	}
-	return "", fmt.Errorf("no published version found for @yeshwanthyk/pican")
+	return "", nil
 }
 
-// fetchChangelog tries the version-specific GitHub release first, then the
-// generic "latest release". Failures are non-fatal — an empty changelog just
-// means the UI shows the update without release notes.
-func (c *Checker) fetchChangelog(ctx context.Context, version string) (body, url string) {
-	tag := "v" + strings.TrimPrefix(version, "v")
-	if rel, err := c.fetchRelease(ctx, c.githubAPI+"/releases/tags/"+tag); err == nil {
-		return rel.Body, rel.HTMLURL
+// latestRelease returns the cached release when available, otherwise a fresh
+// API fetch (cached on success).
+func (c *Checker) latestRelease(ctx context.Context) (Release, error) {
+	c.mu.RLock()
+	cached := c.release
+	c.mu.RUnlock()
+	if cached != nil {
+		return *cached, nil
 	}
-	if rel, err := c.fetchRelease(ctx, c.githubAPI+"/releases/latest"); err == nil {
-		return rel.Body, rel.HTMLURL
-	}
-	return "", ""
-}
-
-type githubRelease struct {
-	Body    string `json:"body"`
-	HTMLURL string `json:"html_url"`
-}
-
-func (c *Checker) fetchRelease(ctx context.Context, url string) (githubRelease, error) {
-	var rel githubRelease
-	body, err := c.get(ctx, url, githubToken())
+	rel, err := c.fetchLatestRelease(ctx)
 	if err != nil {
-		return rel, err
+		return Release{}, err
 	}
-	if err := json.Unmarshal(body, &rel); err != nil {
-		return rel, err
+	c.mu.Lock()
+	if c.release == nil {
+		c.release = &rel
 	}
+	rel = *c.release
+	c.mu.Unlock()
 	return rel, nil
 }
 
-func (c *Checker) get(ctx context.Context, url, bearer string) ([]byte, error) {
+// assetNameForPlatform matches the installers: install.sh downloads
+// pican-<os>-<arch> for darwin/linux, install.ps1 downloads
+// pican-windows-<arch>.exe for windows.
+func assetNameForPlatform(platform string) string {
+	if strings.HasPrefix(platform, "windows-") {
+		return "pican-" + platform + ".exe"
+	}
+	return "pican-" + platform
+}
+
+// fetchLatestRelease reads the newest published release from the GitHub
+// Releases API. 404 means the repository has no release yet; the 403/429 rate
+// limit case suggests setting GITHUB_TOKEN. The release body doubles as the
+// changelog.
+func (c *Checker) fetchLatestRelease(ctx context.Context) (Release, error) {
+	url := c.githubAPI + "/releases/latest"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return Release{}, err
 	}
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "pican-updater")
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
+	if token := githubToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
+
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return Release{}, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return nil, err
+		return Release{}, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return Release{}, fmt.Errorf("GitHub has no published release for Yeshwanthyk/pican yet (GET %s)", url)
+	case http.StatusForbidden, http.StatusTooManyRequests:
+		return Release{}, fmt.Errorf("GitHub API rate limit exceeded (GET %s); set GITHUB_TOKEN to raise the limit", url)
+	default:
+		return Release{}, fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
 	}
-	return body, nil
+
+	var doc struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Body    string `json:"body"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return Release{}, fmt.Errorf("parse GitHub release response: %w", err)
+	}
+	if doc.TagName == "" {
+		return Release{}, fmt.Errorf("GitHub release response is missing tag_name (GET %s)", url)
+	}
+	rel := Release{Tag: doc.TagName, HTMLURL: doc.HTMLURL, Body: doc.Body}
+	for _, a := range doc.Assets {
+		rel.Assets = append(rel.Assets, Asset{Name: a.Name, DownloadURL: a.BrowserDownloadURL})
+	}
+	return rel, nil
 }
 
 func githubToken() string {

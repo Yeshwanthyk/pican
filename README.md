@@ -19,21 +19,18 @@ One server can select any registered runtime combination. It keeps native state 
 
 ## Install
 
-Install as a Pi package:
-
-```bash
-pi install npm:@yeshwanthyk/pican@beta
-```
-
-The package installs the `pican` binary, configures auto-start, and registers `/web`, `/pican`, `/remote`, and `/refresh`.
-
-Or install the latest standalone release:
+Install the latest release from [GitHub Releases](https://github.com/Yeshwanthyk/pican/releases):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash
 ```
 
-See [the installation guide](user-docs/en/install.md) for manual downloads, Windows, service configuration, and remote access.
+The installer downloads the `pican-<os>-<arch>` binary matching your platform,
+installs it to `~/.pi/agent/bin/pican` (or `/usr/local/bin`), and configures
+auto-start on login.
+
+Or build from source with `make build`. See [the installation guide](user-docs/en/install.md)
+for manual downloads, Windows, service configuration, and remote access.
 
 ## Run
 
