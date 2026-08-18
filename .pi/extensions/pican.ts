@@ -18,11 +18,13 @@ import {
   constants as fsConstants,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
-  readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 
 interface PicanState {
@@ -223,7 +225,7 @@ async function startPican(pi: ExtensionAPI): Promise<void> {
     const launcher = windowsLauncher();
     if (!existsSync(launcher)) {
       throw new Error(
-        "pican launcher not found; reinstall with: pi install npm:@yeshwanthyk/pican@beta",
+        "pican launcher not found; install with: curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash",
       );
     }
     await pi.exec("wscript.exe", [launcher]);
@@ -381,19 +383,164 @@ export function withToken(url: string): string {
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
-export function cleanupPicanNpmTemps(agentRoot = agentDir()): number {
-  const scopeDir = join(agentRoot, "npm", "node_modules", "@yeshwanthyk");
-  let removed = 0;
-  try {
-    for (const name of readdirSync(scopeDir)) {
-      if (!name.startsWith(".pican-")) continue;
-      rmSync(join(scopeDir, name), { recursive: true, force: true });
-      removed++;
-    }
-  } catch {
-    // Package directory may not exist yet; nothing to clean.
+// ── GitHub Releases update ─────────────────────────────────────────
+// `/pican update` downloads the latest release binary directly from GitHub
+// Releases — the npm package no longer ships binaries. Parity with
+// internal/app/update.go and install.sh: the same asset naming
+// (pican-<os>-<arch>, .exe on Windows) and the same sha256sums.txt
+// verification policy (verify when present, fail closed on mismatch, warn
+// and proceed when the checksum asset is absent).
+
+const PICAN_RELEASE_BASE =
+  "https://github.com/Yeshwanthyk/pican/releases/latest/download";
+
+export function picanAssetName(
+  platform: string = process.platform,
+  arch: string = process.arch,
+): string {
+  let os: string;
+  switch (platform) {
+    case "darwin":
+      os = "darwin";
+      break;
+    case "linux":
+      os = "linux";
+      break;
+    case "win32":
+      os = "windows";
+      break;
+    default:
+      throw new Error(`pican update does not support platform ${platform}`);
   }
-  return removed;
+  let cpu: string;
+  switch (arch) {
+    case "x64":
+      cpu = "amd64";
+      break;
+    case "arm64":
+      cpu = "arm64";
+      break;
+    default:
+      throw new Error(`pican update does not support architecture ${arch}`);
+  }
+  const suffix = os === "windows" ? ".exe" : "";
+  return `pican-${os}-${cpu}${suffix}`;
+}
+
+export function picanReleaseDownloadUrl(assetName: string): string {
+  return `${PICAN_RELEASE_BASE}/${assetName}`;
+}
+
+export function picanReleaseChecksumsUrl(): string {
+  return `${PICAN_RELEASE_BASE}/sha256sums.txt`;
+}
+
+// checksumForAsset finds the expected sha256 hex digest for assetName in
+// standard sha256sum output (hash + filename per line, either column order,
+// optional ./ or * name prefixes). A missing entry is an error (fail closed),
+// mirroring internal/app/update.go.
+export function checksumForAsset(sums: string, assetName: string): string {
+  for (const raw of sums.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const fields = line.split(/\s+/);
+    if (fields.length !== 2) continue;
+    let hash: string;
+    let name: string;
+    if (fields[0].length === 64) {
+      hash = fields[0];
+      name = fields[1];
+    } else if (fields[1].length === 64) {
+      hash = fields[1];
+      name = fields[0];
+    } else {
+      continue;
+    }
+    name = name.replace(/^\.\//, "").replace(/^\*/, "");
+    if (name === assetName) return hash.toLowerCase();
+  }
+  throw new Error(`sha256sums.txt has no entry for ${assetName}`);
+}
+
+export function sha256OfFile(path: string): string {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+export interface PicanUpdateResult {
+  assetName: string;
+  checksumVerified: boolean;
+}
+
+export interface PicanUpdateOptions {
+  platform?: string;
+  arch?: string;
+  assetName?: string;
+  // download overrides the network step (tests inject a fake; defaults to curl).
+  download?: (url: string, dest: string) => Promise<void>;
+}
+
+const RELEASE_DOWNLOAD_TIMEOUT_MS = 300_000;
+
+// updatePicanFromRelease downloads the latest pican release for the current
+// platform into a temp file next to binPath, verifies its sha256 checksum when
+// the release ships sha256sums.txt (failing closed on mismatch), then
+// atomically replaces binPath. Returns the installed asset name.
+export async function updatePicanFromRelease(
+  pi: ExtensionAPI,
+  binPath: string,
+  opts: PicanUpdateOptions = {},
+): Promise<PicanUpdateResult> {
+  const assetName =
+    opts.assetName ?? picanAssetName(opts.platform, opts.arch);
+  const download =
+    opts.download ??
+    ((url: string, dest: string) =>
+      pi
+        .exec("curl", ["-fsSL", "-o", dest, url], {
+          timeout: RELEASE_DOWNLOAD_TIMEOUT_MS,
+        })
+        .then(() => {}));
+
+  // Stage the download next to the binary so the final rename is a pure
+  // rename(2) on the same filesystem (like internal/app/update.go).
+  const dir = dirname(binPath);
+  const tmpDir = mkdtempSync(join(dir, ".pican-update-"));
+  const tmpBin = join(tmpDir, assetName);
+  try {
+    await download(picanReleaseDownloadUrl(assetName), tmpBin);
+    chmodSync(tmpBin, 0o755);
+
+    // Verify the checksum when the release includes sha256sums.txt; a failed
+    // fetch (e.g. the asset 404s) means no checksums — proceed with a warning,
+    // parity with the in-app updater.
+    let sums: string | null = null;
+    try {
+      const res = await pi.exec("curl", ["-fsSL", picanReleaseChecksumsUrl()], {
+        timeout: RELEASE_DOWNLOAD_TIMEOUT_MS,
+      });
+      sums = res.stdout;
+    } catch {
+      sums = null;
+    }
+
+    let checksumVerified = false;
+    if (sums !== null) {
+      const want = checksumForAsset(sums, assetName); // throws if no entry → fail closed
+      const got = sha256OfFile(tmpBin);
+      if (want !== got) {
+        throw new Error(
+          `sha256 mismatch for ${assetName}: want ${want}, got ${got}`,
+        );
+      }
+      checksumVerified = true;
+    }
+
+    // Atomic replace: rename(2) over the running executable works on Unix.
+    renameSync(tmpBin, binPath);
+    return { assetName, checksumVerified };
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 export function normalizeCommandArgs(args: unknown): string[] {
@@ -755,7 +902,7 @@ export default function (pi: ExtensionAPI) {
   // registers a title tool or input handler.
 
   // Start pican opportunistically when the extension loads so /remote works on a
-  // fresh shell after `pi install npm:@yeshwanthyk/pican@beta`.
+  // fresh shell after installing pican via the extension or the standalone installer.
   void detectHostPort(pi)
     .then((detected) => {
       if (!detected) return;
@@ -919,29 +1066,34 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (subcommand === "update") {
-        try {
-          const cleaned = cleanupPicanNpmTemps();
+        if (!bin) {
           ctx.ui.notify(
-            cleaned > 0
-              ? `Cleaned ${cleaned} stale npm temp dir(s). Updating pican package...`
-              : "Updating pican package...",
-            "info",
+            "pican binary not found. Install it with:\ncurl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash",
+            "error",
           );
-          await pi.exec("pi", ["install", "npm:@yeshwanthyk/pican@beta"]);
+          return;
+        }
+        try {
+          ctx.ui.notify("Downloading latest pican release...", "info");
+          const { assetName, checksumVerified } =
+            await updatePicanFromRelease(pi, bin);
           try {
             await restartPican(pi);
           } catch {
-            // Package update may still have succeeded even if the service is not installed/running.
+            // Binary update may still have succeeded even if the service is not installed/running.
           }
+          const note = checksumVerified
+            ? "checksum verified"
+            : "WARNING: sha256sums.txt not found, checksum skipped";
           ctx.ui.notify(
-            "pican updated. Reloading pi extensions...",
-            "success",
+            `pican updated to latest release (${assetName}, ${note}). Reloading pi extensions...`,
+            checksumVerified ? "success" : "warning",
           );
           await ctx.reload();
           return;
         } catch (err) {
           ctx.ui.notify(
-            `Failed to update pican: ${err}\nTry: rm -rf ~/.pi/agent/npm/node_modules/@yeshwanthyk/.pican-* && pi install npm:@yeshwanthyk/pican@beta`,
+            `Failed to update pican: ${err}\nInstall with: curl -fsSL https://raw.githubusercontent.com/Yeshwanthyk/pican/main/install.sh | bash`,
             "error",
           );
         }
