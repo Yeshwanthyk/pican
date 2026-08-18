@@ -26,3 +26,4 @@ website/.vitepress/locales.generated.json
 
 # External source references belong outside this repository.
 opensrc/
+/dist-release/
